@@ -54,18 +54,24 @@ Thumbs.db
 logs/
 bot.log
 
-# Data files (sensitive data)
+# Data files (sensitive user data - DO NOT COMMIT)
 data/users.json
 data/chat_settings.json
 data/ptb_persistence.pickle
 data/chats/
 data/global/users.json
+data/global/chats_index.json
 data/statistics/
 data/questions_backup/
 data/backups/
 data/active_quizzes.json
-data/system/messages_to_delete.json
+data/bot_mode.json
+data/bot_status.json
+data/system/
+data/media/
+data/photo_quiz_metadata.json
 # data/images/ - оставляем, нужны для фото-квизов
+# data/questions/ - оставляем, это контент викторин
 
 # Test files
 test.py

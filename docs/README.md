@@ -1,6 +1,10 @@
 # 🚀 Morning Quiz Bot
 
-**Интеллектуальный Telegram-бот для проведения викторин с системой достижений и статистики**
+**Интеллектуальный Telegram-бот для проведения викторин с системой достижений, статистики и веб-панелью управления**
+
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-26A5E4.svg)](https://core.telegram.org/bots)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](../LICENSE)
 
 ## ✨ Основные возможности
 
@@ -11,6 +15,9 @@
 - ⚙️ **Гибкие настройки** для каждого чата
 - 🛡️ **Защита от накрутки** с ежедневным сбросом
 - 📱 **Уведомления в личные сообщения** о достижениях
+- 🌐 **Веб-панель управления** с CRUD операциями
+- 📸 **Фото-викторины** (в разработке)
+- 🤖 **AI-интеграция** для генерации вопросов (OpenRouter, Anthropic API)
 
 ## 🎯 Текущий статус
 
@@ -19,6 +26,7 @@
 - **Система ачивок**: Исправлено дублирование, спам, корректная отправка
 - **Статистика категорий**: Сохраняется и загружается без потерь
 - **Все команды**: Функционируют корректно
+- **Веб-панель**: Полностью функциональна
 - **Архитектура**: Стабильна и готова к расширению
 
 ### 🔧 **Недавно исправлено**
@@ -32,19 +40,45 @@
 
 ## 📁 Структура проекта
 
-- `bot.py` - Основная логика бота
-- `data/` - Данные бота (пользователи, настройки, вопросы)
-- `handlers/` - Обработчики команд и событий
-- `modules/` - Основные модули (менеджеры, утилиты)
-- `scripts/` - Вспомогательные скрипты (конвертация изображений и др.)
-- `config/` - Конфигурационные файлы
-- `docs/` - Документация проекта
+```
+morning-quiz-bot/
+├── bot.py                 # Главный файл бота (entry point)
+├── main.py                # Альтернативная точка входа
+├── app_config.py          # Конфигурация приложения
+├── data_manager.py        # Центральное управление данными
+├── state.py               # Управление состоянием (BotState, QuizState)
+├── utils.py               # Вспомогательные утилиты
+├── backup_manager.py      # Система резервного копирования
+├── handlers/              # Обработчики команд и событий
+│   ├── quiz/             # Quiz-обработчики
+│   ├── backup_handlers.py
+│   ├── config_handlers.py
+│   └── ...
+├── modules/               # Основные модули
+│   ├── quiz_engine.py    # Движок викторин
+│   ├── score_manager.py  # Система очков и достижений
+│   ├── category_manager.py
+│   └── ...
+├── web/                   # Веб-панель управления (FastAPI)
+│   ├── main.py
+│   ├── static/
+│   └── templates/
+├── data/                  # Данные бота
+│   ├── questions/        # Вопросы по категориям
+│   ├── images/           # Изображения для фото-викторин
+│   └── system/           # Системные файлы
+├── config/                # Конфигурационные файлы
+├── docs/                  # Документация проекта
+├── scripts/               # Вспомогательные скрипты
+├── tests/                 # Тесты
+└── sys/                   # Системные скрипты развертывания
+```
 
 ## 🚀 Быстрый старт
 
 ### 1. Установка
 ```bash
-git clone <repository>
+git clone https://github.com/WeLizard/morning-quiz-bot.git
 cd morning-quiz-bot
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
@@ -59,74 +93,123 @@ cp env.example .env
 # Отредактируйте .env файл с вашими настройками
 ```
 
+**Необходимые переменные окружения:**
+```env
+BOT_TOKEN=your_telegram_bot_token_here
+LOG_LEVEL=INFO
+```
+
 ### 3. Запуск
 ```bash
+# Запуск бота
 python bot.py
+
+# Запуск веб-панели (опционально)
+python web/run_web.py
+```
+
+### 🐳 Docker
+```bash
+docker-compose up -d
 ```
 
 ## 📚 Документация
 
 ### 🗺️ **Карты и схемы**
-- [**APPLICATION_MAP.md**](APPLICATION_MAP.md) - Карта активных файлов и модулей
-- [**MENU_NAVIGATION_MAP.md**](MENU_NAVIGATION_MAP.md) - Навигация по меню и командам
-- [**DATA_STRUCTURE_OVERVIEW.md**](DATA_STRUCTURE_OVERVIEW.md) - Структура данных
+- [**APPLICATION_MAP.md**](APPLICATION_MAP.md) — Карта активных файлов и модулей
+- [**MENU_NAVIGATION_MAP.md**](MENU_NAVIGATION_MAP.md) — Навигация по меню и командам
+- [**DATA_STRUCTURE_OVERVIEW.md**](DATA_STRUCTURE_OVERVIEW.md) — Структура данных
 
 ### 📖 **Руководства**
-- [**QUICK_START.md**](QUICK_START.md) - Быстрый старт для разработчиков
-- [**ADMIN_SETUP.md**](ADMIN_SETUP.md) - Настройка для администраторов
-- [**DEPLOYMENT.md**](DEPLOYMENT.md) - Развертывание на сервере
+- [**QUICK_START.md**](QUICK_START.md) — Быстрый старт для разработчиков
+- [**ADMIN_SETUP.md**](ADMIN_SETUP.md) — Настройка для администраторов
+- [**DEPLOYMENT.md**](DEPLOYMENT.md) — Развертывание на сервере
+- [**BOT_STATUS_FIX.md**](BOT_STATUS_FIX.md) — Исправление статуса бота
+- [**WEB_PANEL_SYSTEM_CONTROL.md**](WEB_PANEL_SYSTEM_CONTROL.md) — Управление системой через веб-панель
 
 ### 🔧 **Техническая документация**
-- [**PROJECT_OVERVIEW.md**](PROJECT_OVERVIEW.md) - Обзор архитектуры
-- [**COMMANDS_REFERENCE.md**](COMMANDS_REFERENCE.md) - Справочник команд
-- [**LOGGING_SYSTEM.md**](LOGGING_SYSTEM.md) - Система логирования
+- [**PROJECT_OVERVIEW.md**](PROJECT_OVERVIEW.md) — Обзор архитектуры
+- [**COMMANDS_REFERENCE.md**](COMMANDS_REFERENCE.md) — Справочник команд
+- [**LOGGING_SYSTEM.md**](LOGGING_SYSTEM.md) — Система логирования
+- [**ACHIEVEMENTS_DISPLAY.md**](ACHIEVEMENTS_DISPLAY.md) — Система достижений
+- [**BOT_PERMISSIONS.md**](BOT_PERMISSIONS.md) — Права доступа бота
+
+### 🔍 **Дополнительно**
+- [**CHANGELOG.md**](CHANGELOG.md) — История изменений
+- [**TROUBLESHOOTING.md**](TROUBLESHOOTING.md) — Решение проблем
+- [**DEVELOPER_NOTIFICATIONS.md**](DEVELOPER_NOTIFICATIONS.md) — Уведомления разработчика
+- [**HA_WOL_CONFIG.md**](HA_WOL_CONFIG.md) — Настройка Home Assistant WOL
+- [**SUDO_SETUP.md**](SUDO_SETUP.md) — Настройка sudo
+
+## 🛠 Технологии
+
+- **Python 3.8+** — основной язык
+- **python-telegram-bot 22.4+** — Telegram Bot API
+- **FastAPI** — веб-панель управления
+- **APScheduler** — планировщик задач
+- **aiohttp** — асинхронные HTTP-запросы
+- **Pillow** — обработка изображений
+- **Docker & Docker Compose** — контейнеризация
+
+## 🤖 AI-интеграция
+
+Бот поддерживает несколько AI-провайдеров для генерации вопросов и викторин:
+
+- **OpenRouter API** — доступ к различным моделям (Qwen, GPT, и др.)
+- **Anthropic API** — модели Claude
+- **Puter.js** — бесплатный доступ к AI-моделям (с ограничениями)
 
 ## 🎮 Команды бота
 
 ### 🚀 **Основные**
-- `/start` - Начать работу с ботом
-- `/help` - Справка по командам
-- `/quiz` - Запустить викторину
+- `/start` — Начать работу с ботом
+- `/help` — Справка по командам
+- `/quiz` — Запустить викторину
+- `/categories` — Список категорий с статистикой
 
 ### 📊 **Статистика**
-- `/mystats` - Ваша личная статистика
-- `/top` - Рейтинг в текущем чате
-- `/globaltop` - Глобальный рейтинг
-- `/chat_stats` - Статистика чата
-- `/categories` - Список категорий с статистикой
+- `/mystats` — Ваша личная статистика
+- `/top` — Рейтинг в текущем чате
+- `/globaltop` — Глобальный рейтинг
+- `/chat_stats` — Статистика чата
 
 ### ⚙️ **Административные**
-- `/admin_settings` - Настройки чата
-- `/view_chat_config` - Просмотр конфигурации
-- `/adddailyquiz` - Добавить ежедневную викторину
+- `/admin_settings` — Настройки чата
+- `/view_chat_config` — Просмотр конфигурации
+- `/adddailyquiz` — Добавить ежедневную викторину
+
+### 📸 **Фото-викторины** (в разработке)
+- `/photoquiz` — Запустить фото-викторину
 
 ## 🏗️ Архитектура
 
-### 📁 **Структура проекта**
+### 🔄 **Основные модули**
+- **`DataManager`** — Центральное управление всеми данными (персистентность в JSON)
+- **`ScoreManager`** — Система очков, достижений и серий правильных ответов
+- **`CategoryManager`** — Управление категориями, весами и статистикой использования
+- **`QuizEngine`** — Движок викторин с rate limiting (25 req/sec, 18 req/min)
+- **`BotState`** — Глобальное состояние бота (in-memory)
+- **`QuizState`** — Состояние активной викторины (per-chat)
+
+### 📊 **Поток данных**
 ```
-morning-quiz-bot/
-├── bot.py                 # Главный файл бота
-├── app_config.py          # Конфигурация приложения
-├── data_manager.py        # Управление данными
-├── state.py              # Управление состоянием
-├── handlers/             # Обработчики команд
-├── modules/              # Основные модули
-├── data/                 # Данные и настройки
-└── docs/                 # Документация
+Telegram → PTB Application → Handlers → Managers → DataManager → JSON files
+                          ↓
+                     BotState (in-memory)
 ```
 
-### 🔄 **Основные модули**
-- **`DataManager`** - Центральное управление всеми данными
-- **`ScoreManager`** - Система очков и достижений
-- **`CategoryManager`** - Управление категориями и статистикой
-- **`QuizEngine`** - Движок викторин
+### 🔑 **Ключевые решения**
+- **60-секундный таймаут Telegram API** — для работы через РФ→EU маршрутизацию
+- **Двойное отслеживание состояния** — In-memory QuizState + персистентность в JSON
+- **Изоляция по чатам** — каждый чат имеет независимые настройки, статистику, категории
+- **Timezone Europe/Moscow** — все планировщики используют московское время
 
 ## 🎯 Система достижений
 
 ### 🌟 **Типы ачивок**
-1. **Мотивационные сообщения** - по глобальным очкам (10, 25, 50, 100...)
-2. **Чатовые ачивки** - по очкам в конкретном чате (15, 30, 75, 125...)
-3. **Серии правильных ответов** - за подряд правильные ответы (3, 5, 10, 15...)
+1. **Мотивационные сообщения** — по глобальным очкам (10, 25, 50, 100...)
+2. **Чатовые ачивки** — по очкам в конкретном чате (15, 30, 75, 125...)
+3. **Серии правильных ответов** — за подряд правильные ответы (3, 5, 10, 15...)
 
 ### 🎨 **Логика работы**
 - **В групповом чате**: Ачивка приходит в группу + в ЛС пользователя
@@ -142,31 +225,52 @@ docker-compose up -d
 
 ### 🐧 **Linux Service**
 ```bash
-sudo systemctl start quiz-bot
+# Установка сервиса
+sudo cp quiz-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl enable quiz-bot
+sudo systemctl start quiz-bot
+
+# Проверка статуса
+sudo systemctl status quiz-bot
 ```
 
 ### 📋 **Требования**
 - Python 3.8+
-- PostgreSQL (опционально)
-- Redis (опционально)
+- Telegram Bot Token
+- 100MB свободного места
+- Подключение к интернету
+
+### 🔧 **Опционально**
+- PostgreSQL (для продакшена)
+- Redis (для кеширования)
+- Nginx (для веб-панели)
 
 ## 🤝 Вклад в проект
 
 1. Форкните репозиторий
-2. Создайте ветку для новой функции
+2. Создайте ветку для новой функции (`git checkout -b feature/amazing-feature`)
 3. Внесите изменения
-4. Создайте Pull Request
+4. Закоммитьте (`git commit -m 'Add amazing feature'`)
+5. Запушьте (`git push origin feature/amazing-feature`)
+6. Создайте Pull Request
+
+### 📝 **Правила кода**
+- Следуйте PEP 8
+- Добавляйте type hints
+- Пишите осмысленные комментарии
+- Тестируйте изменения локально
 
 ## 📄 Лицензия
 
-MIT License - см. файл [LICENSE](LICENSE)
+MIT License — см. файл [LICENSE](../LICENSE)
 
 ## 🆘 Поддержка
 
 - **Документация**: [docs/](docs/)
 - **Проблемы**: [Issues](../../issues)
 - **Обсуждения**: [Discussions](../../discussions)
+- **Email**: support@example.com
 
 ---
 
@@ -177,16 +281,18 @@ MIT License - см. файл [LICENSE](LICENSE)
 - ✅ Все критические ошибки исправлены
 - ✅ Система ачивок работает корректно
 - ✅ Статистика сохраняется без потерь
+- ✅ Веб-панель полностью функциональна
 - ✅ Архитектура готова к новым возможностям
 
 **Следующий этап: Реализация фото-викторины! 📸**
 
-### 🖼️ **Фото-викторина - В процессе**
+### 🖼️ **Фото-викторина — В процессе**
 - ✅ **Конвертация изображений**: Все PNG/JPG файлы конвертированы в WebP (экономия ~200MB)
 - ✅ **Оптимизация**: 159 WebP изображений готовы для использования
 - 🔄 **В разработке**: Логика фото-викторины, интерфейс, система вопросов
 
 ---
 
-*Последнее обновление: 26.08.2025*
-*Версия: 2.0.0 (Стабильная)*
+*Последнее обновление: 26 февраля 2026*  
+*Версия: 2.0.0 (Стабильная)*  
+*GitHub: [@WeLizard](https://github.com/WeLizard/morning-quiz-bot)*

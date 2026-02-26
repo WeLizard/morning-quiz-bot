@@ -90,12 +90,18 @@ ARCHITECTURE/
 tatus*
 *new data structure*
 
-# AI/Neural networks related
+# AI/IDE assistance (do not commit AI chat files)
 AVATARS/
 .claude/
+.qwen/
+.cursor/
+CLAUDE.md
 modules/openrouter_client.py
 
-# System configuration files
+# Local/temporary files
+local_files.txt
+
+# System configuration files (deployment-specific)
 *.service
 *.conf
 nginx-*.conf

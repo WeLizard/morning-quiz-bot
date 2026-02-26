@@ -102,10 +102,12 @@ AVATARS/
 .qwen/
 .cursor/
 CLAUDE.md
+.replit
 modules/openrouter_client.py
 
 # Local/temporary files
 local_files.txt
+*.bat
 
 # System configuration files (deployment-specific)
 *.service

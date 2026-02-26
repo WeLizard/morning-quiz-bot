@@ -5,7 +5,7 @@
 ### 1. Автоматическое развертывание
 ```bash
 # Скачайте и запустите скрипт развертывания
-wget https://raw.githubusercontent.com/lizardjazz1/morning-quiz-bot/main/deploy.sh
+wget https://raw.githubusercontent.com/WeLizard/morning-quiz-bot/main/deploy.sh
 chmod +x deploy.sh
 sudo ./deploy.sh
 ```
@@ -32,7 +32,7 @@ sudo systemctl status quiz-bot
 
 ### 1. Клонирование и настройка
 ```bash
-git clone https://github.com/lizardjazz1/morning-quiz-bot.git
+git clone https://github.com/WeLizard/morning-quiz-bot.git
 cd morning-quiz-bot
 cp env.example .env
 nano .env  # Укажите ваш BOT_TOKEN
@@ -76,7 +76,7 @@ docker-compose pull && docker-compose up -d
 
 - 📖 [Полная документация](README.md)
 - 🚀 [Инструкции по развертыванию](DEPLOYMENT.md)
-- 🐛 [Создать Issue](https://github.com/lizardjazz1/morning-quiz-bot/issues)
+- 🐛 [Создать Issue](https://github.com/WeLizard/morning-quiz-bot/issues)
 
 ## ✅ Проверка работы
 

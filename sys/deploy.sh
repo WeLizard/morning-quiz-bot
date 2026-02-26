@@ -101,7 +101,7 @@ clone_repository() {
         git pull origin main
     else
         cd "$(dirname "$INSTALL_PATH")"
-        git clone https://github.com/lizardjazz1/morning-quiz-bot.git "$(basename "$INSTALL_PATH")"
+        git clone https://github.com/WeLizard/morning-quiz-bot.git "$(basename "$INSTALL_PATH")"
     fi
     
     # Установка прав доступа

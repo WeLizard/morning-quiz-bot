@@ -266,7 +266,7 @@
                     if (pending) { const receipt = data.requests.find(r => r.id === pending.request_id); if (receipt && !['pending', 'running'].includes(receipt.status)) { busy = false; starting = false; pending = null; notice.textContent = receipt.error || receipt.notice || ''; } }
                     if (renderPage) render();
                 } catch (error) { if (active) { status.textContent = error.message; stage.querySelectorAll('button').forEach(b => { b.disabled = true; }); lastHash = ''; } }
-                finally { if (active) timer = setTimeout(refresh, busy ? 500 : document.hidden ? 10000 : 2000); }
+                finally { if (active) timer = setTimeout(refresh, document.hidden ? 10000 : busy ? 1000 : 2000); }
             }
             async function sendDirect(questionId, selectedOption, internalRound) {
                 if (!active || busy) return;

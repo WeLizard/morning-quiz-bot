@@ -363,6 +363,25 @@ def test_chat_details_expose_personal_statistics_for_that_chat(pg_env):
     asyncio.run(run())
 
 
+def test_ingress_limits_keep_room_for_game_polling_and_login():
+    """Раздельные ведра: игровой опрос, обычные запросы и вход не мешают друг другу."""
+    moments = [1000.0]
+    limits = RequestLimits(clock=lambda: moments[0])
+    client = '127.0.0.1'
+    # Игровой опрос: 600/мин на клиента, 601-й отклоняется.
+    assert all(limits.allow(client, frequent_read=True) for _ in range(600))
+    assert not limits.allow(client, frequent_read=True)
+    # Обычные запросы — своё ведро 120/мин, игровой опрос его не расходует.
+    assert all(limits.allow(client) for _ in range(120))
+    assert not limits.allow(client)
+    # Вход — отдельное узкое ведро 10/мин.
+    assert all(limits.allow(client, auth=True) for _ in range(10))
+    assert not limits.allow(client, auth=True)
+    # Через минуту лимиты освобождаются.
+    moments[0] += 61
+    assert limits.allow(client, frequent_read=True) and limits.allow(client) and limits.allow(client, auth=True)
+
+
 def test_concurrent_login_replay_creates_one_session(pg_env):
     async def run():
         async with environment(pg_env) as env:

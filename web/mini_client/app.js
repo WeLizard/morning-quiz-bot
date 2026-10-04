@@ -45,6 +45,9 @@
         clearTimeout(renewTimer);
         if (!state.token) return;
         renewTimer = setTimeout(renewSession, RENEW_AFTER_MS);
+        // В браузере это число, в Node — объект таймера: unref не даёт таймеру
+        // держать event loop в юнит-тестах.
+        renewTimer?.unref?.();
     }
     async function renewSession() {
         if (!state.token) return;
@@ -339,6 +342,16 @@
         modeCard(cards, 'Классический квиз', `${details.classic.questions} вопросов · ${details.classic.seconds} секунд на ответ. Категории, анонс и паузы настраиваются в чате.`, '/quiz', games.items.find(g => g.kind === 'classic'));
         modeCard(cards, 'Фото-загадки', 'Узнай, что на картинке. Пиши ответ в чат, используй подсказки и получай бонус за скорость.', '/photo_quiz', games.items.find(g => g.kind === 'photo'));
         content.append(cards);
+        if (details.me) {
+            const stats = el('article', undefined, 'card'); stats.append(el('h2', 'Твоя статистика в этом чате'));
+            const accuracy = details.me.accuracy === null || details.me.accuracy === undefined ? '—' : `${details.me.accuracy}%`;
+            note(stats, `Очков: ${details.me.score} · место ${details.me.rank} из ${details.me.members}`);
+            note(stats, `Ответов: ${details.me.answered}, правильных: ${details.me.correct} (${accuracy})`);
+            note(stats, `Серия сейчас: ${details.me.streak}, рекорд: ${details.me.best_streak}`);
+            note(stats, `Достижения чата: ${details.me.achievements_earned} из ${details.me.achievements_available}`);
+            if (details.me.last_answer_at) note(stats, `Последний ответ: ${new Date(details.me.last_answer_at).toLocaleString('ru-RU')}`);
+            content.append(stats);
+        }
         if (details.telegram_url) {
             const link = el('a', 'Открыть этот чат в Telegram'); link.href = details.telegram_url;
             link.addEventListener('click', event => { if (tg?.openTelegramLink) { event.preventDefault(); tg.openTelegramLink(details.telegram_url); } }); content.append(link);

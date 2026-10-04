@@ -424,17 +424,34 @@ class MiniAppStore:
 
     async def chat_details(self, token, chat_id):
         async with self.authorized(token) as (session, user):
-            await self.require_chat(session, user.id, chat_id)
-            chat = await session.get(Chat, chat_id)
+            chat, member = await self.require_chat(session, user.id, chat_id)
             settings = chat.settings or {}
             daily = settings.get('daily_quiz') or {}
             wisdom = settings.get('daily_wisdom') or {}
             current = settings.get('quiz') or {}
             from modules.quiz_preferences import category_preferences
             category_mode, category_pool, random_count = category_preferences(settings)
+            # Личная статистика именно в этом чате: место, точность, серии и достижения.
+            answered = int(member.answered_count or 0)
+            correct = int(member.correct_answers_count or 0)
+            better = await session.scalar(select(func.count()).select_from(ChatMember).where(
+                ChatMember.chat_id == chat_id, ChatMember.score > member.score))
+            members_total = await session.scalar(select(func.count()).select_from(ChatMember).where(
+                ChatMember.chat_id == chat_id))
+            earned = await session.scalar(select(func.count()).select_from(AchievementGrant).where(
+                AchievementGrant.user_id == user.id, AchievementGrant.chat_id == chat_id))
             return {'chat_id': str(chat.id), 'title': chat.title or 'Чат',
                 'settings_revision': chat.settings_revision, 'can_edit': chat.id == user.id,
                 'telegram_url': f'https://t.me/{chat.username}' if chat.username and re.fullmatch(r'[A-Za-z0-9_]{5,32}', chat.username) else None,
+                'me': {'score': str(member.score), 'answered': answered, 'correct': correct,
+                       'accuracy': round(100 * correct / answered, 1) if answered else None,
+                       'streak': int(member.consecutive_correct or 0),
+                       'best_streak': int(member.max_consecutive_correct or 0),
+                       'rank': int(better or 0) + 1, 'members': int(members_total or 0),
+                       'achievements_earned': int(earned or 0),
+                       'achievements_available': len(self.chat_achievements),
+                       'first_answer_at': member.first_answer_at.isoformat() if member.first_answer_at else None,
+                       'last_answer_at': member.last_answer_at.isoformat() if member.last_answer_at else None},
                 'daily': {key: daily.get(key) for key in ('enabled', 'times_msk', 'timezone', 'num_questions',
                     'interval_seconds', 'poll_open_seconds', 'categories_mode', 'specific_categories',
                     'num_random_categories')},

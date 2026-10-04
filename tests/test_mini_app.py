@@ -337,6 +337,32 @@ def test_history_projection_covers_games_answers_and_chat_totals(pg_env):
     asyncio.run(run())
 
 
+def test_chat_details_expose_personal_statistics_for_that_chat(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            async with env.db.transaction() as session:
+                member = await session.get(ChatMember, (CHAT, USER))
+                member.answered_count, member.correct_answers_count = 8, 6
+                member.consecutive_correct, member.max_consecutive_correct = 2, 5
+                session.add(AchievementGrant(user_id=USER, chat_id=CHAT,
+                                             code=f'chat_achievement_{CHAT}_{USER}_25'))
+                other = await session.get(ChatMember, (CHAT, USER + 1))
+                other.score = Decimal('99.000')
+                session.add(AchievementGrant(user_id=USER + 1, chat_id=CHAT,
+                                             code=f'chat_achievement_{CHAT}_{USER + 1}_25',
+                                             metadata_json={'secret': 'FOREIGN'}))
+            headers = await login(env)
+            details = (await env.client.get(f'/api/mini/chats/{CHAT}/details', headers=headers)).json()
+            me = details['me']
+            assert me['score'] == '12.250' and (me['answered'], me['correct']) == (8, 6)
+            assert me['accuracy'] == 75.0
+            assert (me['streak'], me['best_streak']) == (2, 5)
+            assert me['rank'] == 2 and me['members'] >= 2      # впереди игрок с 99 очками
+            assert me['achievements_earned'] == 1 and me['achievements_available'] > 0
+            assert 'FOREIGN' not in str(details)
+    asyncio.run(run())
+
+
 def test_concurrent_login_replay_creates_one_session(pg_env):
     async def run():
         async with environment(pg_env) as env:

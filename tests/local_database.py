@@ -26,7 +26,15 @@ async def isolated_database(url):
     database = Database(DatabaseSettings(url=url))
     async with database.engine.begin() as connection:
         await connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
-    database.engine = database.engine.execution_options(schema_translate_map={None: schema})
+    # Изоляция схемы: translate_map для Core/ORM и search_path для сырого SQL
+    # Alembic (ALTER TABLE без схемы), который через translate_map не проходит.
+    from sqlalchemy.ext.asyncio import create_async_engine
+    await database.engine.dispose()
+    isolated_engine = create_async_engine(
+        url,
+        connect_args={'server_settings': {'search_path': f'"{schema}",public'}},
+    )
+    database.engine = isolated_engine.execution_options(schema_translate_map={None: schema})
     database.session_factory = async_sessionmaker(database.engine, expire_on_commit=False, autoflush=False)
     try:
         async with database.engine.begin() as connection:

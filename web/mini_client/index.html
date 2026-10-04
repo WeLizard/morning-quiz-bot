@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#101317">
+  <meta name="description" content="Morning Quiz: играй в квиз и фото-загадки в приложении или Telegram. Общие правила и прогресс.">
+  <title>Morning Quiz · Игры и прогресс</title>
+  <link rel="stylesheet" href="/app/styles.css">
+  <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script defer src="/app/telegram-ui.js"></script>
+  <script defer src="/app/game-ui.js"></script>
+  <script defer src="/app/play-ui.js"></script>
+  <script defer src="/app/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar"><a class="brand" href="/app" aria-label="Morning Quiz — главная"><span class="mark" aria-hidden="true"><i></i></span><span><small>MORNING QUIZ</small><strong>Daily drop</strong></span></a></header>
+    <p id="environment" class="environment" hidden></p>
+    <main id="content" tabindex="-1" aria-live="polite"><p class="muted">Открываем Morning Quiz…</p></main>
+    <p id="feedback" role="status"></p>
+    <nav id="navigation" class="tabbar" aria-label="Разделы приложения" hidden>
+      <button type="button" data-page="home" aria-current="page">Игры</button>
+      <button type="button" data-page="chats">Чаты</button>
+      <button type="button" data-page="rating">Рейтинг</button>
+      <button type="button" data-page="profile">Профиль</button>
+    </nav>
+  </div>
+  <noscript>Для Mini App необходимо включить JavaScript. Обычный квиз по-прежнему доступен командами бота в чате.</noscript>
+</body>
+</html>

@@ -1,14 +1,22 @@
-# 🚀 Morning Quiz Bot
+# 🚀 Morning Quiz
 
-**Интеллектуальный Telegram-бот для проведения викторин с системой достижений, статистики и веб-панелью управления**
+> Единая навигация по актуальной документации, задачам и архитектурным решениям:
+> [docs/INDEX.md](INDEX.md). Правила обновления документов описаны в
+> [DOCUMENTATION_RULES.md](DOCUMENTATION_RULES.md).
+
+> **Важно:** этот README содержит исторические описания и местами расходится с
+> текущим runtime. Для планирования изменений используйте
+> [проверенную по коду карту функций](CODE_VERIFIED_FEATURE_MAP.md).
+
+**Игровое приложение с викторинами, прогрессом и несколькими интерфейсами: Telegram, Mini App и локальная панель управления.**
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-26A5E4.svg)](https://core.telegram.org/bots)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](../LICENSE)
+[![License](https://img.shields.io/badge/License-not%20declared-lightgrey.svg)](INDEX.md)
 
 ## ✨ Основные возможности
 
-- 🎯 **Интерактивные викторины** с вопросами из 28+ категорий
+- 🎯 **Интерактивные викторины** с вопросами из 63 категорий на момент проверки
 - 🏆 **Система достижений** (мотивационные сообщения, чатовые ачивки, серии правильных ответов)
 - 📊 **Детальная статистика** по пользователям, чатам и категориям
 - 🔄 **Автоматические ежедневные викторины** с настраиваемым расписанием
@@ -264,11 +272,11 @@ sudo systemctl status quiz-bot
 
 ## 📄 Лицензия
 
-MIT License — см. файл [LICENSE](../LICENSE)
+Лицензия проекта пока не зафиксирована отдельным файлом в репозитории.
 
 ## 🆘 Поддержка
 
-- **Документация**: [docs/](docs/)
+- **Документация**: [единый индекс](INDEX.md)
 - **Проблемы**: [Issues](../../issues)
 - **Обсуждения**: [Discussions](../../discussions)
 - **Email**: support@example.com

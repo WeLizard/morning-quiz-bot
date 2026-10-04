@@ -71,6 +71,33 @@ class MiniAppStore:
         return {'access_token': raw_token, 'token_type': 'Bearer', 'expires_in': 900,
                 'expires_at': expires.isoformat()}
 
+    async def renew_session(self, token, *, minutes=15):
+        """Продлевает текущую сессию тем же токеном, не создавая новый вход.
+
+        Сессия живёт 15 минут, а входов на пользователя разрешено не больше пяти за
+        тот же интервал, поэтому без продления активный игрок упирался бы в отказ.
+        Продление не считается новым входом и не расходует квоту.
+        """
+        digest = token_digest(token)
+        now = self.now()
+        async with self.database.transaction() as session:
+            await operation_fence(session)
+            row = await session.scalar(select(MiniAppSession).where(
+                MiniAppSession.token_hash == digest,
+                MiniAppSession.bot_key_id == self.bot_key_id,
+            ).with_for_update())
+            # Минутная поблажка согласована с очисткой просроченных сессий в create_session.
+            if row is None or row.revoked or row.expires_at <= now - timedelta(minutes=1):
+                raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.')
+            user = await session.get(User, row.user_id)
+            if user is None or user.bot_blocked or user.moderation_revision != row.user_revision:
+                raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.')
+            if self.allowed_user_ids is not None and user.id not in self.allowed_user_ids:
+                raise MiniAppError(403, 'Доступ к тестовому Mini App закрыт')
+            row.expires_at = now + timedelta(minutes=minutes)
+            expires = row.expires_at
+        return {'expires_in': minutes * 60, 'expires_at': expires.isoformat()}
+
     @asynccontextmanager
     async def authorized(self, token, *, write=False):
         digest = token_digest(token)

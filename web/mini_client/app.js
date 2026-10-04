@@ -39,6 +39,24 @@
             throw error;
         } finally { clearTimeout(timeout); }
     }
+    const RENEW_AFTER_MS = 10 * 60 * 1000;   // сессия живёт 15 минут, продлеваем заранее
+    let renewTimer = null;
+    function scheduleRenewal() {
+        clearTimeout(renewTimer);
+        if (!state.token) return;
+        renewTimer = setTimeout(renewSession, RENEW_AFTER_MS);
+    }
+    async function renewSession() {
+        if (!state.token) return;
+        try {
+            await request('/api/mini/session/renew', {method: 'POST'});
+            scheduleRenewal();
+        } catch (error) {
+            clearTimeout(renewTimer);
+            if (!state.token) loginScreen('Сессия истекла. Откройте Mini App из Telegram заново.');
+            else feedback.textContent = error.message;
+        }
+    }
     function configureTelegram() {
         window.QuizTelegram.configure(() => { if (state.token) navigate(state.page === 'settings' ? 'profile' : 'home'); },
             () => { if (state.token) navigate('settings'); }, () => { if (state.token) load(); });
@@ -57,6 +75,7 @@
                 try {
                     const session = await request(state.demo ? '/api/dev/session' : '/api/mini/session', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: state.demo ? '{}' : JSON.stringify({init_data: initData})});
                     state.token = session.access_token;
+                    scheduleRenewal();
                     await load();
                 } catch (error) { feedback.textContent = error.message; enter.disabled = false; }
             }, 'primary'); box.append(enter);
@@ -443,7 +462,7 @@
         if (window.QuizTelegram.canFullscreen) preferences.append(button('Развернуть на весь экран', () => window.QuizTelegram.fullscreen(), 'quiet'));
         content.append(preferences);
         const actions = el('div', undefined, 'actions'); actions.append(button('Выйти', async () => {
-            try { await request('/api/mini/session', {method: 'DELETE'}); state.token = null; state.me = null; state.page = 'home'; loginScreen(); }
+            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.token = null; state.me = null; state.page = 'home'; loginScreen(); }
             catch (error) { feedback.textContent = error.message; }
         }, 'quiet')); content.append(actions);
     }

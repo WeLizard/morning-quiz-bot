@@ -67,7 +67,12 @@ async def environment(url, *, membership=True, runtime_enabled=False):
                 yield SimpleNamespace(db=db, app=app, client=client, now=now, verifier=verifier, settings=settings)
         finally:
             async with db.transaction() as session:
-                from storage.models import QuestionCategory
+                from storage.models import QuestionCategory, QuestionCategoryRevision
+                # История ревизий тоже убирается: иначе следующий прогон падает на
+                # уникальности (category_name, revision) ещё до создания категории.
+                await session.execute(delete(QuestionCategoryRevision).where(
+                    QuestionCategoryRevision.category_name == 'Тестовая категория'
+                ))
                 await session.execute(delete(QuestionCategory).where(
                     QuestionCategory.name == 'Тестовая категория'
                 ))
@@ -221,6 +226,43 @@ def test_replay_logout_expiry_and_token_rotation(pg_env):
                 await rotated.profile(fresh['Authorization'][7:])
             assert error.value.status == 401
             env.now[0] += 900
+            assert (await env.client.get('/api/mini/me', headers=fresh)).status_code == 401
+    asyncio.run(run())
+
+
+def test_session_renewal_extends_the_same_token_without_new_login(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            headers = await login(env)
+            async with env.db.transaction() as session:
+                before = await session.scalar(select(MiniAppSession).where(MiniAppSession.user_id == USER))
+                rows_before = await session.scalar(select(func.count()).select_from(MiniAppSession).where(
+                    MiniAppSession.user_id == USER))
+            env.now[0] += 700                     # 11+ минут: сессия ещё жива, но близко к границе
+            assert (await env.client.get('/api/mini/me', headers=headers)).status_code == 200
+            renewed = await env.client.post('/api/mini/session/renew', headers=headers)
+            assert renewed.status_code == 200
+            assert renewed.json()['expires_in'] == 900
+            assert (await env.client.get('/api/mini/me', headers=headers)).status_code == 200
+            async with env.db.transaction() as session:
+                after = await session.scalar(select(MiniAppSession).where(MiniAppSession.user_id == USER))
+                rows_after = await session.scalar(select(func.count()).select_from(MiniAppSession).where(
+                    MiniAppSession.user_id == USER))
+            assert rows_after == rows_before       # продление не создаёт новый вход
+            assert after.expires_at > before.expires_at and after.created_at == before.created_at
+    asyncio.run(run())
+
+
+def test_session_renewal_rejects_revoked_and_expired_tokens(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            headers = await login(env, signature='logout-case')
+            assert (await env.client.post('/api/mini/session/renew', headers=headers)).status_code == 200
+            assert (await env.client.delete('/api/mini/session', headers=headers)).status_code == 204
+            assert (await env.client.post('/api/mini/session/renew', headers=headers)).status_code == 401
+            fresh = await login(env, signature='expiry-case')
+            env.now[0] += 16 * 60
+            assert (await env.client.post('/api/mini/session/renew', headers=fresh)).status_code == 401
             assert (await env.client.get('/api/mini/me', headers=fresh)).status_code == 401
     asyncio.run(run())
 

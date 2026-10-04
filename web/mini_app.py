@@ -264,6 +264,11 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(401, 'Недействительные или просроченные данные Telegram') from None
         return await store.create_session(identity)
 
+    @app.post('/api/mini/session/renew')
+    async def renew(request: Request):
+        # Продление тем же токеном: активная сессия не упирается в лимит входов.
+        return await store.renew_session(credential(request))
+
     @app.delete('/api/mini/session')
     async def logout(request: Request):
         await store.logout(credential(request))

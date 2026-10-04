@@ -41,20 +41,25 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
         # Создаём мок для AppConfig
         self.mock_app_config = Mock()
         self.mock_app_config.paths.data = str(self.test_data_dir)
+        self.mock_app_config.storage_backend = "json"
         
         # Создаём мок для BotState
         self.mock_state = Mock()
+        self.mock_state.quiz_data = {"Космос": [{"question": "Test"}], "История": []}
         
         # Создаём мок для DataManager
         self.mock_data_manager = Mock()
         self.mock_data_manager.statistics_dir = self.test_statistics_dir
         self.mock_data_manager.chats_dir = self.test_chats_dir
+        self.mock_data_manager.postgres_storage = None
+        self.mock_data_manager.get_global_setting.return_value = {}
+
+        # Initialization loads real fixture files, not an unconfigured Mock.
+        self.setup_test_data()
         
         # Создаём CategoryManager
         self.category_manager = CategoryManager(self.mock_state, self.mock_app_config, self.mock_data_manager)
         
-        # Создаём тестовые данные
-        self.setup_test_data()
     
     def tearDown(self):
         """Очистка после тестов"""
@@ -134,7 +139,8 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
         # Проверяем, что статистика обновилась корректно
         stats = self.category_manager.get_category_usage_stats_sync()
         self.assertIn("Тестовая_категория", stats)
-        self.assertEqual(stats["Тестовая_категория"]["total_usage"], 50)  # 5 потоков × 10 обновлений
+        self.assertEqual(stats["Тестовая_категория"]["global_usage"], 50)  # 5 потоков × 10 обновлений
+        self.assertEqual(stats["Тестовая_категория"]["chat_usage"]["123"], 50)
     
     def test_category_statistics_update(self):
         """Тест обновления статистики категорий"""
@@ -144,7 +150,7 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
         # Проверяем, что статистика обновилась
         stats = self.category_manager.get_category_usage_stats_sync()
         self.assertIn("Новая_категория", stats)
-        self.assertEqual(stats["Новая_категория"]["total_usage"], 1)
+        self.assertEqual(stats["Новая_категория"]["global_usage"], 1)
         self.assertEqual(stats["Новая_категория"]["chat_usage"]["999"], 1)
         self.assertIn("999", stats["Новая_категория"]["chats_used_in"])
     
@@ -161,7 +167,9 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
             saved_stats = json.load(f)
         
         self.assertIn("Тест_сохранения", saved_stats)
-        self.assertEqual(saved_stats["Тест_сохранения"]["total_usage"], 1)
+        self.assertEqual(saved_stats["Тест_сохранения"]["global_usage"], 1)
+        reloaded = CategoryManager(self.mock_state, self.mock_app_config, self.mock_data_manager)
+        self.assertEqual(reloaded.get_category_usage_stats_sync()["Тест_сохранения"]["global_usage"], 1)
     
     def test_chat_specific_stats(self):
         """Тест чат-специфичной статистики"""
@@ -176,7 +184,8 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
             chat_stats = json.load(f)
         
         self.assertIn("Чат_категория", chat_stats)
-        self.assertEqual(chat_stats["Чат_категория"]["chat_usage"]["888"], 1)
+        self.assertEqual(chat_stats["Чат_категория"]["chat_usage"], 1)
+        self.assertEqual(self.category_manager.get_category_usage_stats_sync()["Чат_категория"]["chat_usage"]["888"], 1)
     
     def test_weighted_random_categories(self):
         """Тест взвешенного выбора категорий"""
@@ -192,6 +201,10 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
         # Проверяем, что выбрано нужное количество
         self.assertEqual(len(selected), 2)
         self.assertTrue(all(cat in categories for cat in selected))
+        self.assertEqual(len(set(selected)), 2)
+        self.assertIn("Новая_категория", selected)
+        self.assertEqual(self.category_manager._get_weighted_random_categories(categories, 0, 111), [])
+        self.assertEqual(self.category_manager._get_weighted_random_categories(["A", "A", "B"], 3, 111), ["A", "B"])
     
     def test_data_integrity(self):
         """Тест целостности данных"""
@@ -202,12 +215,13 @@ class TestSimplifiedCategoryStats(unittest.TestCase):
         stats = self.category_manager.get_category_usage_stats_sync()
         category_data = stats["Тест_целостности"]
         
-        required_fields = ["total_usage", "last_used", "chat_usage", "global_usage", "chats_used_in"]
+        required_fields = ["total_questions", "last_used", "chat_usage", "global_usage", "chats_used_in"]
         for field in required_fields:
             self.assertIn(field, category_data, f"Отсутствует поле: {field}")
         
         # Проверяем типы данных
-        self.assertIsInstance(category_data["total_usage"], int)
+        self.assertIsInstance(category_data["global_usage"], int)
+        self.assertIsInstance(category_data["total_questions"], int)
         self.assertIsInstance(category_data["chat_usage"], dict)
         self.assertIsInstance(category_data["chats_used_in"], list)
 

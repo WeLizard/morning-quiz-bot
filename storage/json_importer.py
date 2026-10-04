@@ -720,6 +720,9 @@ class JsonToPostgresImporter:
                 )
                 session.add(QuestionCategory(**question_values))
                 verification.record('question_categories', question_values)
+            # Session создаётся с autoflush=False: без flush вставки не видны
+            # ни счётной сверке, ни сравнении fingerprints ниже.
+            await session.flush()
             processed['question_categories'] = len(self.snapshot.question_categories)
 
             for key, payload in self.snapshot.system_states.items():

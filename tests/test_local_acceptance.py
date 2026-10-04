@@ -43,6 +43,8 @@ def snapshot(root):
     write_json(chat / 'categories_stats.json', {'Лес': {'chat_usage': 7}})
     write_json(root / 'statistics' / 'categories_stats.json', {'Лес': {'global_usage': 7, 'chat_usage': {str(CHAT): 7}}})
     write_json(root / 'photo_quiz_metadata.json', {'Сова': {'correct_answer': 'Сова', 'enabled': True, 'hints': {'first_letter': 'С'}}})
+    # Непустой банк вопросов: без flush в импортёре эта проверка падала
+    write_json(root / 'questions' / 'Лес.json', [{'question': 'Кто живёт в лесу?', 'options': ['Лось', 'Кит'], 'correct': 'Лось'}])
     return JsonSnapshot.scan(root)
 
 

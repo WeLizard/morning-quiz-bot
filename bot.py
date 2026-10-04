@@ -8,11 +8,12 @@ import subprocess
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlsplit, urlunsplit
 
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, PicklePersistence, ConversationHandler,
+    CallbackQueryHandler, ContextTypes, ConversationHandler,
     Defaults, filters
 )
 from telegram.constants import ParseMode
@@ -42,6 +43,7 @@ from handlers.common_handlers import CommonHandlers
 from handlers.cleanup_handler import schedule_cleanup_job
 from handlers.backup_handlers import BackupHandlers
 from handlers.photo_quiz_handlers import PhotoQuizHandlers
+from handlers.mafia_handlers import MafiaHandlers
 from datetime import timedelta
 
 # Настройка логирования
@@ -89,6 +91,41 @@ logging.getLogger("telegram.bot").setLevel(logging.INFO)
 logging.getLogger("telegram.net.TelegramRetryer").setLevel(logging.INFO)
 logging.getLogger("telegram.net.HTTPXRequest").setLevel(logging.INFO)
 logging.getLogger("apscheduler").setLevel(logging.INFO)
+
+
+def mask_proxy_url(proxy_url: str) -> str:
+    """Скрывает креды в URL прокси, чтобы не светить их в логах."""
+    try:
+        parts = urlsplit(proxy_url)
+        if not parts.netloc:
+            return proxy_url
+
+        if "@" not in parts.netloc:
+            return urlunsplit(parts)
+
+        credentials, host = parts.netloc.rsplit("@", 1)
+        masked_credentials = "***:***" if ":" in credentials else "***"
+        return urlunsplit(parts._replace(netloc=f"{masked_credentials}@{host}"))
+    except Exception:
+        return "***"
+
+
+def prepare_telegram_proxy(proxy_url: Optional[str]) -> Optional[str]:
+    """Проверяет, что для выбранного типа прокси доступны нужные зависимости."""
+    normalized_proxy_url = (proxy_url or "").strip()
+    if not normalized_proxy_url:
+        return None
+
+    if normalized_proxy_url.lower().startswith("socks"):
+        try:
+            import socksio  # noqa: F401
+        except ImportError as exc:
+            raise RuntimeError(
+                "TELEGRAM_PROXY_URL указывает на SOCKS-прокси, но пакет socksio не установлен. "
+                "Установите зависимость `python-telegram-bot[socks]`."
+            ) from exc
+
+    return normalized_proxy_url
 
 
 def update_logging_level(app_config):
@@ -157,7 +194,7 @@ def check_and_kill_duplicate_bots() -> None:
         # Fallback: используем системные команды
         pids = []
         is_windows = os.name == 'nt'
-        
+
         if is_windows:
             # Windows: используем tasklist
             try:
@@ -292,10 +329,14 @@ async def main() -> None:
     
     application_instance: Optional[Application] = None # Переименовано для ясности
     data_manager_instance: Optional[DataManager] = None
+    postgres_database_instance = None
+    photo_quiz_manager = None
 
     try:
         logger.debug("Загрузка конфигурации из AppConfig...")
         app_config = AppConfig()
+        from storage.startup import require_postgres_backend
+        require_postgres_backend(app_config.storage_backend)
         if not app_config.bot_token:
             logger.critical("Токен бота не найден. Укажите BOT_TOKEN в .env или конфигурации.")
             return
@@ -306,7 +347,28 @@ async def main() -> None:
 
         bot_state = BotState(app_config=app_config)
         data_manager = DataManager(state=bot_state, app_config=app_config)
-        data_manager.load_all_data()
+        if app_config.storage_backend == "postgres":
+            from storage.database import Database, DatabaseSettings
+            from storage.runtime import PostgresRuntimeStorage
+
+            postgres_database_instance = Database(DatabaseSettings.from_env())
+            await postgres_database_instance.check_connection()
+            from storage.startup import require_current_schema
+            await require_current_schema(postgres_database_instance)
+            postgres_storage = PostgresRuntimeStorage(postgres_database_instance)
+            data_manager.attach_postgres_storage(postgres_storage)
+
+            await data_manager.load_questions_async()
+            active_quizzes = await postgres_storage.load_into_state(bot_state)
+            data_manager.set_postgres_active_quizzes_cache(active_quizzes)
+            logger.info(
+                "PostgreSQL state загружен: %s чатов, %s участников, %s активных игр",
+                len(bot_state.chat_settings),
+                sum(len(users) for users in bot_state.user_scores.values()),
+                len(active_quizzes),
+            )
+        else:
+            data_manager.load_all_data()
         data_manager_instance = data_manager
         
         # Передаем data_manager в BotState для автоматического сохранения
@@ -324,15 +386,16 @@ async def main() -> None:
         backup_manager = BackupManager(project_root=Path.cwd())
 
         persistence_path = os.path.join(app_config.data_dir, app_config.persistence_file_name)
-        persistence = PicklePersistence(filepath=persistence_path)
+        from modules.telegram_persistence import build_telegram_persistence
+        persistence = build_telegram_persistence(persistence_path, postgres=bool(data_manager.postgres_storage))
         defaults = Defaults(parse_mode=ParseMode.MARKDOWN_V2)
 
         # HTTPXRequest с таймаутами под RU→EU маршруты (СПб → Amsterdam Telegram DC)
         # С 30.12.2025 маршрутизация стала критически медленной для send_poll()
         # send_poll() обработка: +8-15с + Peak нагрузка: +3-7с = нужны 60с таймауты
         from telegram.request import HTTPXRequest
-        
-        request = HTTPXRequest(
+
+        request_kwargs = dict(
             read_timeout=60.0,       # Восстановлено: критично для send_poll() при RU→EU маршрутизации
             write_timeout=45.0,      # Восстановлено: для больших запросов (polls с опциями)
             connect_timeout=20.0,    # Восстановлено: подключение через VPN/прокси может быть медленным
@@ -340,6 +403,19 @@ async def main() -> None:
             media_write_timeout=60.0,  # Для отправки медиа файлов (фото-викторины)
             connection_pool_size=256   # v22.6 default - большой пул для параллельных запросов и фоновых задач
         )
+
+        telegram_proxy_url = prepare_telegram_proxy(app_config.telegram_proxy_url)
+        if telegram_proxy_url:
+            request_kwargs["proxy"] = telegram_proxy_url
+            logger.info(
+                "🌐 Для Telegram Bot API включен proxy: %s",
+                mask_proxy_url(telegram_proxy_url),
+            )
+
+        request = HTTPXRequest(**request_kwargs)
+        # PTB использует отдельный request-клиент для getUpdates. Если не задать его явно,
+        # polling может ходить в Telegram в обход прокси и "молчать", пока обычные API-вызовы работают.
+        get_updates_request = HTTPXRequest(**request_kwargs)
         
         application_builder = (
             Application.builder()
@@ -348,6 +424,7 @@ async def main() -> None:
             .defaults(defaults)
             .concurrent_updates(True)
             .request(request)
+            .get_updates_request(get_updates_request)
         )
         application_instance = application_builder.build() # Присваиваем созданный application
         logger.info("Объект Application создан.")
@@ -358,6 +435,11 @@ async def main() -> None:
         application_instance.bot_data['bot_state'] = bot_state
         application_instance.bot_data['app_config'] = app_config
         application_instance.bot_data['data_manager'] = data_manager
+        from modules.telegram_menu import navigation_guard
+        application_instance.add_handler(navigation_guard(), group=-90)
+        if data_manager.postgres_storage:
+            from handlers.moderation import moderation_handler
+            application_instance.add_handler(moderation_handler(data_manager.postgres_storage.database), group=-100)
         logger.debug(f"🔧 data_manager добавлен в application.bot_data: {data_manager}")
         logger.debug(f"🔧 Доступные ключи в bot_data: {list(application_instance.bot_data.keys())}")
 
@@ -395,9 +477,12 @@ async def main() -> None:
         
         # Инициализируем PhotoQuizHandlers
         photo_quiz_handlers = PhotoQuizHandlers(photo_quiz_manager=photo_quiz_manager)
+        mafia_handlers = MafiaHandlers(data_manager.postgres_storage.database) if data_manager.postgres_storage else None
+        if mafia_handlers:
+            application_instance.bot_data['game_runtime'] = mafia_handlers
 
         # ===== ПРОВЕРКА РЕЖИМА ТЕХНИЧЕСКОГО ОБСЛУЖИВАНИЯ =====
-        if data_manager.is_maintenance_mode():
+        if not data_manager.postgres_storage and data_manager.is_maintenance_mode():
             logger.info("🔧 Обнаружен режим технического обслуживания. Добавляем обработчики обслуживания.")
             # Добавляем обработчики обслуживания с высоким приоритетом
             maintenance_handlers = common_handlers_instance.get_maintenance_handlers()
@@ -417,6 +502,8 @@ async def main() -> None:
         
         # Добавляем обработчики фото-викторины
         application_instance.add_handlers(photo_quiz_handlers.get_handlers())
+        if mafia_handlers:
+            application_instance.add_handlers(mafia_handlers.get_handlers())
 
         # ===== ВОССТАНОВЛЕНИЕ АКТИВНЫХ ВИКТОРИН =====
         logger.info("🔄 Восстановление активных викторин после перезапуска...")
@@ -425,7 +512,8 @@ async def main() -> None:
             data_manager.cleanup_stale_quizzes()
 
             # Восстанавливаем актуальные викторины
-            await quiz_manager.restore_all_active_quizzes()
+            if not data_manager.postgres_storage:
+                await quiz_manager.restore_all_active_quizzes()
 
             # Настраиваем автоматическое сохранение викторин
             quiz_manager.schedule_quiz_auto_save()
@@ -451,9 +539,21 @@ async def main() -> None:
             logger.error(f"❌ Ошибка при очистке уведомлений об обслуживании: {e}", exc_info=True)
 
         async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+            from storage.admin_actions import BotAccessBlocked, AdminActions
+            if isinstance(context.error, BotAccessBlocked):
+                return
             logger.error("Исключение при обработке обновления:", exc_info=context.error)
             if isinstance(update, Update) and update.effective_chat:
+                if data_manager.postgres_storage:
+                    try:
+                        if not await AdminActions(data_manager.postgres_storage.database).allowed(
+                            update.effective_chat.id, update.effective_user.id if update.effective_user else None):
+                            return
+                    except Exception:
+                        return
+                from storage.settings import SettingsConflict
                 error_message_user = escape_markdown_v2(
+                    str(context.error) if isinstance(context.error, SettingsConflict) else
                     "Произошла внутренняя ошибка. Пожалуйста, сообщите разработчику, если проблема повторится."
                 )
                 try:
@@ -478,10 +578,25 @@ async def main() -> None:
 
         # Инициализируем Application перед запуском (требуется для python-telegram-bot 21.7)
         await application_instance.initialize()
+        if data_manager.postgres_storage:
+            from telegram.ext import CallbackContext
+            await quiz_manager.restore_all_active_quizzes()
+            if mafia_handlers:
+                mafia_handlers.install_deadlines(application_instance.job_queue)
         
         # Запускаем планировщики после инициализации
-        await daily_quiz_scheduler.schedule_all_daily_quizzes_from_startup()
-        wisdom_scheduler.schedule_all_wisdoms_from_startup()
+        if data_manager.postgres_storage:
+            from modules.schedule_sync import ScheduleSync
+            schedule_sync = ScheduleSync(data_manager.postgres_storage.database, app_config,
+                                         daily_quiz_scheduler, wisdom_scheduler)
+            data_manager.schedule_sync = schedule_sync
+            application_instance.bot_data['schedule_sync'] = schedule_sync
+            # Failed DB reads abort startup; individual bad schedules are retried.
+            await schedule_sync.run_once()
+            schedule_sync.install(application_instance.job_queue)
+        else:
+            await daily_quiz_scheduler.schedule_all_daily_quizzes_from_startup()
+            wisdom_scheduler.schedule_all_wisdoms_from_startup()
         wisdom_scheduler.start()
 
         if application_instance.updater:
@@ -515,6 +630,8 @@ async def main() -> None:
         logger.critical(f"Критическая ошибка в функции main: {e}", exc_info=True)
     finally:
         logger.info("Блок finally в main() начал выполнение.")
+        if photo_quiz_manager is not None:
+            await photo_quiz_manager.shutdown()
 
         # Сохраняем состояние перед остановкой
         if application_instance:
@@ -568,7 +685,9 @@ async def main() -> None:
             # Включаем режим обслуживания при остановке бота
             logger.info("🔧 Включение режима обслуживания при остановке бота...")
             try:
-                if hasattr(data_manager_instance, 'enable_maintenance_mode'):
+                if data_manager_instance.postgres_storage:
+                    logger.info('PG shutdown preserves the explicit maintenance switch')
+                elif hasattr(data_manager_instance, 'enable_maintenance_mode'):
                     data_manager_instance.enable_maintenance_mode("Остановка бота")
                     logger.info("✅ Режим обслуживания включен при остановке бота")
                 else:
@@ -578,6 +697,7 @@ async def main() -> None:
 
             logger.info("Сохранение данных DataManager в main().finally...")
             data_manager_instance.save_all_data()
+            await data_manager_instance.flush_postgres_writes()
             logger.info("Данные DataManager сохранены в main().finally.")
             
             # Сохраняем статистику категорий
@@ -590,8 +710,17 @@ async def main() -> None:
                     logger.debug("category_manager не доступен в data_manager")
             except Exception as e:
                 logger.warning(f"Не удалось сохранить статистику категорий: {e}")
+
+            await data_manager_instance.flush_postgres_writes()
         else:
             logger.warning("Экземпляр DataManager не был создан, пропуск сохранения данных в main().finally.")
+
+        if postgres_database_instance:
+            try:
+                await postgres_database_instance.dispose()
+                logger.info("PostgreSQL connection pool закрыт")
+            except Exception as e:
+                logger.warning(f"Ошибка закрытия PostgreSQL pool: {e}")
         
         # Удаляем PID файл при завершении
         pid_file = Path("bot.pid")
@@ -617,5 +746,3 @@ if __name__ == "__main__":
         logger.info("Программа прервана (KeyboardInterrupt/SystemExit на уровне __main__).")
     finally:
         logger.info("Программа завершена (блок finally в __main__).")
-
-

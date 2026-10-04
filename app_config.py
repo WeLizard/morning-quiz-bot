@@ -111,6 +111,25 @@ class AppConfig:
 
         self.bot_token: Optional[str] = os.getenv("BOT_TOKEN")
         logger.debug(f"AppConfig: BOT_TOKEN считан: {'Да' if self.bot_token else 'Нет'}")
+        telegram_proxy_url = (
+            os.getenv("TELEGRAM_PROXY_URL")
+            or os.getenv("TELEGRAM_PROXY")
+            or ""
+        ).strip()
+        self.telegram_proxy_url: Optional[str] = telegram_proxy_url or None
+        logger.debug(
+            f"AppConfig: TELEGRAM_PROXY_URL считан: {'Да' if self.telegram_proxy_url else 'Нет'}"
+        )
+
+        self.storage_backend = os.getenv("STORAGE_BACKEND", "json").strip().lower()
+        if self.storage_backend not in {"json", "postgres"}:
+            raise ValueError("STORAGE_BACKEND должен быть 'json' или 'postgres'")
+        self.database_url: Optional[str] = os.getenv("DATABASE_URL") or None
+        logger.debug(
+            "AppConfig: storage backend=%s, DATABASE_URL=%s",
+            self.storage_backend,
+            "задан" if self.database_url else "не задан",
+        )
 
         # Получаем режим работы из переменной окружения
         mode = os.getenv("MODE", "production").lower()

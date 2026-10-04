@@ -3,6 +3,7 @@ import copy
 from typing import Dict, Any, Set, Optional, List, TYPE_CHECKING
 from collections import defaultdict
 from datetime import datetime, timedelta
+from uuid import uuid4
 from modules.logger_config import get_logger
 
 from utils import get_current_utc_time # utils.py должен быть доступен
@@ -59,6 +60,11 @@ class QuizState:
         self.next_question_job_name: Optional[str] = None # Для отложенной отправки следующего вопроса в режиме serial_interval после раннего ответа
         self.poll_and_solution_message_ids: List[Dict[str, Optional[int]]] = []
         self.results_message_ids: Set[int] = set() # ID сообщений с результатами викторины для удаления через 2 мин
+        self.session_id = uuid4().hex
+        self.revision = 0
+        self.storage_phase = "ready"
+        self.poll_history = {}
+        self.next_question_at = None
 
     def get_current_question_data(self) -> Optional[Dict[str, Any]]:
         if 0 <= self.current_question_index < len(self.questions):
@@ -153,6 +159,13 @@ class BotState:
         import time
         timestamp = time.time()
         self.generic_messages_to_delete[chat_id][message_id] = timestamp
+        if self.data_manager and self.data_manager.postgres_storage:
+            from datetime import timezone
+            from storage.cleanup import CleanupQueue
+            queue = CleanupQueue(self.data_manager.postgres_storage.database)
+            deadline = datetime.fromtimestamp(timestamp, timezone.utc) + timedelta(seconds=delay_seconds if delay_seconds > 0 else 120)
+            self.data_manager._schedule_postgres_write(queue.enqueue(chat_id, message_id, deadline), "cleanup-enqueue")
+            return  # PostgreSQL worker owns deadlines, including after restart.
         logger.debug(f"Сообщение {message_id} добавлено для удаления в чате {chat_id} с timestamp {timestamp}")
 
         # Автосохранение каждые 60 секунд (проверка по времени последнего сохранения)
@@ -223,6 +236,10 @@ class BotState:
 
     def remove_message_from_deletion(self, chat_id: int, message_id: int) -> None:
         """Удаляет сообщение из списка для периодического удаления"""
+        if self.data_manager and self.data_manager.postgres_storage:
+            from storage.cleanup import CleanupQueue
+            self.data_manager._schedule_postgres_write(
+                CleanupQueue(self.data_manager.postgres_storage.database).acknowledge(chat_id, message_id), "cleanup-ack")
         if chat_id in self.generic_messages_to_delete:
             self.generic_messages_to_delete[chat_id].pop(message_id, None)
             logger.info(f"❌ Сообщение {message_id} удалено из списка для удаления в чате {chat_id}. Осталось: {len(self.generic_messages_to_delete[chat_id])}")
@@ -319,4 +336,3 @@ class BotState:
         self.app_config = app_config
         self.data_manager = data_manager
         logger.debug("BotState восстановлен после persistence")
-

@@ -3,6 +3,7 @@ import json
 import os
 import copy
 import asyncio
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Dict, Any, List, Set, Optional, TYPE_CHECKING
 import re
@@ -23,14 +24,19 @@ class DataManager:
     Работает с консолидированными данными в data/ и интегрируется с PTB persistence
     """
     
-    def __init__(self, app_config: 'AppConfig', state: 'BotState'):
+    def __init__(self, app_config: 'AppConfig', state: 'BotState', *, data_root=None):
         # Логируем только при ошибках инициализации
         self.app_config = app_config
         self.paths_config = app_config.paths
         self.state = state
+        self.postgres_storage = None
+        self._postgres_write_tasks: Set[asyncio.Task] = set()
+        self._postgres_active_quizzes_cache: Dict[int, Dict[str, Any]] = {}
+        self._settings_locks: Dict[int, asyncio.Lock] = {}
+        self._settings_read_revisions = ContextVar("settings_read_revisions", default=None)
         
         # Структура папок для консолидированных данных
-        self.data_dir = Path("data")
+        self.data_dir = Path(data_root) if data_root is not None else Path("data")
         self.chats_dir = self.data_dir / "chats"
         self.global_dir = self.data_dir / "global"
         self.statistics_dir = self.data_dir / "statistics"
@@ -47,6 +53,44 @@ class DataManager:
         # Паттерн для символов, которые могут вызвать проблемы в Telegram
         self._problematic_chars_pattern = re.compile(r'[_\*\\[\\]\\(\\)\~\\`\\>\\#\\+\\-\=\\|\\{\\}\\.\\!]')
         # Инициализация завершена без ошибок
+
+    def attach_postgres_storage(self, storage) -> None:
+        """Подключает async PostgreSQL adapter, сохраняя публичный API DataManager."""
+        self.postgres_storage = storage
+
+    def set_postgres_active_quizzes_cache(self, quizzes: Dict[int, Dict[str, Any]]) -> None:
+        self._postgres_active_quizzes_cache = dict(quizzes)
+
+    def _schedule_postgres_write(self, coroutine, description: str) -> bool:
+        if not self.postgres_storage:
+            return False
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError as exc:
+            if hasattr(coroutine, "close"):
+                coroutine.close()
+            raise RuntimeError(
+                f"Нельзя выполнить PostgreSQL write вне event loop: {description}"
+            ) from exc
+
+        task = loop.create_task(coroutine, name=f"postgres:{description}")
+        self._postgres_write_tasks.add(task)
+
+        def _done(completed: asyncio.Task) -> None:
+            self._postgres_write_tasks.discard(completed)
+            try:
+                completed.result()
+            except Exception:
+                logger.exception("Ошибка фоновой записи PostgreSQL: %s", description)
+
+        task.add_done_callback(_done)
+        return True
+
+    async def flush_postgres_writes(self) -> None:
+        """Дожидается всех совместимых sync->async записей перед shutdown."""
+        while getattr(self, "_postgres_write_tasks", None):
+            pending = tuple(self._postgres_write_tasks)
+            await asyncio.gather(*pending, return_exceptions=True)
 
     # ===== ВНУТРЕННИЕ ХЕЛПЕРЫ =====
 
@@ -337,6 +381,8 @@ class DataManager:
 
     def load_questions(self) -> None:
         """Загружает вопросы из консолидированной структуры (по категориям)"""
+        if self.postgres_storage:
+            raise RuntimeError('PostgreSQL question bank must be loaded with load_questions_async()')
         logger.debug("Загрузка вопросов из консолидированной структуры...")
         processed_questions_count = 0
         valid_categories_count = 0
@@ -403,6 +449,21 @@ class DataManager:
             
         except Exception as e:
             logger.error(f"Критическая ошибка при загрузке вопросов: {e}", exc_info=True)
+
+    async def load_questions_async(self) -> None:
+        """Load the authoritative bank without a filesystem fallback in PG mode."""
+        if not self.postgres_storage:
+            await asyncio.to_thread(self.load_questions)
+            return
+        from storage.question_bank import PostgresQuestionBank
+        self.state.quiz_data = await PostgresQuestionBank(
+            self.postgres_storage.database
+        ).for_quiz()
+        logger.info(
+            'Вопросы загружены из PostgreSQL: %s категорий, %s вопросов',
+            len(self.state.quiz_data),
+            sum(len(items) for items in self.state.quiz_data.values()),
+        )
 
     def _save_malformed_questions(self, malformed_entries: List[Dict[str, Any]]) -> None:
         """Сохраняет малформированные вопросы и пытается их исправить"""
@@ -863,6 +924,10 @@ class DataManager:
         Сохраняет данные пользователей чата в консолидированную структуру
         Правильно интегрируется с Telegram Bot API persistence system
         """
+        if self.postgres_storage:
+            # A BotState view can be older than an admin edit or another answer.
+            # PostgreSQL mutations are committed by the classic/photo domain command.
+            return
         try:
             if chat_id not in self.state.user_scores:
                 logger.warning(f"Нет данных для сохранения в чате {chat_id}")
@@ -875,7 +940,7 @@ class DataManager:
             if not chat_users:
                 logger.debug(f"Нет пользователей для сохранения в чате {chat_id}")
                 return
-            
+
             # Сохраняем users.json
             users_data = {}
             for user_id, user_data in chat_users.items():
@@ -934,6 +999,9 @@ class DataManager:
     def save_chat_settings(self) -> None:
         """Сохраняет настройки чатов в консолидированную структуру"""
         logger.debug("Сохранение настроек чатов в консолидированную структуру...")
+
+        if self.postgres_storage:
+            return  # Settings are committed by awaited, versioned commands.
         
         saved_count = 0
         failed_count = 0
@@ -969,6 +1037,9 @@ class DataManager:
         """Сохраняет только измененные настройки чатов для быстрой работы"""
         if not hasattr(self.state, '_chat_settings_modified') or not self.state._chat_settings_modified:
             logger.debug("Нет измененных настроек чатов для сохранения")
+            return
+
+        if self.postgres_storage:
             return
         
         logger.debug(f"Сохранение измененных настроек для {len(self.state._chat_settings_modified)} чатов...")
@@ -1008,6 +1079,9 @@ class DataManager:
             logger.debug("Нет измененных настроек чатов для сохранения")
             return
 
+        if self.postgres_storage:
+            return
+
         logger.debug(f"Асинхронное сохранение измененных настроек для {len(self.state._chat_settings_modified)} чатов...")
 
         # Создаем задачи для параллельного сохранения
@@ -1035,6 +1109,8 @@ class DataManager:
     async def _save_single_chat_settings_async(self, chat_id: int, settings: Dict[str, Any]) -> bool:
         """Асинхронно сохраняет настройки одного чата"""
         try:
+            if self.postgres_storage:
+                raise RuntimeError("Use versioned settings commands, not snapshot writes")
             chat_dir = self.chats_dir / str(chat_id)
             settings_file = chat_dir / "settings.json"
             return await self._write_json_async(settings_file, settings)
@@ -1045,6 +1121,9 @@ class DataManager:
     def save_messages_to_delete(self) -> None:
         """Сохраняет сообщения для удаления в консолидированную структуру с timestamp"""
         try:
+            if self.postgres_storage:
+                logger.debug("PostgreSQL cleanup uses per-message commands, not cached snapshots")
+                return
             # Преобразуем Dict[int, Dict[int, float]] в JSON-совместимый формат
             # chat_id (str) -> {message_id (str): timestamp (float)}
             data_to_save = {}
@@ -1075,6 +1154,10 @@ class DataManager:
     async def save_all_data_async(self) -> None:
         """Асинхронно сохраняет все данные в консолидированную структуру"""
         logger.info("Асинхронное сохранение всех данных...")
+
+        if self.postgres_storage:
+            await self.flush_postgres_writes()
+            return
 
         # Создаем задачи для параллельного сохранения
         tasks = []
@@ -1123,8 +1206,50 @@ class DataManager:
         self.load_messages_to_delete()
         logger.debug("Загрузка всех данных завершена")
 
-    def update_chat_setting(self, chat_id: int, key_path: List[str], value: Any) -> None:
+    def _publish_settings(self, chat_id, snapshot) -> None:
+        self.state.chat_settings[chat_id] = copy.deepcopy(snapshot.values)
+        if not hasattr(self.state, "chat_settings_revisions"):
+            self.state.chat_settings_revisions = {}
+        self.state.chat_settings_revisions[chat_id] = snapshot.revision
+        # Keep the revision observed by this callback, not just a shared cache
+        # another concurrent callback may refresh while this one is awaiting I/O.
+        revisions = dict(self._settings_read_revisions.get() or {})
+        revisions[chat_id] = snapshot.revision
+        self._settings_read_revisions.set(revisions)
+
+    def _settings_expected_revision(self, chat_id):
+        return (self._settings_read_revisions.get() or {}).get(
+            chat_id, self.state.chat_settings_revisions[chat_id],
+        )
+
+    async def get_chat_settings_async(self, chat_id: int) -> Dict[str, Any]:
+        if self.postgres_storage:
+            from storage.settings import SettingsService
+            async with self._settings_locks.setdefault(chat_id, asyncio.Lock()):
+                self._publish_settings(chat_id, await SettingsService(self.postgres_storage.database).get(chat_id))
+        return self.get_chat_settings(chat_id)
+
+    async def _patch_postgres_settings(self, chat_id, changes) -> None:
+        from storage.settings import SettingsConflict, SettingsService
+        async with self._settings_locks.setdefault(chat_id, asyncio.Lock()):
+            service = SettingsService(self.postgres_storage.database)
+            if chat_id not in getattr(self.state, "chat_settings_revisions", {}):
+                self._publish_settings(chat_id, await service.get(chat_id))
+            try:
+                snapshot = await service.patch_paths(
+                    chat_id, changes, defaults=self.app_config.default_chat_settings,
+                    expected_revision=self._settings_expected_revision(chat_id),
+                )
+            except SettingsConflict:
+                self._publish_settings(chat_id, await service.get(chat_id))
+                raise
+            self._publish_settings(chat_id, snapshot)
+
+    async def update_chat_setting(self, chat_id: int, key_path: List[str], value: Any) -> None:
         """Обновляет настройку конкретного чата"""
+        if self.postgres_storage:
+            await self._patch_postgres_settings(chat_id, [(key_path, value)])
+            return
         if chat_id not in self.state.chat_settings:
             self.state.chat_settings[chat_id] = copy.deepcopy(self.app_config.default_chat_settings)
         
@@ -1145,23 +1270,31 @@ class DataManager:
         
         logger.info(f"Настройка '{'.'.join(key_path)}' для чата {chat_id} обновлена на: {value}")
 
-    def update_quiz_setting(self, chat_id: int, setting_name: str, value: Any) -> None:
+    async def update_quiz_setting(self, chat_id: int, setting_name: str, value: Any) -> None:
         """Обновляет настройку квиза для конкретного чата"""
+        if self.postgres_storage:
+            changes = [(["quiz", setting_name], value)]
+            legacy = {"num_questions": "default_num_questions", "open_period_seconds": "default_open_period_seconds",
+                      "announce": "default_announce_quiz", "interval_seconds": "default_interval_seconds"}
+            if setting_name in legacy:
+                changes.append(([legacy[setting_name]], value))
+            await self._patch_postgres_settings(chat_id, changes)
+            return
         logger.debug(f"ОТЛАДКА: update_quiz_setting вызван для чата {chat_id}, настройка '{setting_name}', значение {value}")
         
         # Сохраняем в новую структуру quiz.*
         key_path = ["quiz", setting_name]
-        self.update_chat_setting(chat_id, key_path, value)
+        await self.update_chat_setting(chat_id, key_path, value)
         
         # ДОПОЛНИТЕЛЬНО: Сохраняем в основные настройки чата для совместимости
         if setting_name == "num_questions":
-            self.update_chat_setting(chat_id, ["default_num_questions"], value)
+            await self.update_chat_setting(chat_id, ["default_num_questions"], value)
         elif setting_name == "open_period_seconds":
-            self.update_chat_setting(chat_id, ["default_open_period_seconds"], value)
+            await self.update_chat_setting(chat_id, ["default_open_period_seconds"], value)
         elif setting_name == "announce":
-            self.update_chat_setting(chat_id, ["default_announce_quiz"], value)
+            await self.update_chat_setting(chat_id, ["default_announce_quiz"], value)
         elif setting_name == "interval_seconds":
-            self.update_chat_setting(chat_id, ["default_interval_seconds"], value)
+            await self.update_chat_setting(chat_id, ["default_interval_seconds"], value)
         
         logger.info(f"Настройка квиза '{setting_name}' для чата {chat_id} обновлена на: {value}")
         
@@ -1177,8 +1310,18 @@ class DataManager:
         logger.debug(f"ОТЛАДКА: get_quiz_setting для чата {chat_id}, настройка '{setting_name}' = {result}")
         return result
 
-    def reset_chat_settings(self, chat_id: int) -> None:
+    async def reset_chat_settings(self, chat_id: int) -> None:
         """Сбрасывает настройки конкретного чата"""
+        if self.postgres_storage:
+            from storage.settings import SettingsService
+            async with self._settings_locks.setdefault(chat_id, asyncio.Lock()):
+                service = SettingsService(self.postgres_storage.database)
+                if chat_id not in getattr(self.state, "chat_settings_revisions", {}):
+                    self._publish_settings(chat_id, await service.get(chat_id))
+                snapshot = await service.reset(chat_id, self.app_config.default_chat_settings,
+                                               expected_revision=self._settings_expected_revision(chat_id))
+                self._publish_settings(chat_id, snapshot)
+            return
         if chat_id in self.state.chat_settings:
             del self.state.chat_settings[chat_id]
             logger.info(f"Настройки для чата {chat_id} сброшены")
@@ -1200,7 +1343,7 @@ class DataManager:
             if isinstance(value, dict) and key in base_dict and isinstance(base_dict[key], dict):
                 self._deep_merge_dicts(base_dict[key], value)
             else:
-                base_dict[key] = value
+                base_dict[key] = copy.deepcopy(value)
 
     async def update_chat_metadata(self, chat_id: int, bot=None) -> bool:
         """
@@ -1239,6 +1382,22 @@ class DataManager:
                     chat_title += f" {chat.last_name}"
             
             chat_type = chat.type if hasattr(chat, 'type') else None
+
+            if self.postgres_storage:
+                from storage.settings import SettingsService
+                changes = []
+                if chat_title:
+                    changes.append((["title"], chat_title))
+                if chat_type:
+                    changes.append((["chat_type"], chat_type))
+                if not changes:
+                    return False
+                async with self._settings_locks.setdefault(chat_id, asyncio.Lock()):
+                    snapshot = await SettingsService(self.postgres_storage.database).patch_paths(
+                        chat_id, changes, defaults=self.app_config.default_chat_settings,
+                    )
+                    self._publish_settings(chat_id, snapshot)
+                return True
             
             # Получаем текущие настройки
             if chat_id not in self.state.chat_settings:
@@ -1274,7 +1433,7 @@ class DataManager:
                 logger.debug(f"Не удалось обновить метаданные чата {chat_id}: {e}")
             return False
 
-    def disable_daily_quiz_for_chat(self, chat_id: int, reason: str = "blocked") -> bool:
+    async def disable_daily_quiz_for_chat(self, chat_id: int, reason: str = "blocked") -> bool:
         """
         Автоматически отключает ежедневную рассылку викторин для чата.
         Используется когда бот заблокирован или чат недоступен.
@@ -1287,6 +1446,9 @@ class DataManager:
             bool: True если успешно отключено, False при ошибке
         """
         try:
+            if self.postgres_storage:
+                await self.update_chat_setting(chat_id, ["daily_quiz", "enabled"], False)
+                return True
             # Получаем текущие настройки чата
             if chat_id not in self.state.chat_settings:
                 self.state.chat_settings[chat_id] = {}
@@ -1390,6 +1552,8 @@ class DataManager:
 
     def update_global_statistics(self) -> None:
         """Обновляет глобальную статистику на основе текущих данных"""
+        if self.postgres_storage:
+            return  # MemberService maintains DB totals in the score transaction.
         try:
             # Загружаем текущие глобальные данные
             global_users_file = self.global_dir / "users.json"
@@ -1719,6 +1883,9 @@ class DataManager:
         Сохраняет активные викторины для восстановления после перезапуска.
         Сохраняются только сериализуемые данные викторины.
         """
+        if self.postgres_storage:
+            logger.debug("PostgreSQL sessions use awaited checkpoints, not autosave snapshots")
+            return
         if not hasattr(self, 'state') or not self.state:
             logger.warning("DataManager.save_active_quizzes: state не инициализирован")
             return
@@ -1786,6 +1953,9 @@ class DataManager:
         Загружает сохраненные активные викторины.
         Возвращает словарь chat_id -> quiz_data для восстановления.
         """
+        if self.postgres_storage:
+            return dict(self._postgres_active_quizzes_cache)
+
         active_quizzes_file = self.get_active_quizzes_file_path()
 
         if not active_quizzes_file.exists():
@@ -1851,6 +2021,10 @@ class DataManager:
         Очищает файл активных викторин от устаревших записей.
         Вызывается автоматически при запуске бота.
         """
+        if self.postgres_storage:
+            logger.debug("PostgreSQL session recovery classifies each record without replacing snapshots")
+            return
+
         active_quizzes_file = self.get_active_quizzes_file_path()
 
         if not active_quizzes_file.exists():
@@ -1883,6 +2057,11 @@ class DataManager:
 
     def delete_active_quizzes_file(self) -> None:
         """Удаляет файл активных викторин (при успешном завершении всех викторин)"""
+        if self.postgres_storage:
+            # PostgreSQL sessions remain until an explicit closing command;
+            # restoring jobs must not erase their durable checkpoints.
+            logger.debug("PostgreSQL active sessions сохранены после restore")
+            return
         active_quizzes_file = self.get_active_quizzes_file_path()
         if active_quizzes_file.exists():
             active_quizzes_file.unlink()
@@ -1899,6 +2078,8 @@ class DataManager:
         Включает режим технического обслуживания.
         Сохраняет состояние и время начала обслуживания.
         """
+        if self.postgres_storage:
+            raise RuntimeError('Use awaited PostgreSQL maintenance commands')
         maintenance_file = self.get_maintenance_file_path()
         maintenance_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -1922,6 +2103,8 @@ class DataManager:
         Выключает режим технического обслуживания.
         Возвращает данные для очистки уведомлений.
         """
+        if self.postgres_storage:
+            raise RuntimeError('Use awaited PostgreSQL maintenance commands')
         maintenance_file = self.get_maintenance_file_path()
 
         if not maintenance_file.exists():
@@ -1944,6 +2127,8 @@ class DataManager:
 
     def is_maintenance_mode(self) -> bool:
         """Проверяет, включен ли режим технического обслуживания"""
+        if self.postgres_storage:
+            raise RuntimeError('Use is_maintenance_mode_async for PostgreSQL')
         maintenance_file = self.get_maintenance_file_path()
         if not maintenance_file.exists():
             return False
@@ -1958,6 +2143,8 @@ class DataManager:
 
     def get_maintenance_status(self) -> Dict[str, Any]:
         """Возвращает статус технического обслуживания"""
+        if self.postgres_storage:
+            raise RuntimeError('Use get_maintenance_status_async for PostgreSQL')
         maintenance_file = self.get_maintenance_file_path()
         if not maintenance_file.exists():
             return {"maintenance_mode": False}
@@ -1968,6 +2155,34 @@ class DataManager:
         except Exception as e:
             logger.error(f"Ошибка чтения статуса обслуживания: {e}")
             return {"maintenance_mode": False}
+
+    async def get_maintenance_status_async(self):
+        if not self.postgres_storage:
+            return self.get_maintenance_status()
+        from storage.system_control import SystemControl
+        return await SystemControl(self.postgres_storage.database).read()
+
+    async def is_maintenance_mode_async(self):
+        return (await self.get_maintenance_status_async()).get('maintenance_mode', False)
+
+    async def enable_maintenance_mode_async(self, reason='Техническое обслуживание'):
+        if not self.postgres_storage:
+            return self.enable_maintenance_mode(reason)
+        from uuid import uuid4
+        from storage.system_control import SystemControl
+        service = SystemControl(self.postgres_storage.database)
+        current = await service.read()
+        return await service.set_maintenance(enabled=True, reason=reason, expected_revision=current['revision'], action_id=str(uuid4()))
+
+    async def disable_maintenance_mode_async(self):
+        if not self.postgres_storage:
+            return self.disable_maintenance_mode()
+        from uuid import uuid4
+        from storage.system_control import SystemControl
+        service = SystemControl(self.postgres_storage.database)
+        current = await service.read()
+        await service.set_maintenance(enabled=False, reason='Обслуживание завершено', expected_revision=current['revision'], action_id=str(uuid4()))
+        return current
 
     def add_maintenance_notification(self, chat_id: int, message_id: int) -> None:
         """

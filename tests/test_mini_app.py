@@ -68,7 +68,7 @@ async def environment(url, *, membership=True, runtime_enabled=False):
                 yield SimpleNamespace(db=db, app=app, client=client, now=now, verifier=verifier, settings=settings)
         finally:
             async with db.transaction() as session:
-                from storage.models import QuestionCategory, QuestionCategoryRevision
+                from storage.models import PhotoQuizItem, QuestionCategory, QuestionCategoryRevision
                 # История ревизий тоже убирается: иначе следующий прогон падает на
                 # уникальности (category_name, revision) ещё до создания категории.
                 await session.execute(delete(QuestionCategoryRevision).where(
@@ -77,6 +77,10 @@ async def environment(url, *, membership=True, runtime_enabled=False):
                 await session.execute(delete(QuestionCategory).where(
                     QuestionCategory.name == 'Тестовая категория'
                 ))
+                # Каталог фото глобальный (без chat_id), каскадом за чатом не уходит:
+                # без явной уборки строка 'Сова' остаётся в общей тестовой БД и
+                # ломает проверки каталога в других тестах.
+                await session.execute(delete(PhotoQuizItem).where(PhotoQuizItem.media_key == 'Сова'))
                 await session.execute(delete(Chat).where(Chat.id.in_([USER, USER + 1])))
 
 

@@ -41,6 +41,12 @@ class CommonHandlers:
         start_time = time.time()
         logger.info(f"Команда /help получена в {start_time:.3f}")
 
+        # Готовим заранее: бэкслеш внутри выражения f-string требует Python 3.12+,
+        # а проект заявляет поддержку 3.10+ и образ на python:3.11-slim.
+        support_line = escape_markdown_v2(
+            f'По всем вопросам обращайтесь к {self.app_config.support_contact}'
+        ).replace('@', '\\@')
+
         help_full_text = (
             f"{md.section_header('Справка по командам бота:', '📖')}\n\n"
             f"{md.section_header('Викторина', '📝')}\n"
@@ -70,7 +76,7 @@ class CommonHandlers:
             f"{md.command_help(self.app_config.commands.start, 'начать работу с ботом')}\n"
             f"{md.command_help(self.app_config.commands.cancel, 'отмена текущего диалога (например, настройки)')}\n\n"
             f"{md.section_header('Поддержка', '💬')}\n"
-            f"{escape_markdown_v2(f'По всем вопросам обращайтесь к {self.app_config.support_contact}').replace('@', '\\@')}"
+            f"{support_line}"
         )
         try:
             from modules.telegram_utils import safe_send_message

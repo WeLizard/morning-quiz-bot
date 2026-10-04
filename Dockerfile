@@ -5,6 +5,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Создание пользователя для безопасности
@@ -35,9 +36,9 @@ USER quizbot
 ENV PYTHONPATH=/app
 ENV LOG_LEVEL=INFO
 
-# Проверка здоровья
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# Проверка здоровья: бот не отдаёт HTTP, поэтому проверяем сам процесс
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD pgrep -f "python bot.py" > /dev/null || exit 1
 
 # Команда запуска
 CMD ["python", "bot.py"] 

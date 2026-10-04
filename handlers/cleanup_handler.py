@@ -30,6 +30,14 @@ async def cleanup_old_messages_job(context: ContextTypes.DEFAULT_TYPE):
         logger.error("BotState не найден в context.job.data или context.bot_data. Задача очистки не может быть выполнена.")
         return
 
+    storage = getattr(getattr(bot_state, "data_manager", None), "postgres_storage", None)
+    if storage:
+        from storage.cleanup import CleanupQueue
+        defaults = bot_state.app_config.default_chat_settings
+        await CleanupQueue(storage.database).process_due(context.bot, bot_state,
+            default_auto_delete=defaults.get("auto_delete_bot_messages", True))
+        return
+
     # Убедимся, что атрибут существует и является словарем
     if not hasattr(bot_state, 'generic_messages_to_delete') or \
        not isinstance(bot_state.generic_messages_to_delete, dict):
@@ -130,6 +138,11 @@ async def cleanup_old_messages_job(context: ContextTypes.DEFAULT_TYPE):
 
 def schedule_cleanup_job(job_queue: JobQueue, bot_state=None) -> None:
     """Планирует периодическую задачу очистки сообщений."""
+    if getattr(getattr(bot_state, "data_manager", None), "postgres_storage", None):
+        job_queue.run_repeating(cleanup_old_messages_job, interval=15, first=15,
+            name="postgres_cleanup", data={"bot_state": bot_state},
+            job_kwargs={"id": "postgres_cleanup", "replace_existing": True, "coalesce": True, "max_instances": 1})
+        return
     
     # Получаем режим работы из переменной окружения
     mode = os.getenv("MODE", "production").lower()

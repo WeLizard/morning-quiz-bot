@@ -90,7 +90,14 @@
             "reset_categories_stats": "reset_categories_stats",
             "chat_stats": "chat_stats",
             "category_stats": "category_stats",
-            "chatcategories": "chatcategories"
+            "chatcategories": "chatcategories",
+            "config": "config",
+            "view_chat_config": "viewchatconfig",
+            "adddailyquiz": "adddailyquiz",
+            "removedailyquiz": "removedailyquiz",
+            "listdailyquizzes": "listdailyquizzes",
+            "reloadcfg": "reloadcfg",
+            "daily_wisdom": "dailywisdom"
         },
         "developer_notifications": {
             "enabled": true,

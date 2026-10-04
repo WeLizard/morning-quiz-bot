@@ -34,8 +34,9 @@ from data_manager import DataManager
 from modules.category_manager import CategoryManager
 from modules.score_manager import ScoreManager
 from modules.quiz_engine import QuizEngine
+from .classic_persistence import ClassicPersistenceMixin
 from utils import get_current_utc_time, schedule_job_unique, escape_markdown_v2, is_user_admin_in_update
-from modules.telegram_utils import safe_send_message, format_error_message
+from modules.telegram_utils import safe_send_message, format_error_message, is_formatting_error
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ DELAY_BEFORE_SESSION_MESSAGES_DELETION_SECONDS = 180   # 3 минуты для �
 DELAY_BEFORE_POLL_SOLUTION_DELETION_SECONDS = 120      # 2 минуты для опросов (постепенное удаление)
 DELAY_BEFORE_RESULTS_DELETION_SECONDS = 180            # 3 минуты для результатов (дольше всего) 
 
-class QuizManager:
+class QuizManager(ClassicPersistenceMixin):
     def __init__(
         self, app_config: AppConfig, state: BotState, category_manager: CategoryManager,
         score_manager: ScoreManager, data_manager: DataManager, application: Application
@@ -79,8 +80,8 @@ class QuizManager:
         self._send_question_locks: Dict[int, asyncio.Lock] = {}
         logger.debug(f"QuizManager initialized. Command for quiz: '/{self.app_config.commands.quiz}'")
 
-    def _get_effective_quiz_params(self, chat_id: int, num_questions_override: Optional[int] = None) -> Dict[str, Any]:
-        chat_s = self.data_manager.get_chat_settings(chat_id)
+    async def _get_effective_quiz_params(self, chat_id: int, num_questions_override: Optional[int] = None) -> Dict[str, Any]:
+        chat_s = await self.data_manager.get_chat_settings_async(chat_id)
         default_chat_settings_global = self.app_config.default_chat_settings
         num_q: int
         if num_questions_override is not None:
@@ -143,6 +144,20 @@ class QuizManager:
         interactive_start_message_id: Optional[int] = None
     ):
         logger.info(f"НАЧАЛО _initiate_quiz_session: Чат {chat_id}, Тип: {quiz_type}, Режим: {quiz_mode}, NQ: {num_questions}")
+        if self._pg_sessions:
+            return await self._start_platform_classic(
+                context=context,
+                chat_id=chat_id,
+                initiated_by_user=initiated_by_user,
+                quiz_type=quiz_type,
+                num_questions=num_questions,
+                open_period_seconds=open_period_seconds,
+                announce=announce,
+                announce_delay_seconds=announce_delay_seconds,
+                category_names_for_quiz=category_names_for_quiz,
+                is_random_categories_mode=is_random_categories_mode,
+                interval_seconds=interval_seconds,
+            )
 
         active_quiz = self.state.get_active_quiz(chat_id)
         if active_quiz and not active_quiz.is_stopping:
@@ -168,6 +183,10 @@ class QuizManager:
             cat_mode_for_get_questions = "random_from_pool"
 
         logger.debug(f"_initiate_quiz_session: Получение вопросов. Режим для get_questions: {cat_mode_for_get_questions}, Исходные запрашиваемые категории: {category_names_for_quiz}")
+        if self._pg_sessions:
+            await self.category_manager.refresh_postgres_statistics()
+            # Reload the static bank before selection; running games own snapshots.
+            await self.data_manager.load_questions_async()
         questions_for_session = self.category_manager.get_questions(
             num_questions_needed=num_questions,
             chat_id=chat_id,
@@ -219,7 +238,7 @@ class QuizManager:
         # Получаем эффективное время ответа: сначала из параметров, затем из настроек чата
         effective_open_period = open_period_seconds
         if effective_open_period is None:
-            effective_params = self._get_effective_quiz_params(chat_id, num_questions)
+            effective_params = await self._get_effective_quiz_params(chat_id, num_questions)
             effective_open_period = effective_params.get('open_period_seconds', 30)
         
         # Определяем режим викторины на основе интервала
@@ -237,6 +256,10 @@ class QuizManager:
             original_command_message_id=original_command_message_id,
             interval_seconds=effective_interval, quiz_start_time=get_current_utc_time()
         )
+
+        if self._pg_sessions:
+            await self._checkpoint_classic(current_quiz_state_instance, create=True)
+            self.state.add_active_quiz(chat_id, current_quiz_state_instance)
 
         if interactive_start_message_id:
             current_quiz_state_instance.message_ids_to_delete.add(interactive_start_message_id)
@@ -294,7 +317,7 @@ class QuizManager:
                     error_message = str(e_announce).lower()
                     if quiz_type == "daily" and ("blocked" in error_message or "not found" in error_message or "forbidden" in error_message):
                         logger.warning(f"⚠️ Обнаружена блокировка/недоступность чата {chat_id}. Автоматически отключаю ежедневную рассылку.")
-                        self.data_manager.disable_daily_quiz_for_chat(
+                        await self.data_manager.disable_daily_quiz_for_chat(
                             chat_id,
                             reason="blocked" if "blocked" in error_message else "not_found"
                         )
@@ -322,18 +345,94 @@ class QuizManager:
         logger.info(f"_initiate_quiz_session: Переход к отправке первого вопроса для чата {chat_id}.")
         await self._send_next_question(context, chat_id)
 
-    async def _send_next_question(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    async def _start_platform_classic(
+        self, *, context, chat_id, initiated_by_user, quiz_type,
+        num_questions, open_period_seconds, announce,
+        announce_delay_seconds, category_names_for_quiz,
+        is_random_categories_mode, interval_seconds,
+    ):
+        """Thin Telegram adapter for the shared Classic application service."""
+        from application.classic import ClassicApplicationService
+        from application.classic_selection import select_classic_questions
+        from storage.classic_sessions import ClassicSessionConflict
+
+        database = self._pg_sessions.database
+        try:
+            async with database.transaction() as session:
+                questions = await select_classic_questions(
+                    session,
+                    chat_id=chat_id,
+                    count=num_questions,
+                    defaults=self.app_config.default_chat_settings,
+                    category_names=category_names_for_quiz,
+                    random_categories=is_random_categories_mode or not category_names_for_quiz,
+                )
+                if not questions:
+                    raise ValueError(
+                        'Не удалось подобрать вопросы. Проверьте настройки категорий.'
+                    )
+                user_id = initiated_by_user.id if initiated_by_user else None
+                name = initiated_by_user.full_name if initiated_by_user else None
+                game = await ClassicApplicationService(
+                    database, session,
+                    rules=self.score_manager._classic_scoring_rules(),
+                ).start(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    display_name=name,
+                    questions=questions,
+                    quiz_type=quiz_type,
+                    open_seconds=open_period_seconds,
+                    interval_seconds=max(0, interval_seconds or 0),
+                    start_delay_seconds=announce_delay_seconds if announce else 0,
+                )
+        except (ClassicSessionConflict, ValueError) as error:
+            if initiated_by_user:
+                await safe_send_message(
+                    bot=context.bot,
+                    chat_id=chat_id,
+                    text=escape_markdown_v2(str(error)),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                )
+            return None
+        if announce:
+            actor = initiated_by_user.first_name if initiated_by_user else 'Филиныч'
+            delay = announce_delay_seconds if announce_delay_seconds > 0 else 0
+            text = f'{actor} запускает викторину!'
+            if delay:
+                text += f' Первый вопрос появится через {delay} сек.'
+            await safe_send_message(
+                bot=context.bot,
+                chat_id=chat_id,
+                text=escape_markdown_v2(text),
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
+        logger.info(
+            'Classic platform game %s created for chat %s', game.get('game_id'), chat_id
+        )
+        return game
+
+    async def _send_next_question(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                                  *, expected_session_id=None, expected_question_index=None):
         # Защита от параллельных вызовов для одного чата
         if chat_id not in self._send_question_locks:
             self._send_question_locks[chat_id] = asyncio.Lock()
         
         async with self._send_question_locks[chat_id]:
+            if await self._discard_interrupted_classic(chat_id):
+                return
             logger.debug(f"НАЧАЛО _send_next_question для чата {chat_id}.")
             quiz_state = self.state.get_active_quiz(chat_id)
 
             if not quiz_state or quiz_state.is_stopping:
                 logger.warning(f"_send_next_question: Викторина неактивна или останавливается для чата {chat_id}.")
                 return
+
+            if self._pg_sessions and (
+                (expected_session_id is not None and quiz_state.session_id != expected_session_id)
+                or (expected_question_index is not None and quiz_state.current_question_index != expected_question_index)
+            ):
+                return  # Recheck after waiting for an in-flight send, not only at job entry.
 
             if quiz_state.current_question_index >= quiz_state.num_questions_to_ask:
                 logger.info(f"_send_next_question: Все {quiz_state.num_questions_to_ask} вопросов для чата {chat_id} уже отправлены.")
@@ -352,7 +451,7 @@ class QuizManager:
             if not question_data:
                 error_msg_text = "Ошибка получения данных вопроса."
                 logger.error(f"_send_next_question: {error_msg_text} Индекс: {quiz_state.current_question_index}, чат: {chat_id}. Завершение.")
-                await self._finalize_quiz_session(context, chat_id, error_occurred=True, error_message=error_msg_text)
+                await self._finalize_quiz_session(context, chat_id, error_occurred=True, error_message=error_msg_text, _send_locked=True)
                 return
 
             logger.info(f"_send_next_question: Отправка вопроса {quiz_state.current_question_index + 1}/{quiz_state.num_questions_to_ask} в чате {chat_id}.")
@@ -366,6 +465,13 @@ class QuizManager:
 
             current_category_name_display_unescaped = question_data.get('current_category_name_for_quiz', question_data.get('original_category'))
 
+            if self._pg_sessions:
+                quiz_state.storage_phase = "sending"
+                quiz_state.next_question_at = None
+                await self._checkpoint_classic(quiz_state)
+                if quiz_state.is_stopping or self.state.get_active_quiz(chat_id) is not quiz_state:
+                    return
+
             sent_poll_id = await self.quiz_engine.send_quiz_poll(
                 context, chat_id, question_data,
                 poll_title_prefix=title_prefix_for_poll_unescaped,
@@ -373,7 +479,9 @@ class QuizManager:
                 quiz_type=quiz_state.quiz_type,
                 is_last_question=is_last_q_in_this_session,
                 question_session_index=quiz_state.current_question_index,
-                current_category_name=current_category_name_display_unescaped if current_category_name_display_unescaped else None
+                current_category_name=current_category_name_display_unescaped if current_category_name_display_unescaped else None,
+                persist_poll=(lambda poll_id: self._confirm_classic_poll(quiz_state, poll_id)) if self._pg_sessions else None,
+                before_send=lambda: self._classic_send_allowed(quiz_state),
             )
 
             if sent_poll_id:
@@ -384,13 +492,14 @@ class QuizManager:
 
                 quiz_state.active_poll_ids_in_session.add(sent_poll_id)
                 quiz_state.latest_poll_id_sent = sent_poll_id
-                quiz_state.progression_triggered_for_poll[sent_poll_id] = False
+                if not self._pg_sessions:
+                    quiz_state.progression_triggered_for_poll[sent_poll_id] = False
 
                 poll_data_from_bot_state = self.state.get_current_poll_data(sent_poll_id)
                 if not poll_data_from_bot_state:
                     error_msg_poll_data = "Внутренняя ошибка: потеряны данные опроса при создании (сразу после send_quiz_poll)."
                     logger.error(f"_send_next_question: {error_msg_poll_data} Poll ID: {sent_poll_id}, чат: {chat_id}.")
-                    await self._finalize_quiz_session(context, chat_id, error_occurred=True, error_message=error_msg_poll_data)
+                    await self._finalize_quiz_session(context, chat_id, error_occurred=True, error_message=error_msg_poll_data, _send_locked=True)
                     return
 
                 job_name_for_this_poll_end = f"poll_end_chat_{chat_id}_poll_{sent_poll_id}"
@@ -401,10 +510,11 @@ class QuizManager:
                     job_name=job_name_for_this_poll_end,
                     callback=self._handle_poll_end_job,
                     when=timedelta(seconds=quiz_state.open_period_seconds + self.app_config.job_grace_period_seconds),
-                    data={"chat_id": chat_id, "ended_poll_id": sent_poll_id}
+                    data={"chat_id": chat_id, "ended_poll_id": sent_poll_id, "session_id": quiz_state.session_id}
                 )
 
-                quiz_state.current_question_index += 1
+                if not self._pg_sessions:
+                    quiz_state.current_question_index += 1
                 logger.debug(f"_send_next_question: Индекс вопроса в чате {chat_id} увеличен до {quiz_state.current_question_index}.")
 
                 # Планируем следующий вопрос, если есть интервал и это не последний вопрос
@@ -421,23 +531,28 @@ class QuizManager:
                         job_name=job_name,
                         callback=self._trigger_next_question_job_after_interval,
                         when=timedelta(seconds=delay_seconds),
-                        data={"chat_id": chat_id, "expected_q_index_at_trigger": quiz_state.current_question_index}
+                        data={"chat_id": chat_id, "expected_q_index_at_trigger": quiz_state.current_question_index, "session_id": quiz_state.session_id}
                     )
                     logger.info(f"Следующий вопрос (индекс {quiz_state.current_question_index}) будет отправлен через {delay_seconds} сек (режим serial_interval).")
             else:
                 error_msg_text_send_poll = "Ошибка отправки опроса через Telegram API (QuizEngine.send_quiz_poll вернул None)."
                 logger.error(f"_send_next_question: {error_msg_text_send_poll} Вопрос: {quiz_state.current_question_index}, чат: {chat_id}.")
-                await self._finalize_quiz_session(context, chat_id, error_occurred=True, error_message=error_msg_text_send_poll)
+                await self._finalize_quiz_session(context, chat_id, error_occurred=True, error_message=error_msg_text_send_poll, _send_locked=True)
 
             logger.debug(f"ЗАВЕРШЕНИЕ _send_next_question для чата {chat_id} (вопрос {quiz_state.current_question_index-1 if quiz_state else 'N/A'} отправлен).")
 
     async def _handle_early_answer_for_session(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, answered_poll_id: str):
+        if await self._discard_interrupted_classic(chat_id):
+            return
         logger.info(f"Обработка ответа на опрос {answered_poll_id} в чате {chat_id}.")
         quiz_state = self.state.get_active_quiz(chat_id)
 
         if not quiz_state or quiz_state.is_stopping:
             logger.debug(f"Ответ на опрос {answered_poll_id} проигнорирован: викторина неактивна или останавливается.")
             return
+
+        if self._pg_sessions and answered_poll_id != quiz_state.latest_poll_id_sent:
+            return  # An answer to an older poll must not advance a newer question.
 
         if quiz_state.progression_triggered_for_poll.get(answered_poll_id, False):
             logger.debug(f"Ответ на опрос {answered_poll_id}: переход к следующему вопросу уже был инициирован ранее для этого опроса.")
@@ -451,6 +566,12 @@ class QuizManager:
             logger.debug(f"Флаг next_q_triggered_by_answer установлен в True для poll_id {answered_poll_id}")
         else:
             logger.warning(f"Не найдены данные для poll_id {answered_poll_id} в self.state.current_polls при попытке установить флаг next_q_triggered_by_answer.")
+
+        if self._pg_sessions:
+            quiz_state.next_question_at = (get_current_utc_time() + timedelta(seconds=quiz_state.interval_seconds or 0)).isoformat()
+            await self._checkpoint_classic(quiz_state)
+            if quiz_state.is_stopping or self.state.get_active_quiz(chat_id) is not quiz_state:
+                return
 
         logger.info(f"Первый значащий ответ на опрос {answered_poll_id} (чат {chat_id}). Инициируется отправка следующего вопроса / планирование.")
 
@@ -470,12 +591,13 @@ class QuizManager:
                     job_name=job_name,
                     callback=self._trigger_next_question_job_after_interval,
                     when=timedelta(seconds=delay_seconds),
-                    data={"chat_id": chat_id, "expected_q_index_at_trigger": quiz_state.current_question_index}
+                    data={"chat_id": chat_id, "expected_q_index_at_trigger": quiz_state.current_question_index, "session_id": quiz_state.session_id}
                 )
                 logger.info(f"Следующий вопрос (индекс {quiz_state.current_question_index}) будет отправлен через {delay_seconds} сек (режим serial_interval).")
             else: 
                 logger.info(f"Режим '{quiz_state.quiz_mode}', немедленная отправка следующего вопроса (индекс {quiz_state.current_question_index}).")
-                await self._send_next_question(context, chat_id)
+                await self._send_next_question(context, chat_id, expected_session_id=quiz_state.session_id,
+                                               expected_question_index=quiz_state.current_question_index)
         else:
             logger.info(f"Все вопросы ({quiz_state.num_questions_to_ask}) уже были отправлены. Ответ на {answered_poll_id} не триггерит новые вопросы.")
 
@@ -494,6 +616,10 @@ class QuizManager:
             logger.info(f"_trigger_next_question_job_after_interval: Викторина для чата {chat_id} неактивна или останавливается. Пропуск.")
             return
 
+        if not self._valid_classic_job(context, chat_id):
+            return
+        if await self._discard_interrupted_classic(chat_id):
+            return
         if expected_q_idx is not None and quiz_state.current_question_index != expected_q_idx:
             logger.warning(f"_trigger_next_question_job_after_interval (чат {chat_id}): Ожидаемый индекс вопроса {expected_q_idx} не совпадает с текущим {quiz_state.current_question_index}. Пропуск отправки.")
             return
@@ -502,7 +628,8 @@ class QuizManager:
             quiz_state.next_question_job_name = None 
 
         logger.info(f"Сработала задача отложенной отправки следующего вопроса для чата {chat_id}. Job: {context.job.name if context.job else 'N/A'}.")
-        await self._send_next_question(context, chat_id)
+        await self._send_next_question(context, chat_id, expected_session_id=quiz_state.session_id,
+                                      expected_question_index=expected_q_idx)
 
     async def _handle_poll_end_job(self, context: ContextTypes.DEFAULT_TYPE):
         if not context.job or not isinstance(context.job.data, dict):
@@ -517,7 +644,11 @@ class QuizManager:
             logger.error(f"_handle_poll_end_job: chat_id или ended_poll_id отсутствуют. Data: {job_data}")
             return
 
+        if not self._valid_classic_job(context, chat_id):
+            return
         logger.info(f"Сработал таймаут для poll_id {ended_poll_id} в чате {chat_id}. Job: {context.job.name}")
+        if await self._discard_interrupted_classic(chat_id):
+            return
 
         poll_info_before_removal = self.state.get_current_poll_data(ended_poll_id)
         
@@ -527,8 +658,16 @@ class QuizManager:
             logger.debug(f"_handle_poll_end_job: Опрос {ended_poll_id} уже был обработан или удален. Пропускаем повторную обработку.")
             return
         
-        sent_solution_msg_id = await self.quiz_engine.send_solution_if_available(context, chat_id, ended_poll_id)
         quiz_state = self.state.get_active_quiz(chat_id)
+        sent_solution_msg_id = await self.quiz_engine.send_solution_if_available(
+            context, chat_id, ended_poll_id,
+            persist_solution=(lambda: self._checkpoint_classic(quiz_state)) if self._pg_sessions else None,
+            before_send=(lambda: self._classic_send_allowed(quiz_state)) if quiz_state else None,
+        )
+        if self._pg_sessions and (self.state.get_active_quiz(chat_id) is not quiz_state or quiz_state.is_stopping):
+            if sent_solution_msg_id:
+                await self._queue_classic_messages(chat_id, [sent_solution_msg_id])
+            return
 
         # НАКОПЛЕНИЕ message_ids для батч-удаления в конце викторины
         if poll_info_before_removal and quiz_state:
@@ -544,6 +683,8 @@ class QuizManager:
         elif not poll_info_before_removal:
              logger.warning(f"_handle_poll_end_job: poll_info_before_removal is None для poll_id {ended_poll_id}, чат {chat_id}. Не добавлено в список на удаление.")
 
+        if self._pg_sessions and quiz_state:
+            quiz_state.poll_history[ended_poll_id] = dict(poll_info_before_removal)
         self.state.remove_current_poll(ended_poll_id)
 
         if not quiz_state: 
@@ -568,14 +709,17 @@ class QuizManager:
         quiz_state.active_poll_ids_in_session.discard(ended_poll_id)
         quiz_state.progression_triggered_for_poll.pop(ended_poll_id, None)
 
+        await self._checkpoint_classic(quiz_state)
+
         if quiz_state.current_question_index < quiz_state.num_questions_to_ask:
-            if not next_q_was_triggered_by_answer:
+            if not next_q_was_triggered_by_answer and (not self._pg_sessions or ended_poll_id == quiz_state.latest_poll_id_sent):
                 logger.info(f"Таймаут для опроса {ended_poll_id} (чат {chat_id}). Досрочный ответ НЕ инициировал переход. Запуск следующего вопроса.")
                 if quiz_state.next_question_job_name: 
                     jobs = self.application.job_queue.get_jobs_by_name(quiz_state.next_question_job_name)
                     for job in jobs: job.schedule_removal()
                     quiz_state.next_question_job_name = None
-                await self._send_next_question(context, chat_id)
+                await self._send_next_question(context, chat_id, expected_session_id=quiz_state.session_id,
+                                               expected_question_index=quiz_state.current_question_index)
             else:
                 logger.info(f"Таймаут для опроса {ended_poll_id} (чат {chat_id}). Переход к следующему вопросу уже был инициирован досрочным ответом. Дополнительная отправка из _handle_poll_end_job не требуется.")
         elif not quiz_state.active_poll_ids_in_session: 
@@ -598,7 +742,7 @@ class QuizManager:
             return
 
         # ИЗМЕНЕНИЕ: Проверка настройки автоудаления
-        chat_settings = self.data_manager.get_chat_settings(chat_id)
+        chat_settings = await self.data_manager.get_chat_settings_async(chat_id)
         default_auto_delete_from_config = self.app_config.default_chat_settings.get("auto_delete_bot_messages", True)
         auto_delete_enabled = chat_settings.get("auto_delete_bot_messages", default_auto_delete_from_config)
 
@@ -644,7 +788,7 @@ class QuizManager:
             return
         
         # ИЗМЕНЕНИЕ: Проверка настройки автоудаления
-        chat_settings = self.data_manager.get_chat_settings(chat_id)
+        chat_settings = await self.data_manager.get_chat_settings_async(chat_id)
         default_auto_delete_from_config = self.app_config.default_chat_settings.get("auto_delete_bot_messages", True)
         auto_delete_enabled = chat_settings.get("auto_delete_bot_messages", default_auto_delete_from_config)
 
@@ -678,20 +822,41 @@ class QuizManager:
 
     async def _finalize_quiz_session(
         self, context: ContextTypes.DEFAULT_TYPE, chat_id: int,
-        was_stopped: bool = False, error_occurred: bool = False, error_message: Optional[str] = None
+        was_stopped: bool = False, error_occurred: bool = False, error_message: Optional[str] = None,
+        *, _send_locked=False,
     ):
+        if self._pg_sessions and not _send_locked:
+            # An acknowledged in-flight poll must be checkpointed before closing.
+            expected_quiz = self.state.get_active_quiz(chat_id)
+            async with self._send_question_locks.setdefault(chat_id, asyncio.Lock()):
+                if expected_quiz is not self.state.get_active_quiz(chat_id):
+                    return
+                return await self._finalize_quiz_session_impl(context, chat_id, was_stopped, error_occurred, error_message)
+        return await self._finalize_quiz_session_impl(context, chat_id, was_stopped, error_occurred, error_message)
+
+    async def _finalize_quiz_session_impl(
+        self, context, chat_id, was_stopped=False, error_occurred=False, error_message=None,
+    ):
+        quiz_state = self.state.get_active_quiz(chat_id)
+        if quiz_state and self._pg_sessions:
+            quiz_state.is_stopping = True
+            quiz_state.storage_phase = "finished"
+            await self._checkpoint_classic(quiz_state, status="interrupted" if error_occurred else "stopped" if was_stopped else "completed")
+            quiz_state.scores = await self._pg_sessions.scores(chat_id, list(quiz_state.poll_history))
         quiz_state = self.state.remove_active_quiz(chat_id)
         if not quiz_state:
             logger.warning(f"Попытка финализировать викторину для чата {chat_id}, но активной сессии QuizState не найдено.")
             # Очищаем блокировку даже если викторина не найдена
-            self._send_question_locks.pop(chat_id, None)
+            if not self._pg_sessions:
+                self._send_question_locks.pop(chat_id, None)
             return
 
         escaped_error_message = escape_markdown_v2(error_message) if error_message else None
         logger.info(f"Завершение викторины (тип: {quiz_state.quiz_type}, режим: {quiz_state.quiz_mode}) в чате {chat_id}. Остановлена: {was_stopped}, Ошибка: {error_occurred}, Сообщение: {error_message}")
         
         # Очищаем блокировку отправки вопросов для этого чата
-        self._send_question_locks.pop(chat_id, None)
+        if not self._pg_sessions:
+            self._send_question_locks.pop(chat_id, None)
 
         job_queue = self.application.job_queue
 
@@ -777,15 +942,22 @@ class QuizManager:
 
             # Собираем данные результатов сессии, включая глобальный счет и иконку ачивки
             scores_for_display: List[Dict[str, Any]] = []
+            try:
+                profiles = await self.score_manager.get_session_profiles(chat_id, quiz_state.scores.keys())
+                statistics_available = True
+            except Exception:
+                logger.exception("Статистика БД недоступна, показываем только результаты сессии")
+                profiles = {}
+                statistics_available = False
             for uid, data in quiz_state.scores.items():
                 # Глобальная статистика пользователя (по всем чатам)
-                global_stats = self.score_manager.get_global_user_stats(uid)
+                global_stats = profiles.get(str(uid), {}).get("global")
                 global_total_score_val = global_stats.get('total_score', 0) if global_stats else 0
                 global_answered_polls_val = global_stats.get('answered_polls', 0) if global_stats else 0
                 achievement_icon_val = self.score_manager.get_rating_icon(global_total_score_val)
 
                 # Статистика пользователя в текущем чате
-                current_chat_stats = self.score_manager.get_current_chat_user_stats(uid, chat_id)
+                current_chat_stats = profiles.get(str(uid), {}).get("chat")
                 current_chat_score_val = current_chat_stats.get('total_score', 0) if current_chat_stats else 0
                 current_chat_answered_val = current_chat_stats.get('answered_polls', 0) if current_chat_stats else 0
                 current_chat_correct_val = current_chat_stats.get('correct_answers_count', 0) if current_chat_stats else 0
@@ -796,6 +968,7 @@ class QuizManager:
                     user_id_int = 0
 
                 scores_for_display.append({
+                    "statistics_available": statistics_available,
                     "user_id": user_id_int,
                     "name": data["name"],
                     "score": data["score"],
@@ -839,25 +1012,30 @@ class QuizManager:
                 logger.error(f"Текст результатов (первые 500 символов): {results_text_md[:500]}")
                 # Попробуем отправить без Markdown форматирования в случае ошибки
                 try:
+                    if not is_formatting_error(e_send_res):
+                        raise e_send_res  # Timeout/partial delivery must not create duplicate results.
                     fallback_text = f"🏁 Викторина завершена!\n\n{title_unescaped_for_formatter}\n\n"
                     for entry in scores_for_display[:10]:  # Показываем топ-10
                         name = entry.get('name', 'Unknown')
                         score = entry.get('score', 0)
                         correct = entry.get('correct_count', 0)
                         fallback_text += f"• {name}: {score} очков ({correct} правильных)\n"
-                    fallback_msg = await context.bot.send_message(chat_id=chat_id, text=fallback_text)
+                    fallback_msg = await safe_send_message(context.bot, chat_id, fallback_text, parse_mode=None)
                     logger.info(f"Отправлены результаты викторины без форматирования в чат {chat_id}")
                     # Добавляем fallback результаты в список для удаления через 2 минуты вместе с опросами
                     quiz_state.results_message_ids.add(fallback_msg.message_id)
                 except Exception as e_fallback:
                     logger.error(f"Не удалось отправить даже fallback-сообщение: {e_fallback}")
 
-        # НОВОЕ: Немедленно удаляем только streak ачивки при показе результатов
-        if quiz_state.message_ids_to_delete:
+        if self._pg_sessions:
+            await self._queue_classic_messages(chat_id, quiz_state.results_message_ids)
+
+        # PostgreSQL cleanup is performed by the durable worker, including streak messages.
+        if quiz_state.message_ids_to_delete and not self._pg_sessions:
             logger.info(f"Немедленно удаляем {len(quiz_state.message_ids_to_delete)} сообщений о streak ачивках в чате {chat_id}")
             
             # Проверяем настройку автоудаления
-            chat_settings = self.data_manager.get_chat_settings(chat_id)
+            chat_settings = await self.data_manager.get_chat_settings_async(chat_id)
             default_auto_delete_from_config = self.app_config.default_chat_settings.get("auto_delete_bot_messages", True)
             auto_delete_enabled = chat_settings.get("auto_delete_bot_messages", default_auto_delete_from_config)
             
@@ -897,7 +1075,9 @@ class QuizManager:
             for result_msg_id in quiz_state.results_message_ids:
                 all_messages_to_delete_flat.append(result_msg_id)
 
-            if all_messages_to_delete_flat:
+            if all_messages_to_delete_flat and self._pg_sessions:
+                await self._queue_classic_messages(chat_id, all_messages_to_delete_flat)
+            elif all_messages_to_delete_flat:
                 # ФАЛЛБЭК: Сначала добавляем ВСЕ сообщения в fallback (защита от сбоя delayed задачи)
                 for msg_id in all_messages_to_delete_flat:
                     self.state.add_message_for_deletion(chat_id, msg_id, delay_seconds=0)
@@ -918,7 +1098,7 @@ class QuizManager:
 
         # ОБНОВЛЯЕМ СТАТИСТИКУ КАТЕГОРИЙ ПОСЛЕ ЗАВЕРШЕНИЯ ВИКТОРИНЫ
         # (только если викторина завершилась успешно, один раз за сессию)
-        if not error_occurred and hasattr(self.data_manager, 'category_manager') and self.data_manager.category_manager:
+        if not self._pg_sessions and not error_occurred and hasattr(self.data_manager, 'category_manager') and self.data_manager.category_manager:
             # Собираем все уникальные категории, использованные в этой викторине
             used_categories_in_session = set()
             for question_data in quiz_state.questions:
@@ -1008,7 +1188,7 @@ class QuizManager:
 
         if is_quick_launch:
             logger.info(f"quiz_command_entry: Быстрый запуск викторины для чата {chat_id}.")
-            params_for_quick_launch = self._get_effective_quiz_params(chat_id, parsed_num_q)
+            params_for_quick_launch = await self._get_effective_quiz_params(chat_id, parsed_num_q)
             final_announce_for_quick = parsed_announce_flag if parsed_announce_flag is not None else params_for_quick_launch["announce_quiz"]
             final_is_random_cats_for_quick = not bool(parsed_categories_names)
             await self._initiate_quiz_session(
@@ -1025,7 +1205,7 @@ class QuizManager:
             return ConversationHandler.END
         elif parsed_announce_flag is True:
             logger.info(f"quiz_command_entry: Быстрый запуск викторины (только флаг announce) для чата {chat_id}.")
-            params_for_announce_only = self._get_effective_quiz_params(chat_id)
+            params_for_announce_only = await self._get_effective_quiz_params(chat_id)
             await self._initiate_quiz_session(
                 context, chat_id, user,
                 params_for_announce_only["quiz_type_key"], params_for_announce_only["quiz_mode"],
@@ -1039,7 +1219,7 @@ class QuizManager:
             return ConversationHandler.END
         else:
             logger.info(f"quiz_command_entry: Переход к интерактивной настройке викторины для чата {chat_id}.")
-            params_for_interactive = self._get_effective_quiz_params(chat_id)
+            params_for_interactive = await self._get_effective_quiz_params(chat_id)
             
             # Загружаем сохраненные настройки из базы данных
             saved_num_questions = self.data_manager.get_quiz_setting(chat_id, "num_questions", params_for_interactive["num_questions"])
@@ -1132,7 +1312,7 @@ class QuizManager:
         # Получаем эффективное время ответа
         effective_open_period = cfg.get('open_period_seconds')
         if effective_open_period is None:
-            effective_params = self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
+            effective_params = await self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
             effective_open_period = effective_params.get('open_period_seconds', 30)
         
         text = (
@@ -1164,58 +1344,20 @@ class QuizManager:
             [InlineKeyboardButton(f"🔢 Вопросы: {num_q_display}", callback_data=CB_QCFG_NUM_MENU), InlineKeyboardButton(f"📚 Категория: {cat_button_text_plain}", callback_data=CB_QCFG_CAT_MENU)],
             [InlineKeyboardButton(f"⏰ Время ответа: {open_period_button_text_plain}", callback_data=CB_QCFG_OPEN_PERIOD), InlineKeyboardButton(f"⏱️ Интервал: {interval_button_text_plain}", callback_data=CB_QCFG_INTERVAL)],
             [InlineKeyboardButton(f"📢 Анонс: {announce_button_text_plain}", callback_data=CB_QCFG_ANNOUNCE)],
-            [InlineKeyboardButton("▶️ Запустить викторину", callback_data=CB_QCFG_START)], [InlineKeyboardButton("❌ Отмена", callback_data=CB_QCFG_CANCEL)]
+            [InlineKeyboardButton("▶️ Начать игру", callback_data=CB_QCFG_START, style='success')],
+            [InlineKeyboardButton("‹ Главное меню", callback_data='nav:home'), InlineKeyboardButton("Отмена", callback_data=CB_QCFG_CANCEL)]
         ]
         markup = InlineKeyboardMarkup(kb_layout)
-        message_to_edit_id = context.chat_data.get('_quiz_cfg_msg_id')
-        current_message: Optional[Message] = None
-        is_callback = isinstance(update_or_query, CallbackQuery)
-        if is_callback and update_or_query.message: current_message = update_or_query.message
-        elif isinstance(update_or_query, Update) and update_or_query.message:
-            current_message = update_or_query.message
-            context.chat_data['_quiz_cmd_msg_id'] = current_message.message_id
-
-        if current_message and message_to_edit_id == current_message.message_id and \
-           message_to_edit_id != context.chat_data.get('_quiz_cmd_msg_id'):
-            try:
-                await current_message.edit_text(text, reply_markup=markup, parse_mode=ParseMode.MARKDOWN_V2)
-                if is_callback: await update_or_query.answer()
-                return
-            except BadRequest as e_br:
-                if "Message is not modified" not in str(e_br).lower(): logger.warning(f"Ошибка BadRequest при редактировании меню: {e_br}.")
-                if is_callback: await update_or_query.answer()
-                return
-            except Exception as e_edit: logger.error(f"Не удалось обновить меню (edit): {e_edit}")
-
-        if message_to_edit_id and message_to_edit_id != context.chat_data.get('_quiz_cmd_msg_id'):
-            target_chat_id_for_delete = cfg.get('chat_id', update_or_query.effective_chat.id if update_or_query.effective_chat else None)
-            if target_chat_id_for_delete:
-                try:
-                    await context.bot.delete_message(target_chat_id_for_delete, message_to_edit_id)
-                except Exception: pass
-            context.chat_data['_quiz_cfg_msg_id'] = None
-
-        target_chat_id_for_send = cfg.get('chat_id', update_or_query.effective_chat.id if update_or_query.effective_chat else None)
-        if not target_chat_id_for_send:
-            logger.error("Не удалось определить chat_id для отправки нового меню конфигурации.")
-            if is_callback: await update_or_query.answer("Ошибка: не удалось определить чат.", show_alert=True)
-            return
-
-        try:
-            sent_msg = await safe_send_message(
-                bot=context.bot,
-                chat_id=target_chat_id_for_send,
-                text=text,
-                reply_markup=markup,
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            context.chat_data['_quiz_cfg_msg_id'] = sent_msg.message_id
-            if is_callback: await update_or_query.answer()
-            logger.debug(f"_send_quiz_cfg_message: Меню конфигурации успешно отправлено в чат {target_chat_id_for_send}")
-        except Exception as e_send_new: 
-            logger.error(f"Не удалось отправить новое меню конфигурации: {e_send_new}")
-        except Exception as e:
-            logger.error(f"_send_quiz_cfg_message: Неожиданная ошибка: {e}", exc_info=True)
+        from modules.telegram_menu import card, acknowledge
+        target = context.chat_data.get('_menu_entry_message_id') or context.chat_data.get('_quiz_cfg_msg_id')
+        sent = await card(update_or_query, context, text, markup.inline_keyboard,
+                          parse_mode=ParseMode.MARKDOWN_V2, message_id=target)
+        if sent:
+            context.chat_data['_quiz_cfg_msg_id'] = sent.message_id
+        elif target:
+            context.chat_data['_quiz_cfg_msg_id'] = target
+        if isinstance(update_or_query, CallbackQuery):
+            await acknowledge(update_or_query)
 
     async def handle_quiz_cfg_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
         query = update.callback_query
@@ -1326,7 +1468,7 @@ class QuizManager:
             effective_interval = final_cfg.get('interval_seconds')
             
             # Получаем настройки категорий из чата
-            chat_settings = self.data_manager.get_chat_settings(final_cfg['chat_id'])
+            chat_settings = await self.data_manager.get_chat_settings_async(final_cfg['chat_id'])
             categories_mode = self.data_manager.get_quiz_setting(final_cfg['chat_id'], "categories_mode", 'random')
             categories_pool = self.data_manager.get_quiz_setting(final_cfg['chat_id'], "specific_categories", [])
             
@@ -1390,9 +1532,9 @@ class QuizManager:
                         cfg['num_questions'] = num
                         # Сохраняем настройку в базу данных
                         if cfg.get('chat_id'):
-                            self.data_manager.update_quiz_setting(cfg['chat_id'], "num_questions", num)
+                            await self.data_manager.update_quiz_setting(cfg['chat_id'], "num_questions", num)
                             logger.info(f"Сохранена настройка количества вопросов для чата {cfg['chat_id']}: {num}")
-                        effective_params_after_num_change = self._get_effective_quiz_params(cfg['chat_id'], num)
+                        effective_params_after_num_change = await self._get_effective_quiz_params(cfg['chat_id'], num)
                         cfg['quiz_type_key'] = effective_params_after_num_change['quiz_type_key']
                         cfg['quiz_mode'] = effective_params_after_num_change['quiz_mode']
                     else: await query.answer(f"Некорректное число: {num}. Допустимо от 1 до {self.app_config.max_questions_per_session}.", show_alert=True)
@@ -1405,7 +1547,7 @@ class QuizManager:
             chat_id = cfg.get('chat_id')
             
             # Показываем текущее состояние из базы данных
-            settings = self.data_manager.get_chat_settings(chat_id) if chat_id else {}
+            settings = await self.data_manager.get_chat_settings_async(chat_id) if chat_id else {}
             current_mode = self.data_manager.get_quiz_setting(chat_id, "categories_mode", 'random')
             current_pool = self.data_manager.get_quiz_setting(chat_id, "specific_categories", [])
                 
@@ -1455,7 +1597,7 @@ class QuizManager:
             cfg['announce'] = not cfg['announce']
             # Сохраняем настройку в базу данных
             if cfg.get('chat_id'):
-                self.data_manager.update_quiz_setting(cfg['chat_id'], "announce", cfg['announce'])
+                await self.data_manager.update_quiz_setting(cfg['chat_id'], "announce", cfg['announce'])
                 logger.info(f"Сохранена настройка анонса для чата {cfg['chat_id']}: {cfg['announce']}")
             await self._send_quiz_cfg_message(query, context) 
             return CFG_QUIZ_OPTIONS
@@ -1463,7 +1605,7 @@ class QuizManager:
             logger.debug(f"Обработка настройки интервала для чата {cfg.get('chat_id')}")
             # Показываем меню для настройки интервала
             current_interval = cfg.get('interval_seconds')
-            effective_params = self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
+            effective_params = await self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
             default_interval = effective_params.get('interval_seconds', 30)
             
             if current_interval is not None:
@@ -1497,19 +1639,19 @@ class QuizManager:
                 cfg['interval_seconds'] = None
                 # Сохраняем настройку в базу данных
                 if cfg.get('chat_id'):
-                    self.data_manager.update_quiz_setting(cfg['chat_id'], "interval_seconds", None)
+                    await self.data_manager.update_quiz_setting(cfg['chat_id'], "interval_seconds", None)
                     logger.info(f"Сохранена настройка интервала для чата {cfg['chat_id']}: выключен")
                 await query.answer("Интервал выключен")
                 await self._send_quiz_cfg_message(query, context)
                 return CFG_QUIZ_OPTIONS
             elif opt_type == "on":
                 # Включаем интервал с дефолтным значением из настроек чата
-                effective_params = self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
+                effective_params = await self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
                 interval_value = effective_params.get('interval_seconds', 30)
                 cfg['interval_seconds'] = interval_value
                 # Сохраняем настройку в базу данных
                 if cfg.get('chat_id'):
-                    self.data_manager.update_quiz_setting(cfg['chat_id'], "interval_seconds", interval_value)
+                    await self.data_manager.update_quiz_setting(cfg['chat_id'], "interval_seconds", interval_value)
                     logger.info(f"Сохранена настройка интервала для чата {cfg['chat_id']}: {interval_value} сек")
                 await query.answer("Интервал включен с дефолтным значением")
                 await self._send_quiz_cfg_message(query, context)
@@ -1528,7 +1670,7 @@ class QuizManager:
         elif action == CB_QCFG_OPEN_PERIOD:
             # Показываем меню для настройки времени ответа
             current_open_period = cfg.get('open_period_seconds')
-            effective_params = self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
+            effective_params = await self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
             default_open_period = effective_params.get('open_period_seconds', 30)
             
             if current_open_period is not None:
@@ -1558,12 +1700,12 @@ class QuizManager:
             opt_type = action.split(":", 1)[1]
             if opt_type == "default":
                 # Используем дефолтное значение из настроек чата
-                effective_params = self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
+                effective_params = await self._get_effective_quiz_params(cfg['chat_id'], cfg['num_questions'])
                 open_period_value = effective_params.get('open_period_seconds', 30)
                 cfg['open_period_seconds'] = open_period_value
                 # Сохраняем настройку в базу данных
                 if cfg.get('chat_id'):
-                    self.data_manager.update_quiz_setting(cfg['chat_id'], "open_period_seconds", open_period_value)
+                    await self.data_manager.update_quiz_setting(cfg['chat_id'], "open_period_seconds", open_period_value)
                     logger.info(f"Сохранена настройка времени ответа для чата {cfg['chat_id']}: {open_period_value} сек")
                 await query.answer("Используется время по умолчанию")
                 await self._send_quiz_cfg_message(query, context)
@@ -1592,7 +1734,7 @@ class QuizManager:
                 
                 if mode == "random":
                     # Для случайных категорий спрашиваем количество
-                    chat_settings = self.data_manager.get_chat_settings(chat_id)
+                    chat_settings = await self.data_manager.get_chat_settings_async(chat_id)
                     current_val = self.data_manager.get_quiz_setting(chat_id, "num_random_categories", 3)
                     prompt_text = escape_markdown_v2(f"Введите количество случайных категорий (от 1 до 10):\n\nТекущее: {current_val}")
                     
@@ -1635,7 +1777,7 @@ class QuizManager:
                 if sub_action == 'clear':
                     if chat_id:
                         # Очищаем пул категорий и снимаем все галочки
-                        self.data_manager.update_chat_setting(chat_id, ["quiz", "specific_categories"], [])
+                        await self.data_manager.update_chat_setting(chat_id, ["quiz", "specific_categories"], [])
                         
                         # ОБНОВЛЯЕМ: Синхронизируем cfg с очищенными настройками
                         cfg['specific_categories'] = []
@@ -1654,7 +1796,7 @@ class QuizManager:
                         # Применяем режим "specific" только при сохранении
                         temp_mode = context.chat_data.get('_temp_quiz_categories_mode')
                         if temp_mode == 'specific':
-                            self.data_manager.update_quiz_setting(chat_id, "categories_mode", temp_mode)
+                            await self.data_manager.update_quiz_setting(chat_id, "categories_mode", temp_mode)
                             # Очищаем временный режим
                             context.chat_data.pop('_temp_quiz_categories_mode', None)
                             logger.info(f"Применен режим выбранных категорий при сохранении")
@@ -1701,7 +1843,7 @@ class QuizManager:
                         action_text = "добавлена в"
                     
                     # Сразу применяем изменения в базу данных
-                    self.data_manager.update_chat_setting(chat_id, ["quiz", "specific_categories"], list(current_pool))
+                    await self.data_manager.update_chat_setting(chat_id, ["quiz", "specific_categories"], list(current_pool))
                     
                     # ОБНОВЛЯЕМ: Синхронизируем cfg с изменениями для корректного отображения
                     cfg['specific_categories'] = list(current_pool)
@@ -1737,11 +1879,11 @@ class QuizManager:
                     chat_id = cfg.get('chat_id')
                     if chat_id:
                         # Применяем количество случайных категорий
-                        self.data_manager.update_quiz_setting(chat_id, "num_random_categories", num)
+                        await self.data_manager.update_quiz_setting(chat_id, "num_random_categories", num)
                         # Применяем режим "random" только при успешном вводе числа
                         temp_mode = context.chat_data.get('_temp_quiz_categories_mode')
                         if temp_mode == 'random':
-                            self.data_manager.update_quiz_setting(chat_id, "categories_mode", temp_mode)
+                            await self.data_manager.update_quiz_setting(chat_id, "categories_mode", temp_mode)
                             # Очищаем временный режим
                             context.chat_data.pop('_temp_quiz_categories_mode', None)
                             logger.info(f"Применен режим случайных категорий с количеством: {num}")
@@ -1775,12 +1917,12 @@ class QuizManager:
                     # Сохраняем в базу данных (как и другие настройки)
                     chat_id = cfg.get('chat_id')
                     if chat_id:
-                        self.data_manager.update_quiz_setting(chat_id, "num_questions", num)
+                        await self.data_manager.update_quiz_setting(chat_id, "num_questions", num)
                         logger.info(f"Сохранено количество вопросов: {num} для чата {chat_id}")
 
                     # Обновляем конфигурацию в памяти
                     cfg['num_questions'] = num
-                    effective_params_after_num_change = self._get_effective_quiz_params(cfg['chat_id'], num)
+                    effective_params_after_num_change = await self._get_effective_quiz_params(cfg['chat_id'], num)
                     cfg['quiz_type_key'] = effective_params_after_num_change['quiz_type_key']
                     cfg['quiz_mode'] = effective_params_after_num_change['quiz_mode']
 
@@ -1813,7 +1955,7 @@ class QuizManager:
                 cfg['interval_seconds'] = interval
                 # Сохраняем настройку в базу данных
                 if cfg.get('chat_id'):
-                    self.data_manager.update_quiz_setting(cfg['chat_id'], "interval_seconds", interval)
+                    await self.data_manager.update_quiz_setting(cfg['chat_id'], "interval_seconds", interval)
                     logger.info(f"Сохранена настройка интервала для чата {cfg['chat_id']}: {interval} сек")
                 context.chat_data.pop('_editing_interval', None)  # Убираем флаг
                 try: await update.message.delete()
@@ -1845,7 +1987,7 @@ class QuizManager:
                 cfg['open_period_seconds'] = open_period
                 # Сохраняем настройку в базу данных
                 if cfg.get('chat_id'):
-                    self.data_manager.update_quiz_setting(cfg['chat_id'], "open_period_seconds", open_period)
+                    await self.data_manager.update_quiz_setting(cfg['chat_id'], "open_period_seconds", open_period)
                     logger.info(f"Сохранена настройка времени ответа для чата {cfg['chat_id']}: {open_period} сек")
                 context.chat_data.pop('_editing_open_period', None)  # Убираем флаг
                 try: await update.message.delete()
@@ -1937,6 +2079,37 @@ class QuizManager:
         chat_id = update.effective_chat.id
         user_who_stopped = update.effective_user
         logger.info(f"Команда /{self.app_config.commands.stop_quiz} вызвана пользователем {user_who_stopped.id} ({user_who_stopped.full_name}) в чате {chat_id}.")
+        if self._pg_sessions:
+            from application.classic import ClassicApplicationService
+            database = self._pg_sessions.database
+            can_administer = await is_user_admin_in_update(update, context)
+            try:
+                async with database.transaction() as session:
+                    service = ClassicApplicationService(database, session)
+                    current = await service.current(
+                        chat_id=chat_id, user_id=user_who_stopped.id,
+                    )
+                    if current is None:
+                        raise LookupError('Нет активной викторины для остановки.')
+                    await service.stop(
+                        chat_id=chat_id,
+                        user_id=user_who_stopped.id,
+                        expected_revision=current['revision'],
+                        command_id=f'tg-stop:{chat_id}:{update.message.message_id}',
+                        allow_admin=can_administer,
+                    )
+            except (LookupError, PermissionError, RuntimeError, ValueError) as error:
+                await update.message.reply_text(
+                    escape_markdown_v2(str(error)), parse_mode=ParseMode.MARKDOWN_V2,
+                )
+                return
+            await update.message.reply_text(
+                escape_markdown_v2(
+                    f'Викторина остановлена пользователем {user_who_stopped.first_name}.'
+                ),
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
+            return
         quiz_state = self.state.get_active_quiz(chat_id)
         if not quiz_state:
             await update.message.reply_text(escape_markdown_v2("Нет активной викторины для остановки."), parse_mode=ParseMode.MARKDOWN_V2)
@@ -1958,9 +2131,12 @@ class QuizManager:
         await self._finalize_quiz_session(context, chat_id, was_stopped=True)
 
     def get_handlers(self) -> list:
+        from modules.telegram_menu import conversation_entry, home_fallbacks
         cancel_handler_for_conv = CommandHandler(self.app_config.commands.cancel, self.cancel_quiz_cfg_command)
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler(self.app_config.commands.quiz, self.quiz_command_entry)],
+            entry_points=[CommandHandler(self.app_config.commands.quiz, self.quiz_command_entry),
+                CallbackQueryHandler(conversation_entry(self.quiz_command_entry, self.app_config.commands.quiz), pattern=r'^(nav:quiz|start_quiz)$'),
+                CommandHandler('start', conversation_entry(self.quiz_command_entry, self.app_config.commands.quiz), filters=filters.Regex(r'^/start(?:@\w+)? (?:quiz|play)$'))],
             states={
                 CFG_QUIZ_OPTIONS: [CallbackQueryHandler(self.handle_quiz_cfg_callback, pattern=f"^{CB_QCFG_}")],
                 CFG_QUIZ_NUM_QS: [
@@ -1978,7 +2154,7 @@ class QuizManager:
                     MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_typed_open_period_seconds)
                 ],
             },
-            fallbacks=[cancel_handler_for_conv],
+            fallbacks=[*home_fallbacks(), cancel_handler_for_conv],
             per_chat=True, per_user=True, name="quiz_interactive_setup_conv", persistent=True, allow_reentry=True
         )
         return [
@@ -2010,7 +2186,15 @@ class QuizManager:
         
         try:
             # Сбрасываем статистику
-            self.category_manager.reset_category_usage_stats()
+            if self._pg_sessions:
+                from storage.category_statistics import CategoryStatistics
+                from uuid import uuid4
+                service = CategoryStatistics(self._pg_sessions.database)
+                preview = await service.preview(chat_id)
+                await service.reset_chat(chat_id, expected_version=preview['version'], confirmation=str(chat_id), action_id=str(uuid4()))
+                await self.category_manager.refresh_postgres_statistics()
+            else:
+                self.category_manager.reset_category_usage_stats()
             
             await update.message.reply_text(
                 escape_markdown_v2("✅ Статистика использования категорий успешно сброшена.\n\n"
@@ -2103,23 +2287,22 @@ class QuizManager:
         try:
             # ИСПРАВЛЕНО: Получаем статистику пользователей в этом чате из data_manager
             chat_id_str = str(chat_id)
-            chat_users_file = self.data_manager.chats_dir / chat_id_str / "users.json"
-            
-            chat_user_scores = {}
-            if chat_users_file.exists():
-                try:
+            if self.data_manager.postgres_storage:
+                from storage.score_queries import ScoreQueries
+                snapshot = await ScoreQueries(self.data_manager.postgres_storage.database).chat_statistics(chat_id)
+                chat_user_scores, category_stats = snapshot["users"], snapshot["categories"]
+            else:
+                chat_users_file = self.data_manager.chats_dir / chat_id_str / "users.json"
+                chat_user_scores = {}
+                if chat_users_file.exists():
                     with open(chat_users_file, 'r', encoding='utf-8') as f:
                         chat_user_scores = json.load(f)
-                except Exception as e:
-                    logger.warning(f"Ошибка загрузки пользователей чата {chat_id}: {e}")
-            
-            # Получаем статистику использования категорий в этом чате
-            category_stats = self.category_manager.get_category_usage_stats(read_only=True)
+                category_stats = self.category_manager.get_category_usage_stats(read_only=True)
             
             # Подсчитываем статистику по чату
             total_users_in_chat = len(chat_user_scores)
             total_score_in_chat = sum(user_data.get('score', 0) for user_data in chat_user_scores.values())
-            total_answered_polls = sum(len(user_data.get('answered_polls', set())) for user_data in chat_user_scores.values())
+            total_answered_polls = sum(user_data.get('answered_count', len(user_data.get('answered_polls', set()))) for user_data in chat_user_scores.values())
             
             # Статистика категорий в этом чате
             chat_category_usage = {}
@@ -2404,6 +2587,9 @@ _Если вы хотите начать новую викторину, снач
         Восстанавливает все активные викторины из сохраненных данных.
         Вызывается при запуске бота.
         """
+        if self._pg_sessions:
+            await self._restore_postgres_classic()
+            return
         try:
             # Загружаем сохраненные викторины
             saved_quizzes = self.data_manager.load_active_quizzes()
@@ -2451,6 +2637,8 @@ _Если вы хотите начать новую викторину, снач
         Настраивает автоматическое сохранение активных викторин.
         Вызывается при запуске бота.
         """
+        if self._pg_sessions:
+            return  # Each PostgreSQL transition already awaits its own checkpoint.
         try:
             # Создаем job для периодического сохранения (каждые 5 минут)
             job_name = "auto_save_active_quizzes"
@@ -2484,4 +2672,3 @@ _Если вы хотите начать новую викторину, снач
                 logger.debug("Автоматически сохранены активные викторины")
         except Exception as e:
             logger.error(f"Ошибка автоматического сохранения викторин: {e}")
-

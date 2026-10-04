@@ -4,6 +4,7 @@
 """
 
 import logging
+from hashlib import sha256
 from typing import Dict, Optional
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
@@ -51,6 +52,24 @@ class PhotoQuizHandlers:
     def __init__(self, photo_quiz_manager: PhotoQuizManager):
         self.photo_quiz_manager = photo_quiz_manager
 
+    @property
+    def database(self):
+        storage = self.photo_quiz_manager.postgres_storage
+        if storage is None:
+            raise RuntimeError('Фото-загадки требуют PostgreSQL runtime.')
+        return storage.database
+
+    @staticmethod
+    def _command_id(kind, update_id):
+        return f'tg:photo:{kind}:' + sha256(str(update_id).encode()).hexdigest()[:32]
+
+    async def _current(self, chat_id, user_id):
+        from application.photo import PhotoApplicationService
+        async with self.database.transaction() as session:
+            return await PhotoApplicationService(self.database, session).current(
+                chat_id=chat_id, user_id=user_id,
+            )
+
     async def photo_quiz_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Точка входа команды /photo_quiz -> показывает меню настроек"""
         if not update.message or not update.effective_chat or not update.effective_user:
@@ -60,8 +79,8 @@ class PhotoQuizHandlers:
         user_id = update.effective_user.id
 
         # Проверяем, не идет ли уже фото-викторина
-        active_quiz = self.photo_quiz_manager.get_active_photo_quiz(chat_id)
-        if active_quiz and active_quiz.is_active:
+        active_quiz = await self._current(chat_id, user_id)
+        if active_quiz and active_quiz.get('status') == 'active':
             await update.message.reply_text(
                 escape_markdown_v2("🖼️ Фото-викторина уже идет. Остановите текущую: `/stop_photo_quiz`."),
                 parse_mode="MarkdownV2",
@@ -91,7 +110,24 @@ class PhotoQuizHandlers:
     async def stop_photo_quiz_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /stop_photo_quiz"""
         try:
-            await self.photo_quiz_manager.stop_photo_quiz(update, context)
+            from application.photo import PhotoApplicationService
+            if not update.effective_chat or not update.effective_user:
+                return
+            async with self.database.transaction() as session:
+                service = PhotoApplicationService(self.database, session)
+                current = await service.current(
+                    chat_id=update.effective_chat.id, user_id=update.effective_user.id,
+                )
+                if current is None or current.get('status') != 'active':
+                    raise LookupError('В этом чате нет активной фото-викторины.')
+                await service.stop(
+                    chat_id=update.effective_chat.id, user_id=update.effective_user.id,
+                    expected_revision=current['revision'],
+                    command_id=self._command_id('stop', update.update_id),
+                )
+        except (LookupError, PermissionError, RuntimeError, ValueError) as e:
+            if update.message:
+                await update.message.reply_text(str(e))
         except Exception as e:
             logger.error(f"Ошибка в команде /stop_photo_quiz: {e}")
             if update.message:
@@ -150,12 +186,20 @@ class PhotoQuizHandlers:
         """Обработчик сообщений в фото-викторине"""
         try:
             chat_id = update.effective_chat.id
-            active_quiz = self.photo_quiz_manager.get_active_photo_quiz(chat_id)
-
-            if active_quiz and active_quiz.is_active:
-                await self.photo_quiz_manager.check_answer(update, context)
-            else:
+            if not update.effective_user or not update.message or not update.message.text:
                 return False
+            from application.photo import PhotoApplicationService
+            async with self.database.transaction() as session:
+                service = PhotoApplicationService(self.database, session)
+                current = await service.settle_due(chat_id=chat_id, user_id=update.effective_user.id)
+                if current is None or not current.get('question'):
+                    return False
+                result = await service.answer(
+                    chat_id=chat_id, user_id=update.effective_user.id,
+                    display_name=update.effective_user.full_name,
+                    round_id=current['question']['round_id'], answer=update.message.text,
+                    command_id=self._command_id('answer', update.update_id),
+                )
 
         except Exception as e:
             logger.error(f"Ошибка обработки сообщения в фото-викторине: {e}")
@@ -245,20 +289,25 @@ class PhotoQuizHandlers:
                 await query.answer("Не удалось определить параметры запуска.", show_alert=True)
                 return PHOTO_CFG_OPTIONS
 
-            active_quiz = self.photo_quiz_manager.get_active_photo_quiz(chat_id)
-            if active_quiz and active_quiz.is_active:
+            active_quiz = await self._current(chat_id, user_id)
+            if active_quiz and active_quiz.get('status') == 'active':
                 await query.answer("Фото-викторина уже идет в этом чате.", show_alert=True)
                 await self._send_photo_quiz_cfg_message(query, context)
                 return PHOTO_CFG_OPTIONS
 
-            await self.photo_quiz_manager.start_photo_quiz_series(
-                context=context,
-                chat_id=chat_id,
-                user_id=user_id,
-                time_limit=time_limit,
-                question_count=question_count,
-                hints_enabled=hints_enabled,
-            )
+            from application.photo import PhotoApplicationService, PhotoGameConflict
+            try:
+                async with self.database.transaction() as session:
+                    await PhotoApplicationService(self.database, session).start(
+                        chat_id=chat_id, user_id=user_id,
+                        display_name=update.effective_user.full_name if update.effective_user else None,
+                        open_seconds=time_limit, question_count=question_count,
+                        hints_enabled=hints_enabled,
+                        command_id=self._command_id('start', query.id),
+                    )
+            except (PhotoGameConflict, LookupError, ValueError) as error:
+                await query.answer(str(error)[:180], show_alert=True)
+                return PHOTO_CFG_OPTIONS
 
             await self._cleanup_cfg_message(context, query.message)
             context.chat_data.pop(PHOTO_CFG_STORE_KEY, None)
@@ -321,6 +370,7 @@ class PhotoQuizHandlers:
                     InlineKeyboardButton(
                         "▶️ Запустить фото-викторину",
                         callback_data=CB_PQCFG_START,
+                        style='success',
                     )
                 ],
                 [
@@ -332,62 +382,16 @@ class PhotoQuizHandlers:
             ]
         )
 
-        if await self._edit_cfg_view(context, status_text, markup):
-            return
-
-        existing_message_id = context.chat_data.get(PHOTO_CFG_MENU_MSG_KEY)
-        cfg_chat_id = cfg.get("chat_id")
-        if existing_message_id and cfg_chat_id:
-            try:
-                await context.bot.edit_message_text(
-                    chat_id=cfg_chat_id,
-                    message_id=existing_message_id,
-                    text=status_text,
-                    reply_markup=markup,
-                    parse_mode="MarkdownV2",
-                )
-                return
-            except BadRequest as e_br:
-                # Если сообщение не изменилось - это нормальная ситуация
-                if "Message is not modified" not in str(e_br).lower():
-                    logger.debug(f"Ошибка BadRequest при редактировании сообщения фото-викторины: {e_br}")
-                return
-            except Exception:
-                pass
-
-        target_message: Optional[Message] = None
-        if isinstance(update_or_query, CallbackQuery) and update_or_query.message:
-            target_message = update_or_query.message
-        elif isinstance(update_or_query, Update) and update_or_query.message:
-            target_message = update_or_query.message
-
-        if target_message:
-            try:
-                sent = await safe_send_message(
-                    bot=context.bot,
-                    chat_id=target_message.chat_id,
-                    text=status_text,
-                    reply_markup=markup,
-                    reply_to_message_id=target_message.message_id,
-                    parse_mode="MarkdownV2",
-                )
-                context.chat_data[PHOTO_CFG_MENU_MSG_KEY] = sent.message_id
-            except Exception as e:
-                logger.error(f"Ошибка отправки сообщения конфигурации фото-квиза: {e}", exc_info=True)
-        else:
-            chat_id = cfg_chat_id
-            if chat_id:
-                try:
-                    sent = await safe_send_message(
-                        bot=context.bot,
-                        chat_id=chat_id,
-                        text=status_text,
-                        reply_markup=markup,
-                        parse_mode="MarkdownV2",
-                    )
-                    context.chat_data[PHOTO_CFG_MENU_MSG_KEY] = sent.message_id
-                except Exception as e:
-                    logger.error(f"Ошибка отправки сообщения конфигурации фото-квиза: {e}", exc_info=True)
+        from modules.telegram_menu import card
+        target = context.chat_data.get('_menu_entry_message_id') or context.chat_data.get(PHOTO_CFG_MENU_MSG_KEY)
+        rows = [list(row) for row in markup.inline_keyboard]
+        rows.append([InlineKeyboardButton('‹ Главное меню', callback_data='nav:home')])
+        sent = await card(update_or_query, context, status_text, rows,
+                          parse_mode='MarkdownV2', message_id=target)
+        if sent:
+            context.chat_data[PHOTO_CFG_MENU_MSG_KEY] = sent.message_id
+        elif target:
+            context.chat_data[PHOTO_CFG_MENU_MSG_KEY] = target
 
     async def _cleanup_cfg_message(
         self,
@@ -531,18 +535,21 @@ class PhotoQuizHandlers:
                 )
                 return True
             except BadRequest as e_br:
-                # Если сообщение не изменилось - это нормальная ситуация (например, двойной клик)
-                if "Message is not modified" not in str(e_br).lower():
-                    logger.debug(f"Ошибка BadRequest при редактировании меню фото-викторины: {e_br}")
-                return True  # Считаем успешным, так как сообщение уже имеет нужное содержимое
-            except Exception as e:
-                logger.debug(f"Не удалось отредактировать сообщение меню фото-викторины: {e}")
+                if 'message is not modified' in str(e_br).lower():
+                    return True
+                if 'message to edit not found' in str(e_br).lower():
+                    context.chat_data.pop(PHOTO_CFG_MENU_MSG_KEY, None)
+                    return False
+                raise
         return False
 
     def get_handlers(self) -> list:
+        from modules.telegram_menu import conversation_entry, home_fallbacks
         cancel_handler = CommandHandler("cancel", self.cancel_photo_quiz_command)
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("photo_quiz", self.photo_quiz_command)],
+            entry_points=[CommandHandler("photo_quiz", self.photo_quiz_command),
+                CallbackQueryHandler(conversation_entry(self.photo_quiz_command, 'photo_quiz'), pattern=r'^nav:photo$'),
+                CommandHandler('start', self.photo_quiz_command, filters=filters.Regex(r'^/start(?:@\w+)? photo$'))],
             states={
                 PHOTO_CFG_OPTIONS: [
                     CallbackQueryHandler(
@@ -558,7 +565,7 @@ class PhotoQuizHandlers:
                     ),
                 ],
             },
-            fallbacks=[cancel_handler],
+            fallbacks=[*home_fallbacks(), cancel_handler],
             per_chat=True,
             per_user=True,
             name="photo_quiz_setup_conv",

@@ -7,8 +7,13 @@ import asyncio
 import json
 import logging
 import random
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field, fields
+from copy import deepcopy
+from contextlib import asynccontextmanager
+from functools import wraps
+from inspect import signature
+from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Set
 
@@ -22,6 +27,30 @@ logger = logging.getLogger(__name__)
 
 # Константы для удаления сообщений
 DELAY_BEFORE_PHOTO_QUIZ_DELETION_SECONDS = 180  # 3 минуты (как в обычных викторинах)
+
+
+def serialized_photo(method):
+    """Serialize a chat's transitions, including nested calls in the same task."""
+    parameters = signature(method)
+    @wraps(method)
+    async def wrapped(self, *args, **kwargs):
+        values = parameters.bind(self, *args, **kwargs).arguments
+        chat_id = values.get("chat_id")
+        if chat_id is None:
+            chat_id = values["update"].effective_chat.id if "update" in values else values["quiz_state"].chat_id
+        observed = self.active_photo_quizzes.get(chat_id)
+        index = observed.current_question_index if observed else None
+        if method.__name__ == "_end_photo_quiz" and observed and not observed.is_active:
+            return
+        async with self._chat_guard(chat_id):
+            if await self._discard_interrupted_photo(chat_id) and method.__name__ != 'start_photo_quiz_series':
+                return False
+            if method.__name__ in {"check_answer", "_end_photo_quiz"}:
+                current = self.active_photo_quizzes.get(chat_id)
+                if current is not observed or (current and current.current_question_index != index):
+                    return False
+            return await method(self, *args, **kwargs)
+    return wrapped
 
 @dataclass
 class PhotoQuizState:
@@ -43,6 +72,10 @@ class PhotoQuizState:
     masks: Dict[str, str] = None
     total_correct_answers: int = 0
     total_score: float = 0.0
+    session_id: str = field(default_factory=lambda: uuid4().hex)
+    phase: str = "ready"
+    revision: int = 0
+    last_outcome: Optional[dict] = None
 
     def __post_init__(self):
         if self.hints_given is None:
@@ -58,7 +91,8 @@ class PhotoQuizManager:
         self.score_manager = score_manager
         self.active_photo_quizzes: Dict[int, PhotoQuizState] = {}  # chat_id -> PhotoQuizState
         self.images_metadata: Dict[str, Dict] = {}
-        self.images_dir = Path("data/images")
+        from storage.photo_media import images_root
+        self.images_dir = images_root()
         self.metadata_file = Path("data/photo_quiz_metadata.json")
         
         # Настройки фото-викторины по умолчанию
@@ -66,9 +100,112 @@ class PhotoQuizManager:
         
         # Загружаем метаданные изображений
         self._load_images_metadata()
+
+    @property
+    def postgres_storage(self):
+        return getattr(getattr(self, "data_manager", None), "postgres_storage", None)
+
+    def _now(self):
+        return datetime.now(timezone.utc) if self.postgres_storage else datetime.now()
+
+    async def _discard_interrupted_photo(self, chat_id):
+        state = self.active_photo_quizzes.get(chat_id)
+        if not self.postgres_storage or not state or not state.revision:
+            return False
+        from storage.admin_actions import AdminActions
+        if await AdminActions(self.postgres_storage.database).session_active(f'photo:{chat_id}', state.session_id):
+            return False
+        state.is_active = False
+        if state.timer_task and state.timer_task is not asyncio.current_task():
+            state.timer_task.cancel()
+        self.active_photo_quizzes.pop(chat_id, None)
+        return True
+
+    @asynccontextmanager
+    async def _chat_guard(self, chat_id):
+        if not hasattr(self, "_chat_locks"):
+            self._chat_locks, self._chat_owners = {}, {}
+        task = asyncio.current_task()
+        if self._chat_owners.get(chat_id) is task:
+            yield
+            return
+        async with self._chat_locks.setdefault(chat_id, asyncio.Lock()):
+            self._chat_owners[chat_id] = task
+            try:
+                yield
+            finally:
+                self._chat_owners.pop(chat_id, None)
+
+    @staticmethod
+    def _record(state):
+        value = {f.name: deepcopy(getattr(state, f.name)) for f in fields(state) if f.name != "timer_task"}
+        value["start_time"] = state.start_time.isoformat() if state.start_time else None
+        value["message_ids_to_delete"] = sorted(state.message_ids_to_delete)
+        return value
+
+    @staticmethod
+    def _accept_record(state, value):
+        for key, item in value.items():
+            if key == "timer_task":
+                continue
+            if key == "start_time":
+                item = datetime.fromisoformat(item) if item else None
+            elif key == "message_ids_to_delete":
+                item = set(item)
+            setattr(state, key, deepcopy(item))
+
+    async def _persist(self, state, *, status="active", create=False):
+        if not self.postgres_storage:
+            return
+        from storage.photos import PhotoSessions
+        service = PhotoSessions(self.postgres_storage.database)
+        value = await service.create(self._record(state)) if create else await service.save(self._record(state), status=status)
+        self._accept_record(state, value)
+
+    async def restore_sessions(self, context, *, chat_id=None):
+        if not self.postgres_storage:
+            return
+        from storage.photos import PhotoSessions
+        for record in await PhotoSessions(self.postgres_storage.database).active():
+            if chat_id is not None and record['chat_id'] != chat_id:
+                continue
+            from storage.admin_actions import AdminActions
+            if not await AdminActions(self.postgres_storage.database).allowed(record['chat_id'], record['user_id']):
+                await PhotoSessions(self.postgres_storage.database).save(record, status='interrupted')
+                continue
+            state = PhotoQuizState(chat_id=record["chat_id"], user_id=record["user_id"], questions=[])
+            self._accept_record(state, record)
+            self.active_photo_quizzes[state.chat_id] = state
+            if state.phase in {"sending", "finalizing"}:
+                # Sending may have succeeded without an acknowledgement. Never resend.
+                await self._force_finish(state.chat_id, context)
+            elif state.phase == "active":
+                if (self._now() - state.start_time).total_seconds() >= state.time_limit:
+                    await self._end_photo_quiz(state.chat_id, context, timeout=True)
+                else:
+                    self._start_timer(state, context)
+            elif state.phase in {"ready", "between"}:
+                if state.current_question_index < len(state.questions):
+                    await self._send_current_question(state.chat_id, context)
+                else:
+                    await self._finish_series(state, context)
+            else:
+                raise ValueError("Unknown persisted photo session phase")
+
+    def _start_timer(self, state, context):
+        callback = self._photo_quiz_timer if state.hints_enabled else self._photo_quiz_timer_without_hints
+        state.timer_task = asyncio.create_task(callback(state.chat_id, context))
+
+    async def shutdown(self):
+        tasks = [s.timer_task for s in self.active_photo_quizzes.values() if s.timer_task and not s.timer_task.done()]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
     
     def _load_images_metadata(self):
         """Загружает метаданные изображений из JSON файла"""
+        if self.postgres_storage:
+            return  # Loaded asynchronously from PostgreSQL before selection.
         try:
             if self.metadata_file.exists():
                 with open(self.metadata_file, 'r', encoding='utf-8') as f:
@@ -83,6 +220,8 @@ class PhotoQuizManager:
     
     def _save_images_metadata(self):
         """Сохраняет метаданные изображений в JSON файл"""
+        if self.postgres_storage:
+            raise RuntimeError("PostgreSQL photo metadata must not be written to JSON")
         try:
             self.metadata_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.metadata_file, 'w', encoding='utf-8') as f:
@@ -102,6 +241,32 @@ class PhotoQuizManager:
         """Группирует изображения по нормализованному имени"""
         groups = {}
         webp_files = list(self.images_dir.glob("*.webp"))
+
+        if self.postgres_storage:
+            # PostgreSQL is authoritative. Files never create playable records;
+            # a catalog entry explicitly selects either one content-addressed
+            # object or its compatible legacy filename group.
+            from storage.photo_media import verified_image_path
+            for media_key, value in self.images_metadata.items():
+                if value.get('archived') or not value.get('enabled', True):
+                    continue
+                if value.get('storage_name'):
+                    path = verified_image_path(self.images_dir, media_key, value)
+                    if path is not None:
+                        groups[media_key] = [path.stem]
+                    continue
+                if value.get('image_sha256'):
+                    path = verified_image_path(self.images_dir, media_key, value)
+                    if path is not None:
+                        groups[media_key] = [path.stem]
+                    continue
+                candidates = [
+                    path.stem for path in webp_files
+                    if self._normalize_name(path.stem) == media_key and not path.is_symlink()
+                ]
+                if candidates:
+                    groups[media_key] = candidates
+            return groups
         
         for image_path in webp_files:
             image_name = image_path.stem
@@ -116,11 +281,13 @@ class PhotoQuizManager:
     def get_default_time_limit(self) -> int:
         return self._default_time_limit
 
-    def _get_random_image(self) -> Tuple[str, Dict]:
+    async def _get_random_image(self) -> Tuple[str, Dict]:
         """Получает случайное изображение и его метаданные"""
         try:
             # Получаем группы изображений
             image_groups = self._get_image_groups()
+            image_groups = {name: images for name, images in image_groups.items()
+                            if self.images_metadata.get(name, {}).get("enabled", True)}
             if not image_groups:
                 raise ValueError("Нет WebP изображений в папке data/images")
             
@@ -199,10 +366,10 @@ class PhotoQuizManager:
             "answer": answer,
         }
     
-    def _prepare_question(self) -> Optional[Dict[str, str]]:
+    async def _prepare_question(self) -> Optional[Dict[str, str]]:
         """Подготавливает данные одного фото-вопроса."""
         try:
-            image_path, metadata = self._get_random_image()
+            image_path, metadata = await self._get_random_image()
             display_answer = metadata.get("display_answer") or metadata.get("correct_answer", "")
             display_answer = display_answer.strip()
             if not display_answer:
@@ -222,6 +389,7 @@ class PhotoQuizManager:
             logger.error(f"Ошибка подготовки фото-вопроса: {e}")
             return None
 
+    @serialized_photo
     async def _send_current_question(self, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             state = self.active_photo_quizzes.get(chat_id)
@@ -235,11 +403,11 @@ class PhotoQuizManager:
             question_index = state.current_question_index
             current_question = state.questions[question_index]
 
-            state.start_time = datetime.now()
+            state.start_time = self._now()
             state.current_hint_level = 0
             state.hints_given = []
             state.attempts = 0
-            state.is_active = True
+            state.is_active = not bool(self.postgres_storage)
             state.masks = current_question["masks"]
 
             caption_lines = [
@@ -260,6 +428,8 @@ class PhotoQuizManager:
                 await self._force_finish(chat_id, context)
                 return
 
+            state.phase = "sending"
+            await self._persist(state)
             with open(image_path, "rb") as photo:
                 message = await context.bot.send_photo(
                     chat_id=chat_id,
@@ -275,11 +445,9 @@ class PhotoQuizManager:
             )
 
             state.current_question_index += 1
-
-            if state.hints_enabled:
-                state.timer_task = asyncio.create_task(self._photo_quiz_timer(chat_id, context))
-            else:
-                state.timer_task = asyncio.create_task(self._photo_quiz_timer_without_hints(chat_id, context))
+            state.phase, state.is_active = "active", True
+            await self._persist(state)
+            self._start_timer(state, context)
 
         except Exception as e:
             logger.error(f"Ошибка отправки фото-вопроса: {e}", exc_info=True)
@@ -374,6 +542,7 @@ class PhotoQuizManager:
             hints_enabled=True,
         )
 
+    @serialized_photo
     async def start_photo_quiz_series(
         self,
         context: ContextTypes.DEFAULT_TYPE,
@@ -385,6 +554,10 @@ class PhotoQuizManager:
     ) -> bool:
         """Запускает серию фото-вопросов для пользователя."""
         try:
+            if self.postgres_storage:
+                from storage.admin_actions import AdminActions
+                if not await AdminActions(self.postgres_storage.database).allowed(chat_id, user_id):
+                    return False
             if chat_id in self.active_photo_quizzes:
                 await context.bot.send_message(
                     chat_id=chat_id,
@@ -396,9 +569,12 @@ class PhotoQuizManager:
                 )
                 return False
 
+            if self.postgres_storage:
+                from storage.photos import PhotoCatalog
+                self.images_metadata = await PhotoCatalog(self.postgres_storage.database).load()
             questions: List[Dict[str, str]] = []
             for _ in range(max(1, question_count)):
-                question = self._prepare_question()
+                question = await self._prepare_question()
                 if question:
                     questions.append(question)
 
@@ -424,13 +600,14 @@ class PhotoQuizManager:
                 hints_enabled=hints_enabled,
             )
 
+            await self._persist(state, create=True)
             self.active_photo_quizzes[chat_id] = state
             await self._send_current_question(chat_id, context)
 
             logger.info(
                 f"Запущена фото-викторина в чате {chat_id} для пользователя {user_id}. Вопросов: {len(questions)}"
             )
-            return True
+            return chat_id in self.active_photo_quizzes
 
         except Exception as e:
             logger.error(f"Ошибка запуска фото-викторины: {e}")
@@ -450,31 +627,37 @@ class PhotoQuizManager:
 
             start_time = state.start_time
             for idx, hint_time in enumerate(state.hint_schedule, start=1):
-                wait_seconds = hint_time - (datetime.now() - start_time).total_seconds()
+                if idx <= state.current_hint_level:
+                    continue
+                wait_seconds = hint_time - (self._now() - start_time).total_seconds()
                 if wait_seconds > 0:
                     await asyncio.sleep(wait_seconds)
 
-                current_state = self.active_photo_quizzes.get(chat_id)
-                if not current_state or not current_state.is_active or not current_state.hints_enabled:
-                    return
+                async with self._chat_guard(chat_id):
+                    if await self._discard_interrupted_photo(chat_id):
+                        return
+                    current_state = self.active_photo_quizzes.get(chat_id)
+                    if current_state is not state or not current_state.is_active or not current_state.hints_enabled:
+                        return
+                    hint_key = "first_letters" if idx == 1 else "partial"
+                    hint_mask = current_state.masks.get(hint_key, current_state.masks["initial"])
+                    current_state.current_hint_level = idx
+                    await self._persist(current_state)
+                    message = await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=escape_markdown_v2(f"💡 Подсказка {idx}: {hint_mask}"),
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                    )
+                    current_state.hints_given.append(hint_mask)
+                    current_state.message_ids_to_delete.add(message.message_id)
+                    await self._persist(current_state)
 
-                hint_key = "first_letters" if idx == 1 else "partial"
-                hint_mask = current_state.masks.get(hint_key, current_state.masks["initial"])
-                message = await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=escape_markdown_v2(f"💡 Подсказка {idx}: {hint_mask}"),
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                )
-                current_state.hints_given.append(hint_mask)
-                current_state.current_hint_level = idx
-                current_state.message_ids_to_delete.add(message.message_id)
-
-            remaining = state.time_limit - (datetime.now() - start_time).total_seconds()
+            remaining = state.time_limit - (self._now() - start_time).total_seconds()
             if remaining > 0:
                 await asyncio.sleep(remaining)
 
             current_state = self.active_photo_quizzes.get(chat_id)
-            if current_state and current_state.is_active:
+            if current_state is state and current_state.is_active:
                 await self._end_photo_quiz(chat_id, context, timeout=True)
 
         except Exception as e:
@@ -488,16 +671,18 @@ class PhotoQuizManager:
             if not state:
                 return
 
-            await asyncio.sleep(state.time_limit)
+            remaining = state.time_limit - (self._now() - state.start_time).total_seconds()
+            await asyncio.sleep(max(0, remaining))
 
             current_state = self.active_photo_quizzes.get(chat_id)
-            if current_state and current_state.is_active:
+            if current_state is state and current_state.is_active:
                 await self._end_photo_quiz(chat_id, context, timeout=True)
 
         except Exception as e:
             logger.error(f"Ошибка таймера фото-викторины без подсказок: {e}")
             await self._force_finish(chat_id, context)
     
+    @serialized_photo
     async def check_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         """Проверяет ответ пользователя в фото-викторине"""
         try:
@@ -508,7 +693,17 @@ class PhotoQuizManager:
                 return False
 
             quiz_state = self.active_photo_quizzes[chat_id]
+            actor = getattr(update, "effective_user", None)
+            if actor is None or actor.id != quiz_state.user_id:
+                # A personal photo series must never award its owner for another
+                # group member's message.
+                return False
             # Текущий вопрос - это current_question_index - 1
+            if not quiz_state.is_active:
+                return False
+            if (self._now() - quiz_state.start_time).total_seconds() >= quiz_state.time_limit:
+                await self._end_photo_quiz(chat_id, context, timeout=True)
+                return True
             question_index = quiz_state.current_question_index - 1
             if question_index < 0 or question_index >= len(quiz_state.questions):
                 return False
@@ -530,17 +725,19 @@ class PhotoQuizManager:
             if is_correct:
                 await self._end_photo_quiz(chat_id, context, correct=True, user_answer=user_answer, is_exact_match=True)
             elif is_almost_correct:
+                quiz_state.attempts += 1
+                await self._persist(quiz_state)
                 await update.message.reply_text(
                     escape_markdown_v2("🔥 Вы на верном пути! Но ответ неполный. Попробуйте еще раз."),
                     parse_mode=ParseMode.MARKDOWN_V2,
                 )
-                quiz_state.attempts = getattr(quiz_state, "attempts", 0) + 1
             else:
+                quiz_state.attempts += 1
+                await self._persist(quiz_state)
                 await update.message.reply_text(
                     escape_markdown_v2("❌ Неправильно! Попробуйте еще раз."),
                     parse_mode=ParseMode.MARKDOWN_V2,
                 )
-                quiz_state.attempts = getattr(quiz_state, "attempts", 0) + 1
 
             return True
 
@@ -548,6 +745,7 @@ class PhotoQuizManager:
             logger.error(f"Ошибка проверки ответа: {e}")
             return False
     
+    @serialized_photo
     async def _end_photo_quiz(
         self,
         chat_id: int,
@@ -566,21 +764,14 @@ class PhotoQuizManager:
                 return
 
             quiz_state = self.active_photo_quizzes[chat_id]
+            if not quiz_state.is_active:
+                return
             question_index = quiz_state.current_question_index - 1
             if question_index < 0 or question_index >= len(quiz_state.questions):
                 return
 
             quiz_state.is_active = False
             current_question = quiz_state.questions[question_index]
-
-            current_task = asyncio.current_task()
-            timer_task = quiz_state.timer_task
-            if (
-                timer_task
-                and not timer_task.done()
-                and timer_task is not current_task
-            ):
-                timer_task.cancel()
 
             logger.debug(f"Состояние фото-викторины: {len(quiz_state.message_ids_to_delete)} сообщений для удаления")
 
@@ -589,7 +780,7 @@ class PhotoQuizManager:
                 base_points = 5.0
                 if quiz_state.hints_enabled and quiz_state.hint_schedule:
                     first_hint_time = quiz_state.hint_schedule[0]
-                    elapsed = (datetime.now() - quiz_state.start_time).total_seconds()
+                    elapsed = (self._now() - quiz_state.start_time).total_seconds()
                     if elapsed < first_hint_time:
                         base_points += 1.0
 
@@ -597,36 +788,45 @@ class PhotoQuizManager:
                 penalty = attempts * 0.5
                 points = max(1.0, base_points - penalty)
 
-                # Обновляем общую статистику
-                quiz_state.total_correct_answers += 1
-                quiz_state.total_score += points
+            if self.postgres_storage:
+                try:
+                    from storage.photos import PhotoSessions
+                    value = await PhotoSessions(self.postgres_storage.database).complete_question(
+                        self._record(quiz_state), correct=correct, points=points,
+                    )
+                    self._accept_record(quiz_state, value)
+                    outcome = value["last_outcome"]
+                    correct, points = outcome["correct"], outcome["points"]
+                    timeout = not correct
+                except Exception:
+                    quiz_state.is_active = True
+                    if quiz_state.timer_task is None or quiz_state.timer_task.done() or quiz_state.timer_task is asyncio.current_task():
+                        quiz_state.timer_task = asyncio.create_task(
+                            self._resume_timeout_after_storage_error(quiz_state, question_index, context)
+                        )
+                    raise
+            elif correct:
+                try:
+                    applied = await self.score_manager.award_photo_answer(
+                        quiz_state.chat_id, quiz_state.user_id,
+                        f"photo:{quiz_state.session_id}:{question_index}", points,
+                    )
+                except Exception:
+                    # Keep the same answer id so a retry cannot double-award even
+                    # if the connection failed after the database committed.
+                    quiz_state.is_active = True
+                    if quiz_state.timer_task is None or quiz_state.timer_task.done():
+                        quiz_state.timer_task = asyncio.create_task(
+                            self._resume_timeout_after_storage_error(quiz_state, question_index, context)
+                        )
+                    raise
+                if applied:
+                    quiz_state.total_correct_answers += 1
+                    quiz_state.total_score += points
 
-                chat_id_str = str(quiz_state.chat_id)
-                user_id_str = str(quiz_state.user_id)
-
-                if quiz_state.chat_id not in self.data_manager.state.user_scores:
-                    self.data_manager.state.user_scores[quiz_state.chat_id] = {}
-
-                if user_id_str not in self.data_manager.state.user_scores[quiz_state.chat_id]:
-                    self.data_manager.state.user_scores[quiz_state.chat_id][user_id_str] = {
-                        "name": f"User {user_id_str}",
-                        "score": 0,
-                        "answered_polls": set(),
-                        "correct_answers_count": 0,
-                        "daily_answered_polls": set(),
-                        "first_answer_time": None,
-                        "last_answer_time": None,
-                        "milestones_achieved": set(),
-                    }
-
-                self.data_manager.state.user_scores[quiz_state.chat_id][user_id_str]["score"] += points
-                self.data_manager.state.user_scores[quiz_state.chat_id][user_id_str]["correct_answers_count"] += 1
-
-                logger.debug(
-                    f"Начислено {points} очков пользователю {user_id_str} в чате {quiz_state.chat_id} за фото-викторину"
-                )
-
-                self.data_manager.save_user_data(quiz_state.chat_id)
+            timer_task = quiz_state.timer_task
+            if timer_task and not timer_task.done() and timer_task is not asyncio.current_task():
+                timer_task.cancel()
 
             attempts = getattr(quiz_state, "attempts", 0)
             penalty_value = attempts * 0.5
@@ -649,7 +849,7 @@ class PhotoQuizManager:
                     )
                 else:
                     base_text_lines.append(f"🏆 Очки: {escape('+')}{escape(points_display)}")
-                time_seconds = int((datetime.now() - quiz_state.start_time).total_seconds())
+                time_seconds = int((self._now() - quiz_state.start_time).total_seconds())
                 base_text_lines.append(
                     f"⏱️ Время: {escape(str(time_seconds))} {escape('сек')}"
                 )
@@ -699,6 +899,7 @@ class PhotoQuizManager:
                     exc_info=True,
                 )
 
+            await self._persist(quiz_state)
             if quiz_state.current_question_index < len(quiz_state.questions):
                 logger.info(
                     "[PhotoQuiz] Переход к следующему вопросу (chat=%s, next_index=%s)",
@@ -709,25 +910,33 @@ class PhotoQuizManager:
                 await self._send_current_question(chat_id, context)
                 return
 
-            # Серия завершена - отправляем итоговое сообщение
-            logger.info("[PhotoQuiz] Все вопросы пройдены, отправляем итоговое сообщение")
-            await self._send_final_results(chat_id, context)
-
-            logger.info(
-                "[PhotoQuiz] Планируем очистку сообщений (chat=%s, total_messages=%s)",
-                chat_id,
-                len(quiz_state.message_ids_to_delete),
-            )
-            if quiz_state.message_ids_to_delete:
-                await self._schedule_photo_quiz_cleanup(
-                    chat_id, list(quiz_state.message_ids_to_delete), context
-                )
-
-            del self.active_photo_quizzes[chat_id]
-            logger.info("Фото-викторина завершена в чате %s (серия завершена)", chat_id)
+            await self._finish_series(quiz_state, context)
 
         except Exception as e:
             logger.error(f"Ошибка завершения фото-викторины: {e}")
+
+    @serialized_photo
+    async def _finish_series(self, quiz_state, context):
+        chat_id = quiz_state.chat_id
+        quiz_state.phase, quiz_state.is_active = "finalizing", False
+        await self._persist(quiz_state)
+        await self._send_final_results(chat_id, context)
+        if quiz_state.message_ids_to_delete:
+            await self._schedule_photo_quiz_cleanup(chat_id, list(quiz_state.message_ids_to_delete), context)
+        quiz_state.phase = "finished"
+        await self._persist(quiz_state, status="completed")
+        self.active_photo_quizzes.pop(chat_id, None)
+
+    async def _resume_timeout_after_storage_error(self, quiz_state, question_index, context):
+        """Do not leave a question without a deadline after a failed score write."""
+        remaining = quiz_state.time_limit - (self._now() - quiz_state.start_time).total_seconds()
+        await asyncio.sleep(max(5 if self.postgres_storage else 0, remaining))
+        if (
+            self.active_photo_quizzes.get(quiz_state.chat_id) is quiz_state
+            and quiz_state.is_active
+            and quiz_state.current_question_index - 1 == question_index
+        ):
+            await self._end_photo_quiz(quiz_state.chat_id, context, timeout=True)
 
     async def _send_final_results(self, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
         """Отправляет итоговое сообщение по завершению серии фото-вопросов"""
@@ -768,17 +977,21 @@ class PhotoQuizManager:
         except Exception as e:
             logger.error(f"Ошибка отправки итогового сообщения фото-викторины в чате {chat_id}: {e}")
 
+    @serialized_photo
     async def _force_finish(self, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
         """Принудительно завершает зависшую викторину"""
-        quiz_state = self.active_photo_quizzes.pop(chat_id, None)
+        quiz_state = self.active_photo_quizzes.get(chat_id)
         if not quiz_state:
             return
         try:
-            quiz_state.is_active = False
-            if quiz_state.timer_task and not quiz_state.timer_task.done():
+            quiz_state.is_active, quiz_state.phase = False, "interrupted"
+            await self._persist(quiz_state, status="interrupted")
+            self.active_photo_quizzes.pop(chat_id, None)
+            if quiz_state.timer_task and not quiz_state.timer_task.done() and quiz_state.timer_task is not asyncio.current_task():
                 quiz_state.timer_task.cancel()
         except Exception:
-            pass
+            logger.exception("Не удалось сохранить остановку фото-серии; повторный запуск заблокирован")
+            return
         await context.bot.send_message(
             chat_id=chat_id,
             text=escape_markdown_v2("❌ Фото-викторина остановлена из-за ошибки."),
@@ -787,6 +1000,13 @@ class PhotoQuizManager:
 
     async def _schedule_photo_quiz_cleanup(self, chat_id: int, message_ids: List[int], context: ContextTypes.DEFAULT_TYPE):
         """Планирует отложенное удаление сообщений фото-викторины"""
+        if self.postgres_storage:
+            from storage.cleanup import CleanupQueue
+            queue = CleanupQueue(self.postgres_storage.database)
+            deadline = datetime.now(timezone.utc) + timedelta(seconds=DELAY_BEFORE_PHOTO_QUIZ_DELETION_SECONDS)
+            for message_id in message_ids:
+                await queue.enqueue(chat_id, message_id, deadline, source="photo")
+            return
         try:
             logger.info(f"Начинаем планирование удаления {len(message_ids)} сообщений фото-викторины для чата {chat_id}")
 
@@ -863,6 +1083,7 @@ class PhotoQuizManager:
         except Exception as e:
             logger.error(f"Ошибка отложенного удаления сообщений фото-викторины: {e}")
     
+    @serialized_photo
     async def stop_photo_quiz(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Останавливает активную фото-викторину"""
         try:
@@ -873,9 +1094,11 @@ class PhotoQuizManager:
                 return
 
             quiz_state = self.active_photo_quizzes[chat_id]
-            quiz_state.is_active = False
+            quiz_state.is_active, quiz_state.phase = False, "stopped"
+            await self._persist(quiz_state, status="stopped")
             if quiz_state.timer_task and not quiz_state.timer_task.done():
                 quiz_state.timer_task.cancel()
+            self.active_photo_quizzes.pop(chat_id, None)
 
             answer = "—"
             question_index = quiz_state.current_question_index - 1
@@ -897,7 +1120,7 @@ class PhotoQuizManager:
                     chat_id, list(quiz_state.message_ids_to_delete), context
                 )
 
-            del self.active_photo_quizzes[chat_id]
+            self.active_photo_quizzes.pop(chat_id, None)
 
         except Exception as e:
             logger.error(f"Ошибка остановки фото-викторины: {e}")

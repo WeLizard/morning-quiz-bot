@@ -50,7 +50,19 @@ class DailyQuizScheduler:
             logger.warning(f"Запуск ежедневной викторины в чате {chat_id} пропущен: другая викторина уже активна.")
             return
 
-        chat_settings = self.data_manager.get_chat_settings(chat_id)
+        if self.data_manager.postgres_storage:
+            from storage.schedule_source import ScheduleSource
+            from storage.schedule_plan import effective_settings
+            source = ScheduleSource(self.data_manager.postgres_storage.database, self.app_config)
+            snapshot = (await source.read(chat_id)).get(chat_id)
+            plan = source.plan(snapshot, "quiz")
+            if not plan.times or context.job.data.get("schedule_token") != plan.token:
+                logger.info("Пропущена устаревшая задача квиза чата %s", chat_id)
+                return
+            chat_settings = effective_settings(snapshot.values, self.app_config.default_chat_settings,
+                                               self.app_config.daily_quiz_defaults)
+        else:
+            chat_settings = await self.data_manager.get_chat_settings_async(chat_id)
         daily_quiz_cfg_chat = chat_settings.get("daily_quiz", {})
         daily_quiz_defaults_app = self.app_config.daily_quiz_defaults
 
@@ -91,12 +103,51 @@ class DailyQuizScheduler:
             interval_seconds=interval_seconds
         )
 
+    def apply_postgres_plan(self, chat_id, plan):
+        """Install new jobs first; remove obsolete jobs only after all adds succeed."""
+        queue = self.application.job_queue
+        if queue is None:
+            raise RuntimeError("JobQueue is unavailable")
+        prefix = f"daily_quiz_for_chat_{chat_id}_"
+        existing = [job for job in queue.jobs() if job.name and job.name.startswith(prefix) and not job.removed]
+        keep, created = [], []
+        try:
+            for index, (hour, minute) in enumerate(plan.times):
+                name = f"{prefix}pg_{plan.token}_{hour:02d}{minute:02d}"
+                job = next((j for j in existing if j.name == name), None)
+                if job is None:
+                    job = queue.run_daily(
+                        self._trigger_daily_quiz_job,
+                        time=time(hour, minute, tzinfo=pytz.timezone(plan.timezone)),
+                        data={"chat_id": chat_id, "time_entry_index": index, "schedule_token": plan.token},
+                        name=name,
+                        job_kwargs={"id": name, "replace_existing": True, "coalesce": True,
+                                    "max_instances": 1, "misfire_grace_time": self.app_config.job_grace_period_seconds},
+                    )
+                    created.append(job)
+                keep.append(job)
+        except Exception:
+            for job in created:
+                job.schedule_removal()
+            raise
+        for job in existing:
+            if all(job is not kept for kept in keep):
+                job.schedule_removal()
+
     async def reschedule_job_for_chat(self, chat_id: int) -> None:
         if not self.application.job_queue:
             logger.error("JobQueue не доступен в DailyQuizScheduler. Невозможно перепланировать задачи.")
             return
 
         job_queue: JobQueue = self.application.job_queue # type: ignore
+
+        # Do not remove working jobs if reading the new settings fails.
+        chat_settings = await self.data_manager.get_chat_settings_async(chat_id)
+        if getattr(self.data_manager, "postgres_storage", None):
+            from storage.schedule_plan import build_schedule_plan
+            self.apply_postgres_plan(chat_id, build_schedule_plan(chat_settings, "quiz",
+                                      daily_defaults=self.app_config.daily_quiz_defaults))
+            return
 
         prefix_job_name_base = f"daily_quiz_for_chat_{chat_id}_time_idx_"
         existing_jobs_for_chat = [job for job in job_queue.jobs() if job.name and job.name.startswith(prefix_job_name_base)]
@@ -106,7 +157,6 @@ class DailyQuizScheduler:
                 job.schedule_removal()
             logger.debug(f"Удалены существующие задачи ({len(existing_jobs_for_chat)}) с префиксом '{prefix_job_name_base}' для чата {chat_id} перед перепланировкой.")
 
-        chat_settings = self.data_manager.get_chat_settings(chat_id)
         daily_quiz_cfg_chat = chat_settings.get("daily_quiz", {})
         daily_quiz_defaults_app = self.app_config.daily_quiz_defaults
 
@@ -393,4 +443,3 @@ class DailyQuizScheduler:
                 logger.info(f"      Следующий запуск локально ({job_detail.get('timezone', 'Europe/Moscow')}): {job_detail['next_run_local']}")
         else:
             logger.warning("  ⚠️ Нет запланированных задач ежедневных викторин")
-

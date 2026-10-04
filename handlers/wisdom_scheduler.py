@@ -59,7 +59,7 @@ class WisdomScheduler:
         
         # Инициализируем OpenRouter клиент для генерации фактов
         self.openrouter_client = None
-        if OPENROUTER_AVAILABLE:
+        if OPENROUTER_AVAILABLE and not getattr(app_config, 'disable_external_ai', False):
             self.openrouter_client = get_openrouter_client()
             if self.openrouter_client and self.openrouter_client.api_key:
                 logger.info("✅ OpenRouter доступен для генерации фактов Совы Филиныча")
@@ -110,10 +110,16 @@ class WisdomScheduler:
 
         return selected_wisdom
 
-    async def _send_daily_wisdom(self, chat_id: str, context=None) -> None:
+    async def _send_daily_wisdom(self, chat_id: str, context=None, schedule_token=None) -> None:
         """Отправляет мудрость дня или занимательный факт от Совы Филиныча в указанный чат"""
         try:
             logger.debug(f"Отправка мудрости/факта в чат {chat_id}")
+            source = None
+            if self.data_manager.postgres_storage:
+                from storage.schedule_source import ScheduleSource
+                source = ScheduleSource(self.data_manager.postgres_storage.database, self.app_config)
+                if not await source.is_current(chat_id, "wisdom", schedule_token):
+                    return
 
             # Случайно выбираем тип контента: True - факт от AI, False - старая мудрость
             use_ai_fact = random.choice([True, False])
@@ -152,6 +158,8 @@ class WisdomScheduler:
                 message_text = f"🦉 *Сов Филиныч рассказывает:*\n\n{escape_markdown_v2(fact_text)}"
 
             # Отправляем сообщение
+            if source and not await source.is_current(chat_id, "wisdom", schedule_token):
+                return  # The schedule may have changed during content generation.
             if self.application:
                 await self.application.bot.send_message(
                     chat_id=chat_id,
@@ -168,6 +176,33 @@ class WisdomScheduler:
             logger.error(f"Ошибка при отправке мудрости/факта в чат {chat_id}: {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка при отправке мудрости/факта в чат {chat_id}: {e}")
+
+    def apply_postgres_plan(self, chat_id, plan):
+        legacy = f"wisdom_{chat_id}"
+        prefix = f"{legacy}_pg_"
+        existing = [j for j in self.scheduler.get_jobs() if j.id == legacy or j.id.startswith(prefix)]
+        keep, created = set(), []
+        try:
+            for hour, minute in plan.times:
+                job_id = f"{prefix}{plan.token}_{hour:02d}{minute:02d}"
+                if not any(j.id == job_id for j in existing):
+                    self.scheduler.add_job(
+                        self._send_daily_wisdom,
+                        trigger=CronTrigger(hour=hour, minute=minute, timezone=plan.timezone),
+                        args=[str(chat_id)], kwargs={"schedule_token": plan.token},
+                        id=job_id, name=f"Мудрость дня для чата {chat_id}", replace_existing=True,
+                        coalesce=True, max_instances=1,
+                        misfire_grace_time=self.app_config.job_grace_period_seconds,
+                    )
+                    created.append(job_id)
+                keep.add(job_id)
+        except Exception:
+            for job_id in created:
+                self.scheduler.remove_job(job_id)
+            raise
+        for job in existing:
+            if job.id not in keep:
+                self.scheduler.remove_job(job.id)
 
     def schedule_wisdom_for_chat(self, chat_id: str, wisdom_time: str, timezone_str: str) -> bool:
         """Планирует отправку мудрости дня для конкретного чата"""

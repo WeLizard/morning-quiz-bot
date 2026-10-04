@@ -1,7 +1,13 @@
 # modules/score_manager.py
+import asyncio
 import logging
+from dataclasses import replace
+import json
+from pathlib import Path
+import random
 from typing import Dict, List, Any, Optional, Tuple, TYPE_CHECKING
 from datetime import datetime, timezone, date # datetime используется для now_utc, date для ежедневного сброса
+from decimal import Decimal
 
 from telegram import User as TelegramUser
 
@@ -19,6 +25,29 @@ class ScoreManager:
         self.app_config = app_config
         self.state = state
         self.data_manager = data_manager
+        self.postgres_storage = getattr(data_manager, "postgres_storage", None)
+        self._member_locks = {}
+        self._streak_messages = self._load_streak_messages()
+
+    @staticmethod
+    def _load_streak_messages():
+        path = Path(__file__).resolve().parents[1] / "data" / "system" / "streak_achievements.json"
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+            return {int(key): tuple(messages) for key, messages in
+                    (value.get("streak_achievements") or {}).items() if isinstance(messages, list)}
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            logger.warning("Не удалось загрузить правила достижений за серию")
+            return {}
+
+    def _classic_scoring_rules(self):
+        from domain.scoring import ClassicScoringRules
+        base = ClassicScoringRules.from_settings(self.app_config.global_settings)
+        return replace(
+            base,
+            milestones=tuple(sorted(self.app_config.parsed_chat_achievements, key=abs, reverse=True)),
+            streak_milestones=tuple(sorted(self._streak_messages, reverse=True)),
+        )
 
     def _should_reset_daily_data(self, last_reset_date: Optional[str]) -> bool:
         """Проверяет, нужно ли сбросить ежедневные данные"""
@@ -42,10 +71,113 @@ class ScoreManager:
             current_user_data_global["last_daily_reset"] = date.today().isoformat()
             logger.info(f"Сброшены ежедневные данные для пользователя")
 
-    async     def update_score_and_get_motivation(
+    async def update_score_and_get_motivation(
+        self, chat_id: int, user: TelegramUser, poll_id: str, is_correct: bool,
+        quiz_type_of_poll: str,
+    ) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+        if not self.postgres_storage:
+            return await self._update_score_in_memory(
+                chat_id, user, poll_id, is_correct, quiz_type_of_poll,
+            )
+
+        from storage.members import MemberService
+
+        # Serialize local cache publication too; the database lock coordinates
+        # other bot instances and administrative edits.
+        lock = self._member_locks.setdefault((chat_id, user.id), asyncio.Lock())
+        async with lock:
+            name = (user.first_name or "").strip() or (
+                f"@{user.username}" if user.username else f"User {user.id}"
+            )
+
+            async def transition(data):
+                from domain.scoring import apply_classic_score
+                outcome = apply_classic_score(
+                    data,
+                    chat_id=chat_id,
+                    user_id=user.id,
+                    display_name=name,
+                    answer_id=poll_id,
+                    is_correct=is_correct,
+                    rules=self._classic_scoring_rules(),
+                )
+                chat_message = private_message = streak_message = None
+                if outcome.milestone is not None:
+                    template = self.app_config.parsed_chat_achievements.get(outcome.milestone)
+                    if template:
+                        message = template.format(
+                            user_name=get_username_or_firstname(user),
+                            user_score=round(float(outcome.score_before), 1),
+                        )
+                        chat_message = private_message = escape_markdown_v2(message)
+                if outcome.streak_milestone is not None:
+                    choices = self._streak_messages.get(outcome.streak_milestone, ())
+                    if choices:
+                        message = random.choice(choices).format(
+                            user_name=get_username_or_firstname(user),
+                            streak=data.get("consecutive_correct", 0),
+                        )
+                        streak_message = escape_markdown_v2(message)
+                return outcome.applied, chat_message, private_message, streak_message
+
+            answer = await MemberService(self.postgres_storage.database).apply_answer(
+                chat_id=chat_id, user_id=user.id, display_name=name,
+                answer_id=poll_id, is_correct=is_correct, transition=transition,
+                classic_session_id=getattr(self.state.get_active_quiz(chat_id), "session_id", None),
+            )
+            self.state.user_scores.setdefault(chat_id, {})[str(user.id)] = answer.data
+            if not answer.applied:
+                return False, None, None, None
+
+            active_quiz = self.state.get_active_quiz(chat_id)
+            if active_quiz:
+                scores = active_quiz.scores.setdefault(str(user.id), {
+                    "name": name, "score": 0, "correct_count": 0,
+                    "answered_this_session": set(),
+                })
+                scores["name"] = name
+                if poll_id not in scores["answered_this_session"]:
+                    scores["score"] += 1 if is_correct else -0.5
+                    scores["correct_count"] += int(is_correct)
+                    scores["answered_this_session"].add(poll_id)
+            return answer.result
+
+    async def award_photo_answer(
+        self, chat_id: int, user_id: int, answer_id: str, points: float,
+    ) -> bool:
+        """Award a photo answer without changing classic streak/poll counters."""
+        async def transition(data):
+            data["score"] = float(Decimal(str(data.get("score", 0))) + Decimal(str(points)))
+            data["correct_answers_count"] = data.get("correct_answers_count", 0) + 1
+
+        lock = self._member_locks.setdefault((chat_id, user_id), asyncio.Lock())
+        async with lock:
+            cached = self.state.user_scores.get(chat_id, {}).get(str(user_id), {})
+            name = cached.get("name", f"User {user_id}")
+            if self.postgres_storage:
+                from storage.members import MemberService
+
+                answer = await MemberService(self.postgres_storage.database).apply_answer(
+                    chat_id=chat_id, user_id=user_id, display_name=None,
+                    answer_id=answer_id, is_correct=True, transition=transition, kind="photo",
+                )
+                self.state.user_scores.setdefault(chat_id, {})[str(user_id)] = answer.data
+                return answer.applied
+
+            data = self.state.user_scores.setdefault(chat_id, {}).setdefault(str(user_id), {
+                "name": name, "score": 0, "answered_polls": set(),
+                "correct_answers_count": 0, "daily_answered_polls": set(),
+                "first_answer_time": None, "last_answer_time": None,
+                "milestones_achieved": set(),
+            })
+            await transition(data)
+            self.data_manager.save_user_data(chat_id)
+            return True
+
+    async def _update_score_in_memory(
         self, chat_id: int, user: TelegramUser, poll_id: str, is_correct: bool,
         quiz_type_of_poll: str
-    ) -> Tuple[bool, Optional[str], Optional[str]]:
+    ) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         user_id_str = str(user.id)
         chat_id_str = str(chat_id)
         
@@ -65,22 +197,6 @@ class ScoreManager:
 
         score_updated_in_global_state = False
         motivational_message_text: Optional[str] = None
-
-        # Обновление очков в активной сессии викторины (QuizState.scores)
-        active_quiz = self.state.get_active_quiz(chat_id)
-        if active_quiz:
-            active_quiz.scores.setdefault(user_id_str, {"name": user_name_for_state, "score": 0, "correct_count": 0, "answered_this_session": set()})
-            # Убедимся, что имя в сессии тоже обновляется, если пользователь его сменил
-            if active_quiz.scores[user_id_str].get("name") != user_name_for_state:
-                 active_quiz.scores[user_id_str]["name"] = user_name_for_state
-
-            if poll_id not in active_quiz.scores[user_id_str]["answered_this_session"]:
-                if is_correct:
-                    active_quiz.scores[user_id_str]["score"] += 1
-                    active_quiz.scores[user_id_str]["correct_count"] += 1
-                else:
-                    active_quiz.scores[user_id_str]["score"] -= 0.5  # Отнимаем 0.5 очка за неправильный ответ
-                active_quiz.scores[user_id_str]["answered_this_session"].add(poll_id)
 
         # Обновление очков в глобальной статистике (BotState.user_scores)
         # ИСПРАВЛЕНО: Используем правильную структуру данных
@@ -153,6 +269,23 @@ class ScoreManager:
         # НОВОЕ: Проверяем и сбрасываем ежедневные данные если нужно
         self._reset_daily_data_if_needed(current_user_data_global)
 
+        # JSON path, or a detached PostgreSQL transition without an active session.
+        active_quiz = self.state.get_active_quiz(chat_id)
+        if active_quiz:
+            active_quiz.scores.setdefault(user_id_str, {"name": user_name_for_state, "score": 0, "correct_count": 0, "answered_this_session": set()})
+            if active_quiz.scores[user_id_str].get("name") != user_name_for_state:
+                active_quiz.scores[user_id_str]["name"] = user_name_for_state
+
+            if (
+                poll_id not in active_quiz.scores[user_id_str]["answered_this_session"]
+            ):
+                if is_correct:
+                    active_quiz.scores[user_id_str]["score"] += 1
+                    active_quiz.scores[user_id_str]["correct_count"] += 1
+                else:
+                    active_quiz.scores[user_id_str]["score"] -= 0.5
+                active_quiz.scores[user_id_str]["answered_this_session"].add(poll_id)
+
         # Обновляем имя в глобальном state, если оно изменилось
         if current_user_data_global.get("name") != user_name_for_state:
             current_user_data_global["name"] = user_name_for_state
@@ -209,7 +342,9 @@ class ScoreManager:
         # Эта проверка будет выполнена в конце метода, после обновления consecutive_correct
 
         # НОВАЯ ЛОГИКА: Обновляем очки только если пользователь не отвечал на этот вопрос СЕГОДНЯ
-        if poll_id not in current_user_data_global.get("daily_answered_polls", set()):
+        if (
+            poll_id not in current_user_data_global.get("daily_answered_polls", set())
+        ):
             # НОВАЯ ЛОГИКА: Обновляем очки с учетом бонусов за серию (В РАМКАХ ОДНОГО ЧАТА)
             current_score = current_user_data_global.get("score", 0)
             current_consecutive = current_user_data_global.get("consecutive_correct", 0)
@@ -325,9 +460,7 @@ class ScoreManager:
                 score_updated_in_global_state = True  # Сохраняем при обновлении времени
 
         if score_updated_in_global_state:
-            # Сохраняем данные для конкретного чата
             self.data_manager.save_user_data(chat_id)
-            # Обновляем глобальную статистику
             self.data_manager.update_global_statistics()
 
         return score_updated_in_global_state, motivational_message_text, motivational_message_ls, streak_message_text
@@ -426,7 +559,9 @@ class ScoreManager:
 
                     right_total_val = entry.get('global_total_score')
                     ach_icon = entry.get('achievement_icon', '⭐')
-                    if right_total_val is not None:
+                    if not entry.get("statistics_available", True):
+                        final_name_score_segment = f"{escaped_user_name}: `{escape_markdown_v2(score_display_for_session)}` · статистика временно недоступна"
+                    elif right_total_val is not None:
                         # Округляем глобальные очки до 1 знака после запятой
                         rounded_global_score = round(float(right_total_val), 1)
 
@@ -478,7 +613,10 @@ class ScoreManager:
 
         return result
 
-    def get_chat_rating(self, chat_id: int, top_n: int = 10) -> List[Dict[str, Any]]:
+    async def get_chat_rating(self, chat_id: int, top_n: int = 10) -> List[Dict[str, Any]]:
+        if self.postgres_storage:
+            from storage.score_queries import ScoreQueries
+            return await ScoreQueries(self.postgres_storage.database).rating(chat_id, top_n)
         # chat_id уже int, используем его напрямую
         if chat_id not in self.state.user_scores or not self.state.user_scores[chat_id]:
             return []
@@ -504,7 +642,10 @@ class ScoreManager:
             top_users_list.append({"user_id": user_id_int, "name": user_name, "score": score})
         return top_users_list
 
-    def get_global_rating(self, top_n: int = 10) -> List[Dict[str, Any]]:
+    async def get_global_rating(self, top_n: int = 10) -> List[Dict[str, Any]]:
+        if self.postgres_storage:
+            from storage.score_queries import ScoreQueries
+            return await ScoreQueries(self.postgres_storage.database).rating(limit=top_n)
         global_scores_agg: Dict[str, Dict[str, Any]] = {} # user_id_str -> {"name": ..., "score": ...}
 
         for chat_id, users_in_chat_dict in self.state.user_scores.items():
@@ -543,7 +684,9 @@ class ScoreManager:
             })
         return top_global_list
 
-    def get_user_stats_in_chat(self, chat_id: int, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_stats_in_chat(self, chat_id: int, user_id: str) -> Optional[Dict[str, Any]]:
+        if self.postgres_storage:
+            return (await self.get_session_profiles(chat_id, [user_id])).get(str(user_id), {}).get("chat")
         # chat_id уже int, user_id остается str
         user_scores_chat = self.state.user_scores.get(chat_id, {}).get(user_id)
         if not user_scores_chat:
@@ -562,7 +705,10 @@ class ScoreManager:
         # stats.pop("milestones_achieved", None) # Уже не нужно
         return stats
 
-    def get_global_user_stats(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_global_user_stats(self, user_id: str) -> Optional[Dict[str, Any]]:
+        if self.postgres_storage:
+            from storage.score_queries import ScoreQueries
+            return (await ScoreQueries(self.postgres_storage.database).profiles(None, [user_id])).get(str(user_id), {}).get("global")
         total_score = 0
         total_answered_polls = 0
         # Имя пользователя может отличаться в разных чатах, если логика user_name_for_state была другой.
@@ -628,7 +774,9 @@ class ScoreManager:
             "last_answer_time_overall": last_answer_overall,
         }
 
-    def get_current_chat_user_stats(self, user_id: str, chat_id: int) -> Optional[Dict[str, Any]]:
+    async def get_current_chat_user_stats(self, user_id: str, chat_id: int) -> Optional[Dict[str, Any]]:
+        if self.postgres_storage:
+            return await self.get_user_stats_in_chat(chat_id, user_id)
         """Получает статистику пользователя только в текущем чате"""
         user_id_str = str(user_id)
 
@@ -657,3 +805,14 @@ class ScoreManager:
             "average_score_per_poll": average_score_per_poll,
         }
 
+    async def get_session_profiles(self, chat_id: int, user_ids) -> Dict[str, Any]:
+        if self.postgres_storage:
+            from storage.score_queries import ScoreQueries
+            return await ScoreQueries(self.postgres_storage.database).profiles(chat_id, user_ids)
+        result = {}
+        for uid in user_ids:
+            chat = await self.get_current_chat_user_stats(str(uid), chat_id)
+            if chat is not None:
+                chat.update(await self.get_user_stats_in_chat(chat_id, str(uid)) or {})
+            result[str(uid)] = {"chat": chat, "global": await self.get_global_user_stats(str(uid))}
+        return result

@@ -31,17 +31,19 @@ class RatingHandlers:
                 await update.message.reply_text(escape_markdown_v2("Не удалось определить чат для рейтинга."), parse_mode=ParseMode.MARKDOWN_V2)
                 return
 
-        if global_rating:
-            top_users = self.score_manager.get_global_rating(
-                top_n=self.app_config.rating_display_limit
-            )
-            title_unescaped = "🌍 Глобальный топ игроков"
-        else:
-            top_users = self.score_manager.get_chat_rating(
-                chat_id=chat_id_for_query, # type: ignore
-                top_n=self.app_config.rating_display_limit
-            )
-            title_unescaped = "🏆 Топ игроков в этом чате"
+        try:
+            if global_rating:
+                top_users = await self.score_manager.get_global_rating(top_n=self.app_config.rating_display_limit)
+                title_unescaped = "🌍 Глобальный топ игроков"
+            else:
+                top_users = await self.score_manager.get_chat_rating(
+                    chat_id=chat_id_for_query, top_n=self.app_config.rating_display_limit,
+                )
+                title_unescaped = "🏆 Топ игроков в этом чате"
+        except Exception:
+            logger.exception("Не удалось прочитать рейтинг")
+            await update.message.reply_text("Статистика временно недоступна. Попробуйте позже.")
+            return
 
         if not top_users:
             if global_rating:
@@ -62,7 +64,8 @@ class RatingHandlers:
             # Добавляем сообщение рейтинга в список для удаления
             bot_state = context.bot_data.get('bot_state')
             if bot_state:
-                bot_state.add_message_for_deletion(chat_id_for_query, sent_msg.message_id)
+                if update.effective_chat:
+                    bot_state.add_message_for_deletion(update.effective_chat.id, sent_msg.message_id)
         except Exception as e:
             logger.error(f"Ошибка при отправке рейтинга (global={global_rating}): {e}\nТекст: {formatted_rating_text[:500]}")
             await update.message.reply_text(escape_markdown_v2("Не удалось отобразить рейтинг."), parse_mode=ParseMode.MARKDOWN_V2)
@@ -82,8 +85,14 @@ class RatingHandlers:
         user_id_str = str(user.id)
         user_first_name_escaped = escape_markdown_v2(user.first_name)
 
-        user_chat_stats = self.score_manager.get_user_stats_in_chat(chat_id, user_id_str)
-        user_global_stats = self.score_manager.get_global_user_stats(user_id_str)
+        try:
+            profile = (await self.score_manager.get_session_profiles(chat_id, [user_id_str])).get(user_id_str, {})
+            user_chat_stats = profile.get("chat")
+            user_global_stats = profile.get("global")
+        except Exception:
+            logger.exception("Не удалось прочитать профиль")
+            await update.message.reply_text("Статистика временно недоступна. Попробуйте позже.")
+            return
 
         reply_parts = [escape_markdown_v2(f"📊 Ваша статистика, {user.first_name}")]
 

@@ -142,6 +142,9 @@ class ConfigHandlers:
         Safely reschedule job for chat with concurrency control to prevent CPU overload.
         If timezone_change=True, attempts smart timezone adjustment instead of full reschedule.
         """
+        if self.data_manager.postgres_storage:
+            await self.data_manager.schedule_sync.tick()
+            return
         if not self.daily_quiz_scheduler_ref:
             logger.warning(f"DailyQuizScheduler not available, skipping reschedule for chat {chat_id}")
             return
@@ -172,70 +175,22 @@ class ConfigHandlers:
                                      context: ContextTypes.DEFAULT_TYPE,
                                      new_text: str,
                                      new_markup: Optional[InlineKeyboardMarkup]):
-        target_msg_id = context.chat_data.get(CTX_ADMIN_CFG_MSG_ID)
+        from modules.telegram_menu import card, acknowledge
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
-
-        if not chat_id:
-            logger.error("_update_config_message: chat_id не найден в context.chat_data.")
-            if isinstance(query_or_update, CallbackQuery):
-                try: await query_or_update.answer("Ошибка: сессия настроек повреждена.", show_alert=True)
-                except Exception: pass
+        if not chat_id or query_or_update is None:
             return
-
-        current_message: Optional[Message] = None
-        is_callback_query = isinstance(query_or_update, CallbackQuery)
-
-        if is_callback_query and query_or_update.message:
-            current_message = query_or_update.message
-        elif isinstance(query_or_update, Update) and query_or_update.message:
-            current_message = query_or_update.message
-
-        if current_message and target_msg_id == current_message.message_id:
-            try:
-                await current_message.edit_text(text=new_text, reply_markup=new_markup, parse_mode=ParseMode.MARKDOWN_V2)
-                if is_callback_query:
-                    try: await query_or_update.answer()
-                    except Exception: pass
-                return
-            except BadRequest as e:
-                if "Message is not modified" in str(e).lower():
-                    if is_callback_query:
-                        try: await query_or_update.answer()
-                        except Exception: pass
-                    return
-                logger.warning(f"Не удалось отредактировать сообщение меню {target_msg_id} в чате {chat_id}: {e}. Попытка отправить новое.")
-            except Exception as e_edit:
-                logger.error(f"Непредвиденная ошибка при редактировании сообщения меню {target_msg_id}: {e_edit}. Попытка отправить новое.")
-
-        if target_msg_id and (not current_message or target_msg_id != current_message.message_id):
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=target_msg_id)
-                logger.debug(f"Старое сообщение меню {target_msg_id} удалено.")
-            except Exception as e_del:
-                logger.debug(f"Не удалось удалить старое сообщение меню {target_msg_id}: {e_del}")
-        context.chat_data[CTX_ADMIN_CFG_MSG_ID] = None
-
+        target = context.chat_data.get(CTX_ADMIN_CFG_MSG_ID)
         try:
-            sent_msg = await safe_send_message(
-                bot=context.bot,
-                chat_id=chat_id,
-                text=new_text,
-                reply_markup=new_markup,
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            context.chat_data[CTX_ADMIN_CFG_MSG_ID] = sent_msg.message_id
-            # Добавляем сообщение меню в глобальный список для периодической очистки
-            bot_state = context.bot_data.get('bot_state')
-            if bot_state:
-                bot_state.add_message_for_deletion(chat_id, sent_msg.message_id)
-            if is_callback_query:
-                try: await query_or_update.answer()
-                except Exception: pass
-        except Exception as e_send:
-            logger.error(f"Не удалось отправить новое сообщение меню в чат {chat_id}: {e_send}")
-            if is_callback_query:
-                try: await query_or_update.answer("Ошибка отправки меню.", show_alert=True)
-                except Exception: pass
+            sent = await card(query_or_update, context, new_text, new_markup.inline_keyboard if new_markup else [],
+                              parse_mode=ParseMode.MARKDOWN_V2, message_id=target)
+            if sent:
+                context.chat_data[CTX_ADMIN_CFG_MSG_ID] = sent.message_id
+            if isinstance(query_or_update, CallbackQuery):
+                await acknowledge(query_or_update)
+        except Exception:
+            logger.exception('Settings card update failed; no blind duplicate send')
+            if isinstance(query_or_update, CallbackQuery):
+                await acknowledge(query_or_update, 'Не удалось обновить меню. Попробуй ещё раз.', alert=True)
 
     async def admin_settings_entry(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
         if not update.message or not update.effective_chat or not update.effective_user:
@@ -252,8 +207,11 @@ class ConfigHandlers:
             return ConversationHandler.END
 
         chat_id = update.effective_chat.id
+        entry_message = context.chat_data.get('_menu_entry_message_id')
         context.chat_data.clear()
         context.chat_data[CTX_ADMIN_CFG_CHAT_ID] = chat_id
+        if entry_message:
+            context.chat_data[CTX_ADMIN_CFG_MSG_ID] = entry_message
         
         # Обновляем метаданные чата (название, тип) в фоновом режиме
         import asyncio
@@ -271,30 +229,29 @@ class ConfigHandlers:
              logger.error("_send_main_cfg_menu: CTX_ADMIN_CFG_CHAT_ID не найден.")
              return
         
-        # КЭШИРОВАНИЕ: Используем кэшированные настройки для быстрой работы кнопок
-        cache_key = f"cfg_menu_{chat_id}"
-        cached_text = context.chat_data.get(cache_key)
-        
-        if cached_text is None:
-            # Форматируем настройки только если кэш пуст
-            settings = self.data_manager.get_chat_settings(chat_id)
-            display_text = self._format_settings_display(settings, part="main")
-            daily_brief = self._format_settings_display(settings, part="daily_brief")
-            header_text = f"*{escape_markdown_v2('🛠️ Админ. настройки чата')}*"
-            prompt_text = escape_markdown_v2("Выберите параметр для изменения:")
-            cached_text = f"{header_text}\n\n{display_text}\n\n{daily_brief}\n\n{prompt_text}"
-            context.chat_data[cache_key] = cached_text
-        
-        text = cached_text
+        # Read through to PG: changes from the local admin must appear immediately.
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
+        defaults = self.app_config.default_chat_settings
+        count = settings.get('default_num_questions', defaults.get('default_num_questions', 10))
+        seconds = settings.get('default_open_period_seconds', defaults.get('default_open_period_seconds', 30))
+        cleanup = settings.get('auto_delete_bot_messages', defaults.get('auto_delete_bot_messages', True))
+        daily = settings.get('daily_quiz', {})
+        wisdom = settings.get('daily_wisdom', {})
+        label = 'Личные настройки' if chat_id > 0 else 'Настройки чата'
+        text = f"*{escape_markdown_v2('⚙️ ' + label)}*\n\n"
+        text += escape_markdown_v2(f"Классика: {count} вопросов · {seconds} секунд на ответ.\nИзменения сохраняются сразу — следующая игра использует их.")
+        if context.bot_data.get('telegram_private_test'):
+            text += '\n\n' + escape_markdown_v2('DEV: автоматические расписания здесь выключены. Можно настроить параметры для последующей проверки.')
         kb_buttons = [
-            [InlineKeyboardButton("Настройки /quiz ➡️", callback_data=CB_ADM_GOTO_QUIZ_MENU)],
-            [InlineKeyboardButton("Разрешенные категории", callback_data=CB_ADM_MANAGE_ENABLED_CATEGORIES)],
-            [InlineKeyboardButton("Запрещенные категории", callback_data=CB_ADM_MANAGE_DISABLED_CATEGORIES)],
-            [InlineKeyboardButton("Автоудаление сообщений", callback_data=CB_ADM_TOGGLE_AUTO_DELETE_BOT_MESSAGES)],
-            [InlineKeyboardButton("Ежедневная Викторина ➡️", callback_data=CB_ADM_GOTO_DAILY_MENU)],
-            [InlineKeyboardButton("🧠 Мудрость дня ➡️", callback_data=CB_ADM_WISDOM_MENU)],
-            [InlineKeyboardButton("Сбросить всё к по умолчанию", callback_data=CB_ADM_CONFIRM_RESET_SETTINGS)],
-            [InlineKeyboardButton("✅ Завершить настройку", callback_data=CB_ADM_FINISH_CONFIG)],
+            [InlineKeyboardButton(f"🎮 Квиз · {count} вопросов · {seconds} с", callback_data=CB_ADM_GOTO_QUIZ_MENU, style='primary')],
+            [InlineKeyboardButton("📚 Разрешённые темы", callback_data=CB_ADM_MANAGE_ENABLED_CATEGORIES),
+             InlineKeyboardButton("🚫 Исключённые", callback_data=CB_ADM_MANAGE_DISABLED_CATEGORIES)],
+            [InlineKeyboardButton(f"🧹 Автоудаление: {'вкл' if cleanup else 'выкл'}", callback_data=CB_ADM_TOGGLE_AUTO_DELETE_BOT_MESSAGES)],
+            [InlineKeyboardButton(f"📅 Квиз по расписанию · {'вкл' if daily.get('enabled') else 'выкл'}", callback_data=CB_ADM_GOTO_DAILY_MENU)],
+            [InlineKeyboardButton(f"💡 Мудрость дня · {'вкл' if wisdom.get('enabled') else 'выкл'}", callback_data=CB_ADM_WISDOM_MENU)],
+            [InlineKeyboardButton("Сбросить настройки…", callback_data=CB_ADM_CONFIRM_RESET_SETTINGS, style='danger')],
+            [InlineKeyboardButton("‹ Главное меню", callback_data='nav:home'),
+             InlineKeyboardButton("✓ Готово", callback_data=CB_ADM_FINISH_CONFIG)],
         ]
         context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_main_cfg_menu"
         context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = CB_ADM_BACK_TO_MAIN
@@ -440,7 +397,7 @@ class ConfigHandlers:
             logger.info(f"DEBUG TIMEZONE: Текущий контекст меню: {context.chat_data.get(CTX_CURRENT_MENU_SENDER_CB_NAME)}")
 
         if not chat_id: return ConversationHandler.END
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         def_s = self.app_config.default_chat_settings
         context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_main_cfg_menu"
         context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = CB_ADM_BACK_TO_MAIN
@@ -490,10 +447,12 @@ class ConfigHandlers:
             if 'daily_wisdom' not in settings:
                 settings['daily_wisdom'] = {'enabled': False, 'time': '09:00', 'timezone': 'Europe/Moscow'}
             settings['daily_wisdom']['enabled'] = new_enabled
-            self.data_manager.update_chat_setting(chat_id, ["daily_wisdom", "enabled"], new_enabled)
+            await self.data_manager.update_chat_setting(chat_id, ["daily_wisdom", "enabled"], new_enabled)
 
             # Управляем планировщиком
-            if self.wisdom_scheduler_ref:
+            if self.data_manager.postgres_storage:
+                await self._safe_reschedule_job_for_chat(chat_id)
+            elif self.wisdom_scheduler_ref:
                 if new_enabled:
                     wisdom_time = settings['daily_wisdom'].get('time', '09:00')
                     # Используем часовой пояс от ежедневной викторины
@@ -526,20 +485,24 @@ class ConfigHandlers:
             logger.info(f"DEBUG TIMEZONE: Обрабатываем выбор часового пояса: {action}")
             selected_timezone = action.split(":", 1)[1]
 
-            settings = self.data_manager.get_chat_settings(chat_id)
+            settings = await self.data_manager.get_chat_settings_async(chat_id)
             if 'daily_wisdom' not in settings:
                 settings['daily_wisdom'] = {'enabled': False, 'time': '09:00', 'timezone': 'Europe/Moscow'}
 
-            # Мудрость дня теперь использует часовой пояс от ежедневной викторины
-            # Сохраняем selected_timezone только для обратной совместимости
+            # У квиза и мудрости общий часовой пояс чата.
             old_timezone = settings.get('daily_quiz', {}).get('timezone', 'Europe/Moscow')
             # Используем часовой пояс от ежедневной викторины
             actual_timezone = selected_timezone
+            await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "timezone"], selected_timezone)
 
             # Перепланируем если мудрость включена
-            if self.wisdom_scheduler_ref and settings['daily_wisdom'].get('enabled', False):
-                wisdom_time = settings['daily_wisdom'].get('time', '09:00')
-                self.wisdom_scheduler_ref.schedule_wisdom_for_chat(chat_id, wisdom_time, actual_timezone)
+            if self.data_manager.postgres_storage:
+                await self._safe_reschedule_job_for_chat(chat_id)
+            else:
+                await self._safe_reschedule_job_for_chat(chat_id)
+                if self.wisdom_scheduler_ref and settings['daily_wisdom'].get('enabled', False):
+                    wisdom_time = settings['daily_wisdom'].get('time', '09:00')
+                    self.wisdom_scheduler_ref.schedule_wisdom_for_chat(chat_id, wisdom_time, actual_timezone)
 
             logger.info(f"Часовой пояс мудрости дня для чата {chat_id} изменен: {old_timezone} → {selected_timezone}")
             await query.answer(f"Часовой пояс изменён на {selected_timezone}", show_alert=True)
@@ -558,7 +521,7 @@ class ConfigHandlers:
             return CFG_MAIN_MENU
         elif action.startswith(CB_ADM_SET_DEFAULT_QUIZ_TYPE_OPT):
             val = action.split(":", 1)[1]
-            self.data_manager.update_chat_setting(chat_id, ["default_quiz_type"], val)
+            await self.data_manager.update_chat_setting(chat_id, ["default_quiz_type"], val)
             # Очищаем кэш настроек для быстрой работы
             self._clear_settings_cache(context, chat_id)
             await self._send_main_cfg_menu(query, context)
@@ -574,7 +537,7 @@ class ConfigHandlers:
             return CFG_MAIN_MENU
         elif action.startswith(CB_ADM_SET_DEFAULT_ANNOUNCE_QUIZ_OPT):
             val = action.split(":", 1)[1] == "true"
-            self.data_manager.update_chat_setting(chat_id, ["default_announce_quiz"], val)
+            await self.data_manager.update_chat_setting(chat_id, ["default_announce_quiz"], val)
             await self._send_main_cfg_menu(query, context)
             return CFG_MAIN_MENU
         # ИЗМЕНЕНИЕ: Добавлен обработчик для новой кнопки
@@ -591,7 +554,7 @@ class ConfigHandlers:
         elif action.startswith(CB_ADM_TOGGLE_AUTO_DELETE_BOT_MESSAGES_OPT):
             val_str = action.split(":", 1)[1]
             new_value = val_str == "true"
-            self.data_manager.update_chat_setting(chat_id, ["auto_delete_bot_messages"], new_value)
+            await self.data_manager.update_chat_setting(chat_id, ["auto_delete_bot_messages"], new_value)
             await self._send_main_cfg_menu(query, context)
             return CFG_MAIN_MENU
         elif action == CB_ADM_GOTO_QUIZ_MENU:
@@ -693,7 +656,7 @@ class ConfigHandlers:
                     if not (0 <= h <= 23 and 0 <= m <= 59):
                         error_msg_unescaped = "Некорректное время. Часы 0-23, минуты 0-59."
                     else:
-                        chat_settings_current = self.data_manager.get_chat_settings(chat_id)
+                        chat_settings_current = await self.data_manager.get_chat_settings_async(chat_id)
                         daily_settings_current = chat_settings_current.setdefault("daily_quiz", {})
                         times_list_current: List[Dict[str,int]] = daily_settings_current.setdefault("times_msk", [])
                         new_time_entry = {"hour": h, "minute": m}
@@ -706,8 +669,9 @@ class ConfigHandlers:
                         else:
                             times_list_current.append(new_time_entry)
                             times_list_current.sort(key=lambda t: (t.get("hour",0), t.get("minute",0)))
-                            self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "times_msk"], times_list_current)
-                            parsed_value = f"{h:02d}:{m:02d}"
+                            # Save the complete list once via the common commit
+                            # below; never replace times_msk with a display string.
+                            parsed_value = times_list_current
                 except ValueError: error_msg_unescaped = "Неверный формат времени. Ожидается ЧЧ:ММ (например, 07:30)."
                 except Exception as e_time_parse:
                     logger.error(f"Непредвиденная ошибка парсинга времени '{raw_value}': {e_time_parse}")
@@ -721,11 +685,11 @@ class ConfigHandlers:
                         error_msg_unescaped = "Некорректное время. Часы 0-23, минуты 0-59."
                     else:
                         # Устанавливаем parsed_value для общего механизма сохранения
-                        parsed_value = raw_value
+                        parsed_value = f"{h:02d}:{m:02d}"
 
                         # Перепланируем если мудрость включена
-                        settings = self.data_manager.get_chat_settings(chat_id)
-                        if self.wisdom_scheduler_ref and settings.get('daily_wisdom', {}).get('enabled', False):
+                        settings = await self.data_manager.get_chat_settings_async(chat_id)
+                        if not self.data_manager.postgres_storage and self.wisdom_scheduler_ref and settings.get('daily_wisdom', {}).get('enabled', False):
                             # Используем часовой пояс от ежедневной викторины
                             timezone_str = settings.get('daily_quiz', {}).get('timezone', 'Europe/Moscow')
                             self.wisdom_scheduler_ref.schedule_wisdom_for_chat(str(chat_id), raw_value, timezone_str)
@@ -747,9 +711,11 @@ class ConfigHandlers:
             return CFG_INPUT_VALUE
 
         if parsed_value is not None:
-            self.data_manager.update_chat_setting(chat_id, key_path, parsed_value)
+            await self.data_manager.update_chat_setting(chat_id, key_path, parsed_value)
 
-        if key_path and key_path[0].startswith("daily_quiz") and self.daily_quiz_scheduler_ref:
+        if self.data_manager.postgres_storage and key_path and key_path[0] in {"daily_quiz", "daily_wisdom"}:
+            await self._safe_reschedule_job_for_chat(chat_id)
+        elif key_path and key_path[0].startswith("daily_quiz") and self.daily_quiz_scheduler_ref:
             asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
 
         await fallback_menu_sender_method(update, context)
@@ -859,7 +825,7 @@ class ConfigHandlers:
             key_path_to_save_in_db = key_path_map_for_saving.get(selection_mode)
             if not key_path_to_save_in_db: return CFG_SELECT_GENERAL_CATEGORIES
 
-            self.data_manager.update_chat_setting(chat_id, key_path_to_save_in_db, final_selection_to_save_in_db)
+            await self.data_manager.update_chat_setting(chat_id, key_path_to_save_in_db, final_selection_to_save_in_db)
             if selection_mode == 'daily_specific_categories' and self.daily_quiz_scheduler_ref:
                  asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
 
@@ -875,7 +841,7 @@ class ConfigHandlers:
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
         if not chat_id: return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         display_text = self._format_settings_display(settings, part="daily")
         header_text = f"*{escape_markdown_v2('📅 Настройки Ежедневной Викторины')}*"
         prompt_text = escape_markdown_v2("Выберите параметр для изменения:")
@@ -905,7 +871,7 @@ class ConfigHandlers:
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
         if not chat_id: return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         display_text = self._format_settings_display(settings, part="quiz")
         header_text = f"*{escape_markdown_v2('🏁 Настройки /quiz')}*"
         prompt_text = escape_markdown_v2("Выберите параметр для изменения:")
@@ -932,7 +898,7 @@ class ConfigHandlers:
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
         if not chat_id: return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         wisdom_settings = settings.get('daily_wisdom', {})
 
         # Форматируем текущие настройки
@@ -962,7 +928,7 @@ class ConfigHandlers:
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
         if not chat_id: return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         current_pool = set(settings.get('quiz_categories_pool', []))
         all_categories = self.category_manager.get_all_category_names(with_question_counts=False)
         
@@ -993,7 +959,7 @@ class ConfigHandlers:
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
         if not chat_id: return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         display_text = self._format_settings_display(settings, part="quiz_categories")
         header_text = f"*{escape_markdown_v2('🗂️ Настройки пула категорий для /quiz')}*"
         prompt_text = escape_markdown_v2("Выберите параметр для изменения:")
@@ -1021,7 +987,7 @@ class ConfigHandlers:
         
         if not chat_id: return ConversationHandler.END
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         def_s = self.app_config.default_chat_settings
         context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_quiz_cfg_menu"
         context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = CB_ADM_BACK_TO_QUIZ_MENU
@@ -1045,7 +1011,7 @@ class ConfigHandlers:
             return CFG_QUIZ_MENU
         elif action.startswith(CB_ADM_SET_DEFAULT_QUIZ_TYPE_OPT):
             val = action.split(":", 1)[1]
-            self.data_manager.update_chat_setting(chat_id, ["default_quiz_type"], val)
+            await self.data_manager.update_chat_setting(chat_id, ["default_quiz_type"], val)
             await self._send_quiz_cfg_menu(query, context)
             return CFG_QUIZ_MENU
         elif action == CB_ADM_SET_DEFAULT_ANNOUNCE_QUIZ:
@@ -1059,7 +1025,7 @@ class ConfigHandlers:
             return CFG_QUIZ_MENU
         elif action.startswith(CB_ADM_SET_DEFAULT_ANNOUNCE_QUIZ_OPT):
             val = action.split(":", 1)[1] == "true"
-            self.data_manager.update_chat_setting(chat_id, ["default_announce_quiz"], val)
+            await self.data_manager.update_chat_setting(chat_id, ["default_announce_quiz"], val)
             await self._send_quiz_cfg_menu(query, context)
             return CFG_QUIZ_MENU
         elif action == CB_ADM_QUIZ_SET_CATEGORIES_MODE:
@@ -1088,7 +1054,7 @@ class ConfigHandlers:
             
             if current_menu == "_send_quiz_cfg_menu":
                 # Сохраняем в настройки обычных викторин
-                self.data_manager.update_chat_setting(chat_id, ["quiz_categories_mode"], mode)
+                await self.data_manager.update_chat_setting(chat_id, ["quiz_categories_mode"], mode)
                 await query.answer(f"Режим обычных викторин изменен на: {mode}")
                 
                 # Если выбран режим specific или exclude, показываем меню управления пулом
@@ -1101,7 +1067,7 @@ class ConfigHandlers:
                     
             elif current_menu == "_send_quiz_categories_cfg_menu":
                 # Сохраняем в настройки обычных викторин (тот же конфиг)
-                self.data_manager.update_chat_setting(chat_id, ["quiz_categories_mode"], mode)
+                await self.data_manager.update_chat_setting(chat_id, ["quiz_categories_mode"], mode)
                 await query.answer(f"Режим обычных викторин изменен на: {mode}")
                 
                 # Возвращаемся к меню категорий
@@ -1119,7 +1085,7 @@ class ConfigHandlers:
             
             if sub_action in ['save', 'clear']:
                 if sub_action == 'clear':
-                    self.data_manager.update_chat_setting(chat_id, ["quiz_categories_pool"], [])
+                    await self.data_manager.update_chat_setting(chat_id, ["quiz_categories_pool"], [])
                     await query.answer("Пул категорий очищен")
                 else:
                     await query.answer("Пул категорий сохранен")
@@ -1128,7 +1094,7 @@ class ConfigHandlers:
                 return CFG_QUIZ_MENU
             else:
                 # Переключение категории
-                settings = self.data_manager.get_chat_settings(chat_id)
+                settings = await self.data_manager.get_chat_settings_async(chat_id)
                 current_pool = set(settings.get('quiz_categories_pool', []))
                 
                 if sub_action in current_pool:
@@ -1136,7 +1102,7 @@ class ConfigHandlers:
                 else:
                     current_pool.add(sub_action)
                 
-                self.data_manager.update_chat_setting(chat_id, ["quiz_categories_pool"], list(current_pool))
+                await self.data_manager.update_chat_setting(chat_id, ["quiz_categories_pool"], list(current_pool))
                 await query.answer(f"Категория '{escape_markdown_v2(sub_action)}' {'убрана из' if sub_action in current_pool else 'добавлена в'} пул")
                 # Обновляем текущее меню
                 await self._show_quiz_categories_pool_menu(query, context)
@@ -1191,7 +1157,7 @@ class ConfigHandlers:
         
         if not chat_id: return ConversationHandler.END
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         daily_s_defs_app = self.app_config.daily_quiz_defaults
         context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_daily_cfg_menu"
         context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = CB_ADM_BACK_TO_DAILY_MENU
@@ -1205,7 +1171,7 @@ class ConfigHandlers:
         elif action.startswith(CB_ADM_DAILY_TOGGLE_ENABLED):
             val_str_from_cb = action.split(":", 1)[1]
             new_enabled_state = val_str_from_cb == "true"
-            self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "enabled"], new_enabled_state)
+            await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "enabled"], new_enabled_state)
             if self.daily_quiz_scheduler_ref:
                 asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
             await self._send_daily_cfg_menu(query, context)
@@ -1227,7 +1193,7 @@ class ConfigHandlers:
             return CFG_DAILY_MENU
         elif action.startswith(CB_ADM_DAILY_SET_CATEGORIES_MODE_OPT):
             mode_val_selected = action.split(":",1)[1]
-            self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "categories_mode"], mode_val_selected)
+            await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "categories_mode"], mode_val_selected)
             if self.daily_quiz_scheduler_ref: asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
 
             if mode_val_selected == "random":
@@ -1290,7 +1256,7 @@ class ConfigHandlers:
         chat_id = context.chat_data.get(CTX_ADMIN_CFG_CHAT_ID)
         if not chat_id: return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         daily_settings = settings.setdefault("daily_quiz", {})
         times_list_raw = daily_settings.setdefault("times_msk", [])
         
@@ -1302,7 +1268,7 @@ class ConfigHandlers:
                 times_list = [{"hour": int(hour), "minute": int(minute)}]
                 # Сохраняем исправленные данные
                 daily_settings["times_msk"] = times_list
-                self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "times_msk"], times_list)
+                await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "times_msk"], times_list)
             except:
                 times_list = []
         elif not isinstance(times_list_raw, list):
@@ -1383,7 +1349,7 @@ class ConfigHandlers:
         
         if not chat_id: return ConversationHandler.END
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         daily_settings = settings.setdefault("daily_quiz", {})
         times_list: List[Dict[str, int]] = daily_settings.setdefault("times_msk", [])
         times_list.sort(key=lambda t: (t.get("hour",0), t.get("minute",0)))
@@ -1415,9 +1381,13 @@ class ConfigHandlers:
                 time_index_to_remove_str = action.split(":",1)[1]
                 time_index_to_remove = int(time_index_to_remove_str)
                 if 0 <= time_index_to_remove < len(times_list):
+                    if self.data_manager.postgres_storage and len(times_list) == 1 and daily_settings.get("enabled"):
+                        await query.answer("Сначала отключите ежедневный квиз или добавьте другое время.", show_alert=True)
+                        await self._send_daily_times_menu(query, context)
+                        return CFG_DAILY_TIMES_MENU
                     removed_time = times_list.pop(time_index_to_remove)
                     logger.info(f"Удалено время {removed_time} из списка для чата {chat_id}")
-                    self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "times_msk"], times_list)
+                    await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "times_msk"], times_list)
                     if self.daily_quiz_scheduler_ref:
                         asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
                 else: await query.answer("Ошибка: неверный индекс времени для удаления.", show_alert=True)
@@ -1442,7 +1412,7 @@ class ConfigHandlers:
 
                 if timezone_changed:
                     daily_settings["timezone"] = selected_timezone
-                    self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "timezone"], selected_timezone)
+                    await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "timezone"], selected_timezone)
 
                     # Используем умную перепланировку при смене часового пояса
                     if self.daily_quiz_scheduler_ref:
@@ -1472,14 +1442,13 @@ class ConfigHandlers:
         if not chat_id:
             return
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
 
         # Определяем контекст: мудрость дня или ежедневная викторина
         current_menu = context.chat_data.get(CTX_CURRENT_MENU_SENDER_CB_NAME, "")
         if current_menu == "_send_wisdom_menu":
             # Контекст мудрости дня
-            wisdom_settings = settings.setdefault("daily_wisdom", {})
-            current_timezone = wisdom_settings.get("timezone", "Europe/Moscow")
+            current_timezone = settings.get("daily_quiz", {}).get("timezone", "Europe/Moscow")
             timezone_callback_prefix = CB_ADM_WISDOM_SET_TIMEZONE
             back_callback = CB_ADM_WISDOM_MENU
             title = "🌍 Выбор часового пояса для мудрости дня"
@@ -1554,7 +1523,7 @@ class ConfigHandlers:
         context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = CB_ADM_BACK_TO_MAIN
 
         if action == CB_ADM_EXECUTE_RESET_SETTINGS:
-            self.data_manager.reset_chat_settings(chat_id)
+            await self.data_manager.reset_chat_settings(chat_id)
             if self.daily_quiz_scheduler_ref:
                 asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
             await self._send_main_cfg_menu(query, context)
@@ -1612,10 +1581,13 @@ class ConfigHandlers:
 
 
     def get_handlers(self) -> List[Any]:
+        from modules.telegram_menu import conversation_entry, home_fallbacks
         cancel_handler_for_conv = CommandHandler(self.app_config.commands.cancel, self.cancel_config_conversation)
 
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler(self.app_config.commands.admin_settings, self.admin_settings_entry)],
+            entry_points=[CommandHandler(self.app_config.commands.admin_settings, self.admin_settings_entry),
+                CallbackQueryHandler(conversation_entry(self.admin_settings_entry, self.app_config.commands.admin_settings), pattern=r'^(nav:settings|start_settings)$'),
+                CommandHandler('start', conversation_entry(self.admin_settings_entry, self.app_config.commands.admin_settings), filters=filters.Regex(r'^/start(?:@\w+)? settings$'))],
             states={
                 CFG_MAIN_MENU: [CallbackQueryHandler(self.handle_main_menu_callbacks, pattern=f"^{CB_ADM_}")],
                 CFG_QUIZ_MENU: [CallbackQueryHandler(self.handle_quiz_menu_callbacks, pattern=f"^{CB_ADM_}")],
@@ -1667,7 +1639,7 @@ class ConfigHandlers:
                     CallbackQueryHandler(self.handle_main_menu_callbacks, pattern=f"^{CB_ADM_WISDOM_MENU}$")
                 ],
             },
-            fallbacks=[cancel_handler_for_conv],
+            fallbacks=[*home_fallbacks(), cancel_handler_for_conv],
             per_chat=True, per_user=True, name="admin_settings_conversation", persistent=True, allow_reentry=True
         )
         return [
@@ -1687,7 +1659,7 @@ class ConfigHandlers:
         
         if not chat_id: return ConversationHandler.END
 
-        settings = self.data_manager.get_chat_settings(chat_id)
+        settings = await self.data_manager.get_chat_settings_async(chat_id)
         def_s = self.app_config.default_chat_settings
         context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_quiz_categories_cfg_menu"
         context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = CB_ADM_BACK_TO_QUIZ_CATEGORIES_MENU
@@ -1771,7 +1743,7 @@ class ConfigHandlers:
             return CFG_QUIZ_CATEGORIES_POOL_SELECTION
         elif action == CB_ADM_QUIZ_CAT_POOL_SAVE:
             # Сохраняем выбранные категории
-            self.data_manager.update_chat_setting(chat_id, ["quiz_categories_pool"], list(current_selection))
+            await self.data_manager.update_chat_setting(chat_id, ["quiz_categories_pool"], list(current_selection))
             await self._send_quiz_categories_cfg_menu(query, context)
             return CFG_QUIZ_CATEGORIES_MENU
         elif action == CB_ADM_QUIZ_CAT_POOL_CLEAR:

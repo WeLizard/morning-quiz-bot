@@ -1,5 +1,6 @@
 #poll_answer_handler.py
 import logging
+from hashlib import sha256
 from typing import Optional, TYPE_CHECKING
 
 from telegram import Update, PollAnswer, User as TelegramUser
@@ -8,6 +9,7 @@ from telegram.constants import ParseMode
 
 from utils import escape_markdown_v2
 from modules.telegram_utils import safe_send_message, format_error_message
+from modules.quiz_payload import selected_option_index
 
 if TYPE_CHECKING:
     from app_config import AppConfig
@@ -33,6 +35,45 @@ class CustomPollAnswerHandler:
         self.data_manager = data_manager
         self.quiz_manager = quiz_manager
 
+    async def _handle_platform_answer(self, poll_answer, user) -> bool:
+        """Resolve a v2 delivery and submit the same command used by Mini App."""
+        storage = self.data_manager.postgres_storage
+        if storage is None or getattr(storage, 'database', None) is None:
+            return False
+        from application.classic import ClassicApplicationService
+        from storage.game_deliveries import GameDeliveries
+        async with storage.database.transaction() as session:
+            delivery = await GameDeliveries(session).resolve(
+                channel='telegram', external_id=poll_answer.poll_id
+            )
+            if delivery is None:
+                return False
+            poll = {
+                'option_count': len(delivery.metadata_json.get('option_persistent_ids') or []),
+                'option_persistent_ids': delivery.metadata_json.get('option_persistent_ids') or [],
+            }
+            selected = selected_option_index(poll_answer, poll)
+            if selected is None:
+                logger.warning('Ignoring malformed platform vote for %s', poll_answer.poll_id)
+                return True
+            raw_id = f'{poll_answer.poll_id}:{user.id}'
+            command = 'tg-answer:' + sha256(raw_id.encode()).hexdigest()[:48]
+            try:
+                await ClassicApplicationService(
+                    storage.database, session,
+                    rules=self.score_manager._classic_scoring_rules(),
+                ).answer(
+                    chat_id=delivery.chat_id,
+                    user_id=user.id,
+                    display_name=user.full_name,
+                    round_id=delivery.round_id,
+                    selected_option=selected,
+                    command_id=command,
+                )
+            except (LookupError, PermissionError, RuntimeError, ValueError) as error:
+                logger.info('Classic platform answer rejected: %s', type(error).__name__)
+            return True
+
     async def handle_poll_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.poll_answer:
             logger.debug("handle_poll_answer: update.poll_answer is None, игнорируется.")
@@ -41,6 +82,11 @@ class CustomPollAnswerHandler:
         poll_answer: PollAnswer = update.poll_answer
         user: TelegramUser = poll_answer.user
         answered_poll_id: str = poll_answer.poll_id
+        if user is None or not poll_answer.option_ids:
+            return  # Chat votes and withdrawn votes are not scorable quiz answers.
+
+        if await self._handle_platform_answer(poll_answer, user):
+            return
 
         # ИСПРАВЛЕНО: Проверяем, не обрабатывали ли мы уже этот ответ
         # Создаем уникальный ключ для ответа
@@ -54,9 +100,6 @@ class CustomPollAnswerHandler:
         # Инициализируем множество обработанных ответов, если его нет
         if not hasattr(self, '_processed_answers'):
             self._processed_answers = set()
-        
-        # Добавляем текущий ответ в обработанные
-        self._processed_answers.add(answer_key)
         
         # Ограничиваем размер множества (очищаем старые записи)
         if len(self._processed_answers) > 1000:
@@ -75,19 +118,33 @@ class CustomPollAnswerHandler:
         chat_id_int: int = poll_info_from_state["chat_id"]
         quiz_type_of_poll: str = poll_info_from_state.get("quiz_type", "unknown_type")
         correct_option_index_for_this_poll: int = poll_info_from_state["correct_option_index"]
+        if self.data_manager.postgres_storage:
+            quiz = self.state.get_active_quiz(chat_id_int)
+            if not quiz or quiz.is_stopping:
+                return
 
-        is_answer_correct = (
-            len(poll_answer.option_ids) == 1 and
-            poll_answer.option_ids[0] == correct_option_index_for_this_poll
-        )
+        chosen_index = selected_option_index(poll_answer, poll_info_from_state)
+        if chosen_index is None:
+            logger.warning('Ignoring malformed/mismatched quiz vote for %s', answered_poll_id)
+            return
+        is_answer_correct = chosen_index == correct_option_index_for_this_poll
 
-        score_was_updated, motivational_msg_text_chat, motivational_msg_text_ls, streak_msg_text = await self.score_manager.update_score_and_get_motivation(
-            chat_id=chat_id_int,
-            user=user,
-            poll_id=answered_poll_id,
-            is_correct=is_answer_correct,
-            quiz_type_of_poll=quiz_type_of_poll
-        )
+        try:
+            score_was_updated, motivational_msg_text_chat, motivational_msg_text_ls, streak_msg_text = await self.score_manager.update_score_and_get_motivation(
+                chat_id=chat_id_int, user=user, poll_id=answered_poll_id,
+                is_correct=is_answer_correct, quiz_type_of_poll=quiz_type_of_poll,
+            )
+        except Exception as exc:
+            from storage.classic_sessions import ClassicSessionConflict
+            from storage.admin_actions import BotAccessBlocked
+            if isinstance(exc, (ClassicSessionConflict, BotAccessBlocked)):
+                return
+            raise  # Do not poison the retry cache when persistence fails.
+        self._processed_answers.add(answer_key)
+        if self.data_manager.postgres_storage:
+            from storage.admin_actions import AdminActions
+            if not await AdminActions(self.data_manager.postgres_storage.database).allowed(chat_id_int, user.id):
+                return
         
         # ДЕБАГ: Логируем результат обработки
         logger.info(f"🔍 ДЕБАГ: Результат update_score_and_get_motivation:")
@@ -144,10 +201,6 @@ class CustomPollAnswerHandler:
             if chat_id_int != user.id and motivational_msg_text_ls:  # ИСПРАВЛЕНО: Не отправляем в ЛС если пользователь уже в личном чате И если есть что отправлять
                 try:
                     logger.info(f"🔍 ДЕБАГ: Отправляем в ЛС пользователю {user.id}")
-                    
-                    # Проверяем, может ли бот отправлять сообщения пользователю
-                    bot_info = await context.bot.get_me()
-                    user_info = await context.bot.get_chat(user.id)
                     
                     # Пытаемся отправить сообщение (только чатовые ачивки, без streak)
                     await safe_send_message(

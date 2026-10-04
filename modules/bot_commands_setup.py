@@ -13,7 +13,7 @@ from telegram import (
     BotCommandScopeAllGroupChats,
     BotCommandScopeAllChatAdministrators,
 )
-from telegram.error import TimedOut, NetworkError
+from telegram.error import TimedOut, NetworkError, TelegramError
 
 if TYPE_CHECKING:
     from telegram.ext import Application
@@ -37,6 +37,7 @@ async def setup_bot_commands(application: "Application", app_config: "AppConfig"
         BotCommand(app_config.commands.start, "🚀 Начать работу с ботом"),
         BotCommand(app_config.commands.help, "ℹ️ Помощь по командам"),
         BotCommand(app_config.commands.quiz, "🏁 Начать викторину"),
+        BotCommand("mafia", "🌒 Собрать стол «Ночного города»"),
         BotCommand(app_config.commands.categories, "📚 Список категорий"),
         BotCommand(app_config.commands.category_stats, "📊 Статистика категорий"),
         BotCommand(app_config.commands.chatcategories, "🎲 Очередь категорий с весами"),
@@ -71,7 +72,7 @@ async def setup_bot_commands(application: "Application", app_config: "AppConfig"
     ]
     
     # Функция для установки команд с retry
-    async def set_commands_with_retry(scope=None, max_retries=3):
+    async def set_commands_with_retry(scope=None, scope_name="default", max_retries=3):
         """Устанавливает команды с повторными попытками при таймаутах"""
         for attempt in range(max_retries):
             try:
@@ -83,27 +84,69 @@ async def setup_bot_commands(application: "Application", app_config: "AppConfig"
             except (TimedOut, NetworkError) as e:
                 if attempt < max_retries - 1:
                     wait_time = (attempt + 1) * 2  # 2, 4, 6 секунд
-                    logger.warning(f"Таймаут при установке команд (попытка {attempt + 1}/{max_retries}), повтор через {wait_time}с: {e}")
+                    logger.warning(
+                        "Сбой при установке команд для scope=%s (попытка %s/%s), повтор через %sс: %r",
+                        scope_name,
+                        attempt + 1,
+                        max_retries,
+                        wait_time,
+                        e,
+                    )
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"Не удалось установить команды после {max_retries} попыток: {e}")
+                    logger.error(
+                        "Не удалось установить команды для scope=%s после %s попыток: %r",
+                        scope_name,
+                        max_retries,
+                        e,
+                        exc_info=True,
+                    )
                     return False
             except Exception as e:
-                logger.error(f"Ошибка при установке команд: {e}", exc_info=True)
+                logger.error(
+                    "Ошибка при установке команд для scope=%s: %r",
+                    scope_name,
+                    e,
+                    exc_info=True,
+                )
                 return False
         return False
     
     try:
-        # Устанавливаем команды по умолчанию
-        await set_commands_with_retry()
-        # Приватные чаты
-        await set_commands_with_retry(scope=BotCommandScopeAllPrivateChats())
-        # Группы и супергруппы
-        await set_commands_with_retry(scope=BotCommandScopeAllGroupChats())
-        # Администраторские чаты
-        await set_commands_with_retry(scope=BotCommandScopeAllChatAdministrators())
-        logger.info(f"✅ Команды бота успешно установлены для всех скоупов ({len(bot_commands)} команд).")
+        from modules.mini_app_launch import configured_url
+        try:
+            mini_url = configured_url()
+            if mini_url:
+                from telegram import MenuButtonWebApp, WebAppInfo
+                await application.bot.set_chat_menu_button(menu_button=MenuButtonWebApp('Morning Quiz', WebAppInfo(mini_url)))
+        except (ValueError, TelegramError):
+            logger.warning('Mini App menu was not configured; classic commands remain available')
+        scope_results = [
+            await set_commands_with_retry(scope_name="default"),
+            await set_commands_with_retry(
+                scope=BotCommandScopeAllPrivateChats(),
+                scope_name="private_chats",
+            ),
+            await set_commands_with_retry(
+                scope=BotCommandScopeAllGroupChats(),
+                scope_name="group_chats",
+            ),
+            await set_commands_with_retry(
+                scope=BotCommandScopeAllChatAdministrators(),
+                scope_name="chat_admins",
+            ),
+        ]
+        successful_scopes = sum(1 for success in scope_results if success)
+        if successful_scopes == len(scope_results):
+            logger.info(
+                "✅ Команды бота успешно установлены для всех скоупов (%s команд).",
+                len(bot_commands),
+            )
+        else:
+            logger.warning(
+                "⚠️ Команды бота установлены не для всех скоупов: %s/%s.",
+                successful_scopes,
+                len(scope_results),
+            )
     except Exception as e_set_cmd:
         logger.error(f"❌ Не удалось установить команды бота: {e_set_cmd}", exc_info=True)
-
-

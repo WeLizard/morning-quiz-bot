@@ -4,6 +4,7 @@ import random
 import time
 import json
 import threading
+import copy
 from pathlib import Path
 from typing import List, Dict, Any, Set, Optional, Union, TYPE_CHECKING
 
@@ -19,6 +20,11 @@ class CategoryManager:
         self.state = state
         self.app_config = app_config
         self.data_manager = data_manager
+        self._postgres_storage = (
+            getattr(data_manager, "postgres_storage", None)
+            if getattr(app_config, "storage_backend", "json") == "postgres"
+            else None
+        )
         # Инициализируем статистику использования категорий
         self._category_usage_stats: Dict[str, Dict[str, Any]] = {}
         # Простая блокировка для защиты от race conditions при одновременных обновлениях
@@ -32,6 +38,14 @@ class CategoryManager:
             logger.warning("state.quiz_data отсутствует или имеет неверный тип в CategoryManager. Возвращен пустой словарь.")
             return {}
         return self.state.quiz_data
+
+    async def refresh_postgres_statistics(self):
+        if self._postgres_storage:
+            from storage.models import SystemState
+            async with self._postgres_storage.database.transaction() as session:
+                row = await session.get(SystemState, "category_usage_stats")
+                self._category_usage_stats = copy.deepcopy(row.payload if row else {})
+            self.state.global_settings["category_usage_stats"] = copy.deepcopy(self._category_usage_stats)
 
     def _get_stats_file_path(self) -> Path:
         """Получает путь к файлу статистики категорий"""
@@ -52,6 +66,12 @@ class CategoryManager:
 
     def _load_chat_category_stats(self, chat_id: int) -> Dict[str, Dict[str, Any]]:
         """Загружает статистику использования категорий для конкретного чата"""
+        if self._postgres_storage:
+            return {name: {"chat_usage": value.get("chat_usage", {}).get(str(chat_id), 0),
+                           "last_used": value.get("last_used"),
+                           "total_questions": self._get_total_questions_for_category(name)}
+                    for name, value in self._category_usage_stats.items()
+                    if value.get("chat_usage", {}).get(str(chat_id), 0)}
         try:
             stats_file = self._get_chat_stats_file_path(chat_id)
             if stats_file.exists():
@@ -78,6 +98,8 @@ class CategoryManager:
 
     def _save_chat_category_stats(self, chat_id: int) -> None:
         """Сохраняет статистику использования категорий для конкретного чата"""
+        if self._postgres_storage:
+            return
         try:
             stats_file = self._get_chat_stats_file_path(chat_id)
             # Создаем директорию, если её нет
@@ -108,6 +130,16 @@ class CategoryManager:
 
     def _load_category_usage_stats(self) -> None:
         """Загружает статистику использования категорий из файла"""
+        if self._postgres_storage:
+            self._category_usage_stats = copy.deepcopy(
+                self.state.global_settings.get("category_usage_stats", {})
+            )
+            self._migrate_old_category_stats_format()
+            logger.info(
+                "Статистика категорий загружена из PostgreSQL: %s записей",
+                len(self._category_usage_stats),
+            )
+            return
         try:
             stats_file = self._get_stats_file_path()
             if stats_file.exists():
@@ -213,6 +245,9 @@ class CategoryManager:
 
     def _save_category_usage_stats(self) -> None:
         """Сохраняет статистику использования категорий в файл"""
+        if self._postgres_storage:
+            # PG counters are written by ClassicSessions' closing transaction.
+            return
         try:
             stats_file = self._get_stats_file_path()
             # Создаем директорию, если её нет
@@ -238,6 +273,8 @@ class CategoryManager:
 
     def _update_category_usage_sync(self, category_name: str, chat_id: Optional[int] = None) -> None:
         """Простое синхронное обновление статистики с блокировкой"""
+        if self._postgres_storage:
+            raise RuntimeError("PG category counters are committed with session completion")
         logger.info(f"🔄 _update_category_usage_sync: Начало обновления статистики для категории '{category_name}' в чате {chat_id}")
         
         try:
@@ -304,7 +341,8 @@ class CategoryManager:
 
     def _get_weighted_random_categories(self, candidate_pool: List[str], num_to_pick: int, chat_id: Optional[int] = None) -> List[str]:
         """Выбирает категории с учетом весов на основе частоты использования в конкретном чате"""
-        if not candidate_pool:
+        candidate_pool = list(dict.fromkeys(candidate_pool))
+        if not candidate_pool or num_to_pick <= 0:
             return []
         
         if len(candidate_pool) <= num_to_pick:
@@ -376,6 +414,11 @@ class CategoryManager:
             
             # Возвращаем нужное количество
             selected_categories = [cat for cat, _ in top_categories[:num_to_pick]]
+            # Cooldown is a preference, not a reason to silently shrink a quiz.
+            # Retain all eligible picks; fill a shortage from the remaining pool.
+            if len(selected_categories) < num_to_pick:
+                remaining = [cat for cat in candidate_pool if cat not in selected_categories]
+                selected_categories.extend(random.sample(remaining, num_to_pick - len(selected_categories)))
             
             logger.debug(f"Выбрано {len(selected_categories)} категорий с весами: {[(cat, weight) for cat, weight in category_weights[:num_to_pick]]}")
             return selected_categories
@@ -539,9 +582,8 @@ class CategoryManager:
         chat_disabled_cats_setting: Set[str] = set(chat_settings.get("disabled_categories", []))
         
         # НОВОЕ: Получаем настройки пула категорий для /quiz ИЗ НОВОЙ СТРУКТУРЫ
-        quiz_settings = chat_settings.get("quiz_settings", {})
-        quiz_categories_mode = quiz_settings.get("default_categories_mode", "all")
-        quiz_categories_pool = quiz_settings.get("default_specific_categories", [])
+        from modules.quiz_preferences import category_preferences
+        quiz_categories_mode, quiz_categories_pool, category_count = category_preferences(chat_settings)
 
         all_system_category_names_with_questions = [
             name for name, questions in self._questions_by_category_from_state.items() if questions
@@ -561,12 +603,15 @@ class CategoryManager:
             # НОВАЯ ЛОГИКА: Применяем настройки пула категорий для /quiz
             candidate_pool_for_random: List[str]
             
-            if quiz_categories_mode == "specific" and quiz_categories_pool:
+            if quiz_categories_mode == "specific":
                 # Режим "specific": только указанные категории
                 candidate_pool_for_random = [
                     cat_name for cat_name in quiz_categories_pool
                     if cat_name in all_system_category_names_with_questions and cat_name not in chat_disabled_cats_setting
                 ]
+            elif quiz_categories_mode == "exclude":
+                candidate_pool_for_random = [name for name in all_system_category_names_with_questions
+                    if name not in chat_disabled_cats_setting and name not in quiz_categories_pool]
             elif quiz_categories_mode == "random":
                 # Режим "random": случайные категории из всех доступных
                 candidate_pool_for_random = [
@@ -590,7 +635,7 @@ class CategoryManager:
             # Выбираем категории с учетом весов
             source_categories_names = self._get_weighted_random_categories(
                 candidate_pool_for_random, 
-                chat_settings.get("num_categories_per_quiz", 3),
+                category_count,
                 chat_id
             )
         else:
@@ -645,6 +690,8 @@ class CategoryManager:
 
     def reset_category_usage_stats(self, category_name: Optional[str] = None) -> None:
         """Сбрасывает статистику использования категорий"""
+        if self._postgres_storage:
+            raise RuntimeError("Сброс статистики PostgreSQL пока не поддерживается")
         if category_name and category_name in self._category_usage_stats:
             del self._category_usage_stats[category_name]
         else:
@@ -750,4 +797,3 @@ class CategoryManager:
             
         except Exception as e:
             logger.warning(f"Ошибка при загрузке чатовых статистик категорий: {e}")
-

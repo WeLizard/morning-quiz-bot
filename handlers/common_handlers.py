@@ -24,221 +24,14 @@ class CommonHandlers:
         self.bot_state = bot_state # bot_state сохраняется, но не используется методами этого класса
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if not update.effective_user or not update.message:
-            return
-
-        user = update.effective_user
-        welcome_text = (
-            f"Привет, {bold(user.first_name)}\\! Я бот для проведения викторин\\.\n\n"
-            f"{md.section_header('Быстрые действия:', '🎯')}\n"
-            f"• 🎮 Начать викторину\n"
-            f"• 📊 Мои очки\n"
-            f"• 🏆 Глобальный рейтинг\n"
-            f"• ⚙️ Настройки\n"
-            f"• ❓ Помощь\n\n"
-            f"{md.section_header('Все команды:', '📋')}\n"
-            f"{md.command_help(self.app_config.commands.quiz, 'начать викторину')}\n"
-            f"{md.command_help(self.app_config.commands.mystats, 'моя статистика')}\n"
-            f"{md.command_help(self.app_config.commands.top, 'рейтинг чата')}\n"
-            f"{md.command_help(self.app_config.commands.global_top, 'глобальный рейтинг')}\n"
-            f"{md.command_help(self.app_config.commands.categories, 'доступные категории')}\n"
-            f"{md.command_help(self.app_config.commands.help, 'показать эту справку')}\n\n"
-            f"{md.section_header('Для администраторов:', '💡')}\n"
-            f"• ⚙️ Настройки чата: {code(f'/{self.app_config.commands.admin_settings}')}\n"
-            f"• 🛑 Остановить викторину: {code(f'/{self.app_config.commands.stop_quiz}')}"
-        )
-        try:
-            # Создаем inline клавиатуру для быстрого доступа
-            from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-
-            keyboard = [
-                [
-                    InlineKeyboardButton("🎮 Начать викторину", callback_data="start_quiz"),
-                    InlineKeyboardButton("📊 Мои очки", callback_data="start_mystats")
-                ],
-                [
-                    InlineKeyboardButton("🏆 Глобальный рейтинг", callback_data="start_global_top"),
-                    InlineKeyboardButton("⚙️ Настройки", callback_data="start_settings")
-                ],
-                [
-                    InlineKeyboardButton("❓ Помощь", callback_data="start_help"),
-                    InlineKeyboardButton("📚 Категории", callback_data="start_categories")
-                ]
-            ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            sent_msg = await update.message.reply_text(
-                welcome_text,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            # Добавляем сообщение в список для удаления
-            bot_state = context.bot_data.get('bot_state')
-            if bot_state:
-                bot_state.add_message_for_deletion(update.effective_chat.id, sent_msg.message_id)
-            
-            # Обновляем метаданные чата (название, тип) в фоновом режиме
-            data_manager = context.bot_data.get('data_manager')
-            if data_manager:
-                asyncio.create_task(data_manager.update_chat_metadata(update.effective_chat.id, context.bot))
-        except Exception as e:
-            logger.error(f"Ошибка при отправке start_command: {e}")
+        from modules.telegram_menu import home
+        context.bot_data.setdefault('app_config', self.app_config)
+        await home(update, context)
 
     async def start_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """
-        Обработчик callback-запросов от inline кнопок в главном меню /start
-        """
-        query = update.callback_query
-        if not query or not query.data:
-            return
-
-        try:
-            callback_data = query.data
-            logger.info(f"🔘 START MENU: Получен callback '{callback_data}' от пользователя {query.from_user.id if query.from_user else 'Unknown'}")
-            
-            # ВАЖНО: Отвечаем на callback СРАЗУ, до всех обработок
-            try:
-                await query.answer(timeout=10)  # Подтверждаем получение callback с таймаутом
-            except Exception as e:
-                logger.warning(f"Не удалось ответить на callback сразу: {e}")
-
-            chat_id = query.message.chat_id
-            user = query.from_user
-
-            # Получаем обработчики заранее
-            rating_handlers = context.bot_data.get('rating_handlers')
-
-            if callback_data == "start_quiz":
-                # Имитируем команду /quiz
-                fake_message = type('FakeMessage', (), {
-                    'chat_id': chat_id,
-                    'from_user': user,
-                    'text': f"/{self.app_config.commands.quiz}",
-                    'message_id': query.message.message_id,
-                })()
-
-                fake_update = type('FakeUpdate', (), {
-                    'message': fake_message,
-                    'effective_chat': query.message.chat,
-                    'effective_user': user
-                })()
-
-                # Вызываем обработчик викторины
-                quiz_manager = context.bot_data.get('quiz_manager')
-                if quiz_manager:
-                    await quiz_manager.quiz_command_entry(fake_update, context)
-
-            elif callback_data == "start_mystats":
-                # Имитируем команду /mystats
-                fake_message = type('FakeMessage', (), {
-                    'chat_id': chat_id,
-                    'from_user': user,
-                    'text': f"/{self.app_config.commands.mystats}",
-                    'message_id': query.message.message_id,
-                })()
-
-                fake_update = type('FakeUpdate', (), {
-                    'message': fake_message,
-                    'effective_chat': query.message.chat,
-                    'effective_user': user
-                })()
-
-                # Вызываем обработчик статистики
-                if rating_handlers:
-                    await rating_handlers.mystats_command(fake_update, context)
-
-            elif callback_data == "start_global_top":
-                # Имитируем команду /globaltop
-                fake_update = type('FakeUpdate', (), {
-                    'message': type('FakeMessage', (), {
-                        'chat_id': chat_id,
-                        'from_user': user,
-                        'text': f"/{self.app_config.commands.global_top}"
-                    })(),
-                    'effective_chat': query.message.chat,
-                    'effective_user': user
-                })()
-
-                # Вызываем обработчик глобального рейтинга
-                if rating_handlers:
-                    await rating_handlers.globaltop_command(fake_update, context)
-
-            elif callback_data == "start_settings":
-                # Вызываем команду settings
-                fake_update = type('FakeUpdate', (), {
-                    'message': type('FakeMessage', (), {
-                        'chat_id': chat_id,
-                        'from_user': user,
-                        'text': f"/{self.app_config.commands.mystats}"
-                    })(),
-                    'effective_chat': query.message.chat,
-                    'effective_user': user
-                })()
-
-                await self.mystats_command(fake_update, context)
-
-            elif callback_data == "start_help":
-                # Вызываем команду help
-                # Создаем более совместимый fake update
-                async def fake_reply_text(*args, **kwargs):
-                    # args[0] может быть 'self' если вызывается как метод, или text если как функция
-                    text = args[-1] if len(args) > 0 else kwargs.get('text', '')
-                    return await query.message.reply_text(text, **kwargs)
-
-                fake_message = type('FakeMessage', (), {
-                    'chat_id': chat_id,
-                    'from_user': user,
-                    'text': f"/{self.app_config.commands.help}",
-                    'message_id': query.message.message_id,  # Используем реальный message_id
-                    'reply_text': fake_reply_text
-                })()
-
-                fake_update = type('FakeUpdate', (), {
-                    'message': fake_message,
-                    'effective_chat': query.message.chat,
-                    'effective_user': user
-                })()
-
-                await self.help_command(fake_update, context)
-
-            elif callback_data == "start_categories":
-                # Вызываем команду categories
-                class FakeMessage:
-                    def __init__(self, real_message, user, text):
-                        self.chat_id = real_message.chat_id
-                        self.from_user = user
-                        self.text = text
-                        self.message_id = real_message.message_id
-                        self.chat = real_message.chat
-                        self._real_message = real_message
-                    
-                    async def reply_text(self, *args, **kwargs):
-                        return await self._real_message.reply_text(*args, **kwargs)
-
-                fake_message = FakeMessage(query.message, user, f"/{self.app_config.commands.categories}")
-                
-                fake_update = type('FakeUpdate', (), {
-                    'message': fake_message,
-                    'effective_chat': query.message.chat,
-                    'effective_user': user
-                })()
-
-                await self.categories_command(fake_update, context)
-
-            # Обновляем сообщение, чтобы убрать кнопки (опционально)
-            try:
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception:
-                # Игнорируем ошибку, если не удалось обновить разметку
-                pass
-
-        except Exception as e:
-            logger.error(f"Ошибка при обработке callback от start меню: {e}")
-            try:
-                await query.answer("❌ Произошла ошибка. Попробуйте команду напрямую.")
-            except Exception:
-                pass
+        from modules.telegram_menu import navigate
+        context.bot_data.setdefault('app_config', self.app_config)
+        await navigate(update, context)
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.message:
@@ -383,6 +176,7 @@ class CommonHandlers:
         
         try:
             # Получаем глобальную статистику
+            await self.category_manager.refresh_postgres_statistics()
             global_stats = self.category_manager.get_global_category_stats()
             
             if not global_stats:
@@ -628,7 +422,7 @@ class CommonHandlers:
             return
 
         # Проверяем, включен ли режим обслуживания
-        if not data_manager.is_maintenance_mode():
+        if not await data_manager.is_maintenance_mode_async():
             # Если режим обслуживания не включен, пропускаем
             return
 
@@ -638,7 +432,7 @@ class CommonHandlers:
 
         try:
             # Получаем статус обслуживания
-            maintenance_status = data_manager.get_maintenance_status()
+            maintenance_status = await data_manager.get_maintenance_status_async()
             reason = maintenance_status.get("reason", "Техническое обслуживание")
             start_time_str = maintenance_status.get("start_time", "")
 
@@ -716,8 +510,13 @@ _Приносим извинения за неудобства\\._"""
                 logger.warning("data_manager не найден при очистке уведомлений")
                 return
 
+            if data_manager.postgres_storage:
+                # A restart must not silently clear an operator's persisted switch.
+                # PG interrupted-game cleanup is processed by the durable queue.
+                return
+
             # Выключаем режим обслуживания и получаем данные для очистки
-            maintenance_data = data_manager.disable_maintenance_mode()
+            maintenance_data = await data_manager.disable_maintenance_mode_async()
 
             if not maintenance_data or not maintenance_data.get("chats_notified"):
                 logger.info("Нет уведомлений для очистки")
@@ -862,11 +661,11 @@ _Спасибо за ожидание\\!_"""
 
         if not args:
             # Показать текущий статус
-            is_maintenance = data_manager.is_maintenance_mode()
+            is_maintenance = await data_manager.is_maintenance_mode_async()
             status_text = "ВКЛЮЧЕН" if is_maintenance else "ВЫКЛЮЧЕН"
 
             if is_maintenance:
-                maintenance_data = data_manager.get_maintenance_status()
+                maintenance_data = await data_manager.get_maintenance_status_async()
                 reason = maintenance_data.get("reason", "Не указана")
                 start_time = maintenance_data.get("start_time", "Неизвестно")
                 chats_count = len(maintenance_data.get("chats_notified", []))
@@ -895,19 +694,19 @@ _Спасибо за ожидание\\!_"""
         if action == "on":
             # Включаем режим обслуживания
             reason = " ".join(args[1:]) if len(args) > 1 else "Техническое обслуживание"
-            data_manager.enable_maintenance_mode(reason)
+            await data_manager.enable_maintenance_mode_async(reason)
 
             response = f"""✅ *РЕЖИМ ОБСЛУЖИВАНИЯ ВКЛЮЧЕН*
 
 ⚠️ *Причина:* {escape_markdown_v2(reason)}
-🔄 Бот будет отвечать на все команды уведомлениями об обслуживании
+🔄 Команды остановлены; уведомления об обслуживании появляются не чаще раза в минуту на чат
 
 *Выключить:* /maintenance off"""
 
         elif action == "off":
             # Выключаем режим обслуживания
-            if data_manager.is_maintenance_mode():
-                maintenance_data = data_manager.disable_maintenance_mode()
+            if await data_manager.is_maintenance_mode_async():
+                maintenance_data = await data_manager.disable_maintenance_mode_async()
                 chats_count = len(maintenance_data.get("chats_notified", []))
 
                 response = f"""✅ *РЕЖИМ ОБСЛУЖИВАНИЯ ВЫКЛЮЧЕН*
@@ -941,7 +740,7 @@ _Спасибо за ожидание\\!_"""
             CommandHandler(self.app_config.commands.cancel, self.cancel_command),
             CommandHandler("maintenance", self.maintenance_command),  # Команда для управления обслуживанием
             # Обработчик callback-запросов от inline кнопок
-            CallbackQueryHandler(self.start_menu_callback, pattern=r"^start_"),
+            CallbackQueryHandler(self.start_menu_callback, pattern=r"^(nav:(home|profile|rating|chat_rating|categories|help)|start_(mystats|global_top|help|categories))$"),
         ]
         return handlers_list
 

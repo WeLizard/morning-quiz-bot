@@ -31,7 +31,7 @@ const findButton = (root, label) => {
     const found = root.querySelectorAll('button').find(n => n.textContent === label || n.textContent.startsWith(label));
     assert.ok(found, `Missing button: ${label}`); return found;
 };
-async function application(runtime = true) {
+async function application(runtime = true, startParam = '') {
     const ids = Object.fromEntries(['content', 'navigation', 'feedback', 'environment'].map(id => [id, new Element('div')]));
     for (const page of ['home', 'chats', 'rating', 'profile']) { const b = new Element('button'); b.dataset.page = page; ids.navigation.append(b); }
     const brand = new Element('a'), mounts = [], ui = {prefs: {theme: 'system', haptics: true}, canFullscreen: true,
@@ -49,13 +49,17 @@ async function application(runtime = true) {
                 items: [{kind: 'streak', threshold: 3, title: '3 подряд', earned: true, awarded_at: null, message: 'Серия'}]}},
         '/api/mini/history': {games: [], answers: [], chats: [{chat_id: '42', title: 'Личная игра', answered: 3, correct: 2, score: '12.000', last_answer_at: null}]},
         '/api/mini/categories': {items: ['История', 'Наука']},
+        '/api/mini/chats/42/games': {items: []},
         '/api/mini/chats/42/details': {settings_revision: 3, can_edit: true,
+            me: {score: '12.000', answered: 3, correct: 2, accuracy: 66.7, streak: 1, best_streak: 2,
+                rank: 2, members: 4, achievements_earned: 1, achievements_available: 2,
+                first_answer_at: null, last_answer_at: null},
             classic: {questions: 7, seconds: 45, interval: 12, announce: false, announce_delay: 4, category_mode: 'all', categories: [], random_categories: 3},
             daily: {enabled: false, times_msk: [], timezone: 'Europe/Moscow', num_questions: 10, interval_seconds: 60, poll_open_seconds: 600, categories_mode: 'random', specific_categories: [], num_random_categories: 3},
             wisdom: {enabled: false, time: '09:00'}, auto_delete: true},
     };
     runInNewContext(source('app.js'), {
-        window: {QuizTelegram: ui, QuizGame: {stop() {}, async mount(options) { mounts.push(options); }}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}}}},
+        window: {QuizTelegram: ui, QuizGame: {stop() {}, async mount(options) { mounts.push(options); }}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}, initDataUnsafe: {start_param: startParam}}}},
         document: {getElementById: id => ids[id], createElement: tag => new Element(tag), querySelector: () => brand},
         fetch: async path => { assert.ok(path in fixtures, path); return {ok: true, status: 200, json: async () => fixtures[path]}; },
         AbortController, setTimeout, clearTimeout, queueMicrotask, Intl, console,
@@ -89,6 +93,24 @@ test('home restores the heading and keeps global settings inside profile', async
     app.tab('home').click(); await flush(); app.ui.settings(); await flush();
     assert.equal(app.content.querySelector('h1').textContent, 'Настройки');
     assert.match(app.content.textContent, /Темы обычного квиза/);
+});
+
+test('deep link opens the requested page and falls back on unknown parameters', async () => {
+    const achievements = await application(true, 'achievements');
+    assert.equal(achievements.content.querySelector('h1').textContent, 'Достижения');
+    const history = await application(true, 'history');
+    assert.equal(history.content.querySelector('h1').textContent, 'История');
+    const fallback = await application(true, 'не-страница');
+    assert.equal(fallback.content.querySelector('h1').textContent, 'Ну что, сыграем?');
+});
+
+test('deep link to a chat shows personal statistics and reports a lost chat', async () => {
+    const app = await application(true, 'chat_n42');
+    assert.match(app.content.textContent, /Твоя статистика в этом чате/);
+    assert.match(app.content.textContent, /Достижения чата: 1 из 2/);
+    assert.match(app.content.textContent, /место 2 из 4/);
+    const lost = await application(true, 'chat_n999');
+    assert.match(lost.content.textContent, /Чат из ссылки недоступен/);
 });
 
 test('read-only preview keeps appearance settings without enabling game writes', async () => {

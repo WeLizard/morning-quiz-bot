@@ -37,10 +37,33 @@ def launch_button(chat_type):
 
 def direct_mafia_link(bot_username, chat_id):
     """Build an official Main Mini App deep link for a group lobby."""
+    return deep_link(bot_username, 'mafia', chat_id)
+
+
+# Страницы Mini App, на которые можно вести ссылкой (?startapp=<страница>).
+LAUNCH_PAGES = ('home', 'chats', 'rating', 'profile', 'achievements', 'history')
+
+
+def _bot_username(value):
+    if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9_]{5,32}', value):
+        raise ValueError('Telegram bot username is unavailable')
+    return value
+
+
+def deep_link(bot_username, target, chat_id=None):
+    """Официальная ссылка на Mini App с параметром запуска.
+
+    `target` — страница из белого списка либо 'chat' / 'mafia' вместе с id группы
+    (у групп он отрицательный, в ссылку уходит модуль). Требует настроенного
+    MINI_APP_URL и зарегистрированного Main Mini App в BotFather.
+    """
     if not configured_url():
         return None
-    if not isinstance(bot_username, str) or not re.fullmatch(r'[A-Za-z0-9_]{5,32}', bot_username):
-        raise ValueError('Telegram bot username is unavailable')
-    if not isinstance(chat_id, int) or not -(2**52) < chat_id < 0:
-        raise ValueError('Mafia direct links require a Telegram group ID')
-    return f'https://t.me/{bot_username}?startapp=mafia_n{abs(chat_id)}'
+    username = _bot_username(bot_username)
+    if target in {'chat', 'mafia'}:
+        if not isinstance(chat_id, int) or isinstance(chat_id, bool) or not -(2**52) < chat_id < 0:
+            raise ValueError('Групповые ссылки Mini App требуют отрицательный id группы')
+        return f'https://t.me/{username}?startapp={target}_n{abs(chat_id)}'
+    if target not in LAUNCH_PAGES:
+        raise ValueError('Неизвестная страница Mini App')
+    return f'https://t.me/{username}?startapp={target}'

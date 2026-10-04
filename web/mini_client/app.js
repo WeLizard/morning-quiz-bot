@@ -3,16 +3,20 @@
     const content = document.getElementById('content'), nav = document.getElementById('navigation');
     const feedback = document.getElementById('feedback');
     const tg = window.Telegram?.WebApp;
+    const LAUNCH_PAGES = {home: 'home', chats: 'chats', rating: 'rating', profile: 'profile',
+                          achievements: 'achievements', history: 'history'};
     function launchTarget() {
         let raw = tg?.initDataUnsafe?.start_param || '';
         if (!raw && typeof URLSearchParams !== 'undefined' && typeof location !== 'undefined') {
             raw = new URLSearchParams(location.search).get('tgWebAppStartParam') || '';
         }
-        const match = /^mafia_n([1-9][0-9]{0,15})$/.exec(raw);
-        return match ? {page: 'mafia', chatId: '-' + match[1]} : null;
+        // Ссылки вида ?startapp=chat_n100123 и mafia_n100123 несут id группы (со знаком минус).
+        const scoped = /^(mafia|chat)_n([1-9][0-9]{0,15})$/.exec(raw);
+        if (scoped) return {page: scoped[1], chatId: '-' + scoped[2]};
+        return Object.prototype.hasOwnProperty.call(LAUNCH_PAGES, raw) ? {page: LAUNCH_PAGES[raw]} : null;
     }
     const launch = launchTarget();
-    const state = {token: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: ''};
+    const state = {token: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: ''};
     let generation = 0, playCommand = null, runtimeEnabled = false;
     const el = (tag, text, cls) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; };
     const button = (label, action, cls = '') => { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', action); return node; };
@@ -93,7 +97,11 @@
             const [me, progress, chats, achievements] = await Promise.all([request('/api/mini/me'), request('/api/mini/progress'), request('/api/mini/chats?limit=50'), request('/api/mini/achievements')]);
             if (version !== generation || !state.token) return;
             Object.assign(state, {me, progress, chats: chats.items, moreChats: chats.has_more, chatOffset: chats.items.length, achievements});
-            if (!state.chats.some(c => c.chat_id === state.selected)) state.selected = state.chats[0]?.chat_id || '';
+            if (state.selected && !state.chats.some(c => c.chat_id === state.selected)) {
+                state.launchLost = true;      // чат из ссылки недоступен: не подменяем молча
+                state.selected = '';
+            }
+            if (!state.selected) state.selected = state.chats[0]?.chat_id || '';
             nav.hidden = false; await navigate(state.page);
         } catch (error) {
             if (version !== generation) return;
@@ -335,6 +343,7 @@
         note(copy, 'Выбирай формат. Я приготовлю вопросы.');
         const image = el('img'); image.src = '/app/host.webp'; image.alt = 'Сова Филиныч с микрофоном и карточкой вопроса'; hero.append(copy, image); content.append(hero); metrics(content);
         if (!state.selected) { note(content, 'Пока нет чатов с твоим участием. Сыграй первый квиз в боте, затем обнови приложение.', 'empty'); return; }
+        if (state.launchLost) note(content, 'Чат из ссылки недоступен — возможно, ты больше не участник.', 'error');
         chatSelect(content, () => navigate('chat'));
         const [details, games] = await Promise.all([request(`/api/mini/chats/${state.selected}/details`), request(`/api/mini/chats/${state.selected}/games`)]);
         if (version !== generation) return;

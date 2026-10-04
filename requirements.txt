@@ -1,10 +1,15 @@
-python-telegram-bot[job-queue]>=22.4
+python-telegram-bot[job-queue,socks]==22.8
 python-dotenv==1.1.0
+aiofiles==23.2.1
+openai==2.21.0
 pytz==2024.2
 Pillow>=10.0.0
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 jinja2==3.1.4
 python-multipart==0.0.6
+SQLAlchemy[asyncio]>=2.0.43,<2.1
+asyncpg>=0.30.0,<1
+alembic>=1.15.2,<2
 # Встроенные библиотеки: os, sys, logging, asyncio, typing, json, pathlib, re, copy, html, collections, datetime
-# Совместимость: Python 3.8+, python-telegram-bot 21.7+ для поддержки Python 3.13
+# Совместимость: Python 3.10+, проверяемая локальная среда — Python 3.13

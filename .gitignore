@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.production
+.env.telegram-test
 
 # Python
 __pycache__/
@@ -27,6 +28,7 @@ wheels/
 MANIFEST
 
 # Virtual environments
+.venv/
 env/
 venv/
 ENV/
@@ -58,9 +60,11 @@ bot.log
 data/users.json
 data/chat_settings.json
 data/ptb_persistence.pickle
+*.postgres-ui.pickle
 data/chats/
 data/global/users.json
 data/global/chats_index.json
+data/global/categories.json
 data/statistics/
 data/questions_backup/
 data/backups/
@@ -78,19 +82,21 @@ test.py
 *.test.py
 
 # Temporary files
+.pytest_cache/
 *.tmp
 *.temp
 .cache/
-
-# Docker
-.dockerignore
 
 # Backup files
 *.bak
 *.backup
 backups/
+migration-reports/
 archive/
 ARCHITECTURE/
+
+# Reference material (external dumps, not part of the project)
+references/
 
 # Temporary/artifact files
 tatus*
@@ -107,6 +113,10 @@ modules/openrouter_client.py
 
 # Local/temporary files
 local_files.txt
+.local/
+.venv-local/
+data/questions/.history/
+data/questions/.admin.lock
 *.bat
 
 # System configuration files (deployment-specific)

@@ -1,6 +1,25 @@
-version: '3.8'
-
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: morning-quiz-postgres
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-morning_quiz}
+      POSTGRES_USER: ${POSTGRES_USER:-morning_quiz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-for-local-only}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - quiz-bot-network
+
   quiz-bot:
     build: .
     container_name: morning-quiz-bot
@@ -8,6 +27,11 @@ services:
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-json}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-5}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-5}
+      - DATABASE_POOL_TIMEOUT=${DATABASE_POOL_TIMEOUT:-10}
     volumes:
       - ./data:/app/data
       - ./config:/app/config
@@ -43,4 +67,6 @@ networks:
 
 volumes:
   quiz-bot-data:
-    driver: local 
+    driver: local
+  postgres-data:
+    driver: local

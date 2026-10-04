@@ -1,0 +1,188 @@
+name: mqb-local-dev
+
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_dev
+  TEST_DATABASE_URL: ""
+  STORAGE_BACKEND: postgres
+  MODE: testing
+  PYTHON_DOTENV_DISABLED: "1"
+  DATABASE_ECHO: "0"
+  OPENROUTER_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  SENTRY_DSN: ""
+  PTB_TIMEDELTA: "1"
+  MQB_DEV_CONTAINER: "1"
+
+x-app-service: &app-service
+  image: morning-quiz-dev:local
+  init: true
+  working_dir: /app
+  environment: *app-environment
+  volumes:
+    - ./.local:/app/.local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: morning_quiz_dev
+      POSTGRES_USER: mqb_dev
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - dev-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mqb_dev -d morning_quiz_dev"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *app-service
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    <<: *app-service
+    command:
+      - python
+      - -c
+      - "import asyncio; from scripts.run_admin_preview import seed; asyncio.run(seed())"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  admin:
+    <<: *app-service
+    command: ["python", "scripts/run_admin_preview.py"]
+    environment:
+      <<: *app-environment
+      MQB_DEV_CONTAINER: "1"
+      MQB_DEV_BIND_HOST: 0.0.0.0
+      ADMIN_ACCESS_TOKEN: local-tests-only-admin-key-0000012345
+      ADMIN_ALLOWED_HOSTS: localhost,127.0.0.1,::1
+    ports:
+      - "127.0.0.1:4184:4184"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4184/login', timeout=3)"]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  mini-app:
+    <<: *app-service
+    command: ["python", "-m", "uvicorn", "web.dev_mini_app:create_dev_app", "--factory", "--host", "0.0.0.0", "--port", "4185", "--no-proxy-headers", "--no-access-log"]
+    environment:
+      <<: *app-environment
+      MQB_DEV_CONTAINER: "1"
+      MINI_APP_DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_dev
+      MINI_APP_BOT_TOKEN: 123456:LOCAL_TEST_ONLY_012345678901234567890
+      MINI_APP_ORIGIN: http://127.0.0.1:4185
+      MINI_APP_OFFLINE: "1"
+      MINI_APP_DEV_USER_ID: ${MQB_DEV_PLAYER_ID:-900000000091}
+      PHOTO_IMAGES_DIR: /app/.local/preview/images
+    ports:
+      - "127.0.0.1:4185:4185"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4185/healthz', timeout=3)"]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  telegram:
+    <<: *app-service
+    profiles: [telegram]
+    env_file:
+      - ${MQB_TELEGRAM_ENV_FILE:-.env}
+    command:
+      - python
+      - scripts/run_telegram_test.py
+      - --chat-id
+      - ${MQB_TELEGRAM_CHAT_ID:-621817842}
+      - --expected-bot-id
+      - ${MQB_TELEGRAM_BOT_ID:-7558542939}
+      - --token-file
+      - .env
+    environment:
+      <<: *app-environment
+      MQB_DEV_CONTAINER: "1"
+      MINI_APP_URL: ""
+      MQB_ADMIN_AI_ENABLED: "0"
+      PHOTO_IMAGES_DIR: /app/.local/preview/images
+    ports:
+      - "127.0.0.1:4186:4186"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4186/health', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 25s
+    restart: unless-stopped
+
+  test-db-reset:
+    image: postgres:17-alpine
+    profiles: [test]
+    environment:
+      PGPASSWORD: local-development-only
+    command:
+      - sh
+      - -ec
+      - >-
+        dropdb -h postgres -U mqb_dev --maintenance-db=postgres --force --if-exists morning_quiz_test;
+        createdb -h postgres -U mqb_dev --maintenance-db=postgres morning_quiz_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  tests:
+    <<: *app-service
+    profiles: [test]
+    environment:
+      <<: *app-environment
+      DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_test
+      TEST_DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_test
+      MQB_TEST_DUMP_RESTORE: "1"
+      MQB_DEV_CONTAINER: "1"
+      ADMIN_ALLOWED_HOSTS: localhost,127.0.0.1,::1
+    command:
+      - sh
+      - -ec
+      - >-
+        python -m alembic upgrade head &&
+        python -m alembic check &&
+        python -m pytest -q --disable-warnings --tb=short --junitxml=.local/acceptance/tests.xml &&
+        node --check web/static/js/app.js &&
+        node --check web/static/js/admin-auth.js &&
+        node --check web/static/js/login.js &&
+        node --check web/static/js/postgres-admin.js &&
+        node --check web/mini_client/app.js
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+volumes:
+  dev-postgres:

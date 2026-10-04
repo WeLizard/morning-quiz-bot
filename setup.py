@@ -29,19 +29,22 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     install_requires=[
-        "python-telegram-bot>=20.0",
+        "python-telegram-bot[job-queue,socks]==22.8",
         "python-dotenv>=0.19.0",
         "APScheduler>=3.9.0",
         "pytz>=2022.1",
         "aiofiles>=0.23.0",
         "openai>=1.0.0",  # Для работы с OpenRouter API (qwen/qwen3-max)
+        "sqlalchemy[asyncio]>=2.0.43,<2.1",
+        "asyncpg>=0.30.0,<1",
+        "alembic>=1.15.2,<2",
     ],
     extras_require={
         "dev": [
@@ -51,8 +54,9 @@ setup(
             "mypy>=0.950",
         ],
         "database": [
-            "sqlalchemy>=1.4.0",
-            "alembic>=1.7.0",
+            "sqlalchemy[asyncio]>=2.0.43,<2.1",
+            "asyncpg>=0.30.0,<1",
+            "alembic>=1.15.2,<2",
         ],
         "monitoring": [
             "prometheus-client>=0.14.0",

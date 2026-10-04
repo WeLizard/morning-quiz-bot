@@ -1,0 +1,23 @@
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /usr/sbin/nologin quizbot
+
+WORKDIR /app
+COPY requirements-local-test.txt requirements-local-lock.txt ./
+RUN python -m pip install --no-cache-dir -r requirements-local-test.txt
+
+COPY --chown=quizbot:quizbot . .
+RUN install -d -o quizbot -g quizbot /app/.local /app/.local/preview \
+    /app/.local/preview/images /app/.local/dev-backups
+
+USER quizbot
+
+CMD ["python", "-m", "uvicorn", "web.dev_mini_app:create_dev_app", "--factory", "--host", "0.0.0.0", "--port", "4185", "--no-proxy-headers", "--no-access-log"]

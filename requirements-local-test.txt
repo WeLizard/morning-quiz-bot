@@ -1,0 +1,19 @@
+# Verified local runtime and regression environment. Never installs globally.
+python-telegram-bot[job-queue,socks]==22.8
+python-dotenv==1.2.1
+aiofiles==23.2.1
+openai==2.21.0
+pytz==2023.4
+Pillow==11.3.0
+fastapi==0.115.6
+uvicorn==0.38.0
+jinja2==3.1.5
+python-multipart==0.0.20
+SQLAlchemy[asyncio]==2.0.43
+asyncpg==0.30.0
+alembic==1.15.2
+pytest==8.3.5
+pytest-asyncio==0.24.0
+httpx==0.28.1
+APScheduler==3.10.4
+pydantic==2.11.10

@@ -5,6 +5,7 @@ import asyncio
 import os
 import sys
 import subprocess
+import time
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
@@ -145,115 +146,139 @@ def update_logging_level(app_config):
     
     logger.info(f"🔧 Уровень логирования обновлен: {app_config.log_level_str} (режим: {app_config.debug_mode and 'TESTING' or 'PRODUCTION'})")
 
-def check_and_kill_duplicate_bots() -> None:
-    """Проверяет и завершает дублирующие процессы бота (кроссплатформенная версия)"""
+def _duplicate_check_disabled() -> bool:
+    """Позволяет явно отключить проверку дублей (второй контур на том же хосте)."""
+    return os.getenv("MQB_SKIP_DUPLICATE_KILL", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _looks_like_bot(cmdline) -> bool:
+    return any(str(arg).endswith("bot.py") for arg in (cmdline or []))
+
+
+def _is_same_bot_script(cmdline) -> bool:
+    """True только для процесса, запускающего ЭТОТ же файл bot.py.
+
+    Сравниваются только абсолютные пути: относительный `bot.py` может указывать
+    на другую копию проекта, поэтому такой процесс не завершается.
+    """
+    own_script = Path(__file__).resolve()
+    for arg in cmdline or []:
+        text = str(arg)
+        if not text.endswith("bot.py"):
+            continue
+        candidate = Path(text)
+        if not candidate.is_absolute():
+            continue
+        try:
+            if candidate.resolve() == own_script:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _read_cmdline(pid: str) -> list:
+    """Командная строка процесса из /proc (Linux) без внешних зависимостей."""
     try:
-        # Получаем текущий PID
+        raw = Path(f"/proc/{int(pid)}/cmdline").read_bytes()
+    except (OSError, ValueError):
+        return []
+    return [part.decode("utf-8", "replace") for part in raw.split(b"\0") if part]
+
+
+def check_and_kill_duplicate_bots() -> None:
+    """Завершает дубли ЭТОГО же бота, не трогая другие копии проекта.
+
+    Раньше завершались все процессы с `bot.py` в командной строке, поэтому
+    dev-копия, песочница или чужой бот на том же хосте уничтожали друг друга.
+    Теперь дубль — только процесс с тем же абсолютным путём к bot.py.
+    Проверку можно отключить переменной окружения MQB_SKIP_DUPLICATE_KILL=1.
+    """
+    if _duplicate_check_disabled():
+        logger.info("Проверка дублирующих процессов отключена (MQB_SKIP_DUPLICATE_KILL)")
+        return
+
+    try:
         current_pid = os.getpid()
         logger.info(f"Текущий PID бота: {current_pid}")
+        duplicates: list = []
+        foreign: list = []
+        scanned_with_psutil = False
 
-        # Пытаемся использовать psutil (более надежный кроссплатформенный способ)
         try:
             import psutil
-            pids = []
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    cmdline = proc.info.get('cmdline', [])
-                    if cmdline and any('bot.py' in str(arg) for arg in cmdline):
-                        pid = proc.info['pid']
-                        if pid != current_pid:
-                            pids.append(str(pid))
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-            
-            if pids:
-                logger.warning(f"Найдены дублирующие процессы бота (через psutil): {pids}")
-                for pid in pids:
-                    try:
-                        logger.info(f"Завершение дублирующего процесса: {pid}")
-                        proc = psutil.Process(int(pid))
-                        proc.terminate()
-                        proc.wait(timeout=5)
-                        logger.info(f"Процесс {pid} завершен")
-                    except psutil.TimeoutExpired:
-                        logger.warning(f"Не удалось завершить процесс {pid} за отведенное время, принудительное завершение")
-                        try:
-                            proc.kill()
-                        except:
-                            pass
-                    except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                        logger.warning(f"Не удалось завершить процесс {pid}: {e}")
-            else:
-                logger.info("Дублирующие процессы бота не найдены (проверка через psutil)")
-            return
         except ImportError:
             logger.debug("psutil не установлен, используем системные команды")
-        except Exception as e:
-            logger.debug(f"Ошибка при использовании psutil: {e}, переходим к системным командам")
-
-        # Fallback: используем системные команды
-        pids = []
-        is_windows = os.name == 'nt'
-
-        if is_windows:
-            # Windows: используем tasklist
-            try:
-                result = subprocess.run(
-                    ['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if result.returncode == 0:
-                    for line in result.stdout.strip().split('\n'):
-                        if line and 'bot.py' in line:
-                            # Извлекаем PID из CSV (второе поле)
-                            parts = line.split(',')
-                            if len(parts) > 1:
-                                pid = parts[1].strip('"')
-                                if pid and pid != str(current_pid):
-                                    pids.append(pid)
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                logger.warning(f"Не удалось использовать tasklist: {e}")
         else:
-            # Linux/Unix: используем pgrep
+            scanned_with_psutil = True
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    cmdline = proc.info.get('cmdline') or []
+                    pid = int(proc.info['pid'])
+                    if pid == current_pid:
+                        continue
+                    if _is_same_bot_script(cmdline):
+                        duplicates.append(str(pid))
+                    elif _looks_like_bot(cmdline):
+                        foreign.append(f"{pid} ({' '.join(str(a) for a in cmdline)})")
+                except (psutil.NoSuchProcess, psutil.AccessDenied, TypeError, ValueError):
+                    continue
+
+            for pid in duplicates:
+                try:
+                    logger.info(f"Завершение дублирующего процесса: {pid}")
+                    proc = psutil.Process(int(pid))
+                    proc.terminate()
+                    proc.wait(timeout=5)
+                    logger.info(f"Процесс {pid} завершен")
+                except psutil.TimeoutExpired:
+                    logger.warning(f"Не удалось завершить процесс {pid} за отведенное время, принудительное завершение")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                    logger.warning(f"Не удалось завершить процесс {pid}: {e}")
+
+        if not scanned_with_psutil and os.name != 'nt':
             try:
-                # Проверяем доступность команды pgrep
                 subprocess.run(['which', 'pgrep'], capture_output=True, check=True, timeout=5)
-                
-                # Ищем все процессы Python, содержащие bot.py
                 result = subprocess.run(
                     ['pgrep', '-f', 'python.*bot.py'],
                     capture_output=True,
                     text=True,
                     timeout=10
                 )
-
                 if result.returncode == 0:
-                    pids = result.stdout.strip().split('\n')
-                    pids = [pid for pid in pids if pid and pid != str(current_pid)]
+                    for pid in [item for item in result.stdout.strip().split('\n') if item]:
+                        if pid == str(current_pid):
+                            continue
+                        cmdline = _read_cmdline(pid)
+                        if _is_same_bot_script(cmdline):
+                            duplicates.append(pid)
+                        elif _looks_like_bot(cmdline):
+                            foreign.append(f"{pid} ({' '.join(cmdline)})")
             except (subprocess.CalledProcessError, FileNotFoundError):
                 logger.warning("Команда 'pgrep' недоступна. Пропускаем проверку дублирующих процессов.")
                 return
 
-        # Завершаем найденные процессы
-        if pids:
-            logger.warning(f"Найдены дублирующие процессы бота: {pids}")
-            for pid in pids:
+            for pid in duplicates:
                 try:
                     logger.info(f"Завершение дублирующего процесса: {pid}")
-                    if is_windows:
-                        subprocess.run(['taskkill', '/F', '/PID', pid], timeout=5, capture_output=True)
-                    else:
-                        subprocess.run(['kill', '-TERM', pid], timeout=5)
-                        # Ждем завершения процесса
-                        import time
-                        time.sleep(2)
+                    subprocess.run(['kill', '-TERM', pid], timeout=5, capture_output=True)
+                    time.sleep(2)
                     logger.info(f"Процесс {pid} завершен")
                 except subprocess.TimeoutExpired:
                     logger.warning(f"Не удалось завершить процесс {pid} за отведенное время")
                 except Exception as e:
                     logger.error(f"Ошибка при завершении процесса {pid}: {e}")
+
+        if foreign:
+            logger.warning(
+                "Найдены другие экземпляры bot.py — они НЕ завершаются: " + "; ".join(foreign)
+            )
+        if duplicates:
+            logger.warning(f"Завершено дублирующих процессов: {len(duplicates)}")
         else:
             logger.info("Дублирующие процессы бота не найдены")
 
@@ -313,9 +338,6 @@ async def save_state_on_shutdown(application: Application) -> None:
 
 async def main() -> None:
     """Main entry point for the Morning Quiz Bot"""
-    # Проверяем и завершаем дублирующие процессы бота
-    check_and_kill_duplicate_bots()
-
     logger.info("Запуск бота...")
     
     # Создаем PID файл для мониторинга статуса бота
@@ -340,6 +362,8 @@ async def main() -> None:
         if not app_config.bot_token:
             logger.critical("Токен бота не найден. Укажите BOT_TOKEN в .env или конфигурации.")
             return
+        # Конфигурация валидна: только теперь разбираемся с дублирующими процессами
+        check_and_kill_duplicate_bots()
         logger.debug(f"AppConfig инициализирован. Режим отладки: {app_config.debug_mode}")
         
         # Обновляем уровень логирования на основе конфигурации

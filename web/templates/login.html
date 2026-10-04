@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru" data-admin-theme="night">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход · Quiz Admin</title>
+  <link rel="stylesheet" href="/static/css/quiz-brand.css">
+  <link rel="stylesheet" href="/static/css/admin-auth.css">
+  <script src="/static/js/login.js" defer></script>
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="mq-brand"><span class="mq-mark" aria-hidden="true"><span></span></span><span class="mq-brand-copy"><small>MORNING QUIZ</small><strong>За кулисами</strong></span></div>
+    <p class="login-eyebrow">ПУЛЬТ ВЕДУЩЕГО</p>
+    <h1>Только для своих</h1>
+    <p class="login-description">Панель управления ботом. Войдите с отдельным ключом администратора — токен Telegram сюда вводить не нужно.</p>
+    <form id="loginForm">
+      <label for="accessToken">Ключ доступа</label>
+      <input id="accessToken" name="token" type="password" autocomplete="current-password" required maxlength="512" autofocus>
+      <p id="loginError" role="alert" aria-live="polite"></p>
+      <button type="submit">Войти в панель <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="login-note">Локальная админка · не Telegram Mini App<br>После перезапуска панели потребуется войти снова.</p>
+  </main>
+</body>
+</html>

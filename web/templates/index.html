@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Админ-панель Quiz Bot</title>
+    <script src="/static/js/admin-auth.js"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,12 +21,14 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/modals.css">
     <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/quiz-brand.css">
+    <link rel="stylesheet" href="/static/css/postgres-admin.css">
 </head>
 <body>
     <div class="toast-container" id="toastContainer"></div>
     
     <div class="mobile-header">
-        <button class="burger-button" id="mobileMenuToggle" aria-label="Открыть меню">
+        <button class="burger-button" id="mobileMenuToggle" aria-label="Открыть меню" aria-controls="sidebar" aria-expanded="false">
             ☰
         </button>
         <div class="mobile-header-title">🎯 Quiz Админка</div>
@@ -38,6 +41,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">🎯 Quiz Админка</div>
+                <button class="btn btn-secondary" id="adminLogoutButton" style="margin-top: 12px; width: 100%;">Выйти</button>
             </div>
             
             <nav class="sidebar-nav">
@@ -782,6 +786,7 @@
 
     <!-- JavaScript -->
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/postgres-admin.js"></script>
     <script>
         // Инициализация модального окна при загрузке
         document.addEventListener('DOMContentLoaded', () => {

@@ -1,0 +1,54 @@
+/* Shared identity with the approved Mini App demo; no external fonts/assets. */
+:root {
+    --mq-page: #0b0c12;
+    --mq-surface: #141620;
+    --mq-raised: #1a1d29;
+    --mq-text: #f6f5fb;
+    --mq-muted: #a6a9ba;
+    --mq-line: #2b2e3d;
+    --mq-accent: #d8ff47;
+    --mq-ink: #101207;
+    --mq-violet: #aa98ff;
+    --mq-cyan: #69d9f4;
+    --mq-danger: #ff929a;
+}
+:root[data-admin-theme="night"], :root[data-admin-theme="night"] body {
+    color-scheme: dark;
+    --primary: var(--mq-accent);
+    --primary-dark: #e5ff8a;
+    --primary-light: #e5ff8a;
+    --secondary: var(--mq-violet);
+    --success: #70e1a4;
+    --warning: #f4ce84;
+    --danger: var(--mq-danger);
+    --bg-primary: var(--mq-surface);
+    --bg-secondary: var(--mq-page);
+    --bg-tertiary: var(--mq-raised);
+    --text-primary: var(--mq-text);
+    --text-secondary: var(--mq-muted);
+    --text-tertiary: var(--mq-muted);
+    --border-color: var(--mq-line);
+    --shadow: 0 8px 30px rgb(0 0 0 / .12);
+    --shadow-lg: 0 16px 48px rgb(0 0 0 / .24);
+    --shadow-xl: 0 24px 72px rgb(0 0 0 / .4);
+    background: var(--mq-page);
+    color: var(--mq-text);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+.mq-brand { display: flex; align-items: center; gap: 12px; color: var(--mq-text); }
+.mq-brand-copy { display: flex; flex-direction: column; gap: 3px; }
+.mq-brand-copy small { color: var(--mq-muted); font-size: 10px; letter-spacing: .1em; font-weight: 600; }
+.mq-brand-copy strong { font-size: 16px; letter-spacing: -.025em; font-weight: 650; }
+.mq-mark { position: relative; display: block; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 13px; background: var(--mq-accent); transform: rotate(-5deg); }
+.mq-mark::before, .mq-mark::after, .mq-mark > span { content: ""; position: absolute; background: #15170d; }
+.mq-mark::before, .mq-mark::after { width: 9px; height: 9px; border-radius: 50%; top: 10px; }
+.mq-mark::before { left: 8px; }
+.mq-mark::after { right: 8px; }
+.mq-mark > span { width: 7px; height: 5px; left: 50%; bottom: 9px; border-radius: 0 0 8px 8px; transform: translateX(-50%); }
+:root[data-admin-theme="night"] ::selection { background: var(--mq-accent); color: var(--mq-ink); }
+@media (prefers-reduced-motion: reduce) {
+    :root[data-admin-theme="night"] *, :root[data-admin-theme="night"] *::before, :root[data-admin-theme="night"] *::after {
+        animation: none !important; transition: none !important; scroll-behavior: auto !important;
+    }
+}

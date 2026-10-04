@@ -12,7 +12,9 @@ let currentQuestionsPage = 1;
 let questionsPerPage = 50;
 
 // Initialize application
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    try { await window.adminReady; } catch { return; }
+    if (window.adminBackend === 'postgres') window.installPostgresAdmin();
     initDarkMode();
     initNavigation();
     initMobileMenu();
@@ -21,6 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ========== Dark Mode ==========
 function initDarkMode() {
+    // The PG panel has its own approved theme; legacy preferences must not override it.
+    if (window.adminBackend === 'postgres') return;
     const isDark = localStorage.getItem('darkMode') === 'true';
     if (isDark) {
         document.body.classList.add('dark-mode');
@@ -111,7 +115,8 @@ function initNavigation() {
                 const sidebar = document.getElementById('sidebar');
                 const burger = document.getElementById('mobileMenuToggle');
                 if (sidebar) sidebar.classList.remove('open');
-                if (burger) burger.classList.remove('open');
+                if (burger) { burger.classList.remove('open'); burger.setAttribute('aria-expanded', 'false'); }
+                document.getElementById('sidebarOverlay')?.classList.remove('active');
             }
         });
     });
@@ -127,9 +132,37 @@ function initMobileMenu() {
     function toggleMenu(isOpen) {
         sidebar.classList.toggle('open', isOpen);
         burger.classList.toggle('open', isOpen);
+        burger.setAttribute('aria-expanded', String(isOpen));
         if (overlay) {
             overlay.classList.toggle('active', isOpen);
         }
+    }
+    if (window.adminBackend === 'postgres') {
+        window.setAdminMenuOpen = toggleMenu;
+        const mobile = window.matchMedia('(max-width: 768px)');
+        const syncMenu = () => {
+            const closed = mobile.matches && !sidebar.classList.contains('open');
+            sidebar.inert = closed;
+            if (mobile.matches && sidebar.classList.contains('open')) {
+                document.querySelector('.main-content').inert = true;
+            } else document.querySelector('.main-content').inert = false;
+        };
+        const originalToggle = window.setAdminMenuOpen;
+        window.setAdminMenuOpen = isOpen => { originalToggle(isOpen); syncMenu(); };
+        new MutationObserver(syncMenu).observe(sidebar, {attributes: true, attributeFilter: ['class']});
+        mobile.addEventListener('change', () => { toggleMenu(false); syncMenu(); });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && sidebar.classList.contains('open')) {
+                toggleMenu(false); syncMenu(); burger.focus();
+            }
+            if (event.key === 'Tab' && mobile.matches && sidebar.classList.contains('open')) {
+                const focusable = [burger, ...sidebar.querySelectorAll('a[href]:not([hidden]), button:not([disabled])')];
+                const first = focusable[0], last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+            }
+        });
+        syncMenu();
     }
     
     // Toggle menu on burger click
@@ -167,6 +200,13 @@ function showSection(sectionId) {
     document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
     const activeNav = document.querySelector(`[data-section="${sectionId}"]`);
     if (activeNav) activeNav.classList.add('active');
+    if (window.adminBackend === 'postgres') {
+        document.querySelectorAll('.nav-item').forEach(nav => {
+            if (nav === activeNav) nav.setAttribute('aria-current', 'page');
+            else nav.removeAttribute('aria-current');
+        });
+        if (window.innerWidth <= 768) window.setAdminMenuOpen?.(false);
+    }
     
     // Update sections
     document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
@@ -188,6 +228,9 @@ function showSection(sectionId) {
             case 'bot-metrics':
                 loadBotMetrics();
                 break;
+            case 'claude-ai':
+                if (window.adminBackend === 'postgres') window.loadAdminAI?.();
+                break;
             case 'chats':
                 loadChats();
                 break;
@@ -203,6 +246,10 @@ function showSection(sectionId) {
             case 'settings':
                 loadSettings();
                 break;
+        }
+        // The closed mobile drawer is inert; place focus in the new content.
+        if (window.adminBackend === 'postgres' && window.innerWidth <= 768) {
+            targetSection.querySelector('h1')?.focus({preventScroll: true});
         }
     }
 }

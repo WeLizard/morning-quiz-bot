@@ -59,6 +59,12 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Register PostgreSQL routes before legacy JSON handlers with the same paths.
+from web.postgres_admin import install_postgres_admin
+install_postgres_admin(app)
+from web.admin_auth import install_admin_auth
+install_admin_auth(app)
+
 # Пути
 # Определяем базовую директорию проекта
 # Если запускается из systemd, рабочая директория уже установлена в WorkingDirectory
@@ -91,7 +97,7 @@ if STATIC_DIR.exists():
 # Модели данных
 class Question(BaseModel):
     question: str
-    options: List[str] = Field(..., min_items=2, max_items=10)
+    options: List[str] = Field(..., min_length=2, max_length=10)
     correct: str
     explanation: Optional[str] = None
     difficulty: Optional[str] = None
@@ -311,7 +317,18 @@ async def index():
     """Главная страница"""
     html_file = TEMPLATES_DIR / "index.html"
     with open(html_file, 'r', encoding='utf-8') as f:
-        return HTMLResponse(content=f.read())
+        html = f.read()
+    if os.getenv("STORAGE_BACKEND", "json").strip().lower() == "postgres":
+        # PG adapters use local scripts only; legacy chart/AI widgets are hidden.
+        import re
+        # Server-side marker applies the theme before JS/auth finishes (no white flash).
+        html = html.replace('<html lang="ru">', '<html lang="ru" data-admin-theme="night">', 1)
+        html = html.replace('<body>', '<body class="pg-admin">', 1)
+        html = re.sub(r'<script\b[^>]*src="https?://[^>]*>\s*</script>', '', html)
+        html = re.sub(r'<link\b[^>]*href="https?://[^>]*>', '', html)
+        html = re.sub(r'<script>(.*?)</script>', '', html, flags=re.DOTALL)
+        html = re.sub(r'\s+on[a-z]+="[^"]*"', '', html, flags=re.IGNORECASE)
+    return HTMLResponse(content=html)
 
 @app.get("/api/categories")
 async def get_categories():
@@ -4487,4 +4504,3 @@ async def bot_health_check():
             "status": "unknown",
             "message": f"Error checking health: {str(e)}"
         }
-

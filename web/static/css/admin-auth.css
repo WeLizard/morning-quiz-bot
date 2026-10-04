@@ -1,0 +1,27 @@
+:root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+.login-page { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #101319; color: #f2f4f7; }
+.login-card { width: min(100%, 440px); padding: 36px; border: 1px solid #303642; border-radius: 24px; background: #191e27; }
+.login-mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: #d5ff54; color: #142000; font-weight: 900; font-size: 30px; }
+.login-eyebrow { margin: 26px 0 10px; font-size: 11px; letter-spacing: .12em; color: #b3bdca; }
+h1 { font-size: 28px; letter-spacing: -.03em; margin: 0 0 12px; }
+.login-description { color: #bbc4d0; font-size: 14px; line-height: 1.7; margin-bottom: 26px; }
+label { display: block; font-size: 14px; margin-bottom: 10px; }
+input { width: 100%; min-height: 48px; border: 1px solid #566171; border-radius: 10px; background: #101319; color: #fff; padding: 12px; font: inherit; }
+input:focus-visible, button:focus-visible { outline: 3px solid #d5ff54; outline-offset: 3px; }
+button { width: 100%; min-height: 48px; display: flex; justify-content: space-between; align-items: center; border: 0; border-radius: 10px; padding: 12px 18px; color: #142000; background: #d5ff54; font: inherit; font-weight: 700; cursor: pointer; }
+button:disabled { opacity: .65; cursor: wait; }
+#loginError { min-height: 20px; font-size: 13px; color: #ffa7a7; }
+.login-note { margin: 24px 0 0; color: #a4afbd; font-size: 12px; line-height: 1.7; }
+@media (max-width: 420px) { .login-card { padding: 24px; } }
+
+/* Same palette and mark as the operational panel and Mini App demo. */
+.login-page { background: radial-gradient(ellipse at 15% 0, rgb(132 104 255 / .08), transparent 55%), var(--mq-page); color: var(--mq-text); }
+.login-card { background: var(--mq-surface); border-color: var(--mq-line); border-radius: 24px; padding: 36px; box-shadow: 0 24px 80px rgb(0 0 0 / .22); }
+.login-eyebrow { color: var(--mq-accent); margin-top: 38px; }
+.login-description, .login-note { color: var(--mq-muted); }
+.login-card input { background: var(--mq-page); border-color: #676e82; border-radius: 12px; color: var(--mq-text); }
+.login-card button { background: var(--mq-accent); color: var(--mq-ink); border-radius: 12px; }
+.login-card input:focus-visible, .login-card button:focus-visible { outline-color: var(--mq-accent); }
+#loginError { color: var(--mq-danger); }
+@media (max-width: 420px) { .login-card { padding: 26px; } .login-page { padding: 16px; } }

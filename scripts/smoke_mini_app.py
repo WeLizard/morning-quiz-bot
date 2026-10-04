@@ -56,11 +56,13 @@ async def main() -> int:
     parser.add_argument('--user-id', type=int, default=int(os.getenv('MINI_APP_SMOKE_USER') or 0))
     parser.add_argument('--bot-token', default=os.getenv('MINI_APP_BOT_TOKEN', ''))
     parser.add_argument('--timeout', type=float, default=30.0)
+    parser.add_argument('--dev', action='store_true',
+                        help='Локальный демо-инстанс: вход через POST /api/dev/session, без initData.')
     args = parser.parse_args()
-    if not args.bot_token:
-        print('Нужен MINI_APP_BOT_TOKEN (или --bot-token).', file=sys.stderr)
+    if not args.dev and not args.bot_token:
+        print('Нужен MINI_APP_BOT_TOKEN (или --bot-token); для демо-инстанса есть --dev.', file=sys.stderr)
         return 2
-    if not args.user_id:
+    if not args.dev and not args.user_id:
         print('Нужен --user-id (или MINI_APP_SMOKE_USER).', file=sys.stderr)
         return 2
 
@@ -77,8 +79,14 @@ async def main() -> int:
         report.check('GET /app/app.js', client_js.status_code == 200 and 'RENEW_AFTER_MS' in client_js.text,
                      f'{client_js.status_code}')
 
-        login = await client.post('/api/mini/session', json={'init_data': init_data(args.bot_token, args.user_id)})
-        if not report.check('POST /api/mini/session', login.status_code == 200, f'{login.status_code}'):
+        if args.dev:
+            login = await client.post('/api/dev/session')
+            login_name = 'POST /api/dev/session'
+        else:
+            login = await client.post('/api/mini/session',
+                                      json={'init_data': init_data(args.bot_token, args.user_id)})
+            login_name = 'POST /api/mini/session'
+        if not report.check(login_name, login.status_code == 200, f'{login.status_code}'):
             print('Дальше идти нельзя: сессия не создана.', file=sys.stderr)
             return 1
         headers = {'Authorization': f"Bearer {login.json()['access_token']}"}

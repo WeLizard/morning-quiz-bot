@@ -31,12 +31,20 @@ const findButton = (root, label) => {
     const found = root.querySelectorAll('button').find(n => n.textContent === label || n.textContent.startsWith(label));
     assert.ok(found, `Missing button: ${label}`); return found;
 };
-async function application(runtime = true, startParam = '') {
+async function application(runtime = true, startParam = '', {overrides = {}, manualTimers = false} = {}) {
     const ids = Object.fromEntries(['content', 'navigation', 'feedback', 'environment'].map(id => [id, new Element('div')]));
     for (const page of ['home', 'chats', 'rating', 'profile']) { const b = new Element('button'); b.dataset.page = page; ids.navigation.append(b); }
-    const brand = new Element('a'), mounts = [], ui = {prefs: {theme: 'system', haptics: true}, canFullscreen: true,
+    const brand = new Element('a'), mounts = [], timers = [], ui = {prefs: {theme: 'system', haptics: true}, canFullscreen: true,
         configure(back, settings) { this.back = back; this.settings = settings; }, selection() {},
         setTheme(value) { this.prefs.theme = value; }, toggleHaptics() { return this.prefs.haptics = !this.prefs.haptics; }, fullscreen() {}};
+    // Управляемые таймеры нужны там, где проверяется продление сессии: иначе
+    // ждать десять минут, а настоящий таймер вдобавок держит event loop.
+    const schedule = manualTimers
+        ? (callback, delay) => { const handle = {callback, delay, unref() {}}; timers.push(handle); return handle; }
+        : setTimeout;
+    const cancel = manualTimers
+        ? handle => { const index = timers.indexOf(handle); if (index >= 0) timers.splice(index, 1); }
+        : clearTimeout;
     const fixtures = {
         '/api/mini/config': {runtime_enabled: runtime, offline: true}, '/api/dev/info': {demo: true},
         '/api/dev/session': {access_token: 'unit-test'}, '/api/mini/me': {user_id: '42', display_name: 'Игрок', score: 12, answered_count: 3},
@@ -61,12 +69,15 @@ async function application(runtime = true, startParam = '') {
     runInNewContext(source('app.js'), {
         window: {QuizTelegram: ui, QuizGame: {stop() {}, async mount(options) { mounts.push(options); }}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}, initDataUnsafe: {start_param: startParam}}}},
         document: {getElementById: id => ids[id], createElement: tag => new Element(tag), querySelector: () => brand},
-        fetch: async path => { assert.ok(path in fixtures, path); return {ok: true, status: 200, json: async () => fixtures[path]}; },
-        AbortController, setTimeout, clearTimeout, queueMicrotask, Intl, console,
+        fetch: async path => { assert.ok(path in fixtures || path in overrides, path);
+            const override = overrides[path];
+            if (override) return {ok: override.status < 400, status: override.status, json: async () => override.body ?? {detail: 'Отказ'}};
+            return {ok: true, status: 200, json: async () => fixtures[path]}; },
+        AbortController, setTimeout: schedule, clearTimeout: cancel, queueMicrotask, Intl, console,
     });
     await flush(); await findButton(ids.content, 'Войти как dev-игрок').click(); await flush();
     const tab = page => ids.navigation.children.find(n => n.dataset.page === page);
-    return {...ids, ui, mounts, tab};
+    return {...ids, ui, mounts, tab, timers};
 }
 
 test('home restores the heading and keeps global settings inside profile', async () => {
@@ -111,6 +122,28 @@ test('deep link to a chat shows personal statistics and reports a lost chat', as
     assert.match(app.content.textContent, /место 2 из 4/);
     const lost = await application(true, 'chat_n999');
     assert.match(lost.content.textContent, /Чат из ссылки недоступен/);
+});
+
+test('expired session sends the player back to login and keeps working after it', async () => {
+    const app = await application(true, '', {manualTimers: true,
+        overrides: {'/api/mini/session/renew': {status: 401, body: {detail: 'Сессия завершена'}}}});
+    const renewal = app.timers.find(timer => timer.delay === 600000);
+    assert.ok(renewal, 'продление сессии должно быть запланировано заранее');
+    assert.equal(app.content.querySelector('h1').textContent, 'Ну что, сыграем?');   // до истечения — рабочий экран
+    await renewal.callback(); await flush(); await flush();
+    assert.match(app.content.textContent, /Сессия истекла/);
+    assert.ok(findButton(app.content, 'Войти как dev-игрок'), 'нужен вход заново');
+});
+
+test('expired session returns to login while a server error keeps the session', async () => {
+    const expired = await application(true, '', {overrides: {'/api/mini/progress': {status: 401, body: {detail: 'Сессия завершена'}}}});
+    assert.ok(findButton(expired.content, 'Войти как dev-игрок'), '401 возвращает ко входу');
+    assert.doesNotMatch(expired.content.textContent, /Повторить/);
+    const working = await application();
+    assert.equal(working.content.querySelector('h1').textContent, 'Ну что, сыграем?');   // контроль: без подмены вход не теряется
+    const broken = await application(true, '', {overrides: {'/api/mini/chats?limit=50': {status: 500, body: {detail: 'База недоступна'}}}});
+    assert.ok(findButton(broken.content, 'Повторить'), '500 оставляет сессию и предлагает повтор');
+    assert.doesNotMatch(broken.content.textContent, /Войти как dev-игрок/);
 });
 
 test('read-only preview keeps appearance settings without enabling game writes', async () => {

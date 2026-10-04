@@ -111,6 +111,43 @@ def publish_image(root, key, content):
         Path(temporary).unlink(missing_ok=True)
 
 
+async def catalog_status(database, *, root=None):
+    """Сверка каталога фото с файлами: гейт перед выкладкой.
+
+    Проблемой считается только запись без подтверждённого файла — такое фото
+    нельзя показать. Файлы без записи — ожидаемый след неуверенного коммита
+    (см. `publish_image`), они лишь перечисляются, чтобы не пугать при выкладке.
+    """
+    from .photos import PhotoCatalog
+
+    directory = Path(root or images_root()).resolve()
+    catalog = await PhotoCatalog(database).load()
+    files = {path.stem for path in directory.glob('*.webp')
+             if path.is_file() and not path.is_symlink()}
+    verified, missing, unverified, referenced = [], [], [], set()
+    for key, value in catalog.items():
+        try:
+            name = storage_name(key, value)
+        except InvalidPhoto:
+            name = None
+        if name is not None:
+            referenced.add(name)
+        try:
+            path = verified_image_path(directory, key, value)
+        except InvalidPhoto:
+            path = None
+        if path is not None:
+            verified.append(key)
+        elif name is not None and name in files:
+            unverified.append(key)          # файл на месте, но подпись не сошлась
+        else:
+            missing.append(key)
+    enabled_missing = [key for key in missing if (catalog.get(key) or {}).get('enabled', True)]
+    return {'root': str(directory), 'files': len(files), 'items': len(catalog),
+            'verified': len(verified), 'missing': sorted(missing), 'unverified': sorted(unverified),
+            'enabled_missing': sorted(enabled_missing), 'unreferenced': sorted(files - referenced)}
+
+
 async def create_photo(database, upload_id, raw, answer, enabled, *, root=None, replace_key=None, expected_version=None):
     if not re.fullmatch(r'[a-f0-9]{32}', upload_id):
         raise InvalidPhoto('Недопустимый идентификатор загрузки.')

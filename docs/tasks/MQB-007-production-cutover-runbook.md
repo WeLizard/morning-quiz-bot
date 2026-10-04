@@ -128,6 +128,7 @@ tail -n 100 logs/bot.log | grep -E "PostgreSQL state|Вопросы загруж
 - [ ] Админка: `http://<хост>:8000/login` → вход по `ADMIN_ACCESS_TOKEN`, `/api/analytics/overview` отдаёт реальные числа, банк вопросов открывается, фото отдаётся (`/api/images/<имя>.webp` → 200 `image/webp`).
 - [ ] Mini App (если включаем): `/healthz` → 200, кнопка в BotFather открывает приложение, сессия создаётся.
 - [ ] `alembic current` = `20260904_0011`, отчёт импорта сохранён в `migration-reports/`.
+- [ ] `./venv/bin/python scripts/verify_media_catalog.py` → «каталог согласован»: записи без файла или с расхождением подписи — стоп; файлы без записи допустимы (след неуверенного коммита).
 
 ## 8. Фаза F — наблюдение (48 часов)
 

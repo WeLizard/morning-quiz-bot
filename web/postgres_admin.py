@@ -24,7 +24,7 @@ from starlette.routing import Match
 
 from storage.database import Database, DatabaseSettings
 from storage.members import MemberNotFound, MemberService, ScoreConflict
-from storage.models import Chat, ChatMember, SystemState, User, PollAnswer, QuizSession
+from storage.models import Chat, ChatMember, SystemState, User, PollAnswer, QuizSession, ImportRun
 from storage.runtime import member_data
 from storage.settings import SettingsConflict, SettingsService
 from storage.photos import PhotoCatalog, PhotoMetadataConflict, metadata_version
@@ -176,10 +176,15 @@ def make_router() -> APIRouter:
     router = APIRouter()
 
     @router.get("/api/storage/status")
-    async def pg_storage_status():
+    async def pg_storage_status(request: Request):
+        database = request.app.state.admin_database
+        async with database.transaction() as session:
+            revision = (await session.execute(text('SELECT version_num FROM alembic_version'))).scalars().first()
+            completed_imports = int(await session.scalar(
+                select(func.count()).select_from(ImportRun).where(ImportRun.status == 'completed')) or 0)
         return {
-            "backend": "postgres", "migration_complete": False,
-            "notice": "Локальный dev-контур: изменяемые данные и банк вопросов хранит PostgreSQL; media-файлы неизменяемы.",
+            "backend": "postgres", "schema_revision": revision, "completed_imports": completed_imports,
+            "notice": "Изменяемые данные и банк вопросов хранит PostgreSQL; media-файлы неизменяемы.",
             "capabilities": ["chats", "users", "scores", "settings", "schedules", "photo_metadata", "photo_upload", "question_bank", "analytics", "profiles", "profile_exports", "chat_titles"],
             "unavailable": ["production_control", "live_broadcast"],
             "administration": ["moderation", "reset_preview", "safe_reset", "action_receipts", "profile_archive",

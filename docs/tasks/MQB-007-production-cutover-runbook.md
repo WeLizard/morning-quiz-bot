@@ -129,6 +129,7 @@ tail -n 100 logs/bot.log | grep -E "PostgreSQL state|Вопросы загруж
 - [ ] Mini App (если включаем): `/healthz` → 200, кнопка в BotFather открывает приложение, сессия создаётся.
 - [ ] `alembic current` = `20260904_0011`, отчёт импорта сохранён в `migration-reports/`.
 - [ ] `./venv/bin/python scripts/verify_media_catalog.py` → «каталог согласован»: записи без файла или с расхождением подписи — стоп; файлы без записи допустимы (след неуверенного коммита).
+- [ ] `MINI_APP_BOT_TOKEN=... ./venv/bin/python scripts/smoke_mini_app.py --base-url https://<домен> --user-id <тестовый id>` → «всё в порядке» (16 проверок: healthz, страница и клиент, вход, me/config/progress/achievements/history/categories/leaderboard/chats, детали чата, продление сессии, выход и отказ старого токена).
 
 ## 8. Фаза F — наблюдение (48 часов)
 

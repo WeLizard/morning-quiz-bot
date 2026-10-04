@@ -307,6 +307,11 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         # Экран достижений: свои полученные и ближайшие впереди, без чужих данных.
         return await store.achievements(credential(request))
 
+    @app.get('/api/mini/history')
+    async def history(request: Request, limit: int = Query(20, ge=1, le=50)):
+        # Личная история: последние игры, ответы и агрегаты по чатам.
+        return await store.history(credential(request), limit=limit)
+
     @app.get('/api/mini/leaderboard')
     async def global_leaderboard(request: Request, limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0, le=10000)):
         return await store.global_leaderboard(credential(request), limit=limit, offset=offset)

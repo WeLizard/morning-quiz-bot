@@ -19,8 +19,8 @@ from tests.test_postgres_members import CHAT, OTHER_CHAT, USER, pg_env, scenario
 from storage.admin_actions import AdminActions
 from storage.classic_sessions import ClassicSessions
 from storage.mini_app import MiniAppError, MiniAppStore
-from storage.models import (AchievementGrant, Chat, ChatMember, Game, MiniAppSession, PollAnswer,
-                            QuizSession, User)
+from storage.models import (AchievementGrant, Chat, ChatMember, Game, GamePlayer, MiniAppSession,
+                            PollAnswer, QuizSession, User)
 from storage.repositories import OperationalRepository
 from storage.question_bank import BankConflict, PostgresQuestionBank
 from storage.settings import SettingsService
@@ -297,6 +297,43 @@ def test_achievements_projection_shows_earned_upcoming_and_no_foreign_data(pg_en
             # Чужие данные и метаданные наград наружу не уходят.
             assert 'ADMIN-ONLY' not in response.text and 'metadata' not in response.text
             assert str(USER + 1) not in response.text
+    asyncio.run(run())
+
+
+def test_history_projection_covers_games_answers_and_chat_totals(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            moment = datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc)
+            async with env.db.transaction() as session:
+                session.add(Game(id='game-1', chat_id=CHAT, mode='photo', status='finished', phase='finished',
+                                 is_current=False, started_at=moment - timedelta(minutes=10), ended_at=moment))
+                session.add(GamePlayer(game_id='game-1', user_id=USER, seat='player'))
+                session.add(PollAnswer(poll_id='p-1', user_id=USER, chat_id=CHAT, is_correct=True,
+                                       points_delta=Decimal('1.500'), answered_at=moment,
+                                       game_id='game-1', round_id='r-1'))
+                session.add(PollAnswer(poll_id='p-2', user_id=USER, chat_id=CHAT, is_correct=False,
+                                       points_delta=Decimal('-0.500'), answered_at=moment + timedelta(minutes=1),
+                                       game_id='game-1', round_id='r-2'))
+                session.add(PollAnswer(poll_id='p-3', user_id=USER + 1, chat_id=CHAT, is_correct=True,
+                                       points_delta=Decimal('9.000'), answered_at=moment + timedelta(minutes=2)))
+                member = await session.get(ChatMember, (CHAT, USER))
+                member.answered_count, member.correct_answers_count = 7, 5
+                member.first_answer_at = moment - timedelta(days=3)
+                member.last_answer_at = moment + timedelta(minutes=1)
+            headers = await login(env)
+            response = await env.client.get('/api/mini/history', headers=headers)
+            assert response.status_code == 200
+            data = response.json()
+            game = next(item for item in data['games'] if item['game_id'] == 'game-1')
+            assert (game['mode'], game['status']) == ('photo', 'finished')
+            assert (game['my_answers'], game['my_correct']) == (2, 1)
+            assert [item['is_correct'] for item in data['answers']] == [False, True]   # свежие сверху
+            assert data['answers'][0]['points'] == '-0.500'
+            chat = next(item for item in data['chats'] if item['chat_id'] == str(CHAT))
+            assert (chat['answered'], chat['correct']) == (7, 5) and chat['score'] == '12.250'
+            # Чужие ответы и служебные payload-ы в проекцию не попадают.
+            assert '9.000' not in response.text and str(USER + 1) not in response.text
+            assert 'payload' not in response.text and 'private_state' not in response.text
     asyncio.run(run())
 
 

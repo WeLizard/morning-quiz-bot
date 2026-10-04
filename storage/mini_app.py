@@ -10,7 +10,8 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from .admin_actions import operation_fence
-from .models import AchievementGrant, Chat, ChatMember, Game, MiniAppSession, QuizSession, User
+from .models import (AchievementGrant, Chat, ChatMember, Game, GamePlayer, MiniAppSession,
+                     PollAnswer, QuizSession, User)
 
 
 class MiniAppError(Exception):
@@ -357,6 +358,61 @@ class MiniAppStore:
                     'chats': chats,
                     'streak': {'best': best_streak, 'earned': streak_earned,
                                'available': len(streaks), 'items': streak_items}}
+
+    async def history(self, token, *, limit=20):
+        """Личная история: последние игры, последние ответы и агрегаты по чатам.
+
+        Отдельных ответов в перенесённых из JSON данных нет — там были только
+        агрегаты, поэтому история по чатам строится из `chat_members`, а списки
+        игр и ответов наполняются уже в PostgreSQL. Чужие строки и служебные
+        payload-ы наружу не уходят.
+        """
+        limit = max(1, min(int(limit), 50))
+        async with self.authorized(token) as (session, user):
+            members = (await session.scalars(select(ChatMember).where(
+                ChatMember.user_id == user.id))).all()
+            recent = (await session.scalars(select(PollAnswer).where(
+                PollAnswer.user_id == user.id).order_by(PollAnswer.answered_at.desc()).limit(limit))).all()
+            seats = (await session.scalars(select(GamePlayer.game_id).where(
+                GamePlayer.user_id == user.id))).all()
+            game_ids = {row.game_id for row in recent if row.game_id} | set(seats)
+            games = (await session.scalars(select(Game).where(Game.id.in_(game_ids)).order_by(
+                Game.ended_at.desc().nullslast(), Game.created_at.desc()))).all() if game_ids else []
+            chat_ids = ({m.chat_id for m in members} | {row.chat_id for row in recent}
+                        | {game.chat_id for game in games})
+            titles = dict((await session.execute(select(Chat.id, Chat.title).where(
+                Chat.id.in_(chat_ids)))).all()) if chat_ids else {}
+
+            counts = {}
+            for row in recent:
+                if row.game_id:
+                    bucket = counts.setdefault(row.game_id, [0, 0])
+                    bucket[0] += 1
+                    bucket[1] += 1 if row.is_correct else 0
+
+            answers = [{'chat_id': str(row.chat_id),
+                        'chat_title': titles.get(row.chat_id) or f'Чат {row.chat_id}',
+                        'is_correct': bool(row.is_correct), 'points': str(row.points_delta),
+                        'answered_at': row.answered_at.isoformat() if row.answered_at else None}
+                       for row in recent]
+            game_items = [{'game_id': game.id, 'mode': game.mode, 'status': game.status,
+                           'chat_id': str(game.chat_id),
+                           'chat_title': titles.get(game.chat_id) or f'Чат {game.chat_id}',
+                           'started_at': game.started_at.isoformat() if game.started_at else None,
+                           'ended_at': game.ended_at.isoformat() if game.ended_at else None,
+                           'my_answers': counts.get(game.id, [0, 0])[0],
+                           'my_correct': counts.get(game.id, [0, 0])[1]}
+                          for game in games[:10]]
+            chat_items = sorted(({'chat_id': str(member.chat_id),
+                                  'title': titles.get(member.chat_id) or f'Чат {member.chat_id}',
+                                  'answered': int(member.answered_count or 0),
+                                  'correct': int(member.correct_answers_count or 0),
+                                  'score': str(member.score),
+                                  'last_answer_at': member.last_answer_at.isoformat()
+                                  if member.last_answer_at else None}
+                                 for member in members),
+                                key=lambda item: item['last_answer_at'] or '', reverse=True)[:10]
+            return {'games': game_items, 'answers': answers, 'chats': chat_items}
 
     async def global_leaderboard(self, token, *, limit=20, offset=0):
         async with self.authorized(token) as (session, user):

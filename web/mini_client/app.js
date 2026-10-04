@@ -369,6 +369,7 @@
             for (const chat of state.achievements.chats) for (const item of chat.items.filter(row => row.earned).slice(0, 2)) recent.append(el('span', item.title, 'achievement'));
             if (recent.childElementCount) content.append(recent);
             content.append(button('Все достижения', () => navigate('achievements'), 'quiet'));
+            content.append(button('История игр и ответов', () => navigate('history'), 'quiet'));
         }
         if (state.progress.last_activity) note(content, `Последняя активность: ${new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
         content.append(button('Обновить прогресс', load, 'quiet'));
@@ -528,12 +529,43 @@
         const streakList = el('div'); data.streak.items.forEach(item => streakList.append(achievementLine(item))); content.append(streakList);
         content.append(button('Обновить', () => navigate('achievements'), 'quiet'));
     }
+    async function historyPage(version) {
+        content.append(el('span', 'Твой прогресс', 'eyebrow'), el('h1', 'История'));
+        const data = await request('/api/mini/history');
+        if (version !== generation) return;
+        const modes = {classic: 'Квиз', photo: 'Фото-загадки', mafia: 'Мафия'};
+        content.append(el('h2', 'Последние игры'));
+        if (!data.games.length) note(content, 'Здесь появятся игры, сыгранные после перехода на PostgreSQL.', 'empty');
+        else for (const game of data.games) {
+            const card = el('section', undefined, 'card');
+            card.append(el('strong', `${modes[game.mode] || game.mode} · ${game.chat_title}`));
+            const parts = [game.status === 'active' ? 'идёт сейчас' : 'завершена'];
+            if (game.ended_at) parts.push(new Date(game.ended_at).toLocaleString('ru-RU'));
+            parts.push(`мои ответы: ${game.my_correct}/${game.my_answers}`);
+            card.append(el('small', parts.join(' · ')));
+            content.append(card);
+        }
+        content.append(el('h2', 'Последние ответы'));
+        if (!data.answers.length) note(content, 'Отдельные ответы начнут записываться после перехода на PostgreSQL.', 'empty');
+        else {
+            const list = el('div');
+            for (const item of data.answers) list.append(el('span', `${item.is_correct ? '✓' : '✗'} ${item.chat_title} · ${item.points}`, 'achievement'));
+            content.append(list);
+        }
+        content.append(el('h2', 'Активность по чатам'));
+        if (!data.chats.length) note(content, 'Ты пока не играл в чатах.', 'empty');
+        else for (const chat of data.chats) {
+            const when = chat.last_answer_at ? ` · последний ответ ${new Date(chat.last_answer_at).toLocaleDateString('ru-RU')}` : '';
+            note(content, `${chat.title}: ответов ${chat.answered}, правильных ${chat.correct}, очков ${chat.score}${when}`);
+        }
+        content.append(button('Обновить', () => navigate('history'), 'quiet'));
+    }
     async function navigate(page) {
         if (!state.token) { loginScreen(); return; }
         window.QuizGame.stop();
         window.QuizTelegram.selection();
         state.page = page; const version = ++generation; feedback.textContent = ''; content.replaceChildren();
-        const tab = page.startsWith('settings') || page === 'achievements' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
+        const tab = page.startsWith('settings') || page === 'achievements' || page === 'history' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
         nav.querySelectorAll('button').forEach(node => { if (node.dataset.page === tab) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
         if (tg?.BackButton) { if (page === 'home') tg.BackButton.hide(); else tg.BackButton.show(); }
         try {
@@ -549,6 +581,7 @@
             else if (page === 'chat') await chatHome(version);
             else if (page === 'profile') profile();
             else if (page === 'achievements') await achievementsPage(version);
+            else if (page === 'history') await historyPage(version);
             else if (page === 'settings') await settings();
             else if (page === 'chats') chats();
             else if (page === 'mafia') await mafia(version);

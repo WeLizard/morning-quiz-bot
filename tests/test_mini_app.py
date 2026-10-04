@@ -690,6 +690,22 @@ def test_admin_and_unscoped_routes_are_absent(pg_env, path):
     asyncio.run(run())
 
 
+def test_alchemy_worlds_is_served_as_self_contained_mini_app_page(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            page = await env.client.get('/app/alchemy')
+            assert page.status_code == 200
+            assert page.headers['content-type'].startswith('text/html')
+            html = page.text
+            assert 'Мастерская миров' in html and 'alchemia-worlds-v1' in html
+            # Одиночная игра автономна: ни внешних ссылок, ни обращений к API мини-аппа.
+            assert 'src="http' not in html and 'href="http' not in html
+            assert '/api/mini/' not in html
+            # Новый маршрут объявлен раньше обработчика ассетов и не перехватывается им.
+            assert (await env.client.get('/app/alchemy.html')).status_code == 404
+    asyncio.run(run())
+
+
 def test_cookies_query_tokens_and_unsafe_origins_cannot_authorize(pg_env):
     async def run():
         async with environment(pg_env) as env:

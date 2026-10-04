@@ -140,6 +140,12 @@
         note(nightCopy, 'Собери стол для будущей игры в мафию. Роли и состав уже сохраняются отдельно от квиза.');
         nightCopy.append(button('Открыть дело', () => navigate('mafia'), 'quiet'));
         night.append(nightImage, nightCopy); content.append(night);
+        const workshop = el('article', undefined, 'card mafia-teaser');
+        const workshopCopy = el('div', undefined, 'mafia-teaser-copy');
+        workshopCopy.append(el('span', 'НОВЫЙ РЕЖИМ · АЛХИМИЯ', 'eyebrow'), el('h2', 'Мастерская миров'));
+        note(workshopCopy, '263 элемента и 400 рецептов. Собирай стихии и открывай миры. Прогресс хранится в этом устройстве.');
+        workshopCopy.append(button('Открыть мастерскую', () => window.location.assign('/app/alchemy'), 'quiet'));
+        workshop.append(workshopCopy); content.append(workshop);
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
             const current = await request('/api/mini/runtime'); if (version !== generation) return;

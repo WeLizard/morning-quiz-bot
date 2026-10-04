@@ -234,6 +234,11 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def frontend():
         return FileResponse(Path(__file__).parent / 'mini_client' / 'index.html')
 
+    @app.get('/app/alchemy')
+    async def alchemy_frontend():
+        # Автономная одиночная игра: один собранный HTML, без обращений к API мини-аппа.
+        return FileResponse(Path(__file__).parent / 'mini_client' / 'alchemy.html')
+
     @app.get('/app/{asset}')
     async def frontend_asset(asset: str):
         if asset == 'host.webp':

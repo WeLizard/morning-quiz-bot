@@ -92,12 +92,17 @@ Workstreams 2–3 предшествуют финальному cutover. Game su
 
 ### Этап 2 — PostgreSQL-only runtime
 
-- [ ] В PG-режиме нет mutable JSON/pickle reads или writes.
+- [x] В PG-режиме нет mutable JSON/pickle reads или writes.
+  `tests/test_runtime_contract.py` фиксирует, что сессия мини-аппа не меняет `data/`;
+  старт бота fail-closed при `STORAGE_BACKEND != postgres`. Чтение статичных
+  файлов (config, `data/system/streak_achievements.json`) остаётся по замыслу.
 - [x] PTB UI/conversation state явно ephemeral и не создаёт второй файл state.
 - [x] Редактируемый банк вопросов хранится в PostgreSQL.
-- [ ] Media catalog авторитетен; файлы immutable/content-addressed.
-  Runtime-autodiscovery уже запрещён, новые upload адресуются SHA-256;
-  для legacy media ещё нужен отдельный rehearsal/backfill.
+- [x] Media catalog авторитетен; файлы immutable/content-addressed.
+  Runtime-autodiscovery запрещён, новые upload адресуются SHA-256, `publish_image`
+  никогда не перезаписывает путь; сверка каталога с файлами —
+  `scripts/verify_media_catalog.py` (в песочнице 198/198, сирот нет), поведение
+  закреплено тестом `tests/test_photo_media_catalog.py`.
 - [x] Startup fail-closed при JSON backend основного бота, неверной schema revision или URL.
 - [x] Изменение settings/category немедленно влияет на следующий Telegram run.
 
@@ -122,16 +127,35 @@ Workstreams 2–3 предшествуют финальному cutover. Game su
 - [x] Photo переведён на тот же прямой application lifecycle в обоих клиентах.
 - [ ] В classic/photo runtime отсутствуют `Update.de_json`, `process_update` и
   MiniBridge; bridge после переноса удалён.
+  Фактически bridge остался только в тестовом и offline-контуре:
+  `web/mini_app.py` использует `MiniBridge` лишь в runtime-маршрутах dev/offline
+  фабрик, плюс `modules/mini_bridge_worker.py`, `modules/telegram_test_scope.py`,
+  `modules/mini_offline_runtime.py`, `modules/dev_runtime.py`. В основном пути
+  classic/photo bridge нет. Удаление = отказ от offline-контура тестирования,
+  поэтому нужно отдельное решение.
 
 ### Этап 5 — продуктовый Mini App и финальный аудит
 
-- [ ] Главная, current games, classic, photo 1:1, Mafia, история, статистика,
+- [x] Главная, current games, classic, photo 1:1, Mafia, история, статистика,
   рейтинг, достижения, профиль и настройки используют реальные projections.
-- [ ] Есть loading/error/empty/reconnect/session renewal и корректные deep links.
-- [ ] Десятиминутная сессия не достигает rate limit собственным polling.
+  Достижения — `GET /api/mini/achievements` (`f7f0ea3`), история — `GET /api/mini/history`
+  (`b1dbe89`), личная статистика чата — блок `me` в `chat_details` (`8a066ba`).
+- [x] Есть loading/error/empty/reconnect/session renewal и корректные deep links.
+  Продление сессии — `POST /api/mini/session/renew` (`8128dce`), deep links —
+  whitelist параметров и «чат из ссылки недоступен» (`46f4ddd`), документация
+  `docs/MINI_APP_DEEP_LINKS.md`; пустые состояния и повтор при ошибке — в клиенте.
+- [x] Десятиминутная сессия не достигает rate limit собственным polling.
+  Интервалы разрежены (`03fc84a`), бюджет посчитан в `docs/MINI_APP_RATE_LIMITS.md`,
+  границы ведёр зафиксированы тестом `test_ingress_limits_keep_room_for_game_polling_and_login`.
 - [ ] Сквозная матрица Telegram Desktop/Android/iOS пройдена на тестовом боте.
-- [ ] Runtime contract с запрещёнными operational file reads/writes проходит.
-- [ ] Production не изменён; готов отдельный проверяемый cutover/runbook.
+  Требует ручного прогона с реальных клиентов; автоматизации не поддаётся. Тестовый
+  бот и песочница для этого уже подняты.
+- [x] Runtime contract с запрещёнными operational file reads/writes проходит.
+  `tests/test_runtime_contract.py`: сессия мини-аппа по 11 маршрутам не меняет
+  `data/` ни на байт (снимок размеров и mtime до и после).
+- [x] Production не изменён; готов отдельный проверяемый cutover/runbook.
+  Production-копия осталась на старой версии; изменения только в dev-репозитории,
+  порядок выкладки и откат — `docs/tasks/MQB-007-production-cutover-runbook.md`.
 
 ## Риски и откат
 

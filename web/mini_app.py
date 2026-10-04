@@ -117,23 +117,39 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     database = database or Database(DatabaseSettings(url=normalize_database_url(os.getenv('MINI_APP_DATABASE_URL', ''))))
     # Offline is fail-closed for groups; it never substitutes a permissive verifier.
     verifier = membership if membership is not None else (None if settings.offline else TelegramMembership(settings.bot_token))
-    store = MiniAppStore(database, settings.bot_token, clock=clock, allowed_user_ids=allowed_user_ids)
     limits = RequestLimits()
     config_path = Path(__file__).resolve().parents[1] / 'config' / 'quiz_config.json'
     try:
         quiz_config = json.loads(config_path.read_text(encoding='utf-8'))
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         quiz_config = {}
+    streak_path = Path(__file__).resolve().parents[1] / 'data' / 'system' / 'streak_achievements.json'
+    try:
+        streak_raw = json.loads(streak_path.read_text(encoding='utf-8')).get('streak_achievements') or {} \
+            if streak_path.is_file() else {}
+    except (OSError, ValueError, TypeError, json.JSONDecodeError, AttributeError):
+        streak_raw = {}
+    # Каталоги достижений для экрана мини-аппа: порог -> текст поздравления.
+    chat_achievements: dict = {}
+    for key, message in ((quiz_config.get('global_settings') or {}).get('chat_achievements') or {}).items():
+        try:
+            chat_achievements[int(key)] = str(message)
+        except (TypeError, ValueError):
+            continue
+    streak_achievements: dict = {}
+    for key, messages in streak_raw.items():
+        try:
+            threshold = int(key)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(messages, list) and messages:
+            streak_achievements[threshold] = [str(item) for item in messages]
     if scoring_rules is None:
         from domain.scoring import ClassicScoringRules
-        streak_path = Path(__file__).resolve().parents[1] / 'data' / 'system' / 'streak_achievements.json'
-        try:
-            streak = json.loads(streak_path.read_text(encoding='utf-8')) if streak_path.is_file() else {}
-            streak_thresholds = tuple(int(value) for value in (streak.get('streak_achievements') or {}))
-        except (OSError, ValueError, TypeError, json.JSONDecodeError):
-            streak_thresholds = ()
         scoring_rules = ClassicScoringRules.from_settings(
-            quiz_config.get('global_settings'), streak_milestones=streak_thresholds)
+            quiz_config.get('global_settings'), streak_milestones=tuple(sorted(streak_achievements)))
+    store = MiniAppStore(database, settings.bot_token, clock=clock, allowed_user_ids=allowed_user_ids,
+                         chat_achievements=chat_achievements, streak_achievements=streak_achievements)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -285,6 +301,11 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.get('/api/mini/progress')
     async def progress(request: Request):
         return await store.progress(credential(request))
+
+    @app.get('/api/mini/achievements')
+    async def achievements(request: Request):
+        # Экран достижений: свои полученные и ближайшие впереди, без чужих данных.
+        return await store.achievements(credential(request))
 
     @app.get('/api/mini/leaderboard')
     async def global_leaderboard(request: Request, limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0, le=10000)):

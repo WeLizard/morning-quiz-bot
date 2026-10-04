@@ -87,9 +87,9 @@
         const version = ++generation; window.QuizGame.stop();
         content.replaceChildren(el('p', 'Получаем твои данные…', 'muted'));
         try {
-            const [me, progress, chats] = await Promise.all([request('/api/mini/me'), request('/api/mini/progress'), request('/api/mini/chats?limit=50')]);
+            const [me, progress, chats, achievements] = await Promise.all([request('/api/mini/me'), request('/api/mini/progress'), request('/api/mini/chats?limit=50'), request('/api/mini/achievements')]);
             if (version !== generation || !state.token) return;
-            Object.assign(state, {me, progress, chats: chats.items, moreChats: chats.has_more, chatOffset: chats.items.length});
+            Object.assign(state, {me, progress, chats: chats.items, moreChats: chats.has_more, chatOffset: chats.items.length, achievements});
             if (!state.chats.some(c => c.chat_id === state.selected)) state.selected = state.chats[0]?.chat_id || '';
             nav.hidden = false; await navigate(state.page);
         } catch (error) {
@@ -361,11 +361,15 @@
         metrics(content);
         note(content, `Правильных ответов, включая фото: ${state.progress.correct_including_photo}. Лучшая из текущих серий по чатам: ${state.progress.current_streak}.`);
         content.append(el('h2', 'Достижения'));
-        const codes = new Map();
-        for (const item of state.progress.achievements) codes.set(`${item.chat_id}:${item.code}`, item.code);
-        for (const chat of state.progress.legacy_achievements) for (const code of [...chat.milestones, ...chat.streaks]) codes.set(`${chat.chat_id}:${code}`, String(code));
-        if (!codes.size) note(content, 'Первые достижения ещё впереди. Они появятся здесь после игры.', 'empty');
-        else { const list = el('div'); for (const code of codes.values()) list.append(el('span', code, 'achievement')); content.append(list); }
+        const summary = state.achievements?.summary;
+        if (!summary) note(content, 'Достижения загружаются…', 'muted');
+        else {
+            note(content, `Получено ${summary.earned} из ${summary.available}: ${summary.chat_achievements} за очки в чатах и ${summary.streak_achievements} за серии подряд.`);
+            const recent = el('div');
+            for (const chat of state.achievements.chats) for (const item of chat.items.filter(row => row.earned).slice(0, 2)) recent.append(el('span', item.title, 'achievement'));
+            if (recent.childElementCount) content.append(recent);
+            content.append(button('Все достижения', () => navigate('achievements'), 'quiet'));
+        }
         if (state.progress.last_activity) note(content, `Последняя активность: ${new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
         content.append(button('Обновить прогресс', load, 'quiet'));
     }
@@ -502,12 +506,34 @@
         select.addEventListener('change', () => { list.replaceChildren(); offset = 0; fetchPage().catch(failure); });
         await fetchPage();
     }
+    function achievementLine(item) {
+        const badge = el('span', `${item.earned ? '✓' : '·'} ${item.title}`, `achievement ${item.earned ? 'earned' : ''}`.trim());
+        if (item.message) badge.title = item.message;
+        return badge;
+    }
+    async function achievementsPage(version) {
+        content.append(el('span', 'Твой прогресс', 'eyebrow'), el('h1', 'Достижения'));
+        const data = state.achievements || await request('/api/mini/achievements');
+        if (version !== generation) return;
+        state.achievements = data;
+        note(content, `Получено ${data.summary.earned} из ${data.summary.available}: ${data.summary.chat_achievements} в чатах и ${data.summary.streak_achievements} за серии.`);
+        if (!data.chats.length) note(content, 'Играй в чатах — достижения появятся здесь.', 'empty');
+        for (const chat of data.chats) {
+            content.append(el('h2', chat.title));
+            note(content, `Получено ${chat.earned} из ${chat.available}`);
+            const list = el('div'); chat.items.forEach(item => list.append(achievementLine(item))); content.append(list);
+        }
+        content.append(el('h2', 'Серии подряд'));
+        note(content, `Личный рекорд: ${data.streak.best} подряд. Получено ${data.streak.earned} из ${data.streak.available}.`);
+        const streakList = el('div'); data.streak.items.forEach(item => streakList.append(achievementLine(item))); content.append(streakList);
+        content.append(button('Обновить', () => navigate('achievements'), 'quiet'));
+    }
     async function navigate(page) {
         if (!state.token) { loginScreen(); return; }
         window.QuizGame.stop();
         window.QuizTelegram.selection();
         state.page = page; const version = ++generation; feedback.textContent = ''; content.replaceChildren();
-        const tab = page.startsWith('settings') ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
+        const tab = page.startsWith('settings') || page === 'achievements' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
         nav.querySelectorAll('button').forEach(node => { if (node.dataset.page === tab) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
         if (tg?.BackButton) { if (page === 'home') tg.BackButton.hide(); else tg.BackButton.show(); }
         try {
@@ -522,6 +548,7 @@
             }
             else if (page === 'chat') await chatHome(version);
             else if (page === 'profile') profile();
+            else if (page === 'achievements') await achievementsPage(version);
             else if (page === 'settings') await settings();
             else if (page === 'chats') chats();
             else if (page === 'mafia') await mafia(version);

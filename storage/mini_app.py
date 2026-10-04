@@ -26,10 +26,14 @@ def token_digest(token):
 
 
 class MiniAppStore:
-    def __init__(self, database, bot_token, *, clock=time.time, allowed_user_ids=None):
+    def __init__(self, database, bot_token, *, clock=time.time, allowed_user_ids=None,
+                 chat_achievements=None, streak_achievements=None):
         self.database, self.clock = database, clock
         self.bot_key_id = sha256(bot_token.encode()).hexdigest()
         self.allowed_user_ids = frozenset(allowed_user_ids) if allowed_user_ids is not None else None
+        # Каталоги достижений: порог -> текст поздравления. Из config и data/system.
+        self.chat_achievements = dict(chat_achievements or {})
+        self.streak_achievements = dict(streak_achievements or {})
 
     def now(self):
         return datetime.fromtimestamp(self.clock(), timezone.utc)
@@ -232,6 +236,127 @@ class MiniAppStore:
                                          'streaks': m.streak_achievement_codes} for m in members],
                 'first_activity': user.first_answer_at.isoformat() if user.first_answer_at else None,
                 'last_activity': user.last_answer_at.isoformat() if user.last_answer_at else None}
+
+    @staticmethod
+    def _threshold_from_code(code):
+        match = re.search(r'(-?\d+)$', str(code or ''))
+        return int(match.group(1)) if match else None
+
+    @staticmethod
+    def _achievement_kind(code):
+        text = str(code or '')
+        if text.startswith('chat_achievement_'):
+            return 'chat'
+        if text.startswith('motivational_'):
+            return 'motivational'
+        if text.startswith('streak_'):
+            return 'streak'
+        return 'other'
+
+    @staticmethod
+    def _achievement_title(kind, threshold):
+        if kind == 'streak':
+            return f'{threshold} подряд'
+        if threshold is None:
+            return 'Достижение'
+        if threshold > 0:
+            return f'{threshold} очков'
+        if threshold < 0:
+            return f'минус {abs(threshold)} очков'
+        return 'Старт в чате'
+
+    @staticmethod
+    def _render_achievement_message(template, *, user_name, user_score, streak):
+        if not template:
+            return None
+        return (str(template).replace('{user_name}', user_name)
+                .replace('{user_score}', user_score).replace('{streak}', str(streak)))
+
+    async def achievements(self, token):
+        """Личные достижения: что уже получено и что ещё впереди.
+
+        Канонический источник — `achievement_grants`; коды из `chat_members`
+        (легаси `milestones_achieved` / `streak_achievements_earned`) добавляются,
+        чтобы старые открытия не терялись. Наружу уходят только пороги, названия,
+        свои же очки и тексты поздравлений — без чужих данных и метаданных наград.
+        """
+        async with self.authorized(token) as (session, user):
+            members = (await session.scalars(select(ChatMember).where(ChatMember.user_id == user.id))).all()
+            grants = (await session.scalars(select(AchievementGrant).where(
+                AchievementGrant.user_id == user.id))).all()
+            chat_ids = {m.chat_id for m in members} | {g.chat_id for g in grants if g.chat_id}
+            titles = dict((await session.execute(select(Chat.id, Chat.title).where(
+                Chat.id.in_(chat_ids)))).all()) if chat_ids else {}
+
+            earned = {}
+            for grant in grants:
+                if grant.chat_id:
+                    earned.setdefault(grant.chat_id, {})[str(grant.code)] = grant.awarded_at
+            for member in members:
+                bucket = earned.setdefault(member.chat_id, {})
+                for code in list(member.milestone_codes or []) + list(member.streak_achievement_codes or []):
+                    bucket.setdefault(str(code), None)
+
+            active = [m for m in members if earned.get(m.chat_id)]
+            active.sort(key=lambda m: (float(m.score), m.chat_id), reverse=True)
+
+            catalog = sorted(self.chat_achievements)
+            streaks = sorted(self.streak_achievements)
+            best_streak = max((m.max_consecutive_correct or 0 for m in members), default=0)
+            best_score = f'{max((float(m.score) for m in members), default=0.0):.1f}'
+
+            chats, earned_total = [], 0
+            for member in active[:5]:
+                score = str(member.score)
+                seen, rows = set(), []
+                for code, awarded_at in earned.get(member.chat_id, {}).items():
+                    threshold = self._threshold_from_code(code)
+                    if threshold in seen:
+                        continue
+                    seen.add(threshold)
+                    rows.append({
+                        'kind': self._achievement_kind(code), 'threshold': threshold,
+                        'title': self._achievement_title(self._achievement_kind(code), threshold),
+                        'earned': True, 'awarded_at': awarded_at.isoformat() if awarded_at else None,
+                        'message': self._render_achievement_message(
+                            self.chat_achievements.get(threshold), user_name=user.display_name,
+                            user_score=score, streak=member.max_consecutive_correct)})
+                rows.sort(key=lambda row: (row['threshold'] is None, -(row['threshold'] or 0)))
+                rows = rows[:6]                     # полученные показываем выборочно
+                score_value = float(member.score)
+                upcoming = [t for t in catalog if t not in seen and (
+                    (t > 0 and score_value < t) or (t == 0 and score_value != 0))]
+                for threshold in upcoming[:3]:
+                    rows.append({
+                        'kind': 'chat', 'threshold': threshold,
+                        'title': self._achievement_title('chat', threshold),
+                        'earned': False, 'awarded_at': None,
+                        'message': self._render_achievement_message(
+                            self.chat_achievements.get(threshold), user_name=user.display_name,
+                            user_score=score, streak=member.max_consecutive_correct)})
+                earned_total += len(seen)
+                chats.append({'chat_id': str(member.chat_id),
+                              'title': titles.get(member.chat_id) or f'Чат {member.chat_id}',
+                              'earned': len(seen), 'available': len(catalog), 'items': rows})
+
+            streak_items = []
+            for threshold in streaks[:8]:
+                templates = self.streak_achievements.get(threshold) or []
+                streak_items.append({
+                    'kind': 'streak', 'threshold': threshold,
+                    'title': self._achievement_title('streak', threshold),
+                    'earned': threshold <= best_streak, 'awarded_at': None,
+                    'message': self._render_achievement_message(
+                        templates[0] if templates else None, user_name=user.display_name,
+                        user_score=best_score, streak=threshold)})
+            streak_earned = sum(1 for item in streak_items if item['earned'])
+            return {'summary': {'earned': earned_total + streak_earned,
+                                'available': len(catalog) + len(streaks),
+                                'chat_achievements': len(catalog),
+                                'streak_achievements': len(streaks)},
+                    'chats': chats,
+                    'streak': {'best': best_streak, 'earned': streak_earned,
+                               'available': len(streaks), 'items': streak_items}}
 
     async def global_leaderboard(self, token, *, limit=20, offset=0):
         async with self.authorized(token) as (session, user):

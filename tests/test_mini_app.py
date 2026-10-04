@@ -19,7 +19,8 @@ from tests.test_postgres_members import CHAT, OTHER_CHAT, USER, pg_env, scenario
 from storage.admin_actions import AdminActions
 from storage.classic_sessions import ClassicSessions
 from storage.mini_app import MiniAppError, MiniAppStore
-from storage.models import Chat, ChatMember, Game, MiniAppSession, PollAnswer, QuizSession, User
+from storage.models import (AchievementGrant, Chat, ChatMember, Game, MiniAppSession, PollAnswer,
+                            QuizSession, User)
 from storage.repositories import OperationalRepository
 from storage.question_bank import BankConflict, PostgresQuestionBank
 from storage.settings import SettingsService
@@ -264,6 +265,38 @@ def test_session_renewal_rejects_revoked_and_expired_tokens(pg_env):
             env.now[0] += 16 * 60
             assert (await env.client.post('/api/mini/session/renew', headers=fresh)).status_code == 401
             assert (await env.client.get('/api/mini/me', headers=fresh)).status_code == 401
+    asyncio.run(run())
+
+
+def test_achievements_projection_shows_earned_upcoming_and_no_foreign_data(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            async with env.db.transaction() as session:
+                session.add(AchievementGrant(user_id=USER, chat_id=CHAT,
+                                             code=f'chat_achievement_{CHAT}_{USER}_25',
+                                             metadata_json={'secret': 'ADMIN-ONLY'}))
+                member = await session.get(ChatMember, (CHAT, USER))
+                member.milestone_codes = [f'chat_achievement_{CHAT}_{USER}_{t}'
+                                          for t in (0, 10, 15, 25, 30, 50, 75, 100)]
+                member.max_consecutive_correct = 4
+            headers = await login(env)
+            response = await env.client.get('/api/mini/achievements', headers=headers)
+            assert response.status_code == 200
+            data = response.json()
+            summary = data['summary']
+            assert summary['chat_achievements'] > 0 and 0 < summary['earned'] <= summary['available']
+            chat = next(item for item in data['chats'] if item['chat_id'] == str(CHAT))
+            earned = [item for item in chat['items'] if item['earned']]
+            ahead = [item for item in chat['items'] if not item['earned']]
+            assert len(earned) <= 6                                        # полученные показываем выборочно
+            assert {'100 очков', '75 очков'} <= {item['title'] for item in earned}
+            # Ближайшие впереди не должны вытесняться лимитом на полученные.
+            assert '125 очков' in {item['title'] for item in ahead}
+            assert all(item['kind'] != 'streak' for item in chat['items'])
+            assert data['streak']['best'] == 4 and any(item['earned'] for item in data['streak']['items'])
+            # Чужие данные и метаданные наград наружу не уходят.
+            assert 'ADMIN-ONLY' not in response.text and 'metadata' not in response.text
+            assert str(USER + 1) not in response.text
     asyncio.run(run())
 
 

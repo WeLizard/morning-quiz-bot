@@ -12107,17 +12107,17 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         const added = data.discovered.filter(id => !local.has(id));
         if (data.awarded > 0) banner(`Алхимия: +${data.awarded} очков в профиль · всего ${data.points_total}`);
         if (!added.length) return false;
-        let already = false;
-        try { already = sessionStorage.getItem(RELOADED_KEY) === '1'; } catch {}
-        if (already) return false;
         current.discovered = [...new Set([...current.discovered, ...data.discovered])];
         current.updatedAt = Date.now();
-        try {
-            localStorage.setItem(PRIMARY, JSON.stringify(current));
-            sessionStorage.setItem(RELOADED_KEY, '1');
-            location.reload();
-            return true;
-        } catch { return false; }
+        try { localStorage.setItem(PRIMARY, JSON.stringify(current)); } catch { return false; }
+        // Перезагружаем страницу не больше одного раза за сессию: движок читает
+        // сохранение только при старте, а петлю перезагрузок допускать нельзя.
+        let already = false;
+        try { already = sessionStorage.getItem(RELOADED_KEY) === '1'; } catch {}
+        if (already) return true;
+        try { sessionStorage.setItem(RELOADED_KEY, '1'); } catch {}
+        try { location.reload(); } catch {}
+        return true;
     }
 
     async function sync() {

@@ -26,6 +26,7 @@ from storage.question_bank import BankConflict, PostgresQuestionBank
 from storage.settings import SettingsService
 from web.mini_auth import InvalidInitData, validate_init_data
 from web.mini_app import MiniAppSettings, RequestLimits, TelegramMembership, create_app
+from web import mini_app as mini_app_module
 
 TOKEN = '123456:LOCAL_TEST_ONLY_012345678901234567890'
 ORIGIN = 'http://127.0.0.1:4185'
@@ -384,6 +385,41 @@ def test_ingress_limits_keep_room_for_game_polling_and_login():
     # Через минуту лимиты освобождаются.
     moments[0] += 61
     assert limits.allow(client, frequent_read=True) and limits.allow(client) and limits.allow(client, auth=True)
+
+
+def test_settings_read_telegram_proxy_and_reject_invalid(monkeypatch):
+    """Там, где Telegram доступен только через прокси, мини-апп обязан его знать."""
+    monkeypatch.setenv('MINI_APP_BOT_TOKEN', TOKEN)
+    monkeypatch.setenv('MINI_APP_ORIGIN', ORIGIN)
+    monkeypatch.setenv('MINI_APP_OFFLINE', '1')      # http-origin допустим только в offline
+    monkeypatch.setenv('TELEGRAM_PROXY_URL', 'socks5://127.0.0.1:9050')
+    assert MiniAppSettings.from_env().telegram_proxy == 'socks5://127.0.0.1:9050'
+    monkeypatch.setenv('TELEGRAM_PROXY_URL', 'ftp://proxy.local')
+    with pytest.raises(ValueError):
+        MiniAppSettings.from_env()
+    monkeypatch.setenv('TELEGRAM_PROXY_URL', 'socks5://')
+    with pytest.raises(ValueError):
+        MiniAppSettings.from_env()
+    monkeypatch.setenv('TELEGRAM_PROXY_URL', '  ')
+    assert MiniAppSettings.from_env().telegram_proxy == ''
+
+
+def test_membership_client_uses_proxy_only_when_configured(monkeypatch):
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.clear()
+            captured.update(kwargs)
+
+    monkeypatch.setattr(mini_app_module.httpx, 'AsyncClient', FakeClient)
+    TelegramMembership(TOKEN, proxy='socks5://127.0.0.1:9050')
+    assert captured['proxy'] == 'socks5://127.0.0.1:9050'
+    assert captured['trust_env'] is False          # окружение не подменяет настройку
+    TelegramMembership(TOKEN)
+    assert 'proxy' not in captured                 # без прокси аргумент не передаём
+    injected = object()
+    assert TelegramMembership(TOKEN, client=injected, proxy='socks5://127.0.0.1:9050').client is injected
 
 
 def test_concurrent_login_replay_creates_one_session(pg_env):

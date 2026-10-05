@@ -27,6 +27,7 @@ class MiniAppSettings:
     origin: str
     offline: bool = False
     bot_username: str = ''
+    telegram_proxy: str = field(default='', repr=False)
 
     def __post_init__(self):
         if self.bot_username and not re.fullmatch(r'[A-Za-z0-9_]{5,32}', self.bot_username):
@@ -40,6 +41,10 @@ class MiniAppSettings:
         if parsed.scheme != 'https' and not (self.offline and parsed.scheme == 'http'
                 and parsed.hostname in {'127.0.0.1', 'localhost', '::1'}):
             raise ValueError('Mini App requires HTTPS; HTTP is allowed only for offline loopback tests')
+        if self.telegram_proxy:
+            parsed_proxy = urlsplit(self.telegram_proxy)
+            if parsed_proxy.scheme not in {'socks5', 'socks5h', 'http', 'https'} or not parsed_proxy.hostname:
+                raise ValueError('TELEGRAM_PROXY_URL must be a socks5://, socks5h://, http:// or https:// URL')
 
     @classmethod
     def from_env(cls):
@@ -49,14 +54,21 @@ class MiniAppSettings:
             os.getenv('MINI_APP_ORIGIN', ''),
             os.getenv('MINI_APP_OFFLINE', '') == '1',
             os.getenv('MINI_APP_BOT_USERNAME', ''),
+            os.getenv('TELEGRAM_PROXY_URL', '').strip(),
         )
 
 
 class TelegramMembership:
-    def __init__(self, token, *, client=None):
+    def __init__(self, token, *, client=None, proxy=None):
         self._token = token
         self.bot_id = int(token.split(':', 1)[0])
-        self.client = client or httpx.AsyncClient(timeout=5, follow_redirects=False, trust_env=False)
+        if client is not None:
+            self.client = client
+        else:
+            # Bot API доступен не из каждой сети: там, где Telegram блокируют,
+            # задаётся тот же SOCKS-прокси, что и для бота.
+            options = {'proxy': proxy} if proxy else {}
+            self.client = httpx.AsyncClient(timeout=5, follow_redirects=False, trust_env=False, **options)
 
     async def close(self):
         await self.client.aclose()
@@ -116,7 +128,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     owned_db = database is None
     database = database or Database(DatabaseSettings(url=normalize_database_url(os.getenv('MINI_APP_DATABASE_URL', ''))))
     # Offline is fail-closed for groups; it never substitutes a permissive verifier.
-    verifier = membership if membership is not None else (None if settings.offline else TelegramMembership(settings.bot_token))
+    verifier = membership if membership is not None else (
+        None if settings.offline else TelegramMembership(settings.bot_token, proxy=settings.telegram_proxy))
     limits = RequestLimits()
     config_path = Path(__file__).resolve().parents[1] / 'config' / 'quiz_config.json'
     try:

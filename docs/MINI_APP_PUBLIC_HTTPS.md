@@ -134,6 +134,12 @@ MINI_APP_ORIGIN=https://morningquiz.duckdns.org
 Кнопку меню ставит **владелец бота**: BotFather → `/mybots` → бот → Bot Settings →
 Menu Button → URL (`https://morningquiz.duckdns.org/app`).
 
+Иконка экрана загрузки (BotFather → Mini App → Loading screen → Icon) лежит в
+`docs/assets/miniapp-loading-icon.svg`: сова QuizzyWizzy в очках и с бабочкой,
+холст 512×512, внутри ровно один `<path>`, как требует Telegram. Цвет берёт сам
+Telegram, поэтому в файле нет ни заливки, ни `fill-rule` — дырки (глаза, зазоры)
+заданы обратным направлением контуров и одинаково рисуются при nonzero и evenodd.
+
 ### 6. Проверка
 
 ```bash

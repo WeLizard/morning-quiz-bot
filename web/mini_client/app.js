@@ -83,7 +83,7 @@
                     const session = await request(state.demo ? '/api/dev/session' : '/api/mini/session', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: state.demo ? '{}' : JSON.stringify({init_data: initData})});
                     state.token = session.access_token;
                     // Токен нужен странице «Алхимии» (тот же origin, своя вкладка), чтобы синхронизировать прогресс.
-                    try { sessionStorage.setItem('mqb-mini-token', state.token); } catch {}
+                    try { sessionStorage.setItem('mqb-mini-token', state.token); localStorage.setItem('mqb-mini-token', state.token); } catch {}
                     scheduleRenewal();
                     await load();
                 } catch (error) { feedback.textContent = error.message; enter.disabled = false; }
@@ -500,7 +500,7 @@
         if (window.QuizTelegram.canFullscreen) preferences.append(button('Развернуть на весь экран', () => window.QuizTelegram.fullscreen(), 'quiet'));
         content.append(preferences);
         const actions = el('div', undefined, 'actions'); actions.append(button('Выйти', async () => {
-            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.token = null; state.me = null; state.page = 'home'; try { sessionStorage.removeItem('mqb-mini-token'); } catch {} loginScreen(); }
+            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.token = null; state.me = null; state.page = 'home'; try { sessionStorage.removeItem('mqb-mini-token'); localStorage.removeItem('mqb-mini-token'); } catch {} loginScreen(); }
             catch (error) { feedback.textContent = error.message; }
         }, 'quiet')); content.append(actions);
     }

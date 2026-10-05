@@ -320,20 +320,41 @@ function tokenAt(clientX,clientY,except=null){
  }return closest;
 }
 function inRect(x,y,rect){return x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom;}
+const LIFT_MS=260,LIFT_SLOP=8;var liftTimer=0;
+function clearLift(){if(liftTimer){clearTimeout(liftTimer);liftTimer=0;}document.querySelectorAll('.element-card.pressing').forEach(el=>el.classList.remove('pressing'));}
+/* На телефоне элемент из коллекции поднимается долгим нажатием: обычный сдвиг
+ * пальца должен остаться прокруткой списка, поэтому сразу тянуть нельзя. */
+function beginLift(){
+ liftTimer=0;
+ const d=drag;
+ if(!d||d.active)return;
+ if(!d.element?.isConnected){cleanupDrag();return;}      // коллекция перерисовалась под пальцем
+ d.active=true;d.ghost=document.createElement('div');d.ghost.className='token drag-ghost';
+ d.ghost.innerHTML=art(d.id)+`<span class="element-name">${name(d.id)}</span>`;document.body.appendChild(d.ghost);
+ d.ghost.style.left=d.startX-d.offsetX+'px';d.ghost.style.top=d.startY-d.offsetY+'px';
+ d.element.classList.remove('pressing');d.element.classList.add('dragging');
+ try{d.element.setPointerCapture(d.pointer);}catch(err){}
+ $('trashTarget').classList.toggle('hidden',d.source!=='bench');
+ suppressClickUntil=performance.now()+400;               // отпускание после подъёма — не тап
+ playSound('select');
+}
 function pointerDown(e){
  if(e.button!==0||modal.open||drag||e.target.closest('[data-detail]'))return;
  const benchEl=e.target.closest('[data-token]'),shelfEl=e.target.closest('#collectionGrid [data-pick]');
  if(!benchEl&&!shelfEl)return;
- if(shelfEl&&e.pointerType==='touch')return; // Native vertical scrolling beats elaborate long-press gestures.
  const el=benchEl||shelfEl,t=benchEl?state.bench.find(t=>t.uid===el.dataset.token):null;
  if(benchEl&&!t)return;
  const rect=el.getBoundingClientRect();
  drag={pointer:e.pointerId,source:benchEl?'bench':'shelf',id:t?.id||el.dataset.pick,uid:t?.uid||null,element:el,startX:e.clientX,startY:e.clientY,active:false,ghost:null,target:null,offsetX:benchEl?e.clientX-rect.left:tokenSize.w/2,offsetY:benchEl?e.clientY-rect.top:tokenSize.h/2};
+ if(!benchEl&&e.pointerType==='touch'){el.classList.add('pressing');liftTimer=setTimeout(beginLift,LIFT_MS);}
 }
 function pointerMove(e){
  if(!drag||drag.pointer!==e.pointerId)return;
  const d=drag;
- if(!d.active){if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<7)return;
+ if(!d.active){
+  if(liftTimer&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)>LIFT_SLOP){clearLift();cleanupDrag();return;} // это прокрутка
+  if(liftTimer)return;                                    // ждём долгое нажатие
+  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<7)return;
   d.active=true;d.ghost=document.createElement('div');d.ghost.className='token drag-ghost';d.ghost.innerHTML=art(d.id)+`<span class="element-name">${name(d.id)}</span>`;document.body.appendChild(d.ghost);d.element.classList.add('dragging');
   try{d.element.setPointerCapture(e.pointerId);}catch(err){}
   $('trashTarget').classList.toggle('hidden',d.source!=='bench');
@@ -345,6 +366,7 @@ function pointerMove(e){
  if(d.source==='bench')$('trashTarget').classList.toggle('over',inRect(e.clientX,e.clientY,$('trashTarget').getBoundingClientRect()));
 }
 function cleanupDrag(){
+ clearLift();
  if(!drag)return;
  drag.ghost?.remove();drag.element?.classList.remove('dragging');drag.target?.classList.remove('target','known');
  try{if(drag.element?.hasPointerCapture(drag.pointer))drag.element.releasePointerCapture(drag.pointer);}catch(err){}
@@ -558,6 +580,13 @@ listen(document,'pointerdown',pointerDown);
 listen(document,'pointermove',pointerMove,{passive:false});
 listen(document,'pointerup',pointerUp);
 listen(document,'pointercancel',cancelDrag);
+/* Путь алхимика на телефоне: на узком экране панель целей скрыта вёрсткой, поэтому
+ * открываем её отдельным экраном, а главы и эпохи остаются внутри него кнопкой. */
+listen(document,'click',e=>{
+ if(e.target.closest('[data-action="path"]')&&!e.target.closest('.journey')){e.preventDefault();document.body.classList.add('path-open');return;}
+ if(e.target.closest('.journey-close')||e.target.closest('.journey-sheet-head [data-action="chapters"]'))document.body.classList.remove('path-open');
+});
+listen(document,'keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('path-open'))document.body.classList.remove('path-open');});
 listen(window,'blur',cancelDrag);
 listen(document,'dragstart',e=>{if(e.target.closest('.token,.element-card'))e.preventDefault();});
 listen(document,'contextmenu',e=>{const el=e.target.closest('[data-pick],[data-token]');if(!el)return;e.preventDefault();const id=el.dataset.pick||state.bench.find(t=>t.uid===el.dataset.token)?.id;if(id)showDetail(id);});

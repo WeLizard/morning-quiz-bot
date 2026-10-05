@@ -42,6 +42,20 @@ dialog{max-width:1050px}.primary,.secondary{min-height:44px}.goal-name{font-size
 @media(max-width:760px){.epoch-banner{height:100px;flex-basis:100px}.epoch-caption{left:11px;top:9px;padding:8px 12px;gap:3px}.epoch-caption strong{font-size:20px}.epoch-caption .eyebrow{display:none}.epoch-caption>span:last-child{font-size:10px}.lab-heading{padding:8px 10px}.lab-heading h1{display:none}.lab-heading p{display:none}.mobile-progress{margin-top:0;gap:6px}.mobile-progress #mobileChapter{font-size:9px;max-width:145px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.laboratory{min-height:360px}.epoch-grid{grid-template-columns:1fr;gap:14px}.epoch-card>.epoch-scene{height:114px}.epoch-card-copy{padding:16px}.epoch-hero>.epoch-scene{height:132px}.epoch-hero>div{padding:17px}.epoch-hero h3{font-size:25px}.expedition-intro{grid-template-columns:1fr;gap:15px}.expedition-intro h3{font-size:28px}.stage{grid-template-columns:33px minmax(0,1fr);gap:10px}.stage-number{width:30px;height:30px;font-size:12px}.stage-content h3{font-size:23px}.stage-goals{gap:6px}.stage-goal{padding:5px 7px;font-size:11px}.stage-goal .art{width:29px;height:29px}.completion-card{padding:14px 1px}.completion-card h3{font-size:26px}.epoch-hero+.button-row{flex-direction:column}.journey-tabs .chip{font-size:12px;padding:8px 13px}.element-card .element-name{font-size:10px}}
 @media(max-width:760px) and (max-height:650px){.epoch-banner{height:61px;flex-basis:61px}.epoch-caption{top:6px;padding:7px 11px}.epoch-caption strong{font-size:17px}.epoch-caption>span:last-child{display:none}.laboratory{min-height:290px}.mobile-progress #mobileChapter{max-width:100px}}
 @media(prefers-reduced-motion:reduce){.epoch-card{transition:none}.epoch-card:hover{transform:none}}
+
+/* Телефон: панель «что нужно собрать» была скрыта целиком (@media(max-width:1030px)
+   оставлял только полоску прогресса), поэтому теперь она открывается отдельным
+   экраном — цели, главы, последняя находка и статистика. */
+.journey-sheet-head{display:none}
+.journey-sheet-actions{display:flex;align-items:center;gap:6px}
+body.path-open{overflow:hidden}
+.element-card.pressing{transform:scale(.97);border-color:#c5d89b66;background:#9bbf7b1f}
+@media(max-width:1030px){
+ .journey{display:none}
+ body.path-open .journey{display:flex;position:fixed;inset:0;z-index:900;background:var(--bg);overflow-y:auto;padding:16px 16px 30px;gap:16px}
+ body.path-open .journey-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;background:var(--bg);padding:2px 0 12px;z-index:2}
+ body.path-open .journey .rule{opacity:.5}
+}
 </style>
 </head>
 <body>
@@ -85,7 +99,7 @@ dialog{max-width:1050px}.primary,.secondary{min-height:44px}.goal-name{font-size
 <div class="collection-grid" id="collectionGrid"></div><div class="collection-footer"><span>Четыре стихии. Целый мир.</span><svg class="ui-icon"><use href="#ui-leaf"/></svg></div>
 </section>
 <section class="laboratory" aria-label="Лаборатория">
-<div id="epochBanner" class="epoch-banner"></div><div class="lab-heading"><div class="eyebrow">Мастерская превращений · опыт за опытом</div><h1>Большое начинается <em>с малого.</em></h1><p>Смешивай знакомое. Открывай удивительное.</p><button class="mobile-progress" data-action="chapters" style="background:none;border:0" aria-label="Открыть путь алхимика"><strong id="mobileCount">4 / 421</strong><span class="mini-progress"><span id="mobileProgressFill" style="width:2.1%"></span></span><span id="mobileChapter">Глава 1 из 30</span><svg class="ui-icon" style="width:12px;height:12px"><use href="#ui-arrow"/></svg></button></div>
+<div id="epochBanner" class="epoch-banner"></div><div class="lab-heading"><div class="eyebrow">Мастерская превращений · опыт за опытом</div><h1>Большое начинается <em>с малого.</em></h1><p>Смешивай знакомое. Открывай удивительное.</p><button class="mobile-progress" data-action="path" style="background:none;border:0" aria-label="Открыть путь алхимика: цели, главы и прогресс"><strong id="mobileCount">4 / 421</strong><span class="mini-progress"><span id="mobileProgressFill" style="width:2.1%"></span></span><span id="mobileChapter">Глава 1 из 30</span><svg class="ui-icon" style="width:12px;height:12px"><use href="#ui-arrow"/></svg></button></div>
 <div class="board-wrap">
 <div id="board" class="board" aria-label="Рабочий стол. Выберите два элемента для смешивания.">
 <svg class="transmutation-circle" viewBox="0 0 500 500" fill="none" aria-hidden="true"><circle cx="250" cy="250" r="211" stroke="currentColor" stroke-width=".8"/><circle cx="250" cy="250" r="195" stroke="currentColor" stroke-width=".5" stroke-dasharray="2 11"/><circle cx="250" cy="250" r="171" stroke="currentColor" stroke-width="1"/><circle cx="250" cy="250" r="108" stroke="currentColor" stroke-width=".6"/><path d="m250 56 169 292H81ZM250 444 81 152h338Z" stroke="currentColor" stroke-width=".5"/><path d="M250 9v48M250 443v48M9 250h48m386 0h48M81 80l24 24m290 291 25 25M80 420l25-25m290-291 25-24" stroke="currentColor" stroke-width=".7"/><circle cx="250" cy="250" r="7" stroke="currentColor"/><path d="M238 250h24m-12-12v24" stroke="currentColor"/><g stroke="currentColor"><path d="m246 22 4-9 4 9-4 9Z"/><path d="m470 246 9 4-9 4-9-4Z"/><path d="m246 478 4-9 4 9-4 9Z"/><path d="m22 246 9 4-9 4-9-4Z"/></g></svg>
@@ -96,7 +110,7 @@ dialog{max-width:1050px}.primary,.secondary{min-height:44px}.goal-name{font-size
 </div></div>
 <div class="work-tools"><div class="work-tools-left"><button class="text-btn" data-action="undo" id="undoBtn" title="Отменить изменение стола (Ctrl+Z)" disabled><svg class="ui-icon"><use href="#ui-undo"/></svg><span class="wide">Назад</span></button><button class="text-btn" data-action="arrange" title="Расставить элементы"><svg class="ui-icon"><use href="#ui-arrange"/></svg><span class="wide">Расставить</span></button><button class="text-btn" data-action="clear" title="Очистить только рабочий стол"><svg class="ui-icon"><use href="#ui-trash"/></svg><span>Очистить<span class="wide"> стол</span></span></button></div><button class="hint-button" data-action="hint"><svg class="ui-icon"><use href="#ui-hint"/></svg>Нужна искра?</button></div>
 </section>
-<aside class="journey" aria-label="Прогресс и путь алхимика"><div class="progress-summary"><div class="progress-ring"><svg viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" stroke="#b0bf8e25" stroke-width="3" fill="none"/><circle id="progressCircle" cx="35" cy="35" r="30" stroke="#d6c08a" stroke-width="3" stroke-linecap="round" stroke-dasharray="188.496" stroke-dashoffset="184.528" fill="none"/></svg><span id="progressPercent">2%</span></div><div class="progress-text"><div class="eyebrow">Твой маленький мир</div><strong id="progressTotal">4 из 421</strong><small id="rankLabel">Ученик алхимика</small></div></div><div class="rule"></div><div id="campaignTracker"></div><div id="chapterCard"></div><div class="rule"></div><div id="latestDiscovery"></div><div class="session-stat"><span>Разных опытов <b id="attemptCount">0</b></span><span>Рецептов <b id="recipeCount">0</b></span></div></aside>
+<aside class="journey" id="journey" aria-label="Прогресс и путь алхимика"><div class="journey-sheet-head"><span class="eyebrow">Путь алхимика</span><span class="journey-sheet-actions"><button class="text-btn" data-action="chapters">Главы и эпохи</button><button class="ico-btn journey-close" aria-label="Закрыть"><svg class="ui-icon"><use href="#ui-x"/></svg></button></span></div><div class="progress-summary"><div class="progress-ring"><svg viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" stroke="#b0bf8e25" stroke-width="3" fill="none"/><circle id="progressCircle" cx="35" cy="35" r="30" stroke="#d6c08a" stroke-width="3" stroke-linecap="round" stroke-dasharray="188.496" stroke-dashoffset="184.528" fill="none"/></svg><span id="progressPercent">2%</span></div><div class="progress-text"><div class="eyebrow">Твой маленький мир</div><strong id="progressTotal">4 из 421</strong><small id="rankLabel">Ученик алхимика</small></div></div><div class="rule"></div><div id="campaignTracker"></div><div id="chapterCard"></div><div class="rule"></div><div id="latestDiscovery"></div><div class="session-stat"><span>Разных опытов <b id="attemptCount">0</b></span><span>Рецептов <b id="recipeCount">0</b></span></div></aside>
 </main>
 <nav class="bottomnav" aria-label="Навигация на телефоне"><button class="active" data-action="home"><svg class="ui-icon"><use href="#ui-lab"/></svg>Мастерская</button><button data-action="atlas"><svg class="ui-icon"><use href="#ui-book"/></svg>Атлас</button><button data-action="chapters"><svg class="ui-icon"><use href="#ui-route"/></svg>Истории</button><button data-action="journal"><svg class="ui-icon"><use href="#ui-journal"/></svg>Дневник</button></nav>
 </div>
@@ -11653,20 +11667,41 @@ function tokenAt(clientX,clientY,except=null){
  }return closest;
 }
 function inRect(x,y,rect){return x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom;}
+const LIFT_MS=260,LIFT_SLOP=8;var liftTimer=0;
+function clearLift(){if(liftTimer){clearTimeout(liftTimer);liftTimer=0;}document.querySelectorAll('.element-card.pressing').forEach(el=>el.classList.remove('pressing'));}
+/* На телефоне элемент из коллекции поднимается долгим нажатием: обычный сдвиг
+ * пальца должен остаться прокруткой списка, поэтому сразу тянуть нельзя. */
+function beginLift(){
+ liftTimer=0;
+ const d=drag;
+ if(!d||d.active)return;
+ if(!d.element?.isConnected){cleanupDrag();return;}      // коллекция перерисовалась под пальцем
+ d.active=true;d.ghost=document.createElement('div');d.ghost.className='token drag-ghost';
+ d.ghost.innerHTML=art(d.id)+`<span class="element-name">${name(d.id)}</span>`;document.body.appendChild(d.ghost);
+ d.ghost.style.left=d.startX-d.offsetX+'px';d.ghost.style.top=d.startY-d.offsetY+'px';
+ d.element.classList.remove('pressing');d.element.classList.add('dragging');
+ try{d.element.setPointerCapture(d.pointer);}catch(err){}
+ $('trashTarget').classList.toggle('hidden',d.source!=='bench');
+ suppressClickUntil=performance.now()+400;               // отпускание после подъёма — не тап
+ playSound('select');
+}
 function pointerDown(e){
  if(e.button!==0||modal.open||drag||e.target.closest('[data-detail]'))return;
  const benchEl=e.target.closest('[data-token]'),shelfEl=e.target.closest('#collectionGrid [data-pick]');
  if(!benchEl&&!shelfEl)return;
- if(shelfEl&&e.pointerType==='touch')return; // Native vertical scrolling beats elaborate long-press gestures.
  const el=benchEl||shelfEl,t=benchEl?state.bench.find(t=>t.uid===el.dataset.token):null;
  if(benchEl&&!t)return;
  const rect=el.getBoundingClientRect();
  drag={pointer:e.pointerId,source:benchEl?'bench':'shelf',id:t?.id||el.dataset.pick,uid:t?.uid||null,element:el,startX:e.clientX,startY:e.clientY,active:false,ghost:null,target:null,offsetX:benchEl?e.clientX-rect.left:tokenSize.w/2,offsetY:benchEl?e.clientY-rect.top:tokenSize.h/2};
+ if(!benchEl&&e.pointerType==='touch'){el.classList.add('pressing');liftTimer=setTimeout(beginLift,LIFT_MS);}
 }
 function pointerMove(e){
  if(!drag||drag.pointer!==e.pointerId)return;
  const d=drag;
- if(!d.active){if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<7)return;
+ if(!d.active){
+  if(liftTimer&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)>LIFT_SLOP){clearLift();cleanupDrag();return;} // это прокрутка
+  if(liftTimer)return;                                    // ждём долгое нажатие
+  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<7)return;
   d.active=true;d.ghost=document.createElement('div');d.ghost.className='token drag-ghost';d.ghost.innerHTML=art(d.id)+`<span class="element-name">${name(d.id)}</span>`;document.body.appendChild(d.ghost);d.element.classList.add('dragging');
   try{d.element.setPointerCapture(e.pointerId);}catch(err){}
   $('trashTarget').classList.toggle('hidden',d.source!=='bench');
@@ -11678,6 +11713,7 @@ function pointerMove(e){
  if(d.source==='bench')$('trashTarget').classList.toggle('over',inRect(e.clientX,e.clientY,$('trashTarget').getBoundingClientRect()));
 }
 function cleanupDrag(){
+ clearLift();
  if(!drag)return;
  drag.ghost?.remove();drag.element?.classList.remove('dragging');drag.target?.classList.remove('target','known');
  try{if(drag.element?.hasPointerCapture(drag.pointer))drag.element.releasePointerCapture(drag.pointer);}catch(err){}
@@ -11891,6 +11927,13 @@ listen(document,'pointerdown',pointerDown);
 listen(document,'pointermove',pointerMove,{passive:false});
 listen(document,'pointerup',pointerUp);
 listen(document,'pointercancel',cancelDrag);
+/* Путь алхимика на телефоне: на узком экране панель целей скрыта вёрсткой, поэтому
+ * открываем её отдельным экраном, а главы и эпохи остаются внутри него кнопкой. */
+listen(document,'click',e=>{
+ if(e.target.closest('[data-action="path"]')&&!e.target.closest('.journey')){e.preventDefault();document.body.classList.add('path-open');return;}
+ if(e.target.closest('.journey-close')||e.target.closest('.journey-sheet-head [data-action="chapters"]'))document.body.classList.remove('path-open');
+});
+listen(document,'keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('path-open'))document.body.classList.remove('path-open');});
 listen(window,'blur',cancelDrag);
 listen(document,'dragstart',e=>{if(e.target.closest('.token,.element-card'))e.preventDefault();});
 listen(document,'contextmenu',e=>{const el=e.target.closest('[data-pick],[data-token]');if(!el)return;e.preventDefault();const id=el.dataset.pick||state.bench.find(t=>t.uid===el.dataset.token)?.id;if(id)showDetail(id);});
@@ -12055,7 +12098,11 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
     function token() {
         const fromHash = /(?:^|[#&])t=([A-Za-z0-9_-]{20,})/.exec(location.hash || '');
         if (fromHash) return fromHash[1];
-        try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+        // Мини-апп кладёт токен в sessionStorage (та же вкладка) и в localStorage
+        // (страница игры могла быть открыта позже и в другой вкладке).
+        try { const stored = sessionStorage.getItem(TOKEN_KEY); if (stored) return stored; } catch {}
+        try { const stored = localStorage.getItem(TOKEN_KEY); if (stored) return stored; } catch {}
+        return '';
     }
 
     function readState() {
@@ -12099,10 +12146,19 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         } catch { /* оформление не критично */ }
     }
 
+    // Свежее состояние в формате движка. Нужно, когда игра ещё ни разу не
+    // сохранялась (новое устройство): иначе подставлять серверный прогресс некуда.
+    const fresh = () => ({format: 'alchemia', version: 2, release: '5.1-refined', claims: [],
+        activeCampaign: null, updatedAt: Date.now(), discovered: [], recipeKeys: [], tried: [],
+        favorites: [], achievements: [], history: [], attempts: 0});
+
     function restore(data) {
         let current;
         try { current = JSON.parse(localStorage.getItem(PRIMARY) || 'null'); } catch { current = null; }
-        if (!current || typeof current !== 'object' || !Array.isArray(current.discovered)) return false;
+        if (!current || typeof current !== 'object' || !Array.isArray(current.discovered)) {
+            if (!data.discovered.length) return false;
+            current = fresh();
+        }
         const local = new Set(current.discovered);
         const added = data.discovered.filter(id => !local.has(id));
         if (data.awarded > 0) banner(`Алхимия: +${data.awarded} очков в профиль · всего ${data.points_total}`);
@@ -12120,12 +12176,15 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         return true;
     }
 
+    const EMPTY = {discovered: [], recipeKeys: [], attempts: 0};
+
     async function sync() {
         if (busy) return;
         const bearer = token();
         if (!bearer) return;                      // вне мини-аппа синхронизации нет
-        const state = readState();
-        if (!state) return;
+        // Спрашиваем сервер даже без локального сохранения: на новом устройстве
+        // игра ещё ничего не записала, и именно так подтягивается чужой прогресс.
+        const state = readState() || EMPTY;
         busy = true;
         try {
             const response = await fetch(ENDPOINT, {

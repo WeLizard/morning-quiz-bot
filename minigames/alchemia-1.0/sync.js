@@ -17,7 +17,11 @@
     function token() {
         const fromHash = /(?:^|[#&])t=([A-Za-z0-9_-]{20,})/.exec(location.hash || '');
         if (fromHash) return fromHash[1];
-        try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+        // Мини-апп кладёт токен в sessionStorage (та же вкладка) и в localStorage
+        // (страница игры могла быть открыта позже и в другой вкладке).
+        try { const stored = sessionStorage.getItem(TOKEN_KEY); if (stored) return stored; } catch {}
+        try { const stored = localStorage.getItem(TOKEN_KEY); if (stored) return stored; } catch {}
+        return '';
     }
 
     function readState() {
@@ -61,10 +65,19 @@
         } catch { /* оформление не критично */ }
     }
 
+    // Свежее состояние в формате движка. Нужно, когда игра ещё ни разу не
+    // сохранялась (новое устройство): иначе подставлять серверный прогресс некуда.
+    const fresh = () => ({format: 'alchemia', version: 2, release: '5.1-refined', claims: [],
+        activeCampaign: null, updatedAt: Date.now(), discovered: [], recipeKeys: [], tried: [],
+        favorites: [], achievements: [], history: [], attempts: 0});
+
     function restore(data) {
         let current;
         try { current = JSON.parse(localStorage.getItem(PRIMARY) || 'null'); } catch { current = null; }
-        if (!current || typeof current !== 'object' || !Array.isArray(current.discovered)) return false;
+        if (!current || typeof current !== 'object' || !Array.isArray(current.discovered)) {
+            if (!data.discovered.length) return false;
+            current = fresh();
+        }
         const local = new Set(current.discovered);
         const added = data.discovered.filter(id => !local.has(id));
         if (data.awarded > 0) banner(`Алхимия: +${data.awarded} очков в профиль · всего ${data.points_total}`);
@@ -82,12 +95,15 @@
         return true;
     }
 
+    const EMPTY = {discovered: [], recipeKeys: [], attempts: 0};
+
     async function sync() {
         if (busy) return;
         const bearer = token();
         if (!bearer) return;                      // вне мини-аппа синхронизации нет
-        const state = readState();
-        if (!state) return;
+        // Спрашиваем сервер даже без локального сохранения: на новом устройстве
+        // игра ещё ничего не записала, и именно так подтягивается чужой прогресс.
+        const state = readState() || EMPTY;
         busy = true;
         try {
             const response = await fetch(ENDPOINT, {

@@ -109,3 +109,27 @@ test('повторная подстановка в одной сессии не 
     const stored = JSON.parse(env.localStore.getItem('alchemia.atlas'));
     assert.deepEqual(stored.discovered, ['water', 'earth', 'fire'], 'прогресс всё равно дописывается');
 });
+
+test('на новом устройстве создаёт сохранение из серверного прогресса', async () => {
+    // Игра ещё ни разу не сохранялась: раньше мост в этом случае молчал, и игрок
+    // видел пустой атлас на втором устройстве.
+    const env = bridge({local: {}, response: {awarded: 0, points_total: 24, discovered: ['water', 'earth', 'fire']}});
+    env.listeners.load();
+    await flush();
+    const stored = JSON.parse(env.localStore.getItem('alchemia.atlas'));
+    assert.equal(stored.format, 'alchemia');
+    assert.deepEqual(stored.discovered, ['water', 'earth', 'fire']);
+    assert.equal(env.reloads.count, 1, 'страница перезагружается, чтобы движок прочитал сохранение');
+});
+
+test('берёт токен из localStorage, если его нет в sessionStorage', async () => {
+    const env = bridge({
+        token: '',
+        local: {'mqb-mini-token': 'y'.repeat(32), 'alchemia.atlas': save(['water'])},
+        response: {discovered: []},
+    });
+    env.listeners.load();
+    await flush();
+    assert.equal(env.calls.length, 1);
+    assert.equal(env.calls[0].options.headers.Authorization, `Bearer ${'y'.repeat(32)}`);
+});

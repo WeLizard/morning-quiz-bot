@@ -57,6 +57,17 @@ Telegram, кнопка Mini App в BotFather и матрица Desktop/Android/i
 - [ ] Зафиксирован тег релиза: `git tag -a vX.Y.Z <commit> && git push origin vX.Y.Z`.
 - [ ] Проверено свободное место: PG-том + бэкап + dump (в репетиции хватило 58 ГБ).
 
+### 1.1 Состояние предусловий на 2026-10-05 (измерено в репетиции)
+
+| Предусловие | Факт | Что делать |
+|---|---|---|
+| Открытые пункты MQB-006 | Этап 4 (bridge) и матрица Telegram — открыты | bridge удалять только по решению владельца; матрица — руками в окне |
+| Бэкап `.env`, `data/`, `config/`, юнитов, nginx, `.git` | не снимался | Фаза B, каталог `/home/lizard/backups/cutover-<дата>` |
+| Ключи `.env` | боевой `.env` содержит только 5 ключей: `BOT_TOKEN`, `LOG_LEVEL`, `MODE`, `OPENROUTER_API_KEY`, `TELEGRAM_PROXY_URL` | добавить 25 ключей из `env.example`; критичные: `STORAGE_BACKEND`, `DATABASE_URL`, `POSTGRES_DB/USER/PASSWORD/PORT`, `PHOTO_IMAGES_DIR`, `ADMIN_ACCESS_TOKEN`, `ADMIN_ALLOWED_HOSTS`, `MINI_APP_*` |
+| Тег релиза | тегов в репозитории нет | `git tag -a v1.0.0 <commit> && git push origin v1.0.0` |
+| Свободное место | 55 ГБ свободно | достаточно (снимок 32 МБ, дамп 712 КБ) |
+| Mini App: включаем сразу или потом | зависит от 443/домена (см. сетевую часть) | без публичного HTTPS приложение не поднять |
+
 ## 2. Окно и режим
 
 - Дневная викторина стартует в **07:00 МСК** (`config/quiz_config.json`). Окно cutover — не 06:30–09:00 МСК.
@@ -144,17 +155,19 @@ systemctl is-active quiz-bot quiz-bot-web
 tail -n 100 logs/bot.log | grep -E "PostgreSQL state|Вопросы загружены|готов принимать обновления|ERROR|Traceback"
 ```
 
-Приёмка (все пункты обязательны):
+Приёмка (все пункты обязательны). Пометка «репетиция» — пункт уже проверен на
+свежей БД `mqb_cutover`, приводить заново в окне нужно только то, что зависит от
+живого Telegram:
 
-- [ ] В логе есть `PostgreSQL state загружен: ... чатов, ... участников` и `Вопросы загружены из PostgreSQL: 63 категорий, ...`.
+- [ ] *(репетиция)* В логе есть `PostgreSQL state загружен: ... чатов, ... участников` и `Вопросы загружены из PostgreSQL: 63 категорий, ...`. В репетиции тот же путь загрузки дал `11 чатов, 24 участников, 0 активных игр` и `63 категорий, 6698 вопросов`.
 - [ ] В `logs/` нет `Traceback`, нет упоминаний JSON-фолбэка.
-- [ ] За 10 минут работы в `data/` не появилось изменённых `*.json` (PG-режим не пишет mutable JSON).
+- [ ] *(репетиция)* За время проверок в `data/` не изменился ни один файл: 325 файлов, снимок размеров и mtime до и после совпал.
 - [ ] Telegram: `/start`, `/help`, `/categories`, `/top`, `/mystats`, обычная викторина, фото-викторина.
-- [ ] Админка: `http://<хост>:8000/login` → вход по `ADMIN_ACCESS_TOKEN`, `/api/analytics/overview` отдаёт реальные числа, банк вопросов открывается, фото отдаётся (`/api/images/<имя>.webp` → 200 `image/webp`).
+- [ ] *(репетиция)* Админка: `http://<хост>:8000/login` → вход по `ADMIN_ACCESS_TOKEN` (200), `/api/analytics/overview` → 200, банк вопросов → 200 (198 фото), фото `MrLizard.webp` → 200 `image/webp`, `/api/storage/status` показывает `schema_revision: 20260904_0011` и `completed_imports: 1`.
 - [ ] Mini App (если включаем): `/healthz` → 200, кнопка в BotFather открывает приложение, сессия создаётся.
-- [ ] `alembic current` = `20260904_0011`, отчёт импорта сохранён в `migration-reports/`.
-- [ ] `./venv/bin/python scripts/verify_media_catalog.py` → «каталог согласован»: записи без файла или с расхождением подписи — стоп; файлы без записи допустимы (след неуверенного коммита).
-- [ ] `MINI_APP_BOT_TOKEN=... ./venv/bin/python scripts/smoke_mini_app.py --base-url https://<домен> --user-id <тестовый id>` → «всё в порядке» (16 проверок: healthz, страница и клиент, вход, me/config/progress/achievements/history/categories/leaderboard/chats, детали чата, продление сессии, выход и отказ старого токена).
+- [ ] *(репетиция)* `alembic current` = `20260904_0011`, отчёт импорта сохранён в `migration-reports/`.
+- [ ] *(репетиция)* `./venv/bin/python scripts/verify_media_catalog.py` → «каталог согласован»: записи без файла или с расхождением подписи — стоп; файлы без записи допустимы (след неуверенного коммита).
+- [ ] *(репетиция)* `MINI_APP_BOT_TOKEN=... ./venv/bin/python scripts/smoke_mini_app.py --base-url https://<домен> --user-id <тестовый id>` → «всё в порядке» (16 проверок: healthz, страница и клиент, вход, me/config/progress/achievements/history/categories/leaderboard/chats, детали чата, продление сессии, выход и отказ старого токена).
 
 ## 8. Фаза F — наблюдение (48 часов)
 

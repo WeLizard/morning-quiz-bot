@@ -28,31 +28,52 @@ TXT-запись, порты для этого не нужны вообще. В�
 ### 1. Сертификат без порта 80
 
 ```bash
-install -m 700 scripts/duckdns.sh ~/duckdns.sh
-printf '%s' '<ТОКЕН>' > ~/.duckdns_token && chmod 600 ~/.duckdns_token
+# скрипт доступен и root-у (certbot запускает хуки от root), секретов в нём нет
+sudo install -m 755 scripts/duckdns.sh /home/lizard/duckdns.sh
+
+# токен: certbot ходит от root, cron — от lizard, поэтому файл общий на группу
+sudo install -d -m 750 -o root -g lizard /etc/mqb
+printf '%s' '<ТОКЕН>' | sudo tee /etc/mqb/duckdns_token >/dev/null
+sudo chown root:lizard /etc/mqb/duckdns_token && sudo chmod 640 /etc/mqb/duckdns_token
 
 sudo certbot certonly --manual --preferred-challenges dns \
-  --manual-auth-hook ~/duckdns.sh --manual-cleanup-hook ~/duckdns.sh \
-  --non-interactive --agree-tos -m <ваш email> -d morningquiz.duckdns.org
+  --manual-auth-hook "/home/lizard/duckdns.sh auth" \
+  --manual-cleanup-hook "/home/lizard/duckdns.sh cleanup" \
+  --non-interactive --agree-tos -m <ваш email> -d quizzywizzy.duckdns.org
 ```
 
-Certbot вызывает хук как `duckdns.sh auth` и `duckdns.sh cleanup`, передавая
-`CERTBOT_DOMAIN` и `CERTBOT_VALIDATION`; скрипт ставит и снимает TXT-запись через
-API DuckDNS (`domains=<домен>&token=<токен>&txt=<значение>`, очистка —
-`&txt=&clear=true`).
+Две грабли, на которые легко наступить (обе уже пройдены в репетиции):
 
-**Полезное свойство:** `certbot renew --dry-run` проверяет всю цепочку **до**
-проброса портов — достаточно одного токена.
+1. **certbot вызывает хук без аргументов** — подкоманду (`auth` / `cleanup`) нужно
+   указывать прямо в строке хука, иначе скрипт печатает «использование» и падает с кодом 2.
+2. **certbot работает от root**, то есть `$HOME` у него `/root`; поэтому токен кладём по
+   системному пути `/etc/mqb/duckdns_token`, а не в домашний каталог владельца.
+
+Certbot вызывает хук как `duckdns.sh auth` и `duckdns.sh cleanup`, передавая
+`CERTBOT_DOMAIN` и `CERTBOT_VALIDATION`. Скрипт ставит TXT-запись через API DuckDNS
+(`domains=<домен>&token=<токен>&txt=<значение>`, очистка — `&txt=&clear=true`),
+затем **сам проверяет**, что запись видна в `_acme-challenge.<домен>.duckdns.org`,
+и только после этого возвращает управление (`DUCKDNS_PROPAGATION_TIMEOUT`, по умолчанию 180 с).
+
+**Проверено на живом домене `quizzywizzy.duckdns.org`:** `certbot ... --dry-run`
+(staging) → `The dry run was successful`. То есть вся цепочка DNS-01 работает **до**
+любых изменений в роутере.
 
 ### 2. Проверка продления
 
 ```bash
-sudo certbot renew --dry-run --cert-name morningquiz.duckdns.org
+sudo certbot renew --dry-run --cert-name quizzywizzy.duckdns.org
 systemctl list-timers | grep certbot
 ```
 
 Путь к хуку certbot запоминает в `/etc/letsencrypt/renewal/<домен>.conf`; если
 скрипт переедет, поправить путь там.
+
+Обновление A-записи (если адрес динамический) — своим cron, не трогая home assistant:
+
+```bash
+*/5 * * * * DUCKDNS_TOKEN_FILE=/etc/mqb/duckdns_token /home/lizard/duckdns.sh update quizzywizzy
+```
 
 ### 3. nginx: домен → Mini App
 

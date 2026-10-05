@@ -21,21 +21,43 @@ require_token() {
         TOKEN="$DUCKDNS_TOKEN"
         return
     fi
-    local file="${DUCKDNS_TOKEN_FILE:-$HOME/.duckdns_token}"
-    if [ ! -r "$file" ]; then
-        echo "Нет токена DuckDNS: задайте DUCKDNS_TOKEN или создайте $file с правами 600." >&2
-        exit 2
-    fi
-    TOKEN="$(tr -d '[:space:]' < "$file")"
-    if [ -z "$TOKEN" ]; then
-        echo "Файл $file пуст." >&2
-        exit 2
-    fi
+    # certbot запускает хуки от root, cron — от владельца: ищем в обоих местах.
+    local file
+    for file in ${DUCKDNS_TOKEN_FILE:-} "$HOME/.duckdns_token" /etc/mqb/duckdns_token; do
+        [ -n "$file" ] || continue
+        if [ -r "$file" ]; then
+            TOKEN="$(tr -d '[:space:]' < "$file")"
+            [ -n "$TOKEN" ] && return
+            echo "Файл $file пуст." >&2
+            exit 2
+        fi
+    done
+    echo "Нет токена DuckDNS: положите его в /etc/mqb/duckdns_token, ~/.duckdns_token или задайте DUCKDNS_TOKEN." >&2
+    exit 2
 }
 
 subdomain() {
     # morningquiz.duckdns.org -> morningquiz (DuckDNS не поддерживает вложенные имена)
     printf '%s' "${1%%.duckdns.org}"
+}
+
+wait_for_txt() {
+    # DuckDNS отдаёт TXT и на _acme-challenge.<домен>, но подтверждаем факт, а не надежду.
+    local sub="$1" expected="$2" deadline
+    deadline=$(( $(date +%s) + ${DUCKDNS_PROPAGATION_TIMEOUT:-180} ))
+    if [ "$DRY" = "1" ]; then
+        printf 'DRY: ждали бы TXT=%s у %s\n' "$expected" "$sub" >&2
+        return 0
+    fi
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        if dig +short +time=3 +tries=1 TXT "_acme-challenge.$sub.duckdns.org" @1.1.1.1 | grep -qF "$expected"; then
+            echo "TXT подтверждён в DNS"
+            return 0
+        fi
+        sleep 5
+    done
+    echo "TXT не появился в _acme-challenge.$sub.duckdns.org за ${DUCKDNS_PROPAGATION_TIMEOUT:-180}s." >&2
+    exit 1
 }
 
 call() {
@@ -70,8 +92,7 @@ case "${1:-}" in
         sub="$(subdomain "$CERTBOT_DOMAIN")"
         call "domains=$sub&token=$TOKEN&txt=$CERTBOT_VALIDATION" >/dev/null
         echo "TXT для $sub.duckdns.org добавлен"
-        # Даём записи разойтись: проверяющие Let's Encrypt серверы видят её не мгновенно.
-        if [ "$DRY" != "1" ]; then sleep "${DUCKDNS_PROPAGATION_WAIT:-15}"; fi
+        wait_for_txt "$sub" "$CERTBOT_VALIDATION"
         ;;
     cleanup)
         : "${CERTBOT_DOMAIN:?нужен CERTBOT_DOMAIN}"

@@ -57,3 +57,26 @@ launch_button('private')                        # inline-кнопка web_app, �
 2. **Main Mini App, зарегистрированный в BotFather**: без него Telegram
    игнорирует `?startapp=` и просто открывает чат с ботом. Кнопка меню и
    inline-кнопки `web_app` работают и без регистрации Main Mini App.
+
+## Зарегистрировано у пробного бота (2026-10-05)
+
+Main Mini App оформлен в BotFather для `@Quizywizzy_bot`, поэтому `?startapp=`
+теперь работает (до регистрации Telegram его игнорировал). Ссылки вида:
+
+```
+https://t.me/Quizywizzy_bot/app                      — главная
+https://t.me/Quizywizzy_bot/app?startapp=achievements — экран достижений
+https://t.me/Quizywizzy_bot/app?startapp=history      — история игр и ответов
+https://t.me/Quizywizzy_bot/app?startapp=rating       — рейтинг
+https://t.me/Quizywizzy_bot/app?startapp=profile      — профиль
+https://t.me/Quizywizzy_bot/app?startapp=chats        — список чатов
+https://t.me/Quizywizzy_bot/app?startapp=chat_n1002123346533  — конкретный чат (id группы без минуса)
+https://t.me/Quizywizzy_bot/app?startapp=mafia_n1002123346533 — лобби мафии
+```
+
+Проверено снаружи: `https://t.me/Quizywizzy_bot/app` отдаёт страницу с кнопкой
+**Open App** (`tg://resolve?domain=Quizywizzy_bot&appname=app`). Ссылка на чат
+работает только у того, кто в этом чате состоит: иначе приложение честно скажет
+«Чат из ссылки недоступен».
+
+На боевом боте ту же регистрацию нужно сделать в момент выкладки.

@@ -5,7 +5,7 @@ TEST_DATABASE_URL весь файл пропускается.
 """
 
 import asyncio
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -401,7 +401,7 @@ def test_progress_shows_daily_goal_and_remaining_limit(pg_env):
                 await service.sync(USER, discovered=FREE_ELEMENTS)   # догоняем до потолка
                 capped = await service.progress(USER)
                 assert capped['points_today'] == 30.0 and capped['remaining_today'] == 0.0
-                assert capped['daily_goal'] == {'target': 10.0, 'progress': 10.0, 'done': True}
+                assert capped['daily_goal'] == {'target': 10.0, 'progress': 10.0, 'done': True, 'streak': 1}
             finally:
                 await cleanup(db)
     asyncio.run(run())
@@ -424,8 +424,40 @@ def test_progress_forgets_points_of_a_previous_moscow_day(pg_env):
 
                 next_day = await service.progress(USER, now=DAY2)
                 assert next_day['points_today'] == 0.0 and next_day['remaining_today'] == 30.0
-                assert next_day['daily_goal'] == {'target': 10.0, 'progress': 0.0, 'done': False}
+                assert next_day['daily_goal'] == {'target': 10.0, 'progress': 0.0, 'done': False, 'streak': 1}
                 assert next_day['points_total'] == earned
+            finally:
+                await cleanup(db)
+    asyncio.run(run())
+
+
+def test_goal_streak_counts_consecutive_moscow_days(pg_env):
+    """Серия растёт за закрытую цель дня, повтор в тот же день её не накручивает,
+    а пропущенный день начинает серию заново."""
+    async def run():
+        async with scenario(pg_env) as db:
+            try:
+                await prepare(db)
+                service = AlchemyService(db)
+
+                first = await service.sync(USER, discovered=FREE_ELEMENTS[:8], now=DAY1)
+                assert first['points_today'] >= 10.0, 'подготовка теста: цель дня должна закрыться'
+                assert first['goal_streak'] == 1
+
+                again = await service.sync(USER, discovered=FREE_ELEMENTS[:9], now=DAY1)
+                assert again['goal_streak'] == 1, 'повтор в тот же день серию не накручивает'
+
+                second = await service.sync(USER, discovered=FREE_ELEMENTS[:20], now=DAY2)
+                assert second['points_today'] >= 10.0
+                assert second['goal_streak'] == 2, 'второй день подряд продолжает серию'
+
+                # Один день пропущен: следующий закрытый день начинает серию заново.
+                after_gap = await service.sync(USER, discovered=FREE_ELEMENTS[:40], now=DAY2 + timedelta(days=2))
+                assert after_gap['points_today'] >= 10.0
+                assert after_gap['goal_streak'] == 1
+
+                report = await service.progress(USER, now=DAY2 + timedelta(days=2))
+                assert report['daily_goal']['streak'] == 1
             finally:
                 await cleanup(db)
     asyncio.run(run())

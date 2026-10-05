@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -247,6 +247,11 @@ class AlchemyService:
             row.achievements = sorted(merged_achievements)
             row.points_today += awarded
             row.points_total += awarded
+            # Серия дней: день закрыт, когда набрана цель дня. Повторная синхронизация
+            # в тот же день серию не накручивает, а пропуск дня начинает её заново.
+            if row.points_today >= DAILY_GOAL_POINTS and row.last_goal_day != day:
+                row.goal_streak = (row.goal_streak or 0) + 1 if row.last_goal_day == day - timedelta(days=1) else 1
+                row.last_goal_day = day
             row.updated_at = moment
             if awarded:
                 await session.execute(
@@ -260,6 +265,7 @@ class AlchemyService:
                 'points_today': float(row.points_today),
                 'points_total': float(row.points_total),
                 'remaining_today': float(max(DAILY_POINTS_LIMIT - row.points_today, Decimal('0'))),
+                'goal_streak': int(row.goal_streak or 0),
                 'discovered': list(row.discovered),
                 'chapters': list(row.chapters),
                 'achievements': list(row.achievements),
@@ -297,6 +303,7 @@ class AlchemyService:
                     'target': float(DAILY_GOAL_POINTS),
                     'progress': min(points_today, float(DAILY_GOAL_POINTS)),
                     'done': points_today >= float(DAILY_GOAL_POINTS),
+                    'streak': int(row.goal_streak or 0) if row else 0,
                 },
                 'rank': int(ahead) + 1,
                 'total_players': int(total_players),

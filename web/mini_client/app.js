@@ -558,6 +558,12 @@
             note(card, goal.done
                 ? `Цель дня выполнена: ${format(goal.progress)} из ${format(goal.target)} очков.`
                 : `Цель дня: ${format(goal.progress)} из ${format(goal.target)} очков, осталось ${format(Math.max(0, goal.target - goal.progress))}.`);
+            if (goal.streak > 0) {
+                const days = n => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'день' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'дня' : 'дней'}`;
+                note(card, goal.done
+                    ? `Серия: ${days(goal.streak)} подряд с закрытой целью.`
+                    : `Серия: ${days(goal.streak)}. Закрой цель дня, чтобы её продолжить.`);
+            }
             note(card, (alchemy.remaining_today ?? 0) > 0
                 ? `Сегодня можно набрать ещё ${format(alchemy.remaining_today)} очков.`
                 : 'Суточный лимит выбран: новые очки начислятся завтра.', 'muted');

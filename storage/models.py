@@ -478,6 +478,9 @@ class AlchemyProgress(Base):
         Numeric(14, 3), default=Decimal('0'), nullable=False
     )
     points_day: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Серия дней с закрытой целью дня: считается по московским суткам.
+    goal_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
+    last_goal_day: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

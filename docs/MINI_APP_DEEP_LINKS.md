@@ -64,14 +64,14 @@ Main Mini App оформлен в BotFather для `@Quizywizzy_bot`, поэто
 теперь работает (до регистрации Telegram его игнорировал). Ссылки вида:
 
 ```
-https://t.me/Quizywizzy_bot/app                      — главная
-https://t.me/Quizywizzy_bot/app?startapp=achievements — экран достижений
-https://t.me/Quizywizzy_bot/app?startapp=history      — история игр и ответов
-https://t.me/Quizywizzy_bot/app?startapp=rating       — рейтинг
-https://t.me/Quizywizzy_bot/app?startapp=profile      — профиль
-https://t.me/Quizywizzy_bot/app?startapp=chats        — список чатов
-https://t.me/Quizywizzy_bot/app?startapp=chat_n1002123346533  — конкретный чат (id группы без минуса)
-https://t.me/Quizywizzy_bot/app?startapp=mafia_n1002123346533 — лобби мафии
+https://t.me/Quizywizzy_bot/play                      — главная
+https://t.me/Quizywizzy_bot/play?startapp=achievements — экран достижений
+https://t.me/Quizywizzy_bot/play?startapp=history      — история игр и ответов
+https://t.me/Quizywizzy_bot/play?startapp=rating       — рейтинг
+https://t.me/Quizywizzy_bot/play?startapp=profile      — профиль
+https://t.me/Quizywizzy_bot/play?startapp=chats        — список чатов
+https://t.me/Quizywizzy_bot/play?startapp=chat_n1002123346533  — конкретный чат (id группы без минуса)
+https://t.me/Quizywizzy_bot/play?startapp=mafia_n1002123346533 — лобби мафии
 ```
 
 Проверено снаружи: `https://t.me/Quizywizzy_bot/app` отдаёт страницу с кнопкой
@@ -80,3 +80,8 @@ https://t.me/Quizywizzy_bot/app?startapp=mafia_n1002123346533 — лобби м�
 «Чат из ссылки недоступен».
 
 На боевом боте ту же регистрацию нужно сделать в момент выкладки.
+
+Уточнение по короткому адресу: в BotFather у приложения имя `play`
+(`WizzyPlayHub`), поэтому официальная ссылка — `t.me/Quizywizzy_bot/play`.
+Вариант с `/app` Telegram тоже открывает, но правильнее использовать `/play`
+(его же показывает BotFather в разделе Direct Links).

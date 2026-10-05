@@ -414,6 +414,28 @@ class MiniAppStore:
                                 key=lambda item: item['last_answer_at'] or '', reverse=True)[:10]
             return {'games': game_items, 'answers': answers, 'chats': chat_items}
 
+    async def _alchemy_identity(self, token):
+        async with self.authorized(token) as (session, user):
+            return user.id
+
+    async def alchemy_sync(self, token, *, discovered, crafted, attempts):
+        """Принять сводку «Алхимии» и начислить очки в общий профиль.
+
+        Очки идут только за первое открытие, суточный потолок считает сервис.
+        """
+        from .alchemy import AlchemyService
+        return await AlchemyService(self.database).sync(
+            await self._alchemy_identity(token), discovered=discovered, crafted=crafted, attempts=attempts)
+
+    async def alchemy_progress(self, token):
+        from .alchemy import AlchemyService
+        return await AlchemyService(self.database).progress(await self._alchemy_identity(token))
+
+    async def alchemy_leaderboard(self, token, *, limit=20, offset=0):
+        from .alchemy import AlchemyService
+        return await AlchemyService(self.database).leaderboard(
+            limit=limit, offset=offset, user_id=await self._alchemy_identity(token))
+
     async def global_leaderboard(self, token, *, limit=20, offset=0):
         async with self.authorized(token) as (session, user):
             ranking = select(User.id, User.display_name, User.global_score,

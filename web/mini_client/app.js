@@ -547,6 +547,16 @@
     }
     async function achievementsPage(version) {
         content.append(el('span', 'Твой прогресс', 'eyebrow'), el('h1', 'Достижения'));
+        const alchemy = await request('/api/mini/alchemy').catch(() => null);
+        if (version !== generation) return;
+        if (alchemy) {
+            const card = el('section', undefined, 'card');
+            card.append(el('h2', 'Атлас маленьких чудес'));
+            note(card, `Открыто элементов: ${alchemy.discovered} · глав ${alchemy.chapters} · достижений ${alchemy.achievements}`);
+            note(card, `Очки из Алхимии: ${format(alchemy.points_total)} · место ${alchemy.rank} из ${alchemy.total_players}`);
+            card.append(button('Рейтинг атласа', () => navigate('alchemy-top'), 'quiet'));
+            content.append(card);
+        }
         const data = state.achievements || await request('/api/mini/achievements');
         if (version !== generation) return;
         state.achievements = data;
@@ -593,12 +603,23 @@
         }
         content.append(button('Обновить', () => navigate('history'), 'quiet'));
     }
+    async function alchemyTop(version) {
+        content.append(el('span', 'Атлас маленьких чудес', 'eyebrow'), el('h1', 'Рейтинг атласа'));
+        const data = await request('/api/mini/alchemy/leaderboard?limit=20');
+        if (version !== generation) return;
+        note(content, 'Считаем открытые элементы, а не очки: фарм Алхимии не влияет на рейтинг квиза.');
+        const list = el('section', undefined, 'card');
+        if (!data.items.length) note(list, 'Пока никто не открыл ни одного элемента.', 'empty');
+        else for (const row of data.items) list.append(el('p', `${row.rank}. ${row.display_name}${row.is_me ? ' — это ты' : ''} · ${row.discovered}`, row.is_me ? '' : 'muted'));
+        content.append(list);
+        content.append(button('Обновить', () => navigate('alchemy-top'), 'quiet'));
+    }
     async function navigate(page) {
         if (!state.token) { loginScreen(); return; }
         window.QuizGame.stop();
         window.QuizTelegram.selection();
         state.page = page; const version = ++generation; feedback.textContent = ''; content.replaceChildren();
-        const tab = page.startsWith('settings') || page === 'achievements' || page === 'history' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
+        const tab = page.startsWith('settings') || page === 'achievements' || page === 'history' || page === 'alchemy-top' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
         nav.querySelectorAll('button').forEach(node => { if (node.dataset.page === tab) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
         if (tg?.BackButton) { if (page === 'home') tg.BackButton.hide(); else tg.BackButton.show(); }
         try {
@@ -614,6 +635,7 @@
             else if (page === 'chat') await chatHome(version);
             else if (page === 'profile') profile();
             else if (page === 'achievements') await achievementsPage(version);
+            else if (page === 'alchemy-top') await alchemyTop(version);
             else if (page === 'history') await historyPage(version);
             else if (page === 'settings') await settings();
             else if (page === 'chats') chats();

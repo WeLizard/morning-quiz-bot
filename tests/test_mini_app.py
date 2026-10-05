@@ -895,14 +895,15 @@ def test_alchemia_atlas_is_served_as_self_contained_mini_app_page(pg_env):
             assert page.headers['content-type'].startswith('text/html')
             html = page.text
             assert 'атлас маленьких чудес' in html and 'alchemia.atlas.v1' in html
-            # Одиночная игра автономна: ни внешних ссылок, ни обращений к API мини-аппа.
+            # Ресурсы автономны: ни внешних ссылок, ни сторонних скриптов. Сеть у
+            # страницы ровно одна — синхронизация прогресса с нашим же API.
             assert 'src="http' not in html and 'href="http' not in html
-            assert '/api/mini/' not in html
+            assert '/api/mini/alchemy/sync' in html
             # Инлайн-стили и скрипты обязаны быть разрешены: со строгой политикой
             # мини-аппа страница открывается без оформления и без игры.
             csp = page.headers['content-security-policy']
             assert "script-src 'unsafe-inline'" in csp and "style-src 'unsafe-inline'" in csp
-            assert "connect-src 'none'" in csp
+            assert "connect-src 'self'" in csp and "connect-src 'none'" not in csp
             # API и остальные маршруты остаются под строгой политикой.
             assert (await env.client.get('/api/mini/config')).headers['content-security-policy'] == \
                 "default-src 'none'; frame-ancestors 'none'"

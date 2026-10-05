@@ -335,6 +335,43 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         # Экран достижений: свои полученные и ближайшие впереди, без чужих данных.
         return await store.achievements(credential(request))
 
+    @app.get('/api/mini/alchemy')
+    async def alchemy_progress(request: Request):
+        # Сводка игрока в «Алхимии»: открытия, очки и место.
+        return await store.alchemy_progress(credential(request))
+
+    @app.get('/api/mini/alchemy/leaderboard')
+    async def alchemy_leaderboard(request: Request, limit: int = Query(20, ge=1, le=100),
+                                  offset: int = Query(0, ge=0, le=10000)):
+        # Рейтинг по числу открытых элементов — очки квиза в нём не участвуют.
+        return await store.alchemy_leaderboard(credential(request), limit=limit, offset=offset)
+
+    @app.post('/api/mini/alchemy/sync')
+    async def alchemy_sync(request: Request):
+        # Игра присылает сводку прогресса; очки начисляются только за первое открытие.
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await request.body()
+        if len(raw) > 128 * 1024:
+            raise MiniAppError(413, 'Слишком большой прогресс')
+        try:
+            value = json.loads(raw, object_pairs_hook=unique_object)
+            if not isinstance(value, dict) or set(value) - {'discovered', 'crafted', 'attempts'}:
+                raise ValueError()
+            discovered = value.get('discovered', [])
+            crafted = value.get('crafted', [])
+            attempts = value.get('attempts', 0)
+            if (not isinstance(discovered, list) or len(discovered) > 4000
+                    or not all(isinstance(item, str) and len(item) <= 64 for item in discovered)
+                    or not isinstance(crafted, list) or len(crafted) > 8000
+                    or not all(isinstance(item, str) and len(item) <= 128 for item in crafted)
+                    or type(attempts) is not int or not 0 <= attempts <= 100000):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise MiniAppError(422, 'Некорректная сводка прогресса') from None
+        return await store.alchemy_sync(credential(request), discovered=discovered,
+                                        crafted=crafted, attempts=attempts)
+
     @app.get('/api/mini/history')
     async def history(request: Request, limit: int = Query(20, ge=1, le=50)):
         # Личная история: последние игры, ответы и агрегаты по чатам.

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -454,4 +455,29 @@ class MiniAppSession(Base):
         UniqueConstraint('bot_key_id', 'init_data_hash', name='uq_mini_app_init_data'),
         Index('ix_mini_app_sessions_user_expiry', 'user_id', 'expires_at'),
         Index('ix_mini_app_sessions_expiry', 'expires_at'),
+    )
+
+
+class AlchemyProgress(Base):
+    """Прогресс «Алхимии»: элементы, главы, достижения и очки за эту игру."""
+
+    __tablename__ = 'alchemy_progress'
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey('users.id', ondelete='CASCADE'),
+        primary_key=True, autoincrement=False,
+    )
+    discovered: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    crafted: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    chapters: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    achievements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    points_total: Mapped[Decimal] = mapped_column(
+        Numeric(14, 3), default=Decimal('0'), nullable=False
+    )
+    points_today: Mapped[Decimal] = mapped_column(
+        Numeric(14, 3), default=Decimal('0'), nullable=False
+    )
+    points_day: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

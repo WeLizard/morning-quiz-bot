@@ -50,6 +50,8 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         '/api/dev/session': {access_token: 'unit-test'}, '/api/mini/me': {user_id: '42', display_name: 'Игрок', score: 12, answered_count: 3},
         '/api/mini/progress': {best_streak: 2, correct_including_photo: 2, current_streak: 1, achievements: [], legacy_achievements: []},
         '/api/mini/chats?limit=50': {items: [{chat_id: '42', title: 'Личная игра', type: 'private'}], has_more: false}, '/api/mini/runtime': {connected: true, messages: []},
+        '/api/mini/alchemy': {discovered: 12, chapters: 3, achievements: 2, points_total: 24, rank: 2, total_players: 5},
+        '/api/mini/alchemy/leaderboard?limit=20': {items: [{rank: 1, display_name: 'Игрок', discovered: 12, is_me: true}]},
         '/api/mini/achievements': {summary: {earned: 1, available: 2, chat_achievements: 1, streak_achievements: 1},
             chats: [{chat_id: '42', title: 'Личная игра', earned: 1, available: 1,
                 items: [{kind: 'chat', threshold: 25, title: '25 очков', earned: true, awarded_at: null, message: 'Молодец'}]}],

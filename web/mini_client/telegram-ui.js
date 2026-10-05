@@ -23,6 +23,8 @@
         configure(onBack, onSettings, onResume) {
             theme(); viewport();
             call(() => tg?.ready?.()); call(() => tg?.expand?.());
+            // В развёрнутом приложении случайный свайп вниз закрывает Mini App (7.7+).
+            if (call(() => tg?.isVersionAtLeast?.('7.7'))) call(() => tg?.disableVerticalSwipes?.());
             call(() => tg?.BackButton?.onClick(onBack));
             call(() => tg?.SettingsButton?.onClick(onSettings)); call(() => tg?.SettingsButton?.show());
             for (const event of ['safeAreaChanged', 'contentSafeAreaChanged', 'viewportChanged']) call(() => tg?.onEvent?.(event, viewport));

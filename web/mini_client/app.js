@@ -165,22 +165,23 @@
             choices.append(card);
         }
         content.append(choices);
-        const night = el('article', undefined, 'card mafia-teaser');
-        const nightImage = el('img'); nightImage.src = '/app/mafia.webp'; nightImage.alt = 'Филиныч в капюшоне ведёт ночное дело';
-        const nightCopy = el('div', undefined, 'mafia-teaser-copy');
+        const night = el('article', undefined, 'card play-choice mode-choice night');
+        const nightImage = el('img'); nightImage.src = '/app/mafia.webp'; nightImage.alt = 'Филиныч в капюшоне ведёт ночное дело'; nightImage.className = 'mode-choice-host';
+        const nightCopy = el('div', undefined, 'choice-copy');
         nightCopy.append(el('span', 'НОВЫЙ РЕЖИМ · DEV', 'eyebrow'), el('h2', 'Ночной город'));
         note(nightCopy, 'Собери стол для будущей игры в мафию. Роли и состав уже сохраняются отдельно от квиза.');
-        nightCopy.append(button('Открыть дело', () => navigate('mafia'), 'quiet'));
+        nightCopy.append(button('Открыть дело', () => navigate('mafia'), 'primary'));
         night.append(nightImage, nightCopy); content.append(night);
-        const workshop = el('article', undefined, 'card mafia-teaser');
-        const workshopCopy = el('div', undefined, 'mafia-teaser-copy');
+        const workshop = el('article', undefined, 'card play-choice mode-choice atlas');
+        const workshopImage = el('img'); workshopImage.src = '/app/alchemy.webp'; workshopImage.alt = 'Сова-алхимик за столом с колбами и атласом'; workshopImage.className = 'mode-choice-host';
+        const workshopCopy = el('div', undefined, 'choice-copy');
         workshopCopy.append(el('span', 'НОВЫЙ РЕЖИМ · АЛХИМИЯ', 'eyebrow'), el('h2', 'Атлас маленьких чудес'));
         note(workshopCopy, '421 элемент и 1015 рецептов из четырёх стихий. Прогресс синхронизируется с твоим профилем.');
         workshopCopy.append(button('Открыть атлас', () => {
             const token = state.token ? `#t=${encodeURIComponent(state.token)}` : '';
             window.location.assign(`/app/alchemy${token}`);
-        }, 'quiet'));
-        workshop.append(workshopCopy); content.append(workshop);
+        }, 'primary'));
+        workshop.append(workshopImage, workshopCopy); content.append(workshop);
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
             const current = await request('/api/mini/runtime'); if (version !== generation) return;

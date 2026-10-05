@@ -36,3 +36,40 @@
 .mafia-teaser{position:relative;display:grid;grid-template-columns:42% 1fr;min-height:172px;margin-top:12px;overflow:hidden;padding:0;background:#0b0c10;border-color:#393129;color:#efe8dd}.mafia-teaser::after{content:"";position:absolute;z-index:1;top:0;bottom:0;left:calc(42% - 56px);width:56px;background:linear-gradient(90deg,rgba(11,12,16,0) 0%,rgba(11,12,16,.7) 58%,#0b0c10 100%);pointer-events:none}.mafia-teaser>img{width:100%;height:100%;object-fit:cover;object-position:center;opacity:.94}.mafia-teaser-copy{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:20px}.mafia-teaser .eyebrow,.mafia-case .eyebrow{color:#d7a556}.mafia-teaser h2{margin:7px 0;font-size:24px}.mafia-teaser p{margin:0 0 10px;color:#beb4a6;font-size:12px;line-height:1.5}.mafia-teaser .quiet{color:#e9c27d;padding:0;min-height:32px}.mafia-case{position:relative;min-height:270px;overflow:hidden;border:1px solid #3b3228;border-radius:26px;background:#090a0d;color:#f2eadf}.mafia-case>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;opacity:.68}.mafia-case::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#090a0d 3%,rgba(9,10,13,.08) 70%)}.mafia-case-copy{position:absolute;z-index:1;right:21px;bottom:18px;left:21px}.mafia-case h1{margin:8px 0;font-size:38px;letter-spacing:-.05em}.mafia-case p{max-width:36ch;margin:0;color:#c2b8aa;font-size:13px;line-height:1.55}.mafia-setup h2,.mafia-boundary h2{margin:0 0 7px;font-size:18px}.mafia-setup>p{margin:0 0 17px;color:var(--muted);font-size:13px}.mafia-people{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.mafia-person{min-height:44px;border:1px solid var(--line);border-radius:13px;background:var(--bg);color:var(--text);font-weight:700}.mafia-person.selected{border-color:#c99a50;background:#2d2419;color:#f5dca9}.mafia-roles{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:18px}.mafia-role{min-height:68px;padding:12px;border:1px solid var(--line);border-radius:15px;background:var(--bg)}.mafia-role strong{display:block;color:#d7a556;font-size:21px}.mafia-role span{color:var(--muted);font-size:12px}.mafia-role.citizen strong{color:var(--lime)}.mafia-boundary{margin-top:16px;padding:17px;border-left:2px solid #c99a50;background:color-mix(in srgb,#c99a50 7%,var(--surface));border-radius:0 16px 16px 0}.mafia-boundary h2+ p{margin:0 0 17px;color:var(--muted);font-size:13px;line-height:1.55}.mafia-boundary p:last-child{margin-bottom:0}.mafia-table h2{margin:0 0 7px;font-size:18px}.mafia-table>p{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5}.mafia-player-list{display:grid;gap:7px;margin:16px 0}.mafia-player{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:var(--bg);font-size:13px}.mafia-player strong{font-size:11px;color:var(--muted);font-weight:600}.mafia-player.ready{border-color:color-mix(in srgb,var(--lime) 55%,var(--line))}.mafia-player.ready strong{color:var(--lime)}.mafia-next{color:#d7a556!important}.mafia-role-card{margin-top:16px;padding:18px;border:1px solid #7c5a2e;border-radius:17px;background:linear-gradient(135deg,#251b12,#121318)}.mafia-role-card .eyebrow{color:#d7a556;font-size:10px}.mafia-role-card strong{display:block;margin:8px 0;color:#f3d49a;font-size:28px}.mafia-role-card p{margin:0;color:#bdb3a6;font-size:13px;line-height:1.5}
 .mafia-player.eliminated{opacity:.48;border-style:dashed}.mafia-targets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.mafia-targets button{min-height:42px;background:#171319;border-color:#5b4934;color:#eadbc2}.mafia-history{margin:18px 0;padding-top:15px;border-top:1px solid var(--line)}.mafia-history p{margin:5px 0;font-size:12px}.mafia-history h3{color:#d7a556}
 @media(max-height:650px){.is-playing .play-stage h1.play-question{font-size:20px;margin:9px 0 13px}.is-playing .play-option{min-height:46px;padding:8px 10px}.is-playing .play-answers{gap:6px}.is-playing .play-topline{margin-bottom:3px}.is-playing .play-photo{width:min(100%,28dvh,240px);max-height:none}}
+
+/* Общий стиль плиток выбора режима: одинаковая геометрия и кнопки, разные палитры.
+   Раньше верхние плитки (featured-game/photo-choice) и нижние (mafia-teaser) были
+   из разных систем: сверху широкая кнопка без обводки, снизу узкая с обводкой. */
+.mode-choice{position:relative;display:block;overflow:hidden;margin:0;padding:0;border-radius:26px;
+ border:1px solid var(--line);background:var(--surface);color:var(--text);min-height:196px}
+.mode-choice .choice-copy{position:relative;z-index:2;padding:26px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.mode-choice h2{font-size:26px;line-height:1.12;margin:12px 0}
+.mode-choice p{font-size:13px;line-height:1.55;margin:0}
+.mode-choice .primary{margin-top:16px;width:max-content;max-width:100%;min-height:50px;padding:11px 19px;font-size:14px}
+.mode-choice-host{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.98}
+.mode-choice::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none}
+
+/* Тёмная палитра — «Ночной город» и «Атлас»: сохраняем их характер, но приводим
+   к общей геометрии и к такой же широкой кнопке, как у верхних плиток. */
+.mode-choice.night{background:#0b0c10;border-color:#393129;color:#efe8dd;min-height:210px}
+.mode-choice.night .choice-copy{width:58%}
+.mode-choice.night::after{background:linear-gradient(90deg,#0b0c10 0%,rgba(11,12,16,.94) 40%,rgba(11,12,16,.55) 66%,rgba(11,12,16,.06) 92%)}
+.mode-choice.night .eyebrow{color:#d9c9a1}
+.mode-choice.night p{color:#c9c2b7}
+.mode-choice.night .primary{background:#e6d5a8;color:#241f16;border-color:transparent}
+.mode-choice.atlas{background:#12241b;border-color:#3d553f;color:#eaf3e4;min-height:210px}
+.mode-choice.atlas .choice-copy{width:58%}
+.mode-choice.atlas::after{background:linear-gradient(90deg,#12241b 0%,rgba(18,36,27,.94) 40%,rgba(18,36,27,.5) 68%,rgba(18,36,27,.05) 92%)}
+.mode-choice.atlas .eyebrow{color:#c8e08a}
+.mode-choice.atlas p{color:#c3d2c6}
+.mode-choice.atlas .primary{background:#d0fc50;color:#172300;border-color:transparent}
+.mode-choice .choice-host{object-position:68% center}
+@media(max-width:560px){
+ .mode-choice{min-height:172px}
+ .mode-choice .choice-copy{padding:20px;width:64%}
+ .mode-choice h2{font-size:22px}
+ .mode-choice p{font-size:12px}
+ .mode-choice .primary{min-height:46px;padding:10px 15px;font-size:13px}
+ .mode-choice.night,.mode-choice.atlas{min-height:180px}
+}
+@media(max-width:380px){.mode-choice .choice-copy{width:70%;padding:18px}.mode-choice h2{font-size:20px}}

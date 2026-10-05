@@ -98,6 +98,9 @@ ARCHITECTURE/
 # Reference material (external dumps, not part of the project)
 references/
 
+# Результат сборки Алхимии: коммитится только копия в web/mini_client/alchemy.html
+minigames/alchemia-1.0/index.html
+
 # Temporary/artifact files
 tatus*
 *new data structure*

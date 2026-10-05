@@ -11,7 +11,7 @@ def build():
  html=(ROOT/'shell.html').read_text(encoding='utf-8')
  js=(ROOT/'game.js').read_text(encoding='utf-8')
  js=js.replace('/*__JOURNEY__*/',(ROOT/'journey.js').read_text(encoding='utf-8'))
- sources={'/*__STYLE__*/':(ROOT/'style.css').read_text(encoding='utf-8'),'<!--__ART__-->':(ROOT/'art.svg').read_text(encoding='utf-8'),'/*__DATA__*/':(ROOT/'data.json').read_text(encoding='utf-8'),'/*__SCRIPT__*/':js}
+ sources={'/*__STYLE__*/':(ROOT/'style.css').read_text(encoding='utf-8'),'<!--__ART__-->':(ROOT/'art.svg').read_text(encoding='utf-8'),'/*__DATA__*/':(ROOT/'data.json').read_text(encoding='utf-8'),'/*__SCRIPT__*/':js,'/*__SYNC__*/':(ROOT/'sync.js').read_text(encoding='utf-8')}
  for marker,value in sources.items():
   assert html.count(marker)==1,marker
   html=html.replace(marker,value)

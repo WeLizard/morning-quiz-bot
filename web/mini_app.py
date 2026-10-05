@@ -226,13 +226,13 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         if public_page:
             response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
         if static_game_page:
-            # Одиночная игра собирается в один HTML: стили и скрипты лежат внутри
-            # документа, внешних и сетевых запросов у неё нет. Политика мини-аппа со
-            # `default-src 'none'` такие страницы ломает, поэтому inline разрешён явно,
-            # а сеть, формы и смена base-uri по-прежнему запрещены.
+            # Одиночная игра собирается в один HTML: стили, скрипты и графика лежат
+            # внутри документа. Политика мини-аппа со `default-src 'none'` такие
+            # страницы ломает, поэтому inline разрешён явно. Сеть ограничена своим
+            # origin: игре разрешена только синхронизация прогресса с сервером.
             response.headers['Content-Security-Policy'] = ("default-src 'none'; script-src 'unsafe-inline'; "
                 "style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; "
-                "connect-src 'none'; base-uri 'none'; form-action 'none'; "
+                "connect-src 'self'; base-uri 'none'; form-action 'none'; "
                 "frame-ancestors https://web.telegram.org https://*.telegram.org")
         return response
 

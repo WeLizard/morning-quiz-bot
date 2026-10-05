@@ -82,6 +82,8 @@
                 try {
                     const session = await request(state.demo ? '/api/dev/session' : '/api/mini/session', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: state.demo ? '{}' : JSON.stringify({init_data: initData})});
                     state.token = session.access_token;
+                    // Токен нужен странице «Алхимии» (тот же origin, своя вкладка), чтобы синхронизировать прогресс.
+                    try { sessionStorage.setItem('mqb-mini-token', state.token); } catch {}
                     scheduleRenewal();
                     await load();
                 } catch (error) { feedback.textContent = error.message; enter.disabled = false; }
@@ -173,8 +175,11 @@
         const workshop = el('article', undefined, 'card mafia-teaser');
         const workshopCopy = el('div', undefined, 'mafia-teaser-copy');
         workshopCopy.append(el('span', 'НОВЫЙ РЕЖИМ · АЛХИМИЯ', 'eyebrow'), el('h2', 'Атлас маленьких чудес'));
-        note(workshopCopy, '190 элементов и 347 рецептов из четырёх стихий. Прогресс хранится в этом устройстве.');
-        workshopCopy.append(button('Открыть атлас', () => window.location.assign('/app/alchemy'), 'quiet'));
+        note(workshopCopy, '421 элемент и 1015 рецептов из четырёх стихий. Прогресс синхронизируется с твоим профилем.');
+        workshopCopy.append(button('Открыть атлас', () => {
+            const token = state.token ? `#t=${encodeURIComponent(state.token)}` : '';
+            window.location.assign(`/app/alchemy${token}`);
+        }, 'quiet'));
         workshop.append(workshopCopy); content.append(workshop);
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
@@ -495,7 +500,7 @@
         if (window.QuizTelegram.canFullscreen) preferences.append(button('Развернуть на весь экран', () => window.QuizTelegram.fullscreen(), 'quiet'));
         content.append(preferences);
         const actions = el('div', undefined, 'actions'); actions.append(button('Выйти', async () => {
-            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.token = null; state.me = null; state.page = 'home'; loginScreen(); }
+            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.token = null; state.me = null; state.page = 'home'; try { sessionStorage.removeItem('mqb-mini-token'); } catch {} loginScreen(); }
             catch (error) { feedback.textContent = error.message; }
         }, 'quiet')); content.append(actions);
     }

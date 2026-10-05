@@ -48,3 +48,8 @@ body.path-open{overflow:hidden}
  body.path-open .journey-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;background:var(--bg);padding:2px 0 12px;z-index:2}
  body.path-open .journey .rule{opacity:.5}
 }
+
+/* Подсказка про удержание нужна только там, где нет курсора: на телефоне элемент
+   поднимается долгим нажатием, и об этом надо сказать словами. */
+.touch-hint{display:none}
+@media(hover:none),(pointer:coarse){.touch-hint{display:inline;color:#cfd9b4}}

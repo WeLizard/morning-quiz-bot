@@ -1,0 +1,13 @@
+# Переводы строк для собранных одиночных страниц и их исходников.
+#
+# Артефакт web/mini_client/alchemy.html проверяется хешем
+# (minigames/alchemia-1.0/INTEGRATION.md: 316259 байт, sha256 84c416ab...), а
+# сборка читает исходники байт в байт. При core.autocrlf=true Windows-выгрузка
+# добавляла 675 байт CRLF и хеш перестал сходиться, поэтому здесь жёстко LF.
+web/mini_client/alchemy.html text eol=lf
+minigames/alchemia-1.0/*.html text eol=lf
+minigames/alchemia-1.0/*.css text eol=lf
+minigames/alchemia-1.0/*.js text eol=lf
+minigames/alchemia-1.0/*.json text eol=lf
+minigames/alchemia-1.0/*.md text eol=lf
+minigames/alchemia-1.0/*.py text eol=lf

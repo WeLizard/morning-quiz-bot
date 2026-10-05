@@ -851,6 +851,30 @@ def test_admin_and_unscoped_routes_are_absent(pg_env, path):
     asyncio.run(run())
 
 
+def test_alchemia_atlas_is_served_as_self_contained_mini_app_page(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            page = await env.client.get('/app/alchemy')
+            assert page.status_code == 200
+            assert page.headers['content-type'].startswith('text/html')
+            html = page.text
+            assert 'атлас маленьких чудес' in html and 'alchemia.atlas.v1' in html
+            # Одиночная игра автономна: ни внешних ссылок, ни обращений к API мини-аппа.
+            assert 'src="http' not in html and 'href="http' not in html
+            assert '/api/mini/' not in html
+            # Инлайн-стили и скрипты обязаны быть разрешены: со строгой политикой
+            # мини-аппа страница открывается без оформления и без игры.
+            csp = page.headers['content-security-policy']
+            assert "script-src 'unsafe-inline'" in csp and "style-src 'unsafe-inline'" in csp
+            assert "connect-src 'none'" in csp
+            # API и остальные маршруты остаются под строгой политикой.
+            assert (await env.client.get('/api/mini/config')).headers['content-security-policy'] == \
+                "default-src 'none'; frame-ancestors 'none'"
+            # Новый маршрут объявлен раньше обработчика ассетов и не перехватывается им.
+            assert (await env.client.get('/app/alchemy.html')).status_code == 404
+    asyncio.run(run())
+
+
 def test_cookies_query_tokens_and_unsafe_origins_cannot_authorize(pg_env):
     async def run():
         async with environment(pg_env) as env:

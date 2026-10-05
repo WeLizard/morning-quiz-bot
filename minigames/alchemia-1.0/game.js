@@ -9,9 +9,11 @@ const DATA=JSON.parse(document.getElementById('gameData').textContent);
 const E=new Map(DATA.elements.map(e=>[e.id,e]));
 const R=new Map(DATA.recipes.map(r=>[r.key,r]));
 const C=new Map(DATA.categories.map(c=>[c.id,c]));
+const W=new Map((DATA.worlds||[]).map(w=>[w.id,w]));
 const BASE=['water','earth','fire','air'];
-const STORE='alchemia.atlas.v1';
-const MAX_TOKENS=36, HISTORY_LIMIT=160, MAX_SAVE_BYTES=2000000;
+const STORE='alchemia.atlas'; // Stable key; save schema evolves independently of the release.
+const LEGACY_STORES=['alchemia.atlas.v5','alchemia.atlas.v4','alchemia.atlas.v3','alchemia.atlas.v2','alchemia.atlas.v1'];
+const MAX_TOKENS=36, HISTORY_LIMIT=160, MAX_SAVE_BYTES=8000000;
 const $=id=>document.getElementById(id);
 const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pairKey=(a,b)=>[a,b].sort().join('+');
@@ -27,43 +29,63 @@ const listen=(target,event,callback,opts={})=>target.addEventListener(event,call
 let serial=0;
 const uid=()=>`t${Date.now().toString(36)}_${++serial}`;
 function freshState(){return {
- format:'alchemia',version:1,discovered:[...BASE],recipeKeys:[],tried:[],favorites:[],achievements:[],history:[],attempts:0,
+ format:'alchemia',version:2,release:'5.1-refined',claims:[],activeCampaign:null,updatedAt:Date.now(),discovered:[...BASE],recipeKeys:[],tried:[],favorites:[],achievements:[],history:[],attempts:0,
  bench:BASE.map((id,i)=>({uid:uid(),id,u:i%2?.72:.28,v:i<2?.26:.76})),
- pinned:null,latest:null,settings:{sound:false,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,sort:'new'},created:Date.now()
+ pinned:null,latest:null,settings:{sound:false,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,sort:'new',world:'origins'},created:Date.now()
 };}
 function validPair(k){if(typeof k!=='string')return false;const p=k.split('+');return p.length===2&&p.every(x=>E.has(x))&&pairKey(...p)===k;}
 function cleanSave(raw){
- if(!raw||typeof raw!=='object'||raw.format!=='alchemia'||raw.version!==1||!Array.isArray(raw.discovered)) throw new Error('Это не сохранение Alchemia версии 1.');
+ if(!raw||typeof raw!=='object'||raw.format!=='alchemia'||![1,2].includes(raw.version)||!Array.isArray(raw.discovered)) throw new Error('Это не поддерживаемое сохранение Alchemia (схема 1 или 2).');
  const s=freshState();
  const ids=[...new Set([...BASE,...raw.discovered.filter(x=>typeof x==='string'&&E.has(x))])];
  s.discovered=ids; const found=new Set(ids);
- const arr=(x,max=20000)=>Array.isArray(x)?x.slice(0,max):[];
+ const arr=(x,max=E.size*(E.size+1)/2)=>Array.isArray(x)?x.slice(0,max):[];
  s.recipeKeys=[...new Set(arr(raw.recipeKeys).filter(k=>R.has(k)&&found.has(R.get(k).a)&&found.has(R.get(k).b)&&found.has(R.get(k).result)))];
  s.tried=[...new Set([...arr(raw.tried).filter(k=>validPair(k)&&k.split('+').every(x=>found.has(x))),...s.recipeKeys])];
- s.favorites=[...new Set(arr(raw.favorites,190).filter(x=>found.has(x)))];
+ s.favorites=[...new Set(arr(raw.favorites,E.size).filter(x=>found.has(x)))];
  s.achievements=[]; // Always derive achievement eligibility, never trust imported badges.
  s.bench=arr(raw.bench,MAX_TOKENS).filter(t=>t&&found.has(t.id)).map(t=>({uid:uid(),id:t.id,u:clamp(finite(t.u,.5),0,1),v:clamp(finite(t.v,.5),0,1)}));
  s.history=arr(raw.history,HISTORY_LIMIT).filter(h=>h&&found.has(h.a)&&found.has(h.b)&&Number.isFinite(h.time)).map(h=>{
-  const r=R.get(pairKey(h.a,h.b)); return {a:h.a,b:h.b,result:r&&found.has(r.result)?r.result:null,isNew:!!h.isNew,time:clamp(h.time,0,Date.now()+86400000)};
+  const r=R.get(pairKey(h.a,h.b)); const result=r&&h.result===r.result&&found.has(r.result)?r.result:null; return {a:h.a,b:h.b,result,isNew:!!result&&!!h.isNew,time:clamp(h.time,0,Date.now()+86400000)};
  });
  s.attempts=Math.max(s.tried.length,Math.min(1000000000,Math.floor(finite(raw.attempts))));
  s.pinned=E.has(raw.pinned)&&!found.has(raw.pinned)?raw.pinned:null;
  s.latest=found.has(raw.latest)&&!BASE.includes(raw.latest)?raw.latest:null;
  const settings=raw.settings&&typeof raw.settings==='object'?raw.settings:{};
- s.settings={sound:settings.sound===true,motion:settings.motion!==false,sort:['new','name','tier'].includes(settings.sort)?settings.sort:'new'};
+ s.settings={sound:settings.sound===true,motion:settings.motion!==false,sort:['new','name','tier'].includes(settings.sort)?settings.sort:'new',world:W.has(settings.world)?settings.world:'origins'};
  s.created=clamp(finite(raw.created,Date.now()),0,Date.now());
+ s.updatedAt=clamp(finite(raw.updatedAt,s.created),0,Date.now());
+ s.activeCampaign=(DATA.campaigns||[]).some(c=>c.id===raw.activeCampaign)?raw.activeCampaign:null;
+ const requested=new Set(arr(raw.claims,200));const known=new Set(s.recipeKeys);
+ s.claims=[];
+ for(const c of DATA.campaigns||[])for(const step of c.stages||[]){
+  const eligible=step.goals.every(id=>found.has(id))&&(step.craft||[]).every(id=>DATA.recipes.some(r=>r.result===id&&known.has(r.key)));
+  if(!requested.has(step.id)||!eligible)break;
+  s.claims.push(step.id);
+ }
  return s;
 }
-let storageOK=true,loaded=false,migrated=0,loadWarning='';
+let storageOK=true,loaded=false,migrated=0,loadWarning='',storageLocked=false;
 let state=freshState();
 try{
  const saved=localStorage.getItem(STORE);
- if(saved){if(saved.length>MAX_SAVE_BYTES)throw new Error('Сохранение слишком большое');state=cleanSave(JSON.parse(saved));loaded=true;}
- else{
-  const old=JSON.parse(localStorage.getItem('elementAlchemyDiscovered')||'null');
-  if(Array.isArray(old)){state.discovered=[...new Set([...BASE,...old.filter(x=>E.has(x))])];migrated=state.discovered.length-4;}
+ if(saved){
+  try{if(saved.length>MAX_SAVE_BYTES)throw new Error('oversize');state=cleanSave(JSON.parse(saved));loaded=true;}
+  catch(err){storageLocked=true;loadWarning='Основное сохранение повреждено. Оно не перезаписано. Открой настройки для восстановления резервной копии или импорта файла.';}
+ }else{
+  const candidates=[];
+  for(const key of LEGACY_STORES){
+   try{const text=localStorage.getItem(key);if(text&&text.length<=MAX_SAVE_BYTES)candidates.push(cleanSave(JSON.parse(text)));}catch(err){/* Keep incompatible legacy bytes untouched. */}
+  }
+  try{const old=JSON.parse(localStorage.getItem('elementAlchemyDiscovered')||'null');if(Array.isArray(old))candidates.push(cleanSave({...freshState(),discovered:old}));}catch(err){}
+  if(candidates.length){
+   candidates.sort((a,b)=>b.discovered.length-a.discovered.length||b.updatedAt-a.updatedAt);
+   const seed=candidates[0];
+   state=cleanSave({...seed,discovered:candidates.flatMap(c=>c.discovered),recipeKeys:candidates.flatMap(c=>c.recipeKeys),tried:candidates.flatMap(c=>c.tried),favorites:candidates.flatMap(c=>c.favorites)});
+   migrated=state.discovered.length-BASE.length;loaded=true;
+  }
  }
-}catch(err){loadWarning='Не удалось прочитать сохранение. Можно загрузить резервную копию в настройках.';}
+}catch(err){storageOK=false;loadWarning='Хранилище браузера недоступно. Игра работает, но для сохранения нужен экспорт файла.';}
 let found=new Set(state.discovered),knownRecipes=new Set(state.recipeKeys),tried=new Set(state.tried),favorites=new Set(state.favorites),badges=new Set();
 let selected=null,category='all',onlyFavorites=false,newThisSession=new Set();
 let undoStack=[],drag=null,suppressClickUntil=0,toastTimer=0,resizeFrame=0,modalPage=null,modalContext=null,hint=null;
@@ -74,14 +96,18 @@ const board=$('board'),tokens=$('tokenLayer'),modal=$('modal');
 function syncState(){state.discovered=[...found];state.recipeKeys=[...knownRecipes];state.tried=[...tried];state.favorites=[...favorites];state.achievements=[...badges];}
 function persist(){
  if(documentDisposed)return;
- syncState();
- try{localStorage.setItem(STORE,JSON.stringify(state));storageOK=true;$('saveLabel').innerHTML='<span class="save-dot"></span>Сохранено';}
+ syncState();state.updatedAt=Date.now();
+ if(storageLocked){$('saveLabel').textContent='Нужно восстановление';return;}
+ try{const previous=localStorage.getItem(STORE);if(previous){try{cleanSave(JSON.parse(previous));localStorage.setItem(STORE+'.backup',previous);}catch(e){}}
+ localStorage.setItem(STORE,JSON.stringify(state));storageOK=true;$('saveLabel').innerHTML='<span class="save-dot"></span>Сохранено';}
  catch(err){storageOK=false;$('saveLabel').textContent='Нет автосохранения';$('saveWarning').textContent='Браузер не разрешил автосохранение. Сохрани прогресс файлом в настройках.';$('saveWarning').classList.remove('hidden');}
 }
 function announce(text){$('liveAnnouncer').textContent=text;}
 function pushUndo(){undoStack.push(clone(state.bench));if(undoStack.length>30)undoStack.shift();$('undoBtn').disabled=false;}
 function applySettings(){
+ document.body.dataset.world=state.settings.world||'origins';
  document.body.classList.toggle('reduced-motion',!state.settings.motion);
+ renderEpochHeading();
  $('sortSelect').value=state.settings.sort;
  $('soundBtn').innerHTML=icon(state.settings.sound?'volume':'muted');
  $('soundBtn').title=state.settings.sound?'Выключить звук':'Включить звук';
@@ -137,14 +163,14 @@ function showToast(title,detail='',id=null,kind='normal',duration=3300){
  toastTimer=setTimeout(()=>{stack.replaceChildren();toastTimer=0;},duration);
 }
 function dismissToast(){clearTimeout(toastTimer);toastTimer=0;$('toastStack').replaceChildren();}
-function rank(){return found.size>=190?'Хранитель великого атласа':found.size>=150?'Мастер превращений':found.size>=75?'Исследователь чудес':found.size>=25?'Практикующий алхимик':'Ученик алхимика';}
+function rank(){return found.size>=340?'Архитектор вселенных':found.size>=260?'Хранитель великого атласа':found.size>=160?'Мастер превращений':found.size>=60?'Исследователь чудес':'Ученик алхимика';}
 function chapterComplete(c){return c.goals.every(id=>found.has(id));}
 function currentChapter(){return DATA.chapters.find(c=>!chapterComplete(c))||DATA.chapters[DATA.chapters.length-1];}
 function goalRow(id){return `<button class="goal-row ${found.has(id)?'complete':''} ${state.pinned===id?'tracked':''}" data-goal="${id}" title="${found.has(id)?'Открыть сведения':'Выбрать целью и получить подсказку'}">${art(id)}<span class="goal-name">${name(id)}</span>${icon(found.has(id)?'check':state.pinned===id?'target':'arrow')}</button>`;}
 function renderChapter(){
- const c=currentChapter(),index=DATA.chapters.indexOf(c),done=c.goals.filter(id=>found.has(id)).length;
- $('chapterCard').innerHTML=`<div class="chapter-card"><div class="chapter-head"><span class="eyebrow">Путь алхимика</span><button class="text-btn" data-action="chapters" style="padding:0;font-size:10px">${String(index+1).padStart(2,'0')} / 08 ${icon('arrow')}</button></div><h2>${c.title}</h2><p class="chapter-description">${c.subtitle}</p><div class="goal-list">${c.goals.map(goalRow).join('')}</div><div class="chapter-progress"><span style="width:${done/c.goals.length*100}%"></span></div><div class="chapter-progress-label"><span>${chapterComplete(c)?'Глава завершена':'Открытия главы'}</span><span>${done} / ${c.goals.length}</span></div></div>`;
- $('mobileChapter').textContent=DATA.chapters.every(chapterComplete)?'Все главы пройдены':`Глава ${index+1} из 8`;
+ const c=currentChapter(),index=DATA.chapters.indexOf(c),done=c.goals.filter(id=>found.has(id)).length,total=DATA.chapters.length,world=W.get(c.world||'');
+ $('chapterCard').innerHTML=`<div class="chapter-card"><div class="chapter-head"><span class="eyebrow">${world?escapeHTML(world.name)+' · ':''}Путь алхимика</span><button class="text-btn" data-action="chapters" style="padding:0;font-size:10px">${String(index+1).padStart(2,'0')} / ${String(total).padStart(2,'0')} ${icon('arrow')}</button></div><h2>${c.title}</h2>${world?`<div class="pill" style="display:inline-flex;margin-bottom:10px">${escapeHTML(world.name)}</div>`:''}<p class="chapter-description">${c.subtitle}</p><div class="goal-list">${c.goals.map(goalRow).join('')}</div><div class="chapter-progress"><span style="width:${done/c.goals.length*100}%"></span></div><div class="chapter-progress-label"><span>${chapterComplete(c)?'Глава завершена':'Открытия главы'}</span><span>${done} / ${c.goals.length}</span></div></div>`;
+ $('mobileChapter').textContent=DATA.chapters.every(chapterComplete)?`Все ${total} глав пройдены`:`${world?world.name+' · ':''}Глава ${index+1} из ${total}`;
 }
 function renderLatest(){
  const id=state.latest;
@@ -153,7 +179,7 @@ function renderLatest(){
 function renderProgress(){
  const n=found.size,total=E.size,pct=n/total*100;
  $('collectionCount').textContent=n;$('progressTotal').textContent=`${n} из ${total}`;$('progressPercent').textContent=Math.floor(pct)+'%';$('progressCircle').setAttribute('stroke-dashoffset',String(188.496*(1-n/total)));$('rankLabel').textContent=rank();$('mobileCount').textContent=`${n} / ${total}`;$('mobileProgressFill').style.width=pct+'%';$('attemptCount').textContent=tried.size;$('recipeCount').textContent=knownRecipes.size;
- renderChapter();renderLatest();
+ renderChapter();renderLatest();renderCampaignTracker();
 }
 function card(id,mode='pick',locked=false){
  const e=E.get(id),isFavorite=favorites.has(id);
@@ -374,7 +400,7 @@ function showDetail(id){
  const e=E.get(id),recipes=DATA.recipes.filter(r=>r.result===id),known=recipes.filter(r=>knownRecipes.has(r.key));
  const uses=DATA.recipes.filter(r=>(r.a===id||r.b===id)&&knownRecipes.has(r.key));
  const unknownCount=recipes.length-known.length;
- const content=`<div class="detail-layout"><div class="detail-hero">${art(id)}<h3>${e.name}</h3><span class="pill">${C.get(e.category).name} · Уровень ${e.tier}</span><p>${e.description}</p><div class="detail-actions"><button class="primary" data-add-table="${id}">${icon('lab')} На стол</button><button class="secondary" data-favorite="${id}" aria-pressed="${favorites.has(id)}">${icon('star')} ${favorites.has(id)?'В избранном':'В избранное'}</button></div></div><div><div class="detail-section"><h4>КАК ПОЛУЧИТЬ</h4>${BASE.includes(id)?'<div class="detail-note">Первоэлемент. Доступен с самого начала и никогда не заканчивается.</div>':known.length?known.map(r=>recipeRow(r)).join(''):'<div class="detail-note">Элемент открыт, но его рецепт ещё не записан в этом атласе. Так бывает после переноса старого сохранения.</div>'}${unknownCount&&!BASE.includes(id)?`<p style="margin-top:10px;font-size:10px">Ещё ${unknownCount} ${noun(unknownCount,'способ','способа','способов')} получения ждёт открытия. Атлас не раскрывает найденное за тебя.</p>`:''}</div><div class="detail-section"><h4>ИЗВЕСТНЫЕ ПРЕВРАЩЕНИЯ</h4>${uses.length?uses.map(r=>recipeRow(r,true)).join(''):`<div class="detail-note">${DATA.recipes.some(r=>r.a===id||r.b===id)?'Ты ещё не записал превращения с этим элементом. Попробуй соединить его с чем-то знакомым.':'Завершённое открытие. Это один из финальных элементов коллекции — новых превращений с ним нет.'}</div>`}</div><div class="detail-note">Рецепты — игровые ассоциации и фантазия, а не инструкции по химии. Все ингредиенты в коллекции бесконечны.</div><button class="text-btn" data-action="atlas" style="margin-top:12px">${icon('book')} Вернуться к атласу</button></div></div>`;
+ const content=`<div class="detail-layout"><div class="detail-hero">${art(id)}<h3>${e.name}</h3><span class="pill">${C.get(e.category).name} · Глубина цепочки ${e.tier}</span><p>${e.description}</p><div class="detail-actions"><button class="primary" data-add-table="${id}">${icon('lab')} На стол</button><button class="secondary" data-favorite="${id}" aria-pressed="${favorites.has(id)}">${icon('star')} ${favorites.has(id)?'В избранном':'В избранное'}</button></div></div><div><div class="detail-section"><h4>КАК ПОЛУЧИТЬ</h4>${BASE.includes(id)?'<div class="detail-note">Первоэлемент. Доступен с самого начала и никогда не заканчивается.</div>':known.length?known.map(r=>recipeRow(r)).join(''):'<div class="detail-note">Элемент открыт, но его рецепт ещё не записан в этом атласе. Так бывает после переноса старого сохранения.</div>'}${unknownCount&&!BASE.includes(id)?`<p style="margin-top:10px;font-size:10px">Ещё ${unknownCount} ${noun(unknownCount,'способ','способа','способов')} получения ждёт открытия. Атлас не раскрывает найденное за тебя.</p>`:''}</div><div class="detail-section"><h4>ИЗВЕСТНЫЕ ПРЕВРАЩЕНИЯ</h4>${uses.length?uses.map(r=>recipeRow(r,true)).join(''):`<div class="detail-note">${DATA.recipes.some(r=>r.a===id||r.b===id)?'Ты ещё не записал превращения с этим элементом. Попробуй соединить его с чем-то знакомым.':'Завершённое открытие. Это один из финальных элементов коллекции — новых превращений с ним нет.'}</div>`}</div><div class="detail-note">Рецепты — игровые ассоциации и фантазия, а не инструкции по химии. Все ингредиенты в коллекции бесконечны.</div><button class="text-btn" data-action="atlas" style="margin-top:12px">${icon('book')} Вернуться к атласу</button></div></div>`;
  openModal(e.name,'Лист '+String(DATA.elements.indexOf(e)+1).padStart(3,'0')+' · '+C.get(e.category).name,content,'detail',id);
 }
 function showLocked(id){
@@ -382,9 +408,10 @@ function showLocked(id){
  openModal('Ещё одна тайна','В атласе всё ещё есть белые пятна',emptyState('question','Неоткрытый элемент',`Эта страница принадлежит категории «${C.get(e.category).name}». Продолжай эксперименты — или воспользуйся подсказкой, которая подберёт доступное сейчас открытие.`)+`<div class="button-row" style="justify-content:center"><button class="primary" data-action="hint">${icon('hint')} Найти новую искру</button><button class="secondary" data-action="atlas">Назад в атлас</button></div>`,'locked');
 }
 function showChapters(){
- const current=currentChapter();
- const content=`${state.pinned?`<div class="goal-focus">${art(state.pinned)}<div><p>Твоя цель</p><strong>${name(state.pinned)}</strong></div><button class="ico-btn" data-action="hint" title="Подсказка к цели">${icon('hint')}</button><button class="ico-btn" data-action="unpin" aria-label="Снять цель">${icon('x')}</button></div>`:''}<p style="margin-bottom:18px">Восемь маленьких историй, которые помогут не потеряться. Главы не закрывают рецепты: исследовать можно в любом порядке. Нажми на неизвестную цель, чтобы проложить путь к ней.</p><div class="chapter-grid">${DATA.chapters.map((c,i)=>`<section class="chapter-tile ${c===current?'current':''}"><div class="eyebrow">Глава ${String(i+1).padStart(2,'0')} · ${chapterComplete(c)?'Завершена':c===current?'Твоя следующая история':'Впереди'}</div><h3>${c.title}</h3><p>${c.subtitle}</p><div class="goal-list">${c.goals.map(goalRow).join('')}</div><div class="chapter-progress"><span style="width:${c.goals.filter(id=>found.has(id)).length/c.goals.length*100}%"></span></div></section>`).join('')}</div>`;
- openModal('Путь алхимика',DATA.chapters.filter(chapterComplete).length+' из 8 глав завершено',content,'chapters');
+ const current=currentChapter(),total=DATA.chapters.length,worlds=(DATA.worlds&&DATA.worlds.length?DATA.worlds:[{id:'all',name:'Все главы',description:'',color:'#9e9fd2',chapters:DATA.chapters.map(c=>c.id)}]);
+ const worldSections=worlds.map(world=>{const chapters=DATA.chapters.filter(c=>(c.world||'all')===world.id);if(!chapters.length)return '';const complete=chapters.filter(chapterComplete).length;return `<section style="margin-bottom:22px"><div class="detail-note" style="margin-bottom:12px;border-left:4px solid ${world.color};padding-left:12px"><strong style="display:block;margin-bottom:4px">${escapeHTML(world.name)}</strong><span>${escapeHTML(world.description||'')}</span><div style="margin-top:6px;font-size:10px">${complete} / ${chapters.length} глав завершено</div></div><div class="chapter-grid">${chapters.map(c=>{const i=DATA.chapters.indexOf(c);return `<section class="chapter-tile ${c===current?'current':''}"><div class="eyebrow">Глава ${String(i+1).padStart(2,'0')} · ${chapterComplete(c)?'Завершена':c===current?'Твоя следующая история':'Впереди'}</div><h3>${c.title}</h3><p>${c.subtitle}</p><div class="goal-list">${c.goals.map(goalRow).join('')}</div><div class="chapter-progress"><span style="width:${c.goals.filter(id=>found.has(id)).length/c.goals.length*100}%"></span></div></section>`;}).join('')}</div></section>`;}).join('');
+ const content=`${state.pinned?`<div class="goal-focus">${art(state.pinned)}<div><p>Твоя цель</p><strong>${name(state.pinned)}</strong></div><button class="ico-btn" data-action="hint" title="Подсказка к цели">${icon('hint')}</button><button class="ico-btn" data-action="unpin" aria-label="Снять цель">${icon('x')}</button></div>`:''}<div class="modal-toolbar" style="margin-bottom:14px"><button class="chip active" data-action="chapters">Главы</button><button class="chip" data-action="epochs">Эпохи</button><button class="chip" data-action="campaign">Кампания</button></div><p style="margin-bottom:18px">Теперь главы сгруппированы по эпохам мира. Они помогают не потеряться в большом атласе, но не ограничивают свободу экспериментов. Нажми на неизвестную цель, чтобы проложить путь к ней.</p>${worldSections}`;
+ openModal('Путь алхимика',DATA.chapters.filter(chapterComplete).length+' из '+total+' глав завершено · '+worlds.length+' эпох',content,'chapters');
 }
 function showAchievements(){
  const content=`<div class="stat-grid"><div class="stat-box"><strong>${badges.size}/${DATA.achievements.length}</strong><span>достижений</span></div><div class="stat-box"><strong>${found.size}</strong><span>открытых элементов</span></div><div class="stat-box"><strong>${knownRecipes.size}</strong><span>записанных рецептов</span></div></div><div class="achievement-grid">${DATA.achievements.map(a=>`<div class="achievement-card ${badges.has(a.id)?'earned':''}">${art(a.art)}<h3>${a.name}</h3><p>${a.text}</p><span class="pill">${badges.has(a.id)?'Получено':a.type==='count'?Math.min(found.size,a.value)+' / '+a.value:a.type==='tried'?Math.min(tried.size,a.value)+' / '+a.value:a.type==='recipes'?Math.min(knownRecipes.size,a.value)+' / '+a.value:a.elements.filter(x=>found.has(x)).length+' / '+a.elements.length}</span></div>`).join('')}</div>`;
@@ -400,7 +427,7 @@ function showJournal(){
 }
 function showSettings(keepScroll=false){
  const scroll=keepScroll?$('modalBody').scrollTop:0;
- const content=`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section><section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:10px;margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:10px;margin-top:22px">Alchemia 1.0 · ${E.size} оригинальных векторных иллюстраций · ${R.size} рецептов · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
+ const content=`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section><section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:10px;margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:10px;margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
  openModal('Настройки','Настрой уют, не отвлекаясь от чудес',content,'settings');if(keepScroll)$('modalBody').scrollTop=scroll;
 }
 function showHelp(){
@@ -456,7 +483,7 @@ function requestConfirm(title,body,label,fn,back='settings'){
 function resetGame(){
  requestConfirm('Начать с чистого листа?','Все открытия, записи, достижения и избранное в этой игре будут удалены. Перед сбросом можно отменить действие и выгрузить сохранение в настройках.','Да, начать заново',()=>{
   const settings=clone(state.settings);state=freshState();state.settings=settings;found=new Set(BASE);knownRecipes=new Set();tried=new Set();favorites=new Set();badges=new Set();selected=null;undoStack=[];newThisSession.clear();category='all';onlyFavorites=false;$('collectionSearch').value='';hint=null;
-  stopParticles();closeModal();applySettings();renderAll();arrangeBench(false);persist();showToast('Новый маленький мир','Четыре стихии снова готовы удивлять.',null,'normal',2300);
+  storageLocked=false;loadWarning='';$('saveWarning').classList.add('hidden');stopParticles();closeModal();applySettings();renderAll();arrangeBench(false);persist();showToast('Новый маленький мир','Четыре стихии снова готовы удивлять.',null,'normal',2300);
  });
 }
 function exportSave(){
@@ -467,13 +494,13 @@ function exportSave(){
 }
 async function importSave(file){
  if(!file)return;
- if(file.size>MAX_SAVE_BYTES){openModal('Файл слишком большой','Импорт не выполнен','<p>Размер сохранения не должен превышать 2 МБ. Текущая игра не изменена.</p><div class="button-row"><button class="secondary" data-action="settings">Назад</button></div>','error');return;}
+ if(file.size>MAX_SAVE_BYTES){openModal('Файл слишком большой','Импорт не выполнен','<p>Размер сохранения не должен превышать 8 МБ. Текущая игра не изменена.</p><div class="button-row"><button class="secondary" data-action="settings">Назад</button></div>','error');return;}
  try{
   const imported=cleanSave(JSON.parse(await file.text()));
   requestConfirm('Загрузить этот мир?',`В файле открыто <strong>${imported.discovered.length} из ${E.size}</strong> элементов и записано <strong>${imported.recipeKeys.length}</strong> рецептов. Сейчас у тебя открыто <strong>${found.size}</strong> элементов. Загрузка заменит текущую игру, а не объединит коллекции.`,`Загрузить ${imported.discovered.length} элементов`,()=>{
-   state=imported;found=new Set(state.discovered);knownRecipes=new Set(state.recipeKeys);tried=new Set(state.tried);favorites=new Set(state.favorites);badges=new Set();updateAchievements();selected=null;undoStack=[];newThisSession.clear();category='all';onlyFavorites=false;$('collectionSearch').value='';hint=null;stopParticles();closeModal();applySettings();renderAll();arrangeBench(false);persist();showToast('Мир восстановлен',`${found.size} открытий снова в твоей коллекции.`,null,'normal',2500);
+   storageLocked=false;loadWarning='';$('saveWarning').classList.add('hidden');state=imported;found=new Set(state.discovered);knownRecipes=new Set(state.recipeKeys);tried=new Set(state.tried);favorites=new Set(state.favorites);badges=new Set();updateAchievements();selected=null;undoStack=[];newThisSession.clear();category='all';onlyFavorites=false;$('collectionSearch').value='';hint=null;stopParticles();closeModal();applySettings();renderAll();arrangeBench(false);persist();showToast('Мир восстановлен',`${found.size} открытий снова в твоей коллекции.`,null,'normal',2500);
   });
- }catch(err){openModal('Не удалось загрузить файл','Текущая игра не изменена',`<p>Проверь, что это JSON-сохранение Alchemia версии 1. Повреждённые файлы и сохранения других игр не поддерживаются.</p><div class="button-row"><button class="secondary" data-action="settings">Назад к сохранениям</button></div>`,'error');}
+ }catch(err){openModal('Не удалось загрузить файл','Текущая игра не изменена',`<p>Проверь, что это JSON-сохранение Alchemia (схема 1 или 2). Повреждённые файлы и сохранения других игр не поддерживаются.</p><div class="button-row"><button class="secondary" data-action="settings">Назад к сохранениям</button></div>`,'error');}
 }
 
 /* One delegated action handler survives every render without accumulating listeners. */
@@ -483,6 +510,9 @@ function action(name){
   case'help':showHelp();break;
   case'atlas':showAtlas();break;
   case'chapters':showChapters();break;
+  case'epochs':showEpochs();break;
+  case'restore-backup':restoreBackup();break;
+  case'campaign':showCampaign();break;
   case'journal':showJournal();break;
   case'achievements':showAchievements();break;
   case'settings':showSettings();break;
@@ -562,6 +592,7 @@ const resizeObserver=new ResizeObserver(()=>{
 resizeObserver.observe(board);
 listen(document,'visibilitychange',()=>{if(document.hidden){cancelDrag();stopParticles();persist();audio?.suspend().catch(()=>{});}});
 listen(window,'pagehide',()=>{cancelDrag();stopParticles();persist();audio?.suspend().catch(()=>{});});
+/*__JOURNEY__*/
 /* Public read-only inspection surface, useful for content and save compatibility checks. */
 function auditContent(){
  const known=new Set(BASE),keys=new Set();let errors=[];
@@ -569,7 +600,7 @@ function auditContent(){
  for(let i=0;i<E.size;i++){const size=known.size;for(const r of DATA.recipes)if(known.has(r.a)&&known.has(r.b))known.add(r.result);if(known.size===size)break;}
  return {elements:E.size,recipes:R.size,illustrations:document.querySelectorAll('symbol[id^="art-"]').length,reachable:known.size,errors,unreachable:[...E.keys()].filter(id=>!known.has(id))};
 }
-Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'1.0.0',getState:()=>{syncState();return clone(state);},audit:auditContent}),writable:false});
+Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'5.1-refined',getState:()=>{syncState();return clone(state);},audit:auditContent}),writable:false});
 updateAchievements();applySettings();renderAll();sizeCanvas();
 if(!loaded)arrangeBench(false);
 lastBoardSize={w:board.clientWidth,h:board.clientHeight};

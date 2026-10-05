@@ -11,3 +11,6 @@ minigames/alchemia-1.0/*.js text eol=lf
 minigames/alchemia-1.0/*.json text eol=lf
 minigames/alchemia-1.0/*.md text eol=lf
 minigames/alchemia-1.0/*.py text eol=lf
+# Иллюстрации элементов: из них собирается art.svg, поэтому LF обязателен и здесь.
+minigames/alchemia-1.0/*.svg text eol=lf
+minigames/alchemia-1.0/illustrations/*.svg text eol=lf

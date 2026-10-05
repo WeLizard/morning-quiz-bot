@@ -1,0 +1,1349 @@
+{
+  "added_recipes": [
+    {
+      "a": "steam",
+      "b": "wind",
+      "result": "cloud",
+      "key": "steam+wind"
+    },
+    {
+      "a": "dew",
+      "b": "air",
+      "result": "fog",
+      "key": "air+dew"
+    },
+    {
+      "a": "dew",
+      "b": "cold",
+      "result": "snow",
+      "key": "cold+dew"
+    },
+    {
+      "a": "hurricane",
+      "b": "rain",
+      "result": "storm",
+      "key": "hurricane+rain"
+    },
+    {
+      "a": "volcano",
+      "b": "ocean",
+      "result": "island",
+      "key": "ocean+volcano"
+    },
+    {
+      "a": "island",
+      "b": "sand",
+      "result": "beach",
+      "key": "island+sand"
+    },
+    {
+      "a": "ocean",
+      "b": "beach",
+      "result": "sea",
+      "key": "beach+ocean"
+    },
+    {
+      "a": "tree",
+      "b": "soil",
+      "result": "forest",
+      "key": "soil+tree"
+    },
+    {
+      "a": "soil",
+      "b": "water",
+      "result": "mud",
+      "key": "soil+water"
+    },
+    {
+      "a": "sand",
+      "b": "wind",
+      "result": "dust",
+      "key": "sand+wind"
+    },
+    {
+      "a": "water",
+      "b": "heat",
+      "result": "steam",
+      "key": "heat+water"
+    },
+    {
+      "a": "air",
+      "b": "pressure",
+      "result": "wind",
+      "key": "air+pressure"
+    },
+    {
+      "a": "thread",
+      "b": "tool",
+      "result": "fabric",
+      "key": "thread+tool"
+    },
+    {
+      "a": "stone",
+      "b": "heat",
+      "result": "lava",
+      "key": "heat+stone"
+    },
+    {
+      "a": "sun",
+      "b": "wind",
+      "result": "energy",
+      "key": "sun+wind"
+    },
+    {
+      "a": "ash",
+      "b": "rain",
+      "result": "base",
+      "key": "ash+rain"
+    },
+    {
+      "a": "fruit",
+      "b": "bacteria",
+      "result": "alcohol",
+      "key": "bacteria+fruit"
+    },
+    {
+      "a": "atom",
+      "b": "mineral",
+      "result": "radioactivity",
+      "key": "atom+mineral"
+    },
+    {
+      "a": "human",
+      "b": "temple",
+      "result": "religion",
+      "key": "human+temple"
+    },
+    {
+      "a": "book",
+      "b": "curiosity",
+      "result": "question",
+      "key": "book+curiosity"
+    },
+    {
+      "a": "stone",
+      "b": "gravity",
+      "result": "asteroid",
+      "key": "gravity+stone"
+    },
+    {
+      "a": "human",
+      "b": "obsidian",
+      "result": "wound",
+      "key": "human+obsidian"
+    },
+    {
+      "a": "horse",
+      "b": "wizard",
+      "result": "centaur",
+      "key": "horse+wizard"
+    },
+    {
+      "a": "human",
+      "b": "fairy",
+      "result": "elf",
+      "key": "fairy+human"
+    },
+    {
+      "a": "human",
+      "b": "ruins",
+      "result": "sadness",
+      "key": "human+ruins"
+    },
+    {
+      "a": "human",
+      "b": "storm",
+      "result": "anger",
+      "key": "human+storm"
+    },
+    {
+      "a": "human",
+      "b": "dragon",
+      "result": "fear",
+      "key": "dragon+human"
+    },
+    {
+      "a": "cat",
+      "b": "book",
+      "result": "curiosity",
+      "key": "book+cat"
+    },
+    {
+      "a": "cat",
+      "b": "house",
+      "result": "joy",
+      "key": "cat+house"
+    },
+    {
+      "a": "cheese",
+      "b": "house",
+      "result": "mouse",
+      "key": "cheese+house"
+    },
+    {
+      "a": "turtle",
+      "b": "coral",
+      "result": "coralreef",
+      "key": "coral+turtle"
+    },
+    {
+      "a": "whale",
+      "b": "ecosystem",
+      "result": "biosphere",
+      "key": "ecosystem+whale"
+    },
+    {
+      "a": "volcano",
+      "b": "water",
+      "result": "obsidian",
+      "key": "volcano+water"
+    },
+    {
+      "a": "oil",
+      "b": "polymer",
+      "result": "rubber",
+      "key": "oil+polymer"
+    },
+    {
+      "a": "polymer",
+      "b": "heat",
+      "result": "plastic",
+      "key": "heat+polymer"
+    },
+    {
+      "a": "boat",
+      "b": "wind",
+      "result": "sail",
+      "key": "boat+wind"
+    },
+    {
+      "a": "sail",
+      "b": "wood",
+      "result": "boat",
+      "key": "sail+wood"
+    },
+    {
+      "a": "engine",
+      "b": "metal",
+      "result": "train",
+      "key": "engine+metal"
+    },
+    {
+      "a": "train",
+      "b": "steel",
+      "result": "factory",
+      "key": "steel+train"
+    },
+    {
+      "a": "pyramid",
+      "b": "religion",
+      "result": "temple",
+      "key": "pyramid+religion"
+    },
+    {
+      "a": "knight",
+      "b": "brick",
+      "result": "castle",
+      "key": "brick+knight"
+    },
+    {
+      "a": "temple",
+      "b": "time",
+      "result": "ruins",
+      "key": "temple+time"
+    },
+    {
+      "a": "ruins",
+      "b": "book",
+      "result": "research",
+      "key": "book+ruins"
+    },
+    {
+      "a": "meat",
+      "b": "water",
+      "result": "soup",
+      "key": "meat+water"
+    },
+    {
+      "a": "cookie",
+      "b": "chocolate",
+      "result": "cake",
+      "key": "chocolate+cookie"
+    },
+    {
+      "a": "cake",
+      "b": "human",
+      "result": "joy",
+      "key": "cake+human"
+    },
+    {
+      "a": "coffee",
+      "b": "human",
+      "result": "joy",
+      "key": "coffee+human"
+    },
+    {
+      "a": "pizza",
+      "b": "human",
+      "result": "joy",
+      "key": "human+pizza"
+    },
+    {
+      "a": "soup",
+      "b": "human",
+      "result": "joy",
+      "key": "human+soup"
+    },
+    {
+      "a": "meat",
+      "b": "research",
+      "result": "protein",
+      "key": "meat+research"
+    },
+    {
+      "a": "alcohol",
+      "b": "lab",
+      "result": "medicine",
+      "key": "alcohol+lab"
+    },
+    {
+      "a": "golem",
+      "b": "magic",
+      "result": "wizard",
+      "key": "golem+magic"
+    },
+    {
+      "a": "fairy",
+      "b": "water",
+      "result": "potion",
+      "key": "fairy+water"
+    },
+    {
+      "a": "bird",
+      "b": "magic",
+      "result": "phoenix",
+      "key": "bird+magic"
+    },
+    {
+      "a": "horse",
+      "b": "philosopher",
+      "result": "unicorn",
+      "key": "horse+philosopher"
+    },
+    {
+      "a": "ocean",
+      "b": "wizard",
+      "result": "mermaid",
+      "key": "ocean+wizard"
+    },
+    {
+      "a": "lizard",
+      "b": "wizard",
+      "result": "dragon",
+      "key": "lizard+wizard"
+    },
+    {
+      "a": "phoenix",
+      "b": "time",
+      "result": "magic",
+      "key": "phoenix+time"
+    },
+    {
+      "a": "unicorn",
+      "b": "space",
+      "result": "portal",
+      "key": "space+unicorn"
+    },
+    {
+      "a": "elf",
+      "b": "exoplanet",
+      "result": "alienflora",
+      "key": "elf+exoplanet"
+    },
+    {
+      "a": "dragon",
+      "b": "exoplanet",
+      "result": "alienfauna",
+      "key": "dragon+exoplanet"
+    },
+    {
+      "a": "centaur",
+      "b": "alliance",
+      "result": "embassy",
+      "key": "alliance+centaur"
+    },
+    {
+      "a": "mermaid",
+      "b": "exoplanet",
+      "result": "alienocean",
+      "key": "exoplanet+mermaid"
+    },
+    {
+      "a": "joy",
+      "b": "thought",
+      "result": "noosphere",
+      "key": "joy+thought"
+    },
+    {
+      "a": "sadness",
+      "b": "thought",
+      "result": "noosphere",
+      "key": "sadness+thought"
+    },
+    {
+      "a": "fear",
+      "b": "research",
+      "result": "algorithm",
+      "key": "fear+research"
+    },
+    {
+      "a": "surprise",
+      "b": "sound",
+      "result": "signal",
+      "key": "sound+surprise"
+    },
+    {
+      "a": "microbe",
+      "b": "water",
+      "result": "cell",
+      "key": "microbe+water"
+    },
+    {
+      "a": "nucleus",
+      "b": "dna",
+      "result": "gene",
+      "key": "dna+nucleus"
+    },
+    {
+      "a": "atom",
+      "b": "atom",
+      "result": "molecule",
+      "key": "atom+atom"
+    },
+    {
+      "a": "molecule",
+      "b": "microscope",
+      "result": "atom",
+      "key": "microscope+molecule"
+    },
+    {
+      "a": "ion",
+      "b": "electricity",
+      "result": "electron",
+      "key": "electricity+ion"
+    },
+    {
+      "a": "atom",
+      "b": "energy",
+      "result": "proton",
+      "key": "atom+energy"
+    },
+    {
+      "a": "atom",
+      "b": "research",
+      "result": "neutron",
+      "key": "atom+research"
+    },
+    {
+      "a": "electron",
+      "b": "atom",
+      "result": "ion",
+      "key": "atom+electron"
+    },
+    {
+      "a": "ion",
+      "b": "heat",
+      "result": "plasma",
+      "key": "heat+ion"
+    },
+    {
+      "a": "proton",
+      "b": "plasma",
+      "result": "fusion",
+      "key": "plasma+proton"
+    },
+    {
+      "a": "antibody",
+      "b": "research",
+      "result": "vaccine",
+      "key": "antibody+research"
+    },
+    {
+      "a": "vaccine",
+      "b": "nanobot",
+      "result": "nanomedicine",
+      "key": "nanobot+vaccine"
+    },
+    {
+      "a": "ion",
+      "b": "silicon",
+      "result": "semiconductor",
+      "key": "ion+silicon"
+    },
+    {
+      "a": "metal",
+      "b": "quantumcomputer",
+      "result": "superconductor",
+      "key": "metal+quantumcomputer"
+    },
+    {
+      "a": "superconductor",
+      "b": "chip",
+      "result": "quantumcomputer",
+      "key": "chip+superconductor"
+    },
+    {
+      "a": "nanobot",
+      "b": "engine",
+      "result": "molecularmotor",
+      "key": "engine+nanobot"
+    },
+    {
+      "a": "molecularmotor",
+      "b": "factory",
+      "result": "nanofactory",
+      "key": "factory+molecularmotor"
+    },
+    {
+      "a": "fabricator",
+      "b": "programmablematter",
+      "result": "replicator",
+      "key": "fabricator+programmablematter"
+    },
+    {
+      "a": "replicator",
+      "b": "cell",
+      "result": "syntheticcell",
+      "key": "cell+replicator"
+    },
+    {
+      "a": "android",
+      "b": "code",
+      "result": "agi",
+      "key": "android+code"
+    },
+    {
+      "a": "superintelligence",
+      "b": "time",
+      "result": "singularity",
+      "key": "superintelligence+time"
+    },
+    {
+      "a": "singularity",
+      "b": "cyborg",
+      "result": "posthuman",
+      "key": "cyborg+singularity"
+    },
+    {
+      "a": "telescope",
+      "b": "lab",
+      "result": "observatory",
+      "key": "lab+telescope"
+    },
+    {
+      "a": "lens",
+      "b": "space",
+      "result": "telescope",
+      "key": "lens+space"
+    },
+    {
+      "a": "observatory",
+      "b": "book",
+      "result": "starmap",
+      "key": "book+observatory"
+    },
+    {
+      "a": "rover",
+      "b": "space",
+      "result": "probe",
+      "key": "rover+space"
+    },
+    {
+      "a": "probe",
+      "b": "wheel",
+      "result": "rover",
+      "key": "probe+wheel"
+    },
+    {
+      "a": "astronaut",
+      "b": "moon",
+      "result": "moonbase",
+      "key": "astronaut+moon"
+    },
+    {
+      "a": "rover",
+      "b": "mars",
+      "result": "research",
+      "key": "mars+rover"
+    },
+    {
+      "a": "probe",
+      "b": "star",
+      "result": "exoplanet",
+      "key": "probe+star"
+    },
+    {
+      "a": "probe",
+      "b": "life",
+      "result": "biosignature",
+      "key": "life+probe"
+    },
+    {
+      "a": "biosignature",
+      "b": "microscope",
+      "result": "alienmicrobe",
+      "key": "biosignature+microscope"
+    },
+    {
+      "a": "electron",
+      "b": "quantum",
+      "result": "antimatter",
+      "key": "electron+quantum"
+    },
+    {
+      "a": "antimatter",
+      "b": "spaceship",
+      "result": "warpdrive",
+      "key": "antimatter+spaceship"
+    },
+    {
+      "a": "gravity",
+      "b": "research",
+      "result": "darkmatter",
+      "key": "gravity+research"
+    },
+    {
+      "a": "darkmatter",
+      "b": "computer",
+      "result": "simulation",
+      "key": "computer+darkmatter"
+    },
+    {
+      "a": "pulsar",
+      "b": "signal",
+      "result": "beacon",
+      "key": "pulsar+signal"
+    },
+    {
+      "a": "galaxy",
+      "b": "energy",
+      "result": "quasar",
+      "key": "energy+galaxy"
+    },
+    {
+      "a": "quasar",
+      "b": "laser",
+      "result": "kugelblitz",
+      "key": "laser+quasar"
+    },
+    {
+      "a": "starmap",
+      "b": "stargate",
+      "result": "warpnetwork",
+      "key": "stargate+starmap"
+    },
+    {
+      "a": "alien",
+      "b": "rocket",
+      "result": "ufo",
+      "key": "alien+rocket"
+    },
+    {
+      "a": "ufo",
+      "b": "translator",
+      "result": "contact",
+      "key": "translator+ufo"
+    },
+    {
+      "a": "xenocrystal",
+      "b": "research",
+      "result": "xenomaterial",
+      "key": "research+xenocrystal"
+    },
+    {
+      "a": "xenomaterial",
+      "b": "graphene",
+      "result": "metamaterial",
+      "key": "graphene+xenomaterial"
+    },
+    {
+      "a": "gene",
+      "b": "radioactivity",
+      "result": "mutation",
+      "key": "gene+radioactivity"
+    },
+    {
+      "a": "gene",
+      "b": "time",
+      "result": "evolution",
+      "key": "gene+time"
+    },
+    {
+      "a": "evolution",
+      "b": "ecosystem",
+      "result": "biome",
+      "key": "ecosystem+evolution"
+    },
+    {
+      "a": "tissue",
+      "b": "life",
+      "result": "organ",
+      "key": "life+tissue"
+    },
+    {
+      "a": "algae",
+      "b": "sun",
+      "result": "photosynthesis",
+      "key": "algae+sun"
+    },
+    {
+      "a": "mushroom",
+      "b": "soil",
+      "result": "mycelium",
+      "key": "mushroom+soil"
+    },
+    {
+      "a": "coral",
+      "b": "sea",
+      "result": "coralreef",
+      "key": "coral+sea"
+    },
+    {
+      "a": "glass",
+      "b": "farm",
+      "result": "greenhouse",
+      "key": "farm+glass"
+    },
+    {
+      "a": "plastic",
+      "b": "factory",
+      "result": "recycling",
+      "key": "factory+plastic"
+    },
+    {
+      "a": "algae",
+      "b": "bioreactor",
+      "result": "biofuel",
+      "key": "algae+bioreactor"
+    },
+    {
+      "a": "biofuel",
+      "b": "metal",
+      "result": "engine",
+      "key": "biofuel+metal"
+    },
+    {
+      "a": "polymer",
+      "b": "plant",
+      "result": "bioplastic",
+      "key": "plant+polymer"
+    },
+    {
+      "a": "bioplastic",
+      "b": "factory",
+      "result": "recycling",
+      "key": "bioplastic+factory"
+    },
+    {
+      "a": "hydroponics",
+      "b": "megacity",
+      "result": "verticalfarm",
+      "key": "hydroponics+megacity"
+    },
+    {
+      "a": "verticalfarm",
+      "b": "habitat",
+      "result": "spacegarden",
+      "key": "habitat+verticalfarm"
+    },
+    {
+      "a": "recycling",
+      "b": "wood",
+      "result": "upcycling",
+      "key": "recycling+wood"
+    },
+    {
+      "a": "upcycling",
+      "b": "paint",
+      "result": "art",
+      "key": "paint+upcycling"
+    },
+    {
+      "a": "prosthetic",
+      "b": "robot",
+      "result": "exoskeleton",
+      "key": "prosthetic+robot"
+    },
+    {
+      "a": "exoskeleton",
+      "b": "asteroid",
+      "result": "asteroidmining",
+      "key": "asteroid+exoskeleton"
+    },
+    {
+      "a": "prosthetic",
+      "b": "research",
+      "result": "bionics",
+      "key": "prosthetic+research"
+    },
+    {
+      "a": "bionics",
+      "b": "printer",
+      "result": "prosthetic",
+      "key": "bionics+printer"
+    },
+    {
+      "a": "cold",
+      "b": "medicine",
+      "result": "cryonics",
+      "key": "cold+medicine"
+    },
+    {
+      "a": "nanotube",
+      "b": "water",
+      "result": "nanofilter",
+      "key": "nanotube+water"
+    },
+    {
+      "a": "nanofilter",
+      "b": "plant",
+      "result": "hydroponics",
+      "key": "nanofilter+plant"
+    },
+    {
+      "a": "earth",
+      "b": "reactor",
+      "result": "geothermal",
+      "key": "earth+reactor"
+    },
+    {
+      "a": "geothermal",
+      "b": "city",
+      "result": "powergrid",
+      "key": "city+geothermal"
+    },
+    {
+      "a": "electricity",
+      "b": "village",
+      "result": "powergrid",
+      "key": "electricity+village"
+    },
+    {
+      "a": "windturbine",
+      "b": "farm",
+      "result": "windfarm",
+      "key": "farm+windturbine"
+    },
+    {
+      "a": "sensor",
+      "b": "research",
+      "result": "data",
+      "key": "research+sensor"
+    },
+    {
+      "a": "algorithm",
+      "b": "book",
+      "result": "code",
+      "key": "algorithm+book"
+    },
+    {
+      "a": "data",
+      "b": "server",
+      "result": "database",
+      "key": "data+server"
+    },
+    {
+      "a": "simulation",
+      "b": "lens",
+      "result": "virtualreality",
+      "key": "lens+simulation"
+    },
+    {
+      "a": "automation",
+      "b": "house",
+      "result": "factory",
+      "key": "automation+house"
+    },
+    {
+      "a": "city",
+      "b": "colony",
+      "result": "megacity",
+      "key": "city+colony"
+    },
+    {
+      "a": "spacestation",
+      "b": "steel",
+      "result": "habitat",
+      "key": "spacestation+steel"
+    },
+    {
+      "a": "spacestation",
+      "b": "factory",
+      "result": "orbitalyard",
+      "key": "factory+spacestation"
+    },
+    {
+      "a": "telescope",
+      "b": "moon",
+      "result": "exomoon",
+      "key": "moon+telescope"
+    },
+    {
+      "a": "exomoon",
+      "b": "life",
+      "result": "terraforming",
+      "key": "exomoon+life"
+    },
+    {
+      "a": "solarcell",
+      "b": "star",
+      "result": "dysonswarm",
+      "key": "solarcell+star"
+    },
+    {
+      "a": "planet",
+      "b": "forest",
+      "result": "jungleworld",
+      "key": "forest+planet"
+    },
+    {
+      "a": "desertworld",
+      "b": "water",
+      "result": "terraformer",
+      "key": "desertworld+water"
+    },
+    {
+      "a": "jungleworld",
+      "b": "habitat",
+      "result": "spacegarden",
+      "key": "habitat+jungleworld"
+    },
+    {
+      "a": "iceworld",
+      "b": "heat",
+      "result": "oceanworld",
+      "key": "heat+iceworld"
+    },
+    {
+      "a": "xenomaterial",
+      "b": "pressure",
+      "result": "xenocrystal",
+      "key": "pressure+xenomaterial"
+    },
+    {
+      "a": "time",
+      "b": "data",
+      "result": "timeline",
+      "key": "data+time"
+    },
+    {
+      "a": "genome",
+      "b": "tool",
+      "result": "crispr",
+      "key": "genome+tool"
+    },
+    {
+      "a": "genomeediting",
+      "b": "lab",
+      "result": "syntheticbiology",
+      "key": "genomeediting+lab"
+    },
+    {
+      "a": "stemcell",
+      "b": "organ",
+      "result": "organoid",
+      "key": "organ+stemcell"
+    },
+    {
+      "a": "medicine",
+      "b": "genome",
+      "result": "longevity",
+      "key": "genome+medicine"
+    },
+    {
+      "a": "neuron",
+      "b": "computer",
+      "result": "mindupload",
+      "key": "computer+neuron"
+    },
+    {
+      "a": "quantum",
+      "b": "internet",
+      "result": "quantuminternet",
+      "key": "internet+quantum"
+    },
+    {
+      "a": "database",
+      "b": "crystal",
+      "result": "memoryvault",
+      "key": "crystal+database"
+    },
+    {
+      "a": "nanotechnology",
+      "b": "silicon",
+      "result": "metamaterial",
+      "key": "nanotechnology+silicon"
+    },
+    {
+      "a": "metamaterial",
+      "b": "laser",
+      "result": "cloaking",
+      "key": "laser+metamaterial"
+    },
+    {
+      "a": "cloaking",
+      "b": "signal",
+      "result": "sensor",
+      "key": "cloaking+signal"
+    },
+    {
+      "a": "nanoparticle",
+      "b": "cloud",
+      "result": "nanocloud",
+      "key": "cloud+nanoparticle"
+    },
+    {
+      "a": "nanocloud",
+      "b": "water",
+      "result": "nanofilter",
+      "key": "nanocloud+water"
+    },
+    {
+      "a": "superintelligence",
+      "b": "planet",
+      "result": "planetaryai",
+      "key": "planet+superintelligence"
+    },
+    {
+      "a": "laser",
+      "b": "observatory",
+      "result": "beacon",
+      "key": "laser+observatory"
+    },
+    {
+      "a": "wormhole",
+      "b": "orbitalyard",
+      "result": "stargate",
+      "key": "orbitalyard+wormhole"
+    },
+    {
+      "a": "habitat",
+      "b": "air",
+      "result": "cloudcity",
+      "key": "air+habitat"
+    },
+    {
+      "a": "planet",
+      "b": "plant",
+      "result": "biosphere",
+      "key": "planet+plant"
+    },
+    {
+      "a": "spacestation",
+      "b": "greenhouse",
+      "result": "spacegarden",
+      "key": "greenhouse+spacestation"
+    },
+    {
+      "a": "blackhole",
+      "b": "computer",
+      "result": "blackholecomputer",
+      "key": "blackhole+computer"
+    },
+    {
+      "a": "light",
+      "b": "gravity",
+      "result": "kugelblitz",
+      "key": "gravity+light"
+    },
+    {
+      "a": "colony",
+      "b": "metamaterial",
+      "result": "shieldworld",
+      "key": "colony+metamaterial"
+    },
+    {
+      "a": "aliencity",
+      "b": "embassy",
+      "result": "xenomarket",
+      "key": "aliencity+embassy"
+    },
+    {
+      "a": "alienartifact",
+      "b": "temple",
+      "result": "xenomuseum",
+      "key": "alienartifact+temple"
+    },
+    {
+      "a": "alienmicrobe",
+      "b": "life",
+      "result": "symbiosis",
+      "key": "alienmicrobe+life"
+    },
+    {
+      "a": "symbiosis",
+      "b": "bioreactor",
+      "result": "xenobiotech",
+      "key": "bioreactor+symbiosis"
+    },
+    {
+      "a": "human",
+      "b": "xenolanguage",
+      "result": "xenodiplomat",
+      "key": "human+xenolanguage"
+    },
+    {
+      "a": "timecrystal",
+      "b": "lab",
+      "result": "chronolab",
+      "key": "lab+timecrystal"
+    },
+    {
+      "a": "timeline",
+      "b": "research",
+      "result": "causality",
+      "key": "research+timeline"
+    },
+    {
+      "a": "xenoarchive",
+      "b": "galaxy",
+      "result": "galacticlibrary",
+      "key": "galaxy+xenoarchive"
+    },
+    {
+      "a": "spacegarden",
+      "b": "starforge",
+      "result": "stellargarden",
+      "key": "spacegarden+starforge"
+    },
+    {
+      "a": "dysonswarm",
+      "b": "engine",
+      "result": "stellarengine",
+      "key": "dysonswarm+engine"
+    },
+    {
+      "a": "stellarengine",
+      "b": "generationship",
+      "result": "worldship",
+      "key": "generationship+stellarengine"
+    },
+    {
+      "a": "orbitalyard",
+      "b": "habitat",
+      "result": "orbitalcolony",
+      "key": "habitat+orbitalyard"
+    },
+    {
+      "a": "orbitalcolony",
+      "b": "moonbase",
+      "result": "mooncity",
+      "key": "moonbase+orbitalcolony"
+    },
+    {
+      "a": "asteroidbase",
+      "b": "robot",
+      "result": "asteroidmining",
+      "key": "asteroidbase+robot"
+    },
+    {
+      "a": "colony",
+      "b": "terraforming",
+      "result": "marscity",
+      "key": "colony+terraforming"
+    },
+    {
+      "a": "marscity",
+      "b": "spaceship",
+      "result": "colony",
+      "key": "marscity+spaceship"
+    },
+    {
+      "a": "mooncity",
+      "b": "spaceship",
+      "result": "worldship",
+      "key": "mooncity+spaceship"
+    },
+    {
+      "a": "alienfauna",
+      "b": "alienflora",
+      "result": "ecosystem",
+      "key": "alienfauna+alienflora"
+    },
+    {
+      "a": "syntheticcell",
+      "b": "lab",
+      "result": "bioreactor",
+      "key": "lab+syntheticcell"
+    },
+    {
+      "a": "xenobiotech",
+      "b": "medicine",
+      "result": "longevity",
+      "key": "medicine+xenobiotech"
+    },
+    {
+      "a": "rejuvenation",
+      "b": "cyborg",
+      "result": "posthuman",
+      "key": "cyborg+rejuvenation"
+    },
+    {
+      "a": "digitalimmortality",
+      "b": "internet",
+      "result": "mindcloud",
+      "key": "digitalimmortality+internet"
+    },
+    {
+      "a": "holodeck",
+      "b": "data",
+      "result": "digitaltwin",
+      "key": "data+holodeck"
+    },
+    {
+      "a": "digitaltwin",
+      "b": "research",
+      "result": "simulation",
+      "key": "digitaltwin+research"
+    },
+    {
+      "a": "assemblyline",
+      "b": "computer",
+      "result": "automation",
+      "key": "assemblyline+computer"
+    },
+    {
+      "a": "biosphere",
+      "b": "habitat",
+      "result": "spacegarden",
+      "key": "biosphere+habitat"
+    },
+    {
+      "a": "organ",
+      "b": "water",
+      "result": "blood",
+      "key": "organ+water"
+    },
+    {
+      "a": "honey",
+      "b": "flower",
+      "result": "bee",
+      "key": "flower+honey"
+    },
+    {
+      "a": "animal",
+      "b": "factory",
+      "result": "meat",
+      "key": "animal+factory"
+    },
+    {
+      "a": "house",
+      "b": "human",
+      "result": "village",
+      "key": "house+human"
+    },
+    {
+      "a": "wheel",
+      "b": "steel",
+      "result": "car",
+      "key": "steel+wheel"
+    }
+  ],
+  "candidates_not_applied": [
+    {
+      "candidate": "blizzard|snow+storm",
+      "reason": "existing pair retained",
+      "existing": "blizzard"
+    },
+    {
+      "candidate": "river|mountain+rain",
+      "reason": "existing pair retained",
+      "existing": "river"
+    },
+    {
+      "candidate": "meat|animal+fire",
+      "reason": "existing pair retained",
+      "existing": "human"
+    },
+    {
+      "candidate": "village|house+road",
+      "reason": "unknown ingredient; not shipped"
+    },
+    {
+      "candidate": "car|engine+steel",
+      "reason": "existing pair retained",
+      "existing": "train"
+    },
+    {
+      "candidate": "bee|flower+insect",
+      "reason": "existing pair retained",
+      "existing": "bee"
+    },
+    {
+      "candidate": "blood|heart+human",
+      "reason": "existing pair retained",
+      "existing": "love"
+    },
+    {
+      "candidate": "turtle|animal+stone",
+      "reason": "existing pair retained",
+      "existing": "lizard"
+    },
+    {
+      "candidate": "whale|ocean+animal",
+      "reason": "existing pair retained",
+      "existing": "whale"
+    },
+    {
+      "candidate": "dragonfly|insect+wind",
+      "reason": "existing pair retained",
+      "existing": "dragonfly"
+    },
+    {
+      "candidate": "pottery|clay+heat",
+      "reason": "existing pair retained",
+      "existing": "brick"
+    },
+    {
+      "candidate": "music|human+sound",
+      "reason": "existing pair retained",
+      "existing": "music"
+    },
+    {
+      "candidate": "cookie|dough+chocolate",
+      "reason": "existing pair retained",
+      "existing": "cake"
+    },
+    {
+      "candidate": "pizza|bread+cheese",
+      "reason": "existing pair retained",
+      "existing": "pizza"
+    },
+    {
+      "candidate": "nucleus|cell+microscope",
+      "reason": "existing pair retained",
+      "existing": "dna"
+    },
+    {
+      "candidate": "android|cyborg+ai",
+      "reason": "existing pair retained",
+      "existing": "posthuman"
+    },
+    {
+      "candidate": "astronaut|human+spacestation",
+      "reason": "existing pair retained",
+      "existing": "colony"
+    },
+    {
+      "candidate": "pulsar|star+neutron",
+      "reason": "existing pair retained",
+      "existing": "pulsar"
+    },
+    {
+      "candidate": "arcology|livingcity+engineer",
+      "reason": "unknown ingredient; not shipped"
+    }
+  ],
+  "preserved_historical_pairs": 807,
+  "added_count": 208
+}

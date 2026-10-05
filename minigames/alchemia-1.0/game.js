@@ -52,7 +52,7 @@ function cleanSave(raw){
  s.pinned=E.has(raw.pinned)&&!found.has(raw.pinned)?raw.pinned:null;
  s.latest=found.has(raw.latest)&&!BASE.includes(raw.latest)?raw.latest:null;
  const settings=raw.settings&&typeof raw.settings==='object'?raw.settings:{};
- s.settings={sound:settings.sound===true,motion:settings.motion!==false,sort:['new','name','tier'].includes(settings.sort)?settings.sort:'new',world:W.has(settings.world)?settings.world:'origins'};
+ s.settings={sound:settings.sound===true,motion:settings.motion!==false,sort:['new','name','tier'].includes(settings.sort)?settings.sort:'new',world:W.has(settings.world)?settings.world:'origins',topbarHidden:settings.topbarHidden===true};
  s.created=clamp(finite(raw.created,Date.now()),0,Date.now());
  s.updatedAt=clamp(finite(raw.updatedAt,s.created),0,Date.now());
  s.activeCampaign=(DATA.campaigns||[]).some(c=>c.id===raw.activeCampaign)?raw.activeCampaign:null;
@@ -178,7 +178,7 @@ function renderLatest(){
 }
 function renderProgress(){
  const n=found.size,total=E.size,pct=n/total*100;
- $('collectionCount').textContent=n;$('progressTotal').textContent=`${n} из ${total}`;$('progressPercent').textContent=Math.floor(pct)+'%';$('progressCircle').setAttribute('stroke-dashoffset',String(188.496*(1-n/total)));$('rankLabel').textContent=rank();$('mobileCount').textContent=`${n} / ${total}`;$('mobileProgressFill').style.width=pct+'%';$('attemptCount').textContent=tried.size;$('recipeCount').textContent=knownRecipes.size;
+ $('collectionCount').textContent=n;$('progressTotal').textContent=`${n} из ${total}`;$('progressPercent').textContent=Math.floor(pct)+'%';$('progressCircle').setAttribute('stroke-dashoffset',String(188.496*(1-n/total)));$('rankLabel').textContent=rank();$('mobileCount').textContent=`${n} / ${total}`;$('pathPillCount').textContent=`${n} / ${total}`;$('mobileProgressFill').style.width=pct+'%';$('attemptCount').textContent=tried.size;$('recipeCount').textContent=knownRecipes.size;
  renderChapter();renderLatest();renderCampaignTracker();
 }
 function card(id,mode='pick',locked=false){
@@ -599,6 +599,31 @@ listen(modal,'cancel',e=>{e.preventDefault();closeModal();});
 listen(modal,'click',e=>{if(e.target===modal&&!inRect(e.clientX,e.clientY,modal.getBoundingClientRect()))closeModal();});
 listen($('modalBody'),'input',e=>{if(e.target.id==='atlasSearch'){atlasFilter.q=e.target.value;$('atlasGrid').innerHTML=atlasItems();}});
 listen($('modalBody'),'change',e=>{if(e.target.id==='atlasCategory'){atlasFilter.category=e.target.value;$('atlasGrid').innerHTML=atlasItems();}});
+/* Верхняя панель на телефоне: тянем ручку вверх — панель уезжает, тянем вниз —
+   возвращается. Короткий тап по ручке переключает её. Состояние запоминаем. */
+(()=>{
+ const handle=$('topbarHandle');
+ if(!handle)return;
+ const setHidden=hidden=>{document.body.classList.toggle('topbar-hidden',hidden);handle.setAttribute('aria-expanded',String(!hidden));
+  state.settings.topbarHidden=hidden;syncState();};
+ setHidden(Boolean(state.settings.topbarHidden));
+ let startY=0,moved=0,dragging=false;
+ handle.addEventListener('pointerdown',e=>{dragging=true;moved=0;startY=e.clientY;try{handle.setPointerCapture(e.pointerId);}catch(err){}});
+ handle.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  moved=e.clientY-startY;
+  if(Math.abs(moved)>18){setHidden(moved>0);state.settings.topbarHidden=moved>0;dragging=false;}
+ });
+ const finish=e=>{
+  if(!dragging)return;
+  dragging=false;
+  if(Math.abs(moved)<=18)setHidden(!document.body.classList.contains('topbar-hidden'));
+  persist();
+ };
+ handle.addEventListener('pointerup',finish);
+ handle.addEventListener('pointercancel',()=>{dragging=false;});
+ handle.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setHidden(!document.body.classList.contains('topbar-hidden'));persist();}});
+})();
 listen($('importInput'),'change',()=>importSave($('importInput').files?.[0]));
 listen(document,'keydown',e=>{
  if(e.key==='Escape'){cancelDrag();if(!modal.open){selected=null;renderSelection();dismissToast();}return;}
@@ -629,7 +654,22 @@ function auditContent(){
  for(let i=0;i<E.size;i++){const size=known.size;for(const r of DATA.recipes)if(known.has(r.a)&&known.has(r.b))known.add(r.result);if(known.size===size)break;}
  return {elements:E.size,recipes:R.size,illustrations:document.querySelectorAll('symbol[id^="art-"]').length,reachable:known.size,errors,unreachable:[...E.keys()].filter(id=>!known.has(id))};
 }
-Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'5.1-refined',getState:()=>{syncState();return clone(state);},audit:auditContent}),writable:false});
+/* Вливание прогресса с другого устройства. Игра читает сохранение только при
+ * старте, поэтому одного localStorage мало: серверные открытия надо применить к
+ * живому состоянию, иначе следующее persist() затрёт их своим. */
+function applyRemoteState(remote){
+ if(!remote||typeof remote!=='object')return {added:0};
+ const incoming=Array.isArray(remote.discovered)?remote.discovered.filter(id=>E.has(id)):[];
+ const recipes=Array.isArray(remote.recipeKeys)?remote.recipeKeys.filter(k=>R.has(k)):null;
+ let added=0;
+ for(const id of incoming)if(!found.has(id)){found.add(id);newThisSession.add(id);added++;}
+ if(recipes)for(const key of recipes)knownRecipes.add(key);
+ updateAchievements();
+ if(added){renderAll();playSound('discovered');}
+ persist();
+ return {added};
+}
+Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'5.1-refined',getState:()=>{syncState();return clone(state);},applyRemoteState,audit:auditContent}),writable:false});
 updateAchievements();applySettings();renderAll();sizeCanvas();
 if(!loaded)arrangeBench(false);
 lastBoardSize={w:board.clientWidth,h:board.clientHeight};

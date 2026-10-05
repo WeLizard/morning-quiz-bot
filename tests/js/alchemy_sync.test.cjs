@@ -25,7 +25,11 @@ function bridge({token = 'x'.repeat(32), local = {}, session = {}, response = {}
     const reloads = {count: 0};
     const banners = [];
     const listeners = {};
+    const applied = [];
     const sandbox = {
+        window: {
+            Alchemia: {applyRemoteState: remote => { applied.push(remote); return {added: Array.isArray(remote.discovered) ? remote.discovered.length : 0}; }},
+        },
         localStorage: localStore,
         sessionStorage: sessionStore,
         location: {hash: token ? `#t=${token}` : '', reload: () => { reloads.count += 1; }},
@@ -45,7 +49,12 @@ function bridge({token = 'x'.repeat(32), local = {}, session = {}, response = {}
         setTimeout: () => 0,
     };
     runInNewContext(source, sandbox);
-    return {listeners, calls, reloads, banners, localStore, sessionStore, token};
+    const environment = {listeners, calls, reloads, banners, localStore, sessionStore, token, applied,
+        // Игра «не умеет» вливать чужой прогресс — проверяем запасной путь моста.
+        set declineRemote(value) { sandbox.window.Alchemia.applyRemoteState = () => ({added: 0}); },
+        get declineRemote() { return false; },
+        window: sandbox.window};
+    return environment;
 }
 
 const save = (discovered, extra = {}) => JSON.stringify({
@@ -69,7 +78,8 @@ test('отправляет сводку и подставляет серверн
     assert.equal(body.attempts, 7);
     const stored = JSON.parse(env.localStore.getItem('alchemia.atlas'));
     assert.equal(stored.discovered.length, 8, 'серверные открытия должны попасть в сохранение');
-    assert.equal(env.reloads.count, 1, 'страница перезагружается один раз, чтобы движок подхватил прогресс');
+    assert.equal(env.applied.length, 1, 'прогресс вливается в живую игру, а не только в localStorage');
+    assert.equal(env.reloads.count, 0, 'перезагружать страницу не нужно, если игра приняла прогресс');
     assert.match(env.banners.join(' '), /\+8 очков/);
 });
 
@@ -97,23 +107,40 @@ test('обрыв сети не ломает игру и не перезагру�
     assert.equal(env.reloads.count, 0);
 });
 
-test('повторная подстановка в одной сессии не перезагружает страницу второй раз', async () => {
+test('новое устройство: серверный прогресс вливается в живую игру', async () => {
+    // Именно эта ситуация была у живого игрока: на сервере 143 открытия, на
+    // устройстве игра стартовала с четырьмя базовыми — и затирала серверные.
     const env = bridge({
-        local: {'alchemia.atlas': save(['water'])},
-        session: {'mqb-alchemy-restored': '1'},
-        response: {discovered: ['water', 'earth', 'fire']},
+        local: {'alchemia.atlas': save(['water', 'earth', 'fire', 'air'])},
+        response: {awarded: 0, points_total: 286, discovered: ['water', 'earth', 'fire', 'air', 'steam', 'mud', 'sand']},
     });
     env.listeners.load();
     await flush();
-    assert.equal(env.reloads.count, 0, 'второй перезагрузки в той же сессии быть не должно');
+    assert.equal(env.applied.length, 1, 'состояние должно уйти в живую игру');
+    assert.deepEqual(env.applied[0].discovered, ['water', 'earth', 'fire', 'air', 'steam', 'mud', 'sand']);
+    assert.equal(env.reloads.count, 0, 'игрока не выкидываем перезагрузкой');
+});
+
+test('если игра не принимает прогресс — работает запасной путь с перезагрузкой', async () => {
+    const env = bridge({
+        local: {'alchemia.atlas': save(['water'])},
+        response: {discovered: ['water', 'earth', 'fire']},
+    });
+    // Игра еще не умеет вливать чужой прогресс (старая версия страницы): мост
+    // обязан дописать сохранение и один раз перезагрузить страницу.
+    env.declineRemote = true;
+    env.listeners.load();
+    await flush();
     const stored = JSON.parse(env.localStore.getItem('alchemia.atlas'));
-    assert.deepEqual(stored.discovered, ['water', 'earth', 'fire'], 'прогресс всё равно дописывается');
+    assert.deepEqual(stored.discovered, ['water', 'earth', 'fire'], 'запасной путь пишет в сохранение');
+    assert.equal(env.reloads.count, 1, 'и один раз перезагружает страницу');
 });
 
 test('на новом устройстве создаёт сохранение из серверного прогресса', async () => {
     // Игра ещё ни разу не сохранялась: раньше мост в этом случае молчал, и игрок
     // видел пустой атлас на втором устройстве.
     const env = bridge({local: {}, response: {awarded: 0, points_total: 24, discovered: ['water', 'earth', 'fire']}});
+    env.declineRemote = true;                      // проверяем именно запись сохранения
     env.listeners.load();
     await flush();
     const stored = JSON.parse(env.localStore.getItem('alchemia.atlas'));

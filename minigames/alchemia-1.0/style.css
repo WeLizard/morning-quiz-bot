@@ -53,3 +53,38 @@ body.path-open{overflow:hidden}
    поднимается долгим нажатием, и об этом надо сказать словами. */
 .touch-hint{display:none}
 @media(hover:none),(pointer:coarse){.touch-hint{display:inline;color:#cfd9b4}}
+
+/* --- Правки по замечаниям живого игрока (телефон и тач-ноутбук) --- */
+
+/* 1. Полоска категорий. Кнопки уходили за край и не листались: во flex-строке они
+   сжимались, а колонка сетки не давала им места. Теперь чипы не сжимаются, полоска
+   прокручивается пальцем и не вылезает за панель. */
+.category-strip{min-width:0;max-width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.category-strip>*{flex:0 0 auto}
+.collection-head{min-width:0}
+.collection{min-width:0}
+@media(max-width:760px){.category-strip{padding-bottom:6px;gap:6px}.category-strip .chip{scroll-snap-align:start}}
+
+/* 2. Верхнюю панель можно убрать вверх и вытянуть обратно: на телефоне она съедала
+   экран. Тянем за ручку или просто нажимаем её. */
+.topbar-handle{display:none}
+@media(max-width:1030px){
+ .topbar-handle{display:flex;align-items:center;justify-content:center;width:100%;height:16px;flex:0 0 16px;padding:0;background:#173226;border:0;border-bottom:1px solid #b1c49720;cursor:grab;touch-action:none}
+ .topbar-handle span{width:46px;height:3px;border-radius:3px;background:#b9c69a55}
+ .topbar-handle:active span{background:#d3dcb1aa}
+ body.topbar-hidden .topbar{height:0;overflow:hidden;border-bottom:0;padding-top:0;padding-bottom:0;transition:height .22s ease}
+ body.topbar-hidden .topbar-handle{background:#152d21}
+ .topbar{transition:height .22s ease}
+}
+
+/* 3. Второй, заметный вход в «Путь алхимика» — в баннере эпохи, рядом с сюжетом.
+   Одну и ту же кнопку видно и на телефоне, и на десктопе. */
+.path-pill{position:absolute;left:14px;top:14px;z-index:3;display:inline-flex;align-items:center;gap:8px;
+ background:#10291ee6;border:1px solid #cbbd8855;color:var(--gold);border-radius:11px;
+ padding:8px 12px;font-size:11px;letter-spacing:.3px;box-shadow:0 6px 18px #0617133d}
+.path-pill:hover{background:#16352599;border-color:#e0cf9a88}
+.path-pill .ui-icon{width:15px;height:15px}
+.path-pill-count{color:var(--muted);font-size:10px;padding-left:2px;border-left:1px solid #cbbd8833}
+@media(max-width:760px){.epoch-banner{padding-top:0}.path-pill{left:10px;top:10px;padding:7px 10px;font-size:10px}}
+@media(max-width:1030px){.path-pill{display:inline-flex}}
+.epoch-banner{position:relative}

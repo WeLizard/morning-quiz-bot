@@ -82,11 +82,19 @@
         const added = data.discovered.filter(id => !local.has(id));
         if (data.awarded > 0) banner(`Алхимия: +${data.awarded} очков в профиль · всего ${data.points_total}`);
         if (!added.length) return false;
+        // Сохранение обновляем всегда: это страховка, даже если игра сейчас занята
+        // или не умеет принимать чужой прогресс.
         current.discovered = [...new Set([...current.discovered, ...data.discovered])];
         current.updatedAt = Date.now();
-        try { localStorage.setItem(PRIMARY, JSON.stringify(current)); } catch { return false; }
-        // Перезагружаем страницу не больше одного раза за сессию: движок читает
-        // сохранение только при старте, а петлю перезагрузок допускать нельзя.
+        try { localStorage.setItem(PRIMARY, JSON.stringify(current)); } catch { /* ниже всё равно попробуем */ }
+        // Главное — влить прогресс в живую игру: она держит состояние в памяти и
+        // иначе перезапишет его своим при следующем сохранении.
+        try {
+            const game = window.Alchemia;
+            if (game && typeof game.applyRemoteState === 'function') {
+                if (game.applyRemoteState({discovered: data.discovered}).added > 0) return true;
+            }
+        } catch { /* ниже сработает перезагрузка */ }
         let already = false;
         try { already = sessionStorage.getItem(RELOADED_KEY) === '1'; } catch {}
         if (already) return true;

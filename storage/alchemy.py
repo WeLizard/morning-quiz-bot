@@ -35,6 +35,10 @@ POINTS_PER_ELEMENT = Decimal('2')
 POINTS_PER_CHAPTER = Decimal('3')
 POINTS_PER_ACHIEVEMENT = Decimal('5')
 DAILY_POINTS_LIMIT = Decimal('30')
+# Цель дня: сколько очков достаточно, чтобы день считался закрытым. Награда за неё —
+# не дополнительные очки (их отсекает суточный потолок), а серия дней и понимание,
+# сколько ещё можно набрать сегодня.
+DAILY_GOAL_POINTS = Decimal('10')
 ACHIEVEMENT_CODE_PREFIX = 'alchemy_'
 MAX_LEADERBOARD_LIMIT = 100
 
@@ -262,9 +266,10 @@ class AlchemyService:
             }
         return result
 
-    async def progress(self, user_id: int) -> dict[str, Any]:
-        """Сводка игрока и его место по числу открытых элементов."""
+    async def progress(self, user_id: int, *, now: Optional[datetime] = None) -> dict[str, Any]:
+        """Сводка игрока: место, очки за всё время и дневная цель."""
         rank_expression = _discovered_rank_expression()
+        today = _moscow_day(_resolve_now(now))
         async with self.database.transaction() as session:
             row = await session.get(AlchemyProgress, user_id)
             discovered = len(_stored(row.discovered)) if row else 0
@@ -278,11 +283,21 @@ class AlchemyService:
                 select(func.count()).select_from(AlchemyProgress)
                 .where(rank_expression > discovered)
             ) or 0
+            # Счётчик дня обнуляется сам: очки прошлых суток к цели не относятся.
+            points_today = float(row.points_today) if row and row.points_day == today else 0.0
             return {
                 'discovered': discovered,
                 'chapters': len(_stored(row.chapters)) if row else 0,
                 'achievements': len(_stored(row.achievements)) if row else 0,
                 'points_total': float(row.points_total) if row else 0.0,
+                'points_today': points_today,
+                'daily_limit': float(DAILY_POINTS_LIMIT),
+                'remaining_today': float(max(DAILY_POINTS_LIMIT - Decimal(str(points_today)), Decimal('0'))),
+                'daily_goal': {
+                    'target': float(DAILY_GOAL_POINTS),
+                    'progress': min(points_today, float(DAILY_GOAL_POINTS)),
+                    'done': points_today >= float(DAILY_GOAL_POINTS),
+                },
                 'rank': int(ahead) + 1,
                 'total_players': int(total_players),
             }

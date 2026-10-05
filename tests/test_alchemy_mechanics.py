@@ -377,3 +377,55 @@ def test_catalog_missing_file_raises_runtime_error(tmp_path):
     from storage import alchemy as module
     with pytest.raises(RuntimeError, match='не найден'):
         module._load_catalog(tmp_path / 'data.json')
+
+
+def test_progress_shows_daily_goal_and_remaining_limit(pg_env):
+    """Игрок должен видеть цель дня и сколько ещё очков можно набрать сегодня."""
+    async def run():
+        async with scenario(pg_env) as db:
+            try:
+                await prepare(db)
+                service = AlchemyService(db)
+                # Очки за достижения зависят от каталога, поэтому ожидания считаем
+                # от фактического начисления, а не от числа открытых элементов.
+                start = await service.sync(USER, discovered=FREE_ELEMENTS[:3])
+                earned = start['points_today']
+                report = await service.progress(USER)
+                assert report['points_today'] == earned
+                assert report['remaining_today'] == 30.0 - earned
+                assert report['daily_limit'] == 30.0
+                assert report['daily_goal']['target'] == 10.0
+                assert report['daily_goal']['progress'] == min(earned, 10.0)
+                assert report['daily_goal']['done'] is (earned >= 10.0)
+
+                await service.sync(USER, discovered=FREE_ELEMENTS)   # догоняем до потолка
+                capped = await service.progress(USER)
+                assert capped['points_today'] == 30.0 and capped['remaining_today'] == 0.0
+                assert capped['daily_goal'] == {'target': 10.0, 'progress': 10.0, 'done': True}
+            finally:
+                await cleanup(db)
+    asyncio.run(run())
+
+
+def test_progress_forgets_points_of_a_previous_moscow_day(pg_env):
+    """Очки прошлых суток в цель дня не идут, а накопленное остаётся."""
+    async def run():
+        async with scenario(pg_env) as db:
+            try:
+                await prepare(db)
+                service = AlchemyService(db)
+                synced = await service.sync(USER, discovered=FREE_ELEMENTS[:8], now=DAY1)
+                earned = synced['points_today']
+                assert earned > 0
+
+                same_day = await service.progress(USER, now=DAY1)
+                assert same_day['points_today'] == earned
+                assert same_day['remaining_today'] == 30.0 - earned
+
+                next_day = await service.progress(USER, now=DAY2)
+                assert next_day['points_today'] == 0.0 and next_day['remaining_today'] == 30.0
+                assert next_day['daily_goal'] == {'target': 10.0, 'progress': 0.0, 'done': False}
+                assert next_day['points_total'] == earned
+            finally:
+                await cleanup(db)
+    asyncio.run(run())

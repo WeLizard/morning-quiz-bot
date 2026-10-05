@@ -551,9 +551,16 @@
         if (version !== generation) return;
         if (alchemy) {
             const card = el('section', undefined, 'card');
+            const goal = alchemy.daily_goal || {target: 10, progress: alchemy.points_today || 0, done: false};
             card.append(el('h2', 'Атлас маленьких чудес'));
             note(card, `Открыто элементов: ${alchemy.discovered} · глав ${alchemy.chapters} · достижений ${alchemy.achievements}`);
             note(card, `Очки из Алхимии: ${format(alchemy.points_total)} · место ${alchemy.rank} из ${alchemy.total_players}`);
+            note(card, goal.done
+                ? `Цель дня выполнена: ${format(goal.progress)} из ${format(goal.target)} очков.`
+                : `Цель дня: ${format(goal.progress)} из ${format(goal.target)} очков, осталось ${format(Math.max(0, goal.target - goal.progress))}.`);
+            note(card, (alchemy.remaining_today ?? 0) > 0
+                ? `Сегодня можно набрать ещё ${format(alchemy.remaining_today)} очков.`
+                : 'Суточный лимит выбран: новые очки начислятся завтра.', 'muted');
             card.append(button('Рейтинг атласа', () => navigate('alchemy-top'), 'quiet'));
             content.append(card);
         }

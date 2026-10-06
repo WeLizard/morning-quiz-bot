@@ -53,6 +53,7 @@
 .game-mode-card .choice-copy{position:relative;z-index:2;display:flex;min-height:220px;width:54%;padding:25px 27px;flex-direction:column;align-items:flex-start;justify-content:center}
 .game-mode-card.image-left .choice-copy{margin-left:auto;align-items:flex-end;text-align:right}
 .game-mode-card.image-left .choice-copy h2,.game-mode-card.image-left .choice-copy .eyebrow{text-align:right}
+.game-mode-card.image-right .choice-copy h2,.game-mode-card.image-right .choice-copy .eyebrow{text-align:left}
 .game-mode-card.image-right .choice-copy{margin-right:auto}
 .game-mode-card h2{font-size:26px;line-height:1.12;margin:10px 0 8px}
 .game-mode-card p{max-width:31ch;margin:0;color:#d1d6cc;font-size:12.5px;line-height:1.48}

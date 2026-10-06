@@ -144,6 +144,53 @@
         parent.append(item);
     }
     function play(command) { playCommand = command; navigate('play'); }
+    const HOME_GAME_CARDS = [
+        {
+            id: 'classic', side: 'left', palette: 'green', image: '/app/host.webp',
+            alt: 'Филиныч ведёт классический квиз в студии', eyebrow: 'РАЗМИНКА ДЛЯ ЛЮБОПЫТНЫХ',
+            title: 'Классический квиз',
+            description: 'Один вопрос — одно маленькое открытие. Проверь эрудицию и доверься интуиции.',
+            label: 'Играть в квиз', action: () => play('/quiz'), runtime: true, position: '24% 44%'
+        },
+        {
+            id: 'photo', side: 'right', palette: 'green', image: '/app/photo.webp',
+            alt: 'Филиныч рассматривает фотографии и ищет подсказки', eyebrow: 'СЛОЖИ ОБРАЗЫ В СЛОВО',
+            title: 'Фото-загадки',
+            description: 'Смотри внимательнее: детали важны. Узнай, что скрыто на снимке, и собери серию.',
+            label: 'Угадывать фото', action: () => play('/photo_quiz'), runtime: true, position: '72% 62%'
+        },
+        {
+            id: 'night', side: 'left', palette: 'brown', image: '/app/mafia.webp',
+            alt: 'Филиныч в капюшоне ведёт ночное дело', eyebrow: 'НОВЫЙ РЕЖИМ · DEV',
+            title: 'Ночной город',
+            description: 'Собери стол, настрой роли и раскрой городскую историю. Мафия живёт отдельно от квиза.',
+            label: 'Открыть дело', action: () => navigate('mafia'), position: '24% 46%'
+        },
+        {
+            id: 'atlas', side: 'right', palette: 'brown', image: '/app/alchemy.webp',
+            alt: 'Сова-алхимик у светящегося атласа элементов', eyebrow: 'НОВЫЙ РЕЖИМ · АЛХИМИЯ',
+            title: 'Атлас маленьких чудес',
+            description: 'Смешивай стихии, открывай цепочки и заполняй свой атлас. Прогресс синхронизируется с профилем.',
+            label: 'Открыть атлас', action: () => {
+                const token = state.token ? `#t=${encodeURIComponent(state.token)}` : '';
+                window.location.assign(`/app/alchemy${token}`);
+            }, position: '72% 50%'
+        },
+    ];
+    function homeGameCard(spec) {
+        const card = el('article', undefined, `card play-choice game-mode-card palette-${spec.palette} image-${spec.side} mode-${spec.id}`);
+        card.dataset.gameMode = spec.id;
+        const image = el('img'); image.src = spec.image; image.alt = spec.alt; image.className = 'mode-choice-host';
+        image.style.objectPosition = spec.position || (spec.side === 'left' ? '25% center' : '75% center');
+        const body = el('div', undefined, 'choice-copy');
+        body.append(el('span', spec.eyebrow, 'eyebrow'), el('h2', spec.title));
+        note(body, spec.description);
+        const start = button(spec.label, spec.action, 'primary');
+        if (spec.runtime) start.disabled = !runtimeEnabled;
+        body.append(start);
+        card.append(image, body);
+        return card;
+    }
     async function home(version) {
         const hero = el('section', undefined, 'hero home-hero'), copy = el('div', undefined, 'hero-copy');
         copy.append(el('span', 'Филиныч на связи', 'eyebrow'));
@@ -152,36 +199,9 @@
         const image = el('img'); image.src = '/app/host.webp'; image.alt = 'Сова Филиныч, ведущий квиза'; hero.append(copy, image); content.append(hero);
         const rhythm = el('div', undefined, 'player-rhythm');
         rhythm.append(el('span', `${format(state.me.score)} баллов`), el('span', `Лучшая серия · ${format(state.progress.best_streak)}`)); content.append(rhythm);
-        const choices = el('section', undefined, 'play-choices');
-        for (const [title, description, command, label] of [
-            ['Классический квиз', 'Один вопрос — маленькое открытие. Проверим, что подскажет интуиция?', '/quiz', 'Играть в квиз'],
-            ['Фото-загадки', 'Интересная картинка. Но угадаешь ли ты, что это?', '/photo_quiz', 'Угадывать фото']]) {
-            const classic = command === '/quiz';
-            const card = el('article', undefined, `card play-choice ${classic ? 'featured-game' : 'photo-choice'}`), body = el('div', undefined, 'choice-copy');
-            body.append(el('span', classic ? 'РАЗМИНКА ДЛЯ ЛЮБОПЫТНЫХ' : 'СЛОЖИ ОБРАЗЫ В СЛОВО', 'eyebrow'), el('h2', title)); note(body, description);
-            const start = button(label, () => play(command), 'primary'); start.disabled = !runtimeEnabled; body.append(start); card.append(body);
-            if (classic) { const portrait = el('img'); portrait.src = '/app/host.webp'; portrait.alt = 'Филиныч приглашает за игровой стол'; portrait.className = 'choice-host'; card.append(portrait); }
-            else { const portrait = el('img'); portrait.src = '/app/photo.webp'; portrait.alt = 'Филиныч соединяет два фрагмента изображения в новую загадку'; portrait.className = 'choice-photo'; card.append(portrait); }
-            choices.append(card);
-        }
+        const choices = el('section', undefined, 'play-choices game-mode-list');
+        HOME_GAME_CARDS.forEach(spec => choices.append(homeGameCard(spec)));
         content.append(choices);
-        const night = el('article', undefined, 'card play-choice mode-choice night');
-        const nightImage = el('img'); nightImage.src = '/app/mafia.webp'; nightImage.alt = 'Филиныч в капюшоне ведёт ночное дело'; nightImage.className = 'mode-choice-host';
-        const nightCopy = el('div', undefined, 'choice-copy');
-        nightCopy.append(el('span', 'НОВЫЙ РЕЖИМ · DEV', 'eyebrow'), el('h2', 'Ночной город'));
-        note(nightCopy, 'Собери стол для будущей игры в мафию. Роли и состав уже сохраняются отдельно от квиза.');
-        nightCopy.append(button('Открыть дело', () => navigate('mafia'), 'primary'));
-        night.append(nightImage, nightCopy); content.append(night);
-        const workshop = el('article', undefined, 'card play-choice mode-choice atlas');
-        const workshopImage = el('img'); workshopImage.src = '/app/alchemy.webp'; workshopImage.alt = 'Сова-алхимик за столом с колбами и атласом'; workshopImage.className = 'mode-choice-host';
-        const workshopCopy = el('div', undefined, 'choice-copy');
-        workshopCopy.append(el('span', 'НОВЫЙ РЕЖИМ · АЛХИМИЯ', 'eyebrow'), el('h2', 'Атлас маленьких чудес'));
-        note(workshopCopy, '421 элемент и 1015 рецептов из четырёх стихий. Прогресс синхронизируется с твоим профилем.');
-        workshopCopy.append(button('Открыть атлас', () => {
-            const token = state.token ? `#t=${encodeURIComponent(state.token)}` : '';
-            window.location.assign(`/app/alchemy${token}`);
-        }, 'primary'));
-        workshop.append(workshopImage, workshopCopy); content.append(workshop);
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
             const current = await request('/api/mini/runtime'); if (version !== generation) return;

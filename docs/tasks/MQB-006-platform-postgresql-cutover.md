@@ -141,6 +141,12 @@ Workstreams 2–3 предшествуют финальному cutover. Game su
   inbox моста, а сам мост живёт в dev/offline-контуре
   (`modules/mini_bridge_worker.py`, `telegram_test_scope.py`,
   `mini_offline_runtime.py`, `dev_runtime.py`).
+  Точные точки входа (проверено 2026-10-06, `web/mini_client/play-ui.js`):
+  `callback` — строки 41, 70, 73, 80 (Telegram-меню настройки квиза);
+  `text` — строка 94 (фото-ответ, когда PG-сессии нет, `directPhotoAnswer = false`);
+  `command` — строка 241 («да, завершить») и строка 343 (`/help` из ярлыка
+  «Как играть», `web/mini_client/app.js:211` через `play(cmd)`).
+  Все четыре ветки живые: убрать их без изменения поведения игрока нельзя.
   Нужно продуктовое решение: оставить мост только для ответа на Telegram-опрос как
   внешний адаптер, либо писать ответ прямо в ledger и закрывать poll без отметки
   голоса, либо отказаться от голосования в чатовых квизах из Mini App.

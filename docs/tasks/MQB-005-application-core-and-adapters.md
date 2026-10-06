@@ -47,8 +47,12 @@ Morning Quiz работает как единое приложение. Поль
   баллы повторно.
 - [x] Восстановление общего состояния не зависит от Telegram message history.
 - [x] Для пользовательских функций отмечены Telegram, Mini App и общий test.
-- [ ] Старт/переходы фото-серии и подготовка классического раунда ещё используют
-  переходный PTB runtime bridge; вынести delivery events в общий outbox.
+- [x] *(проверено 2026-10-06)* Старт/переходы фото-серии и подготовка классического раунда
+  переведены на общий application service, delivery events идут через транзакционный
+  outbox: NotificationQueue.enqueue_in в pplication/classic.py, обработчик —
+  handlers/mafia_handlers.py. Прямые маршруты в web/mini_app.py вызывают
+  ClassicApplicationService и PhotoApplicationService без Update.de_json и
+  process_update. Остаток — ответ на уже существующий Telegram-опрос (см. MQB-006).
 
 ## Проверка
 

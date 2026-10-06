@@ -127,12 +127,23 @@ Workstreams 2–3 предшествуют финальному cutover. Game su
 - [x] Photo переведён на тот же прямой application lifecycle в обоих клиентах.
 - [ ] В classic/photo runtime отсутствуют `Update.de_json`, `process_update` и
   MiniBridge; bridge после переноса удалён.
-  Фактически bridge остался только в тестовом и offline-контуре:
-  `web/mini_app.py` использует `MiniBridge` лишь в runtime-маршрутах dev/offline
-  фабрик, плюс `modules/mini_bridge_worker.py`, `modules/telegram_test_scope.py`,
-  `modules/mini_offline_runtime.py`, `modules/dev_runtime.py`. В основном пути
-  classic/photo bridge нет. Удаление = отказ от offline-контура тестирования,
-  поэтому нужно отдельное решение.
+  *(проверено 2026-10-06)* В основном пути их нет: прямые маршруты
+  `/api/mini/classic/chats/{id}/{start,sync,answer,stop}` и
+  `/api/mini/photo/chats/{id}/{start,current,answer,stop,image}` вызывают
+  `ClassicApplicationService` и `PhotoApplicationService`, доставка идёт через
+  транзакционный outbox (`NotificationQueue` → `handlers/mafia_handlers.py`).
+  Остаток — три точки работы с уже существующим Telegram-опросом, а не запуск игры:
+  1. `send({type:'vote'})` — ответ на poll, запущенный в чате: подделать голос
+     пользователя через Bot API нельзя, поэтому ответ идёт через мост;
+  2. `callback` и `text` — фолбэк, когда прямого маршрута нет;
+  3. `command` — завершение/старт, дублирующее прямые `stop`/`start`.
+  Плюс `web/mini_app.py` (`runtime_action`) по-прежнему кладёт любое действие в
+  inbox моста, а сам мост живёт в dev/offline-контуре
+  (`modules/mini_bridge_worker.py`, `telegram_test_scope.py`,
+  `mini_offline_runtime.py`, `dev_runtime.py`).
+  Нужно продуктовое решение: оставить мост только для ответа на Telegram-опрос как
+  внешний адаптер, либо писать ответ прямо в ledger и закрывать poll без отметки
+  голоса, либо отказаться от голосования в чатовых квизах из Mini App.
 
 ### Этап 5 — продуктовый Mini App и финальный аудит
 

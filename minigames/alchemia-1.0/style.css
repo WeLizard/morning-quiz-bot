@@ -79,12 +79,12 @@ body.path-open{overflow:hidden}
 
 /* 3. Второй, заметный вход в «Путь алхимика» — в баннере эпохи, рядом с сюжетом.
    Одну и ту же кнопку видно и на телефоне, и на десктопе. */
-.path-pill{position:absolute;left:14px;top:14px;z-index:3;display:inline-flex;align-items:center;gap:8px;
+.path-pill{position:absolute;right:14px;top:14px;z-index:3;display:inline-flex;align-items:center;gap:8px;
  background:#10291ee6;border:1px solid #cbbd8855;color:var(--gold);border-radius:11px;
  padding:8px 12px;font-size:11px;letter-spacing:.3px;box-shadow:0 6px 18px #0617133d}
 .path-pill:hover{background:#16352599;border-color:#e0cf9a88}
 .path-pill .ui-icon{width:15px;height:15px}
 .path-pill-count{color:var(--muted);font-size:10px;padding-left:2px;border-left:1px solid #cbbd8833}
-@media(max-width:760px){.epoch-banner{padding-top:0}.path-pill{left:10px;top:10px;padding:7px 10px;font-size:10px}}
+@media(max-width:760px){.epoch-banner{padding-top:0}.path-pill{right:10px;top:10px;padding:7px 10px;font-size:10px}}
 @media(max-width:1030px){.path-pill{display:inline-flex}}
 .epoch-banner{position:relative}

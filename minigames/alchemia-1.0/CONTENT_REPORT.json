@@ -1,12 +1,12 @@
 {
-  "elements": 421,
-  "recipes": 1015,
-  "reachable": 421,
-  "chapters": 30,
+  "elements": 431,
+  "recipes": 1035,
+  "reachable": 431,
+  "chapters": 33,
   "worlds": 5,
-  "campaigns": 5,
-  "stages": 20,
-  "achievements": 38,
+  "campaigns": 7,
+  "stages": 28,
+  "achievements": 42,
   "terminals": [
     "blizzard",
     "mouse",
@@ -19,15 +19,20 @@
     "biome",
     "posthuman",
     "livingcity",
-    "worldship",
     "alternatehistory",
-    "panplanetary",
     "warpnetwork",
-    "exocivilization"
+    "dreamlab",
+    "deeparchive",
+    "chronogarden",
+    "xenogarden",
+    "firstalliance",
+    "worldseed",
+    "starbloom",
+    "skyport"
   ],
   "single_recipe_elements": [],
-  "illustration_symbols": 421,
-  "distinct_svg_bodies": 421,
+  "illustration_symbols": 431,
+  "distinct_svg_bodies": 431,
   "art_hashes": {
     "water": "14f57df66c983201fde2027cb9ec2ef5fb1b43734bee960d34357d7365af5a75",
     "earth": "bce6068625bf08356bbad18f3a87c804206ae6165c56abd8b6d054f7e94b3177",
@@ -449,7 +454,17 @@
     "stellargarden": "04a8ed575a0a2ec4a9c99bc616ac8dd5241f671679021d402cc187fbc9758f49",
     "panplanetary": "ddece8042813b716b60273f3f76b89c0f13ed6918afee71dc75c8b8236f10af6",
     "warpnetwork": "8b1df93178a2d99da8f412d7a1f10a22c3808a5f472a537946332376a5d4d1a2",
-    "exocivilization": "eb355e28d0efcacaeb420df47e9d0a9e85a476a67c99d649e3e561702ed2642e"
+    "exocivilization": "eb355e28d0efcacaeb420df47e9d0a9e85a476a67c99d649e3e561702ed2642e",
+    "bioship": "96a9270c5be8113820b9da39ac9608c3dfb96c616a13e5f8f4146f9bab57e373",
+    "livingplanet": "68b9130f8aba740a2bd67ccc3bff48f5594e694229dc16e6047d1ac0237ca008",
+    "dreamlab": "9226e847b607423eaf064e7b04a2779a29cdf00565c309e0bc0f0b80658d05a8",
+    "deeparchive": "36658b1f78d832249aba76e74219b9ed0d698d4daeb422cc3b6d76309b6a1b25",
+    "chronogarden": "8270d5a0bb8a5d76f8e5c2ea293cdaddcfc898a8593e93bccfb1be754904b1d6",
+    "xenogarden": "12d981e33154636d3598ed823851e0aafa66ae0f6bc980321ac00cd2eca98591",
+    "firstalliance": "a7d558ee9c7c1124a6d4ec1ab1ec67aadb858aa790309801a819831cc90d3ea9",
+    "worldseed": "f00ac4c96b66d5d2b3221253289a7f4f34e6cafa896c1005cba47d2fa2f9602e",
+    "starbloom": "0507af7ab1ffb5319c20aedca460bfdda40bd73d2f6906ae5aaad7531db156bd",
+    "skyport": "8580792176fa24cddbdc5ea2e3586c51431e4d2f95348ad94a950bfa93c6b996"
   },
-  "html_sha256": "cf9f6e734350378e36bfe3dcfc61ce5c6292d22f0181a28070f6a24660a3d9b3"
+  "html_sha256": "c2c081da2b32f6252776b11d049290c3f370350d01b0d7932cf74083551dc839"
 }

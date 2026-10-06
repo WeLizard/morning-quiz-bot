@@ -5,8 +5,10 @@ TEST_DATABASE_URL весь файл пропускается.
 """
 
 import asyncio
+import json
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy import delete, select
@@ -366,10 +368,13 @@ def test_sync_creates_missing_profile_and_progress(pg_env):
 
 def test_catalog_is_cached_and_complete():
     assert load_catalog() is load_catalog()
-    assert len(CATALOG.element_ids) == 421
-    assert len(CATALOG.recipe_keys) == 1015
-    assert len(CATALOG.chapters) == 30
-    assert len(CATALOG.achievements) == 38
+    # Состав сверяем с самим data.json: контент растёт от версии к версии,
+    # и жёсткие числа здесь ломали бы тест на каждом расширении.
+    data = json.loads((Path(__file__).resolve().parents[1] / 'minigames' / 'alchemia-1.0' / 'data.json').read_text(encoding='utf-8'))
+    assert len(CATALOG.element_ids) == len(data['elements'])
+    assert len(CATALOG.recipe_keys) == len(data['recipes'])
+    assert len(CATALOG.chapters) == len(data['chapters'])
+    assert len(CATALOG.achievements) == len(data['achievements'])
     assert len(FREE_ELEMENTS) >= 41
 
 

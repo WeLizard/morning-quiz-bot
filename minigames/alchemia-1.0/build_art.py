@@ -320,6 +320,17 @@ A['galacticlibrary']='''<path d="M20 88h80V34H20z" fill="url(#night)"/><path d="
 A['warpnetwork']='''<circle cx="26" cy="46" r="10" fill="none" stroke="url(#teal)" stroke-width="5"/><circle cx="94" cy="46" r="10" fill="none" stroke="url(#violet)" stroke-width="5"/><circle cx="60" cy="86" r="10" fill="none" stroke="url(#gold)" stroke-width="5"/><path d="M36 46h48M34 52l20 26M86 52L66 78" fill="none" stroke="url(#cream)" stroke-width="4" stroke-linecap="round"/><path d="M60 18v12" stroke="url(#copper)" stroke-width="4" stroke-linecap="round"/>'''
 A['exocivilization']='''<circle cx="38" cy="64" r="16" fill="url(#teal)"/><circle cx="82" cy="48" r="16" fill="url(#violet)"/><rect x="50" y="68" width="24" height="16" rx="4" fill="url(#night)"/><path d="M38 44v-8M82 28v-8M62 68v-12" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/><path d="M34 96q26-14 52 0" fill="none" stroke="url(#cream)" stroke-width="4" stroke-linecap="round"/>'''
 
+
+A['bioship']=group(A['worldship'],'translate(4 10) scale(.92)')+leaf(44,44,.34,-20)+leaf(78,46,.30,35)+line('M33 88Q60 102 87 88','#d7dba7',3)+circle(91,28,5,'url(#mint)')
+A['livingplanet']=group(A['planet'],'translate(0 2)')+leaf(48,55,.34,-25)+leaf(77,72,.3,60)+line('M27 90Q59 74 90 89','#e8e0bf',2.5)+circle(84,31,4,'url(#gold)')
+A['dreamlab']=group(A['holodeck'],'translate(1 18) scale(.98)')+path('M26 43C31 26 49 18 63 26C73 14 91 18 96 34C106 37 108 53 97 60H33C24 60 19 51 21 43Z','url(#cloud)','#d7dbc9',1.2)+star(49,42,7)+star(67,37,5)+circle(83,46,4,'url(#violet)')
+A['deeparchive']=group(A['galacticlibrary'],'translate(0 6) scale(.96)')+circle(60,22,11,'url(#gold)','#f4e6b9',1)+line('M60 33V47M49 24H71','#6e8f84',3)+path('M27 97Q60 74 93 97','none','#c9c49d',4)
+A['chronogarden']=group(A['timecrystal'],'translate(0 -2) scale(.88)')+line('M60 96C48 83 47 66 34 54M60 96C73 83 73 65 87 54','#92b47f',4)+leaf(34,56,.42,-20)+leaf(87,56,.42,145)+ellipse(60,102,28,5,'#93845f')
+A['xenogarden']=group(flower('#c8b0d8'),'translate(3 23) scale(.72)')+leaf(42,70,.38,-38)+leaf(76,72,.35,35)+path('M24 90Q30 34 60 26Q90 34 96 90','none','url(#glass)',4)+line('M32 90H88','#d7d3ac',4)+circle(61,29,5,'url(#gold)')
+A['firstalliance']=group(A['firsttreaty'],'translate(0 6) scale(.94)')+circle(38,82,10,'url(#teal)')+circle(82,82,10,'url(#violet)')+path('M47 82H73','none','#f1e9c8',4)+path('M38 72v20M82 72v20','none','#d6c08a',3)+star(60,53,6)
+A['worldseed']=group(A['seed'],'translate(-2 4) scale(.86)')+group(A['planet'],'translate(48 42) scale(.34)')+line('M42 80Q58 70 71 58','#efe5bd',2.5)+star(86,29,5)
+A['starbloom']=group(flower('#d8b6d8'),'translate(0 4) scale(.93)')+star(35,27,5)+star(81,24,6)+star(94,56,4)+path('M32 25Q58 36 84 25','none','#f0ddb0',2)
+A['skyport']=group(A['city'],'translate(-4 18) scale(.55)')+group(A['stargate'],'translate(40 14) scale(.48)')+group(A['worldship'],'translate(40 60) scale(.42)')+line('M21 96H99','#c7c69e',4)+circle(28,92,5,'url(#gold)')+circle(92,92,5,'url(#gold)')
 exec((ROOT/'detail_art.py').read_text(encoding='utf-8'),globals())
 data=json.loads((ROOT/'data.json').read_text(encoding='utf-8'))
 missing=[e['id'] for e in data['elements'] if not A.get(e['id'])]

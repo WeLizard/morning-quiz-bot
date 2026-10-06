@@ -1,5 +1,5 @@
 {
-  "version": "5.1-refined",
+  "version": "5.1-refined-continuation",
   "elements": [
     {
       "id": "water",
@@ -3617,7 +3617,7 @@
       "art": "worldship",
       "description": "Целый мир собрали в полёт, потому что путь оказался длиннее поколения.",
       "tier": 8,
-      "terminal": true
+      "terminal": false
     },
     {
       "id": "biosphere",
@@ -3770,7 +3770,7 @@
       "art": "panplanetary",
       "description": "Несколько обитаемых миров начали думать как одна большая цивилизация.",
       "tier": 10,
-      "terminal": true
+      "terminal": false
     },
     {
       "id": "warpnetwork",
@@ -3788,6 +3788,96 @@
       "art": "exocivilization",
       "description": "Чужая цивилизация предстала уже не намёками, а во всей своей сложности.",
       "tier": 10,
+      "terminal": false
+    },
+    {
+      "id": "bioship",
+      "name": "Биокорабль",
+      "category": "space",
+      "art": "bioship",
+      "description": "Корабль, который не собирают по деталям, а выращивают как живой организм.",
+      "tier": 11,
+      "terminal": false
+    },
+    {
+      "id": "livingplanet",
+      "name": "Живая планета",
+      "category": "life",
+      "art": "livingplanet",
+      "description": "Целый мир ведёт себя как огромное живое существо с собственной памятью и ритмом.",
+      "tier": 11,
+      "terminal": false
+    },
+    {
+      "id": "dreamlab",
+      "name": "Лаборатория сновидений",
+      "category": "magic",
+      "art": "dreamlab",
+      "description": "Сны превратились в управляемое пространство для экспериментов и идей.",
+      "tier": 11,
+      "terminal": true
+    },
+    {
+      "id": "deeparchive",
+      "name": "Глубинный архив",
+      "category": "science",
+      "art": "deeparchive",
+      "description": "Память цивилизаций собрана в хранилище, где прошлое можно изучать почти как место.",
+      "tier": 11,
+      "terminal": true
+    },
+    {
+      "id": "chronogarden",
+      "name": "Хроносад",
+      "category": "magic",
+      "art": "chronogarden",
+      "description": "Сад, в котором время цветёт по своим законам: одни ветви стареют, другие только просыпаются.",
+      "tier": 11,
+      "terminal": true
+    },
+    {
+      "id": "xenogarden",
+      "name": "Ксеносад",
+      "category": "life",
+      "art": "xenogarden",
+      "description": "Чужая флора и земные принципы роста научились жить в одной экосистеме.",
+      "tier": 11,
+      "terminal": true
+    },
+    {
+      "id": "firstalliance",
+      "name": "Первый союз",
+      "category": "science",
+      "art": "firstalliance",
+      "description": "Контакт перестал быть событием и стал настоящим совместным будущим.",
+      "tier": 12,
+      "terminal": true
+    },
+    {
+      "id": "worldseed",
+      "name": "Семя мира",
+      "category": "magic",
+      "art": "worldseed",
+      "description": "Компактная заготовка будущего мира: почва, память и жизнь свёрнуты в один зародыш.",
+      "tier": 12,
+      "terminal": true
+    },
+    {
+      "id": "starbloom",
+      "name": "Звёздный цветок",
+      "category": "magic",
+      "art": "starbloom",
+      "description": "Цветение поднялось так высоко, что лепестки теперь похожи на маленькие созвездия.",
+      "tier": 12,
+      "terminal": true
+    },
+    {
+      "id": "skyport",
+      "name": "Небесная гавань",
+      "category": "craft",
+      "art": "skyport",
+      "description": "Место, где города, врата и корабли наконец соединились в одну удобную точку пути.",
+      "tier": 11,
       "terminal": true
     }
   ],
@@ -9881,6 +9971,126 @@
       "b": "steel",
       "result": "car",
       "key": "steel+wheel"
+    },
+    {
+      "a": "worldship",
+      "b": "biosphere",
+      "result": "bioship",
+      "key": "biosphere+worldship"
+    },
+    {
+      "a": "genome",
+      "b": "worldship",
+      "result": "bioship",
+      "key": "genome+worldship"
+    },
+    {
+      "a": "biosphere",
+      "b": "planet",
+      "result": "livingplanet",
+      "key": "biosphere+planet"
+    },
+    {
+      "a": "biosphere",
+      "b": "exoplanet",
+      "result": "livingplanet",
+      "key": "biosphere+exoplanet"
+    },
+    {
+      "a": "holodeck",
+      "b": "noosphere",
+      "result": "dreamlab",
+      "key": "holodeck+noosphere"
+    },
+    {
+      "a": "noosphere",
+      "b": "chronolab",
+      "result": "dreamlab",
+      "key": "chronolab+noosphere"
+    },
+    {
+      "a": "galacticlibrary",
+      "b": "agi",
+      "result": "deeparchive",
+      "key": "agi+galacticlibrary"
+    },
+    {
+      "a": "xenomuseum",
+      "b": "superintelligence",
+      "result": "deeparchive",
+      "key": "superintelligence+xenomuseum"
+    },
+    {
+      "a": "timecrystal",
+      "b": "stellargarden",
+      "result": "chronogarden",
+      "key": "stellargarden+timecrystal"
+    },
+    {
+      "a": "chronolab",
+      "b": "forest",
+      "result": "chronogarden",
+      "key": "chronolab+forest"
+    },
+    {
+      "a": "alienflora",
+      "b": "greenhouse",
+      "result": "xenogarden",
+      "key": "alienflora+greenhouse"
+    },
+    {
+      "a": "alienflora",
+      "b": "biosphere",
+      "result": "xenogarden",
+      "key": "alienflora+biosphere"
+    },
+    {
+      "a": "firsttreaty",
+      "b": "exocivilization",
+      "result": "firstalliance",
+      "key": "exocivilization+firsttreaty"
+    },
+    {
+      "a": "xenodiplomat",
+      "b": "panplanetary",
+      "result": "firstalliance",
+      "key": "panplanetary+xenodiplomat"
+    },
+    {
+      "a": "bioship",
+      "b": "livingplanet",
+      "result": "worldseed",
+      "key": "bioship+livingplanet"
+    },
+    {
+      "a": "seed",
+      "b": "livingplanet",
+      "result": "worldseed",
+      "key": "livingplanet+seed"
+    },
+    {
+      "a": "stellargarden",
+      "b": "flower",
+      "result": "starbloom",
+      "key": "flower+stellargarden"
+    },
+    {
+      "a": "nebula",
+      "b": "plant",
+      "result": "starbloom",
+      "key": "nebula+plant"
+    },
+    {
+      "a": "city",
+      "b": "stargate",
+      "result": "skyport",
+      "key": "city+stargate"
+    },
+    {
+      "a": "mooncity",
+      "b": "worldship",
+      "result": "skyport",
+      "key": "mooncity+worldship"
     }
   ],
   "categories": [
@@ -10353,6 +10563,48 @@
       ],
       "color": "#e1ba8d",
       "world": "mystic"
+    },
+    {
+      "id": "livingfrontier",
+      "title": "Живые миры",
+      "subtitle": "Корабли, города и целые планеты становятся не просто механизмами, а экосистемами с собственным дыханием.",
+      "goals": [
+        "bioship",
+        "livingplanet",
+        "worldseed",
+        "starbloom",
+        "ringworld"
+      ],
+      "color": "#9db6cf",
+      "world": "cosmos"
+    },
+    {
+      "id": "sharedfutures",
+      "title": "Общее будущее",
+      "subtitle": "После первого контакта наступает сложный и красивый этап: научиться расти, помнить и мечтать вместе.",
+      "goals": [
+        "xenogarden",
+        "dreamlab",
+        "deeparchive",
+        "firstalliance",
+        "skyport"
+      ],
+      "color": "#c2a7db",
+      "world": "xeno"
+    },
+    {
+      "id": "gardenoftime",
+      "title": "Сад времени",
+      "subtitle": "Когда память, сады и лаборатории сновидений переплетаются, сама история начинает ветвиться как живая крона.",
+      "goals": [
+        "chronogarden",
+        "dreamlab",
+        "starbloom",
+        "worldseed",
+        "deeparchive"
+      ],
+      "color": "#e4c39a",
+      "world": "mystic"
     }
   ],
   "achievements": [
@@ -10748,6 +11000,47 @@
       "type": "recipes",
       "value": 320,
       "art": "warpnetwork"
+    },
+    {
+      "id": "late_gardener",
+      "name": "Садовник горизонта",
+      "desc": "Открой живую планету, ксеносад, хроносад и звёздный цветок.",
+      "type": "elements",
+      "elements": [
+        "livingplanet",
+        "xenogarden",
+        "chronogarden",
+        "starbloom"
+      ],
+      "art": "chronogarden"
+    },
+    {
+      "id": "late_bridge",
+      "name": "Мосты между мирами",
+      "desc": "Собери первый союз, небесную гавань и глубинный архив.",
+      "type": "elements",
+      "elements": [
+        "firstalliance",
+        "skyport",
+        "deeparchive"
+      ],
+      "art": "firstalliance"
+    },
+    {
+      "id": "late_frontier",
+      "name": "Новый край атласа",
+      "desc": "Открой не меньше 430 элементов.",
+      "type": "count",
+      "value": 430,
+      "art": "worldseed"
+    },
+    {
+      "id": "late_recipes",
+      "name": "Мастер длинных цепочек",
+      "desc": "Запиши не меньше 900 проверенных рецептов.",
+      "type": "recipes",
+      "value": 900,
+      "art": "worldseed"
     }
   ],
   "worlds": [
@@ -10792,7 +11085,8 @@
         "orbitalworks",
         "farworlds",
         "farfuture",
-        "stellarworks"
+        "stellarworks",
+        "livingfrontier"
       ]
     },
     {
@@ -10803,7 +11097,8 @@
       "chapters": [
         "contact_path",
         "xenoscience",
-        "xenodiplomacy"
+        "xenodiplomacy",
+        "sharedfutures"
       ]
     },
     {
@@ -10818,7 +11113,8 @@
         "temporal",
         "beyondhuman",
         "infosingularity",
-        "aftertime"
+        "aftertime",
+        "gardenoftime"
       ]
     }
   ],
@@ -11219,6 +11515,166 @@
           "reward": {
             "points": 10,
             "seal": "Библиотека развилок"
+          }
+        }
+      ]
+    },
+    {
+      "id": "camp_livingfrontier",
+      "title": "Живой горизонт",
+      "world": "cosmos",
+      "description": "Вырасти из космической инфраструктуры не просто транспортную сеть, а среду для новых миров и форм жизни.",
+      "stages": [
+        {
+          "id": "living1",
+          "title": "Первый живой корпус",
+          "brief": "Соедини технику и биосферу так, чтобы корабль перестал быть просто машиной.",
+          "goals": [
+            "worldship",
+            "biosphere",
+            "bioship"
+          ],
+          "craft": [
+            "bioship"
+          ],
+          "ending": "Первый биокорабль вышел на орбиту: он не собран, а выращен.",
+          "reward": {
+            "points": 10,
+            "seal": "Живой корпус"
+          }
+        },
+        {
+          "id": "living2",
+          "title": "Пульс звезды",
+          "brief": "Нужна кузница, способная работать в космическом масштабе.",
+          "goals": [
+            "stellarengine",
+            "starforge",
+            "dysonswarm"
+          ],
+          "craft": [
+            "starforge"
+          ],
+          "ending": "Звёздная кузница открыла путь к строительству вокруг самих светил.",
+          "reward": {
+            "points": 10,
+            "seal": "Пульс звезды"
+          }
+        },
+        {
+          "id": "living3",
+          "title": "Кольцо обитаемости",
+          "brief": "Построй среду, где можно жить не на планете, а вокруг неё.",
+          "goals": [
+            "orbitalyard",
+            "ringworld",
+            "skyport"
+          ],
+          "craft": [
+            "ringworld"
+          ],
+          "ending": "Кольцевой мир замкнул собственный горизонт и стал новым домом.",
+          "reward": {
+            "points": 10,
+            "seal": "Кольцо обитаемости"
+          }
+        },
+        {
+          "id": "living4",
+          "title": "Сеятель миров",
+          "brief": "Подготовь компактный зародыш нового мира и доведи живую планету до устойчивости.",
+          "goals": [
+            "livingplanet",
+            "worldseed",
+            "starbloom"
+          ],
+          "craft": [
+            "worldseed"
+          ],
+          "ending": "Семя мира готово. Следующие миры можно будет не завоёвывать, а выращивать.",
+          "reward": {
+            "points": 10,
+            "seal": "Сеятель миров"
+          }
+        }
+      ]
+    },
+    {
+      "id": "camp_sharedfutures",
+      "title": "Общее небо",
+      "world": "xeno",
+      "description": "Построй не просто союз миров, а культуру совместного роста, памяти и доверия между разными цивилизациями.",
+      "stages": [
+        {
+          "id": "shared1",
+          "title": "Сад перевода",
+          "brief": "Найди пространство, где чужая жизнь сможет укорениться рядом с нашей.",
+          "goals": [
+            "alienflora",
+            "greenhouse",
+            "xenogarden"
+          ],
+          "craft": [
+            "xenogarden"
+          ],
+          "ending": "Ксеносад показал, что совместное будущее начинается с мягкой среды, а не с приказов.",
+          "reward": {
+            "points": 10,
+            "seal": "Сад перевода"
+          }
+        },
+        {
+          "id": "shared2",
+          "title": "Память без границ",
+          "brief": "Нужен архив, в котором разные цивилизации смогут узнавать друг друга.",
+          "goals": [
+            "galacticlibrary",
+            "deeparchive",
+            "xenomuseum"
+          ],
+          "craft": [
+            "deeparchive"
+          ],
+          "ending": "Глубинный архив стал местом, где память перестала быть одинокой.",
+          "reward": {
+            "points": 10,
+            "seal": "Память без границ"
+          }
+        },
+        {
+          "id": "shared3",
+          "title": "Общие сны",
+          "brief": "Если совместить ноосферу и пространство моделирования, можно начать диалог даже до слов.",
+          "goals": [
+            "noosphere",
+            "dreamlab",
+            "chronogarden"
+          ],
+          "craft": [
+            "dreamlab"
+          ],
+          "ending": "Лаборатория сновидений помогла встречаться идеям раньше, чем дипломатам.",
+          "reward": {
+            "points": 10,
+            "seal": "Общие сны"
+          }
+        },
+        {
+          "id": "shared4",
+          "title": "Первый союз",
+          "brief": "Соедини контакт, опыт сотрудничества и реальные площадки обмена.",
+          "goals": [
+            "firstalliance",
+            "exocivilization",
+            "skyport"
+          ],
+          "craft": [
+            "firstalliance"
+          ],
+          "ending": "Первый союз заключён. Чужие миры перестали быть только чужими.",
+          "reward": {
+            "points": 10,
+            "seal": "Первый союз"
           }
         }
       ]

@@ -109,6 +109,18 @@ test('home restores the heading and keeps global settings inside profile', async
     assert.match(app.content.textContent, /Темы обычного квиза/);
 });
 
+test('home game cards keep alternating sides and palettes', async () => {
+    const app = await application();
+    const cards = app.content.querySelectorAll('.game-mode-card');
+    assert.equal(cards.length, 4);
+    assert.deepEqual(cards.map(card => card.dataset.gameMode), ['classic', 'photo', 'night', 'atlas']);
+    assert.match(cards[0].className, /palette-green.*image-left/);
+    assert.match(cards[1].className, /palette-green.*image-right/);
+    assert.match(cards[2].className, /palette-brown.*image-left/);
+    assert.match(cards[3].className, /palette-brown.*image-right/);
+    assert.match(app.content.textContent, /Атлас маленьких чудес/);
+});
+
 test('deep link opens the requested page and falls back on unknown parameters', async () => {
     const achievements = await application(true, 'achievements');
     assert.equal(achievements.content.querySelector('h1').textContent, 'Достижения');

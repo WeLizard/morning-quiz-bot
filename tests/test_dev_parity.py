@@ -177,7 +177,9 @@ def test_mini_client_new_projections_and_no_public_demo_bypass(pg_env):
             assert '/app/app.js' in response.text and 'maximum-scale' not in response.text
             assert (await env.client.get('/app/app.js')).status_code == 200
             assert (await env.client.get('/app/host.webp')).status_code == 200
-            assert (await env.client.get('/app/photo.webp')).status_code == 200\n            assert (await env.client.get('/app/host-card.svg')).status_code == 200\n            assert (await env.client.get('/app/mafia-card.svg')).status_code == 200
+            assert (await env.client.get('/app/photo.webp')).status_code == 200
+            assert (await env.client.get('/app/host-card.webp')).status_code == 200
+            assert (await env.client.get('/app/mafia-card.webp')).status_code == 200
             assert (await env.client.post('/api/dev/session')).status_code == 404
             assert (await env.client.get('/api/mini/progress')).status_code == 401
             headers = await mini_login(env)

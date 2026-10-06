@@ -146,7 +146,7 @@
     function play(command) { playCommand = command; navigate('play'); }
     const HOME_GAME_CARDS = [
         {
-            id: 'classic', side: 'left', palette: 'green', image: '/app/host-card.svg',
+            id: 'classic', side: 'left', palette: 'green', image: '/app/host-card.webp',
             alt: 'Филиныч ведёт классический квиз в студии', eyebrow: 'РАЗМИНКА ДЛЯ ЛЮБОПЫТНЫХ',
             title: 'Классический квиз',
             description: 'Один вопрос — одно маленькое открытие. Проверь эрудицию и доверься интуиции.',
@@ -160,7 +160,7 @@
             label: 'Угадывать фото', action: () => play('/photo_quiz'), runtime: true, position: '72% 62%'
         },
         {
-            id: 'night', side: 'left', palette: 'brown', image: '/app/mafia-card.svg',
+            id: 'night', side: 'left', palette: 'brown', image: '/app/mafia-card.webp',
             alt: 'Филиныч в капюшоне ведёт ночное дело', eyebrow: 'НОВЫЙ РЕЖИМ · DEV',
             title: 'Ночной город',
             description: 'Собери стол, настрой роли и раскрой городскую историю. Мафия живёт отдельно от квиза.',

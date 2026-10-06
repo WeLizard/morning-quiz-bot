@@ -195,7 +195,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.middleware('http')
     async def boundary(request, call_next):
         static_game_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app/alchemy'}
-        public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/telegram-ui.js', '/app/game-ui.js', '/app/play-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.svg', '/app/mafia-card.svg'}
+        public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/telegram-ui.js', '/app/game-ui.js', '/app/play-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp'}
         origin = f'{request.url.scheme}://{request.url.netloc}'
         allowed = origin == settings.origin
         if request.url.scheme != 'https':
@@ -288,7 +288,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-mafia.webp')
         if asset == 'alchemy.webp':
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-atlas.webp')
-        if asset not in {'app.js', 'telegram-ui.js', 'game-ui.js', 'play-ui.js', 'styles.css', 'host-card.svg', 'mafia-card.svg'}:
+        if asset not in {'app.js', 'telegram-ui.js', 'game-ui.js', 'play-ui.js', 'styles.css', 'host-card.webp', 'mafia-card.webp'}:
             raise MiniAppError(404, 'Файл не найден')
         return FileResponse(Path(__file__).parent / 'mini_client' / asset)
 

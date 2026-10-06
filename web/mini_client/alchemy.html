@@ -96,6 +96,9 @@ body.path-open{overflow:hidden}
 @media(max-width:760px){.epoch-banner{padding-top:0}.path-pill{right:10px;top:10px;padding:7px 10px;font-size:10px}}
 @media(max-width:1030px){.path-pill{display:inline-flex}}
 .epoch-banner{position:relative}
+.category-strip{cursor:grab}
+.category-strip.panning{cursor:grabbing;scroll-snap-type:none;user-select:none}
+.category-strip.panning .chip{pointer-events:none}
 </style>
 </head>
 <body>
@@ -107,7 +110,7 @@ body.path-open{overflow:hidden}
 <symbol id="ui-star" viewBox="0 0 24 24"><path d="m12 2 3 6.5 7 1-5 5 1 7-6-3.5L6 21l1-6.5-5-5 7-1Z"/></symbol>
 <symbol id="ui-volume" viewBox="0 0 24 24"><path d="M3 9h4l5-5v16l-5-5H3Zm13-1q5 4 0 8m3-11q8 7 0 14"/></symbol>
 <symbol id="ui-muted" viewBox="0 0 24 24"><path d="M3 9h4l5-5v16l-5-5H3Zm13 0 5 6m0-6-5 6"/></symbol>
-<symbol id="ui-settings" viewBox="0 0 24 24"><path d="m10 2-1 3-3 1-3-1-2 4 3 2v3l-2 2 2 4 4-1 2 2 3 1 2-3 4-1 2-3-2-3 1-3-3-2-3 1Z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="ui-settings" viewBox="0 0 24 24"><path d="M10.30 4.90L10.58 2.51L13.42 2.51L13.70 4.90A7.3 7.3 0 0 1 15.81 5.78L17.71 4.28L19.72 6.29L18.22 8.19A7.3 7.3 0 0 1 19.10 10.30L21.49 10.58L21.49 13.42L19.10 13.70A7.3 7.3 0 0 1 18.22 15.81L19.72 17.71L17.71 19.72L15.81 18.22A7.3 7.3 0 0 1 13.70 19.10L13.42 21.49L10.58 21.49L10.30 19.10A7.3 7.3 0 0 1 8.19 18.22L6.29 19.72L4.28 17.71L5.78 15.81A7.3 7.3 0 0 1 4.90 13.70L2.51 13.42L2.51 10.58L4.90 10.30A7.3 7.3 0 0 1 5.78 8.19L4.28 6.29L6.29 4.28L8.19 5.78A7.3 7.3 0 0 1 10.30 4.90Z"/><circle cx="12" cy="12" r="3"/></symbol>
 <symbol id="ui-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 8a3 3 0 0 1 6 1q0 2-3 3v1m0 4h0"/></symbol>
 <symbol id="ui-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></symbol>
 <symbol id="ui-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
@@ -12411,7 +12414,7 @@ listen(document,'click',e=>{
   if(e.shiftKey){if(id)showDetail(id);return;}if(pick)chooseFromCollection(pick.dataset.pick);else chooseToken(token.dataset.token);return;}
  const el=e.target.closest('[data-action],[data-category],[data-goal],[data-favorite],[data-add-table],[data-load-recipe],[data-locked],[data-journal-filter],[data-setting]');if(!el)return;
  if(el.dataset.action){action(el.dataset.action);return;}
- if(el.dataset.category){category=el.dataset.category;renderCollection();return;}
+ if(el.dataset.category){if(performance.now()<suppressClickUntil)return;category=el.dataset.category;renderCollection();return;}
  if(el.dataset.goal){pinGoal(el.dataset.goal);return;}
  if(el.dataset.favorite){const id=el.dataset.favorite;favorites.has(id)?favorites.delete(id):favorites.add(id);persist();renderCollection();showDetail(id);return;}
  if(el.dataset.addTable){const id=el.dataset.addTable;closeModal();pushUndo();const t=addToken(id);if(t){selected=t.uid;renderBoard();persist();}return;}
@@ -12420,6 +12423,35 @@ listen(document,'click',e=>{
  if(el.dataset.journalFilter){journalFilter=el.dataset.journalFilter;showJournal();return;}
  if(el.dataset.setting){const key=el.dataset.setting;state.settings[key]=!state.settings[key];applySettings();if(!state.settings.motion)stopParticles();persist();showSettings(true);if(key==='sound'&&state.settings.sound)playSound('select');}
 });
+/* Полоса категорий шире панели и без видимой прокрутки: пальцу хватает нативного жеста,
+ * а мыши нужны колесо и перетаскивание. */
+{
+ const strip=$('categoryStrip');let panId=null,startX=0,startLeft=0,moved=false;
+ listen(strip,'wheel',e=>{
+  if(e.shiftKey||strip.scrollWidth<=strip.clientWidth||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
+  strip.scrollLeft+=e.deltaY;e.preventDefault();
+ },{passive:false});
+ listen(strip,'pointerdown',e=>{
+  if(e.pointerType!=='mouse'||e.button!==0)return;
+  panId=e.pointerId;startX=e.clientX;startLeft=strip.scrollLeft;moved=false;
+ });
+ listen(strip,'pointermove',e=>{
+  if(e.pointerId!==panId)return;
+  const dx=e.clientX-startX;
+  if(!moved){
+   if(Math.abs(dx)<5)return;
+   moved=true;strip.classList.add('panning');
+   try{strip.setPointerCapture(panId);}catch(err){}
+  }
+  strip.scrollLeft=startLeft-dx;
+ });
+ const endPan=e=>{
+  if(e.pointerId!==panId)return;
+  panId=null;strip.classList.remove('panning');
+  if(moved)suppressClickUntil=performance.now()+250;   // отпускание после протяжки — не выбор категории
+ };
+ listen(strip,'pointerup',endPan);listen(strip,'pointercancel',endPan);
+}
 listen(document,'pointerdown',pointerDown);
 listen(document,'pointermove',pointerMove,{passive:false});
 listen(document,'pointerup',pointerUp);
@@ -12502,7 +12534,7 @@ function epochScene(id,extra=''){
  const use=(k,x,y,w)=>`<svg x="${x}" y="${y}" width="${w}" height="${w}" viewBox="0 0 120 120"><use href="#art-${k}"/></svg>`;
  let scene=`<rect width="960" height="240" fill="${bg}"/>`;
  for(let i=0;i<32;i++){const x=(i*137+29)%950,y=(i*31+13)%187;scene+=`<circle cx="${x}" cy="${y}" r="${i%4?1:2}" fill="${gold}" opacity=".5"/>`;}
- if(id==='origins')scene+=`<circle cx="728" cy="58" r="32" fill="${gold}" opacity=".75"/><path d="M0 153Q160 50 350 148T730 140T960 143V240H0Z" fill="${middle}"/><path d="M0 199Q210 143 430 195T960 160V240H0Z" fill="#2f5747"/><path d="M606 164Q505 192 579 203T622 240H496Q427 205 536 191Z" fill="${light}" opacity=".7"/>${use('forest',43,19,211)}${use('tree',740,37,185)}${use('greenhouse',299,91,119)}${use('mushroom',698,176,60)}`;
+ if(id==='origins')scene+=`<circle cx="728" cy="58" r="32" fill="${gold}" opacity=".75"/><path d="M0 153Q160 50 350 148T730 140T960 143V240H0Z" fill="${middle}"/><path d="M0 199Q210 143 430 195T960 160V240H0Z" fill="#2f5747"/><defs><clipPath id="riverClip"><path d="M0 153Q160 50 350 148T730 140T960 143V240H0Z"/></clipPath></defs><path d="M538 187Q552 191 579 193Q660 205 625 240H492Q420 200 538 187Z" fill="${light}" opacity=".7" clip-path="url(#riverClip)"/>${use('forest',43,19,211)}${use('tree',740,37,185)}${use('greenhouse',299,91,119)}${use('mushroom',698,176,60)}`;
  else if(id==='makers')scene+=`<path d="M0 200L960 172V240H0Z" fill="${middle}" opacity=".36"/><path d="M0 217H960M24 240L960 207M490 188L571 240" stroke="${light}" opacity=".2"/>${use('factory',35,49,176)}${use('windturbine',239,2,197)}${use('solarfarm',421,88,155)}${use('verticalfarm',636,21,185)}${use('nanobot',825,116,97)}<path d="M168 204H659L704 193" fill="none" stroke="${gold}" stroke-width="3" opacity=".5"/>`;
  else if(id==='cosmos')scene+=`<ellipse cx="480" cy="250" rx="530" ry="97" fill="${middle}"/><ellipse cx="480" cy="264" rx="530" ry="95" fill="#242f4a"/>${use('planet',57,5,182)}${use('orbitalcolony',383,5,158)}${use('moonbase',551,115,132)}${use('spaceship',699,35,138)}${use('satellite',291,83,96)}<path d="M160 90Q446-49 794 88" fill="none" stroke="${gold}" stroke-dasharray="4 8" opacity=".32"/>`;
  else if(id==='xeno')scene+=`<circle cx="235" cy="65" r="46" fill="${middle}"/><circle cx="700" cy="37" r="18" fill="${gold}"/><path d="M0 199Q276 120 445 190T960 172V240H0Z" fill="${middle}" opacity=".5"/>${use('alienflora',29,31,182)}${use('aliencity',319,31,189)}${use('ufo',581,9,123)}${use('alienfauna',716,117,129)}${use('xenodiplomat',529,123,102)}`;

@@ -88,3 +88,6 @@ body.path-open{overflow:hidden}
 @media(max-width:760px){.epoch-banner{padding-top:0}.path-pill{right:10px;top:10px;padding:7px 10px;font-size:10px}}
 @media(max-width:1030px){.path-pill{display:inline-flex}}
 .epoch-banner{position:relative}
+.category-strip{cursor:grab}
+.category-strip.panning{cursor:grabbing;scroll-snap-type:none;user-select:none}
+.category-strip.panning .chip{pointer-events:none}

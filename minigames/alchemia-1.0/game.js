@@ -567,7 +567,7 @@ listen(document,'click',e=>{
   if(e.shiftKey){if(id)showDetail(id);return;}if(pick)chooseFromCollection(pick.dataset.pick);else chooseToken(token.dataset.token);return;}
  const el=e.target.closest('[data-action],[data-category],[data-goal],[data-favorite],[data-add-table],[data-load-recipe],[data-locked],[data-journal-filter],[data-setting]');if(!el)return;
  if(el.dataset.action){action(el.dataset.action);return;}
- if(el.dataset.category){category=el.dataset.category;renderCollection();return;}
+ if(el.dataset.category){if(performance.now()<suppressClickUntil)return;category=el.dataset.category;renderCollection();return;}
  if(el.dataset.goal){pinGoal(el.dataset.goal);return;}
  if(el.dataset.favorite){const id=el.dataset.favorite;favorites.has(id)?favorites.delete(id):favorites.add(id);persist();renderCollection();showDetail(id);return;}
  if(el.dataset.addTable){const id=el.dataset.addTable;closeModal();pushUndo();const t=addToken(id);if(t){selected=t.uid;renderBoard();persist();}return;}
@@ -576,6 +576,35 @@ listen(document,'click',e=>{
  if(el.dataset.journalFilter){journalFilter=el.dataset.journalFilter;showJournal();return;}
  if(el.dataset.setting){const key=el.dataset.setting;state.settings[key]=!state.settings[key];applySettings();if(!state.settings.motion)stopParticles();persist();showSettings(true);if(key==='sound'&&state.settings.sound)playSound('select');}
 });
+/* Полоса категорий шире панели и без видимой прокрутки: пальцу хватает нативного жеста,
+ * а мыши нужны колесо и перетаскивание. */
+{
+ const strip=$('categoryStrip');let panId=null,startX=0,startLeft=0,moved=false;
+ listen(strip,'wheel',e=>{
+  if(e.shiftKey||strip.scrollWidth<=strip.clientWidth||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
+  strip.scrollLeft+=e.deltaY;e.preventDefault();
+ },{passive:false});
+ listen(strip,'pointerdown',e=>{
+  if(e.pointerType!=='mouse'||e.button!==0)return;
+  panId=e.pointerId;startX=e.clientX;startLeft=strip.scrollLeft;moved=false;
+ });
+ listen(strip,'pointermove',e=>{
+  if(e.pointerId!==panId)return;
+  const dx=e.clientX-startX;
+  if(!moved){
+   if(Math.abs(dx)<5)return;
+   moved=true;strip.classList.add('panning');
+   try{strip.setPointerCapture(panId);}catch(err){}
+  }
+  strip.scrollLeft=startLeft-dx;
+ });
+ const endPan=e=>{
+  if(e.pointerId!==panId)return;
+  panId=null;strip.classList.remove('panning');
+  if(moved)suppressClickUntil=performance.now()+250;   // отпускание после протяжки — не выбор категории
+ };
+ listen(strip,'pointerup',endPan);listen(strip,'pointercancel',endPan);
+}
 listen(document,'pointerdown',pointerDown);
 listen(document,'pointermove',pointerMove,{passive:false});
 listen(document,'pointerup',pointerUp);

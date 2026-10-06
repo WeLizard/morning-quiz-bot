@@ -7,6 +7,8 @@ const {runInNewContext} = require('node:vm');
 
 class Element {
     constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.attrs = {}; this.events = {}; this.className = ''; this.text = '';
+        // Карточки главной выставляют object-position через style — заглушка должна это выдерживать.
+        this.style = {};
         this.classList = {add: (...names) => { this.className += ' ' + names.join(' '); }, toggle: (name, enabled) => { this.className = this.className.split(' ').filter(n => n !== name).concat(enabled ? [name] : []).join(' '); }};
     }
     set textContent(value) { this.text = String(value); this.children = []; }

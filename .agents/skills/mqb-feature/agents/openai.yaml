@@ -1,0 +1,5 @@
+interface:
+  display_name: "MQB Feature"
+  short_description: "Обычные фичи через общий сервис и адаптеры"
+policy:
+  allow_implicit_invocation: true

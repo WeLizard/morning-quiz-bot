@@ -23,7 +23,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import Database
-from .models import AlchemyProgress, User
+from .models import Account, AlchemyProgress, User
+from .guest_accounts import GuestAccounts
+from .mini_app import MiniAppError
 from .repositories import OperationalRepository
 
 logger = logging.getLogger(__name__)
@@ -221,7 +223,7 @@ class AlchemyService:
             # Прогресс монотонный: заработанное не отзывается более бедным sync.
             merged_chapters = stored_chapters | catalog.closed_chapters(merged_elements)
             merged_achievements = stored_achievements | catalog.earned_achievements(
-                merged_elements, merged_recipes, tried
+                merged_elements, merged_recipes, max(row.attempts, tried)
             )
 
             new_chapters = merged_chapters - stored_chapters
@@ -241,6 +243,7 @@ class AlchemyService:
                     'Алхимия: суточный потолок срезал %s очков у %s', requested - awarded, user_id
                 )
 
+            row.attempts = max(row.attempts, tried)
             row.discovered = sorted(merged_elements)
             row.crafted = sorted(merged_recipes)
             row.chapters = sorted(merged_chapters)
@@ -277,17 +280,17 @@ class AlchemyService:
         rank_expression = _discovered_rank_expression()
         today = _moscow_day(_resolve_now(now))
         async with self.database.transaction() as session:
-            row = await session.get(AlchemyProgress, user_id)
+            row = await session.scalar(select(AlchemyProgress).where(AlchemyProgress.user_id == user_id))
             discovered = len(_stored(row.discovered)) if row else 0
             total_players = await session.scalar(
-                select(func.count()).select_from(AlchemyProgress)
+                select(func.count()).select_from(AlchemyProgress).where(AlchemyProgress.user_id.is_not(None))
             ) or 0
             if row is None:
                 # Игрок без строки прогресса всё равно участник: место не выше числа игроков.
                 total_players += 1
             ahead = await session.scalar(
                 select(func.count()).select_from(AlchemyProgress)
-                .where(rank_expression > discovered)
+                .where(rank_expression > discovered, AlchemyProgress.user_id.is_not(None))
             ) or 0
             # Счётчик дня обнуляется сам: очки прошлых суток к цели не относятся.
             points_today = float(row.points_today) if row and row.points_day == today else 0.0
@@ -340,23 +343,69 @@ class AlchemyService:
         ]}
 
     async def _locked_progress(self, session: AsyncSession, user_id: int) -> AlchemyProgress:
-        """Строка прогресса под блокировкой; отсутствующую создаём гонко-безопасно."""
+        """Legacy Telegram resolver; progress is owned by one independent account."""
         await OperationalRepository(session).ensure_user({'id': user_id})
+        user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+        if user.account_id is None:
+            account = Account(display_name=user.display_name, archived=user.archived,
+                bot_blocked=user.bot_blocked, moderation_revision=user.moderation_revision,
+                moderation_reason=user.moderation_reason)
+            session.add(account)
+            await session.flush()
+            user.account_id = account.id
+        return await self._locked_account_progress(session, user.account_id, user_id=user_id)
+
+    async def _locked_account_progress(self, session, account_id, *, user_id=None):
         statement = select(AlchemyProgress).where(
-            AlchemyProgress.user_id == user_id
-        ).with_for_update()
+            AlchemyProgress.account_id == account_id).with_for_update()
+        await session.execute(pg_insert(AlchemyProgress).values(
+            account_id=account_id, user_id=user_id, discovered=[], crafted=[], chapters=[],
+            achievements=[], attempts=0, points_total=Decimal('0'),
+            points_today=Decimal('0'), points_day=None,
+        ).on_conflict_do_nothing(index_elements=[AlchemyProgress.account_id]))
         row = await session.scalar(statement)
-        if row is None:
-            await session.execute(
-                pg_insert(AlchemyProgress)
-                .values(
-                    user_id=user_id, discovered=[], crafted=[], chapters=[], achievements=[],
-                    points_total=Decimal('0'), points_today=Decimal('0'), points_day=None,
-                )
-                .on_conflict_do_nothing(index_elements=[AlchemyProgress.user_id])
-            )
-            row = await session.scalar(statement)
+        if row.user_id != user_id:
+            raise MiniAppError(409, 'Владелец прогресса не совпадает; требуется явная привязка')
         return row
+
+    @staticmethod
+    def _guest_projection(row):
+        # Imported offline discoveries are saved, never evidence for rated rewards.
+        return {'awarded': 0, 'discovered': list(row.discovered) if row else [],
+                'crafted': list(row.crafted) if row else [], 'attempts': row.attempts if row else 0,
+                'chapters': list(row.chapters) if row else [],
+                'achievements': list(row.achievements) if row else [],
+                'points_total': 0, 'points_today': 0, 'remaining_today': 0,
+                'goal_streak': 0, 'reward_eligible': False}
+
+    async def guest_progress(self, credential, *, now=None):
+        moment = _resolve_now(now)
+        auth = GuestAccounts(self.database, clock=lambda: moment.timestamp())
+        async with self.database.transaction() as session:
+            account, _ = await auth._authorized(session, credential, lock=True)
+            row = await session.get(AlchemyProgress, account.id)
+            if row is not None and row.user_id is not None:
+                raise MiniAppError(409, 'Для этого прогресса требуется подтверждённый вход')
+            return self._guest_projection(row)
+
+    async def guest_sync(self, credential, *, expected_account_id, discovered=(), crafted=(), attempts=0, now=None):
+        moment = _resolve_now(now)
+        catalog = load_catalog()
+        auth = GuestAccounts(self.database, clock=lambda: moment.timestamp())
+        async with self.database.transaction() as session:
+            account, _ = await auth._authorized(session, credential, lock=True)
+            if str(account.id) != expected_account_id:
+                raise MiniAppError(409, 'Гостевой профиль изменился. Открой игру заново.')
+            row = await self._locked_account_progress(session, account.id)
+            opened = _stored(row.discovered) | catalog.known_elements(discovered)
+            recipes = _stored(row.crafted) | catalog.known_recipes(crafted)
+            row.attempts = max(row.attempts, _count(attempts))
+            row.discovered, row.crafted = sorted(opened), sorted(recipes)
+            row.chapters = sorted(_stored(row.chapters) | catalog.closed_chapters(opened))
+            row.achievements = sorted(_stored(row.achievements) |
+                catalog.earned_achievements(opened, recipes, row.attempts))
+            row.updated_at = moment
+            return self._guest_projection(row)
 
     @staticmethod
     async def _grant(session: AsyncSession, user_id: int, achievement_ids: Iterable[str]) -> int:

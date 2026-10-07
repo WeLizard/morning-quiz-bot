@@ -14,3 +14,6 @@ minigames/alchemia-1.0/*.py text eol=lf
 # Иллюстрации элементов: из них собирается art.svg, поэтому LF обязателен и здесь.
 minigames/alchemia-1.0/*.svg text eol=lf
 minigames/alchemia-1.0/illustrations/*.svg text eol=lf
+.githooks/* text eol=lf
+.codex/*.json text eol=lf
+.agents/skills/** text eol=lf

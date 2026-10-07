@@ -11,8 +11,9 @@ const R=new Map(DATA.recipes.map(r=>[r.key,r]));
 const C=new Map(DATA.categories.map(c=>[c.id,c]));
 const W=new Map((DATA.worlds||[]).map(w=>[w.id,w]));
 const BASE=['water','earth','fire','air'];
-const STORE='alchemia.atlas'; // Stable key; save schema evolves independently of the release.
-const LEGACY_STORES=['alchemia.atlas.v5','alchemia.atlas.v4','alchemia.atlas.v3','alchemia.atlas.v2','alchemia.atlas.v1'];
+const GUEST_ID=/^[0-9a-f-]{36}$/.test(window.MQB_ALCHEMY_GUEST_ID||'')?window.MQB_ALCHEMY_GUEST_ID:null;
+const STORE=GUEST_ID?`alchemia.atlas.guest.${GUEST_ID}`:'alchemia.atlas';
+const LEGACY_STORES=GUEST_ID?[]:['alchemia.atlas.v5','alchemia.atlas.v4','alchemia.atlas.v3','alchemia.atlas.v2','alchemia.atlas.v1'];
 const MAX_TOKENS=36, HISTORY_LIMIT=160, MAX_SAVE_BYTES=8000000;
 const $=id=>document.getElementById(id);
 const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -77,7 +78,7 @@ try{
   for(const key of LEGACY_STORES){
    try{const text=localStorage.getItem(key);if(text&&text.length<=MAX_SAVE_BYTES)candidates.push(cleanSave(JSON.parse(text)));}catch(err){/* Keep incompatible legacy bytes untouched. */}
   }
-  try{const old=JSON.parse(localStorage.getItem('elementAlchemyDiscovered')||'null');if(Array.isArray(old))candidates.push(cleanSave({...freshState(),discovered:old}));}catch(err){}
+  if(!GUEST_ID)try{const old=JSON.parse(localStorage.getItem('elementAlchemyDiscovered')||'null');if(Array.isArray(old))candidates.push(cleanSave({...freshState(),discovered:old}));}catch(err){}
   if(candidates.length){
    candidates.sort((a,b)=>b.discovered.length-a.discovered.length||b.updatedAt-a.updatedAt);
    const seed=candidates[0];
@@ -690,13 +691,15 @@ function applyRemoteState(remote){
  if(!remote||typeof remote!=='object')return {added:0};
  const incoming=Array.isArray(remote.discovered)?remote.discovered.filter(id=>E.has(id)):[];
  const recipes=Array.isArray(remote.recipeKeys)?remote.recipeKeys.filter(k=>R.has(k)):null;
- let added=0;
+ let added=0,recipesAdded=0;
  for(const id of incoming)if(!found.has(id)){found.add(id);newThisSession.add(id);added++;}
- if(recipes)for(const key of recipes)knownRecipes.add(key);
+ if(recipes)for(const key of recipes)if(!knownRecipes.has(key)){knownRecipes.add(key);recipesAdded++;}
+ const previousAttempts=state.attempts;
+ if(Number.isInteger(remote.attempts)&&remote.attempts>=0)state.attempts=Math.max(state.attempts,remote.attempts);
  updateAchievements();
  if(added){renderAll();playSound('discovered');}
  persist();
- return {added};
+ return {added,recipesAdded,attemptsAdded:state.attempts>previousAttempts};
 }
 Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'5.1-refined',getState:()=>{syncState();return clone(state);},applyRemoteState,audit:auditContent}),writable:false});
 updateAchievements();applySettings();renderAll();sizeCanvas();

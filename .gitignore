@@ -122,6 +122,13 @@ data/questions/.history/
 data/questions/.admin.lock
 *.bat
 
+# Shared project rules and skills override personal global AI-file exclusions.
+!/AGENTS.md
+!/.agents/
+/.agents/*
+!/.agents/skills/
+!/.agents/skills/**
+
 # System configuration files (deployment-specific)
 *.service
 *.conf

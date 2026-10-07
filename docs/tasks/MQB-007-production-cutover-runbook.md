@@ -12,7 +12,7 @@
 
 | Проверка | Результат |
 |---|---|
-| Миграции на пустой БД | 11 ревизий, head `20260904_0011`, `alembic check` — расхождений нет |
+| Миграции на пустой БД | 13 ревизий, head `20260904_0013`, `alembic check` — расхождений нет |
 | Импорт боевых JSON (31 МБ, 126 файлов) | `status: completed`, `errors: 0`, 10/10 fingerprints matched |
 | Перенесённые данные | 11 чатов, 16 пользователей, 24 участника, 184 ачивки, 18 расписаний, 198 фото, 63 категории, 6698 вопросов, 7 system_states |
 | Тестовый гейт на чистой мигрированной БД | 441 passed, 3 skipped (нужны `pg_dump`/`createdb` на хосте) |
@@ -32,7 +32,7 @@
 | Шаг | Результат |
 |---|---|
 | Снимок боевых данных | 32 МБ (`data/` + `config/`), снят только на чтение |
-| Миграции на пустой БД | head `20260904_0011`, `alembic check` — расхождений нет |
+| Миграции на пустой БД | head `20260904_0013`, `alembic check` — расхождений нет |
 | Сухой прогон импортёра | `dry_run`, ошибок 0, счётчики совпали с ожидаемыми ниже |
 | Импорт | `status: completed`, `errors: []`, `source == database`, **10/10 fingerprints matched**, 1,66 с |
 | Гейт media-каталога на свежей БД | «каталог согласован»: 198 файлов ↔ 198 записей |
@@ -92,7 +92,7 @@ ENV
 docker compose --profile postgres up -d postgres
 until docker inspect --format '{{.State.Health.Status}}' morning-quiz-postgres | grep -q healthy; do sleep 3; done
 ./venv/bin/python -m alembic upgrade head
-./venv/bin/python -m alembic current      # ожидаем 20260904_0011 (head)
+./venv/bin/python -m alembic current      # ожидаем 20260904_0013 (head)
 ```
 
 Порт `5432` публикуется только на `127.0.0.1` — чужие БД на сервере не затрагиваются. Если на хосте уже занят 5432, задать `POSTGRES_PORT` и тот же порт в `DATABASE_URL`.
@@ -163,9 +163,9 @@ tail -n 100 logs/bot.log | grep -E "PostgreSQL state|Вопросы загруж
 - [ ] В `logs/` нет `Traceback`, нет упоминаний JSON-фолбэка.
 - [ ] *(репетиция)* За время проверок в `data/` не изменился ни один файл: 325 файлов, снимок размеров и mtime до и после совпал.
 - [ ] Telegram: `/start`, `/help`, `/categories`, `/top`, `/mystats`, обычная викторина, фото-викторина.
-- [ ] *(репетиция)* Админка: `http://<хост>:8000/login` → вход по `ADMIN_ACCESS_TOKEN` (200), `/api/analytics/overview` → 200, банк вопросов → 200 (198 фото), фото `MrLizard.webp` → 200 `image/webp`, `/api/storage/status` показывает `schema_revision: 20260904_0011` и `completed_imports: 1`.
+- [ ] *(репетиция)* Админка: `http://<хост>:8000/login` → вход по `ADMIN_ACCESS_TOKEN` (200), `/api/analytics/overview` → 200, банк вопросов → 200 (198 фото), фото `MrLizard.webp` → 200 `image/webp`, `/api/storage/status` показывает `schema_revision: 20260904_0013` и `completed_imports: 1`.
 - [ ] Mini App (если включаем): `/healthz` → 200, кнопка в BotFather открывает приложение, сессия создаётся.
-- [ ] *(репетиция)* `alembic current` = `20260904_0011`, отчёт импорта сохранён в `migration-reports/`.
+- [ ] *(репетиция)* `alembic current` = `20260904_0013`, отчёт импорта сохранён в `migration-reports/`.
 - [ ] *(репетиция)* `./venv/bin/python scripts/verify_media_catalog.py` → «каталог согласован»: записи без файла или с расхождением подписи — стоп; файлы без записи допустимы (след неуверенного коммита).
 - [ ] *(репетиция)* `MINI_APP_BOT_TOKEN=... ./venv/bin/python scripts/smoke_mini_app.py --base-url https://<домен> --user-id <тестовый id>` → «всё в порядке» (16 проверок: healthz, страница и клиент, вход, me/config/progress/achievements/history/categories/leaderboard/chats, детали чата, продление сессии, выход и отказ старого токена).
 - [ ] Механики «Алхимии»: `/app/alchemy` → 200 (автономный файл с мостом синхронизации), синхронизация прогресса начисляет очки в общий профиль (2 за элемент, 3 за главу, 5 за достижение) только за первое открытие, повторная отправка даёт 0, суточный потолок 30 соблюдается, в сводке видны цель дня, серия дней и остаток лимита, рейтинг атласа отдаёт места и не раскрывает чужие идентификаторы.

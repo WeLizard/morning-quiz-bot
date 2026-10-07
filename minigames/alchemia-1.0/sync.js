@@ -3,9 +3,11 @@
    не происходит, а весь блок обёрнут в try/catch. */
 (() => {
     'use strict';
-    const ENDPOINT = '/api/mini/alchemy/sync';
-    const PRIMARY = 'alchemia.atlas';
-    const LEGACY = ['alchemia.atlas.v5', 'alchemia.atlas.v4', 'alchemia.atlas.v3',
+    const guestId = /^[0-9a-f-]{36}$/.test(window.MQB_ALCHEMY_GUEST_ID || '')
+        ? window.MQB_ALCHEMY_GUEST_ID : null;
+    const ENDPOINT = guestId ? '/api/guest/alchemy/sync' : '/api/mini/alchemy/sync';
+    const PRIMARY = guestId ? `alchemia.atlas.guest.${guestId}` : 'alchemia.atlas';
+    const LEGACY = guestId ? [] : ['alchemia.atlas.v5', 'alchemia.atlas.v4', 'alchemia.atlas.v3',
                     'alchemia.atlas.v2', 'alchemia.atlas.v1', 'elementAlchemyDiscovered'];
     const TOKEN_KEY = 'mqb-mini-token';
     const RELOADED_KEY = 'mqb-alchemy-restored';
@@ -13,6 +15,7 @@
     const MAX_DISCOVERED = 2000;
     const MAX_CRAFTED = 4000;
     let busy = false;
+    let staleGuest = false;
 
     function token() {
         const fromHash = /(?:^|[#&])t=([A-Za-z0-9_-]{20,})/.exec(location.hash || '');
@@ -75,16 +78,23 @@
         let current;
         try { current = JSON.parse(localStorage.getItem(PRIMARY) || 'null'); } catch { current = null; }
         if (!current || typeof current !== 'object' || !Array.isArray(current.discovered)) {
-            if (!data.discovered.length) return false;
+            if (!data.discovered.length && !(data.crafted || []).length && !data.attempts) return false;
             current = fresh();
         }
         const local = new Set(current.discovered);
         const added = data.discovered.filter(id => !local.has(id));
+        const remoteRecipes = Array.isArray(data.crafted) ? data.crafted : [];
+        const localRecipes = new Set(Array.isArray(current.recipeKeys) ? current.recipeKeys : []);
+        const recipesAdded = remoteRecipes.filter(key => !localRecipes.has(key));
+        const attempts = Number.isInteger(data.attempts) && data.attempts >= 0 ? data.attempts : 0;
+        const attemptsAdded = attempts > (Number.isInteger(current.attempts) ? current.attempts : 0);
         if (data.awarded > 0) banner(`Алхимия: +${data.awarded} очков в профиль · всего ${data.points_total}`);
-        if (!added.length) return false;
+        if (!added.length && !recipesAdded.length && !attemptsAdded) return false;
         // Сохранение обновляем всегда: это страховка, даже если игра сейчас занята
         // или не умеет принимать чужой прогресс.
         current.discovered = [...new Set([...current.discovered, ...data.discovered])];
+        current.recipeKeys = [...new Set([...localRecipes, ...remoteRecipes])];
+        current.attempts = Math.max(current.attempts || 0, attempts);
         current.updatedAt = Date.now();
         try { localStorage.setItem(PRIMARY, JSON.stringify(current)); } catch { /* ниже всё равно попробуем */ }
         // Главное — влить прогресс в живую игру: она держит состояние в памяти и
@@ -92,7 +102,9 @@
         try {
             const game = window.Alchemia;
             if (game && typeof game.applyRemoteState === 'function') {
-                if (game.applyRemoteState({discovered: data.discovered}).added > 0) return true;
+                const applied = game.applyRemoteState({discovered: data.discovered,
+                    recipeKeys: remoteRecipes, attempts});
+                if (applied.added > 0 || applied.recipesAdded > 0 || applied.attemptsAdded) return true;
             }
         } catch { /* ниже сработает перезагрузка */ }
         let already = false;
@@ -106,9 +118,9 @@
     const EMPTY = {discovered: [], recipeKeys: [], attempts: 0};
 
     async function sync() {
-        if (busy) return;
-        const bearer = token();
-        if (!bearer) return;                      // вне мини-аппа синхронизации нет
+        if (busy || staleGuest) return;
+        const bearer = guestId ? '' : token();
+        if (!guestId && !bearer) return;          // автономный HTML без аккаунта
         // Спрашиваем сервер даже без локального сохранения: на новом устройстве
         // игра ещё ничего не записала, и именно так подтягивается чужой прогресс.
         const state = readState() || EMPTY;
@@ -116,9 +128,21 @@
         try {
             const response = await fetch(ENDPOINT, {
                 method: 'POST', credentials: 'same-origin',
-                headers: {'Content-Type': 'application/json', Authorization: `Bearer ${bearer}`},
+                headers: guestId
+                    ? {'Content-Type': 'application/json', 'X-Guest-CSRF': '1', 'X-Guest-Account': guestId}
+                    : {'Content-Type': 'application/json', Authorization: `Bearer ${bearer}`},
                 body: JSON.stringify(summary(state)),
             });
+            if (guestId && response.status === 409) {
+                staleGuest = true;
+                banner('Гостевой профиль изменился. Открой игру заново из приложения.');
+                return;
+            }
+            if (guestId && response.status === 401) {
+                staleGuest = true;
+                banner('Доступ к гостевому профилю потерян. Локальное сохранение осталось на этом устройстве.');
+                return;
+            }
             if (!response.ok) return;
             restore(await response.json());
         } catch { /* игра не должна страдать из-за сети */ } finally { busy = false; }

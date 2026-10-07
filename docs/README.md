@@ -4,6 +4,9 @@
 > [docs/INDEX.md](INDEX.md). Правила обновления документов описаны в
 > [DOCUMENTATION_RULES.md](DOCUMENTATION_RULES.md).
 
+> Разработка и релиз: [DEVELOPMENT](engineering/DEVELOPMENT.md), [RELEASE_CRITERIA](engineering/RELEASE_CRITERIA.md),
+> [FARM_CONCEPT](engineering/FARM_CONCEPT.md) и [AGENTS.md](../AGENTS.md). Концепт фермы — предложение.
+
 > **Важно:** этот README содержит исторические описания и местами расходится с
 > текущим runtime. Для планирования изменений используйте
 > [проверенную по коду карту функций](CODE_VERIFIED_FEATURE_MAP.md).

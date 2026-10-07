@@ -18,7 +18,7 @@ function storage(initial = {}) {
     };
 }
 
-function bridge({token = 'x'.repeat(32), local = {}, session = {}, response = {}, fail = false} = {}) {
+function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {}, response = {}, status = 200, fail = false} = {}) {
     const localStore = storage(local);
     const sessionStore = storage(session);
     const calls = [];
@@ -28,6 +28,7 @@ function bridge({token = 'x'.repeat(32), local = {}, session = {}, response = {}
     const applied = [];
     const sandbox = {
         window: {
+            MQB_ALCHEMY_GUEST_ID: guestId,
             Alchemia: {applyRemoteState: remote => { applied.push(remote); return {added: Array.isArray(remote.discovered) ? remote.discovered.length : 0}; }},
         },
         localStorage: localStore,
@@ -41,7 +42,7 @@ function bridge({token = 'x'.repeat(32), local = {}, session = {}, response = {}
         fetch: async (url, options) => {
             calls.push({url, options});
             if (fail) throw new Error('сеть недоступна');
-            return {ok: true, status: 200, json: async () => response};
+            return {ok: status >= 200 && status < 300, status, json: async () => response};
         },
         addEventListener: (event, callback) => { listeners[event] = callback; },
         requestAnimationFrame: callback => callback(),
@@ -159,4 +160,75 @@ test('берёт токен из localStorage, если его нет в session
     await flush();
     assert.equal(env.calls.length, 1);
     assert.equal(env.calls[0].options.headers.Authorization, `Bearer ${'y'.repeat(32)}`);
+});
+
+test('гость использует отдельное сохранение и не отправляет оставшийся Telegram token', async () => {
+    const guestId = '11111111-1111-4111-8111-111111111111';
+    const scoped = `alchemia.atlas.guest.${guestId}`;
+    const env = bridge({guestId, local: {
+        'mqb-mini-token': 'y'.repeat(32),
+        'alchemia.atlas': save(['water', 'secret-from-telegram']),
+        [scoped]: save(['water', 'earth', 'fire', 'air', 'steam']),
+    }, response: {awarded: 0, discovered: ['water', 'earth', 'fire', 'air', 'steam', 'mud']}});
+    env.listeners.load();
+    await flush();
+    assert.equal(env.calls[0].url, '/api/guest/alchemy/sync');
+    assert.equal(env.calls[0].options.headers.Authorization, undefined);
+    assert.equal(env.calls[0].options.headers['X-Guest-CSRF'], '1');
+    assert.equal(env.calls[0].options.headers['X-Guest-Account'], guestId);
+    assert.deepEqual(JSON.parse(env.calls[0].options.body).discovered, ['water', 'earth', 'fire', 'air', 'steam']);
+    assert.deepEqual(JSON.parse(env.localStore.getItem('alchemia.atlas')).discovered,
+        ['water', 'secret-from-telegram']);
+    assert.deepEqual(JSON.parse(env.localStore.getItem(scoped)).discovered,
+        ['water', 'earth', 'fire', 'air', 'steam', 'mud']);
+});
+
+test('старая гостевая вкладка прекращает sync после смены cookie', async () => {
+    const guestId = '11111111-1111-4111-8111-111111111111';
+    const env = bridge({guestId, status: 409, local: {[`alchemia.atlas.guest.${guestId}`]: save(['water'])}});
+    env.listeners.load();
+    await flush();
+    assert.equal(env.calls[0].options.headers['X-Guest-Account'], guestId);
+    env.listeners.visibilitychange();
+    await flush();
+    assert.equal(env.calls.length, 1);
+    assert.match(env.banners.join(' '), /Гостевой профиль изменился/);
+});
+
+test('истёкшая гостевая сессия сообщает о локальном сохранении', async () => {
+    const guestId = '11111111-1111-4111-8111-111111111111';
+    const env = bridge({guestId, status: 401});
+    env.listeners.load();
+    await flush();
+    env.listeners.visibilitychange();
+    await flush();
+    assert.equal(env.calls.length, 1);
+    assert.match(env.banners.join(' '), /Доступ к гостевому профилю потерян/);
+});
+
+test('гость восстанавливает рецепты и число опытов при тех же открытиях', async () => {
+    const guestId = '11111111-1111-4111-8111-111111111111';
+    const key = `alchemia.atlas.guest.${guestId}`;
+    const env = bridge({guestId, local: {[key]: save(['water', 'earth', 'fire', 'air'], {recipeKeys: [], attempts: 0})},
+        response: {discovered: ['water', 'earth', 'fire', 'air'], crafted: ['air+water'], attempts: 17, awarded: 0}});
+    env.listeners.load();
+    await flush();
+    const restored = JSON.parse(env.localStore.getItem(key));
+    assert.deepEqual(restored.recipeKeys, ['air+water']);
+    assert.equal(restored.attempts, 17);
+    assert.deepEqual(env.applied[0].recipeKeys, ['air+water']);
+    assert.equal(env.applied[0].attempts, 17);
+});
+
+test('второй гость не загружает сохранение первого', async () => {
+    const first = '11111111-1111-4111-8111-111111111111';
+    const second = '22222222-2222-4222-8222-222222222222';
+    const env = bridge({token: '', guestId: second, local: {
+        [`alchemia.atlas.guest.${first}`]: save(['water', 'steam']),
+        'alchemia.atlas': save(['water', 'earth', 'steam']),
+    }, response: {awarded: 0, discovered: ['water', 'earth', 'fire', 'air']}});
+    env.listeners.load();
+    await flush();
+    assert.deepEqual(JSON.parse(env.calls[0].options.body).discovered, []);
+    assert.equal(env.localStore.getItem(`alchemia.atlas.guest.${first}`), save(['water', 'steam']));
 });

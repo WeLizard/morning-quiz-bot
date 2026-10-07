@@ -1,4 +1,4 @@
-"""Separate Mini App ASGI service. Never import or mount web.main/admin routes."""
+"""Player ASGI service for browser guests and Telegram Mini App."""
 import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
@@ -12,12 +12,14 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Query, Request, Response
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 import httpx
 from sqlalchemy.exc import SQLAlchemyError
 
 from storage.database import Database, DatabaseSettings, normalize_database_url
 from storage.mini_app import MiniAppError, MiniAppStore
+from storage.guest_accounts import GuestAccounts, SESSION_SECONDS
+from storage.alchemy import AlchemyService
 from web.mini_auth import InvalidInitData, unique_object, validate_init_data
 
 
@@ -32,7 +34,7 @@ class MiniAppSettings:
     def __post_init__(self):
         if self.bot_username and not re.fullmatch(r'[A-Za-z0-9_]{5,32}', self.bot_username):
             raise ValueError('Invalid Telegram bot username')
-        if not re.fullmatch(r'[0-9]+:[A-Za-z0-9_-]{30,}', self.bot_token):
+        if self.bot_token and not re.fullmatch(r'[0-9]+:[A-Za-z0-9_-]{30,}', self.bot_token):
             raise ValueError('Set a dedicated MINI_APP_BOT_TOKEN for the same Telegram bot')
         parsed = urlsplit(self.origin)
         if (parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path
@@ -129,7 +131,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     database = database or Database(DatabaseSettings(url=normalize_database_url(os.getenv('MINI_APP_DATABASE_URL', ''))))
     # Offline is fail-closed for groups; it never substitutes a permissive verifier.
     verifier = membership if membership is not None else (
-        None if settings.offline else TelegramMembership(settings.bot_token, proxy=settings.telegram_proxy))
+        None if settings.offline or not settings.bot_token else TelegramMembership(settings.bot_token, proxy=settings.telegram_proxy))
     limits = RequestLimits()
     config_path = Path(__file__).resolve().parents[1] / 'config' / 'quiz_config.json'
     try:
@@ -164,6 +166,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     store = MiniAppStore(database, settings.bot_token, clock=clock, allowed_user_ids=allowed_user_ids,
                          chat_achievements=chat_achievements, streak_achievements=streak_achievements)
 
+    guest_store = GuestAccounts(database, clock=clock)
+    guest_alchemy = AlchemyService(database)
+
     @asynccontextmanager
     async def lifespan(app):
         try:
@@ -180,6 +185,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
 
     app = FastAPI(title='Morning Quiz Mini App API', docs_url=None, redoc_url=None,
                   openapi_url=None, lifespan=lifespan, redirect_slashes=False)
+    app.state.guest_store = guest_store
     app.state.mini_store = store
     app.state.mini_runtime_enabled = runtime_enabled
 
@@ -211,11 +217,15 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         elif (request.headers.get('origin') not in (None, settings.origin)
               or (request.headers.get('sec-fetch-site') == 'cross-site' and not public_page)):
             response = JSONResponse({'detail': 'Межсайтовый запрос запрещён'}, 403)
+        elif (request.url.path.startswith('/api/guest/') and request.method not in {'GET', 'HEAD'}
+              and (request.headers.get('origin') != settings.origin
+                   or request.headers.get('x-guest-csrf') != '1')):
+            response = JSONResponse({'detail': 'Подтверждение origin обязательно'}, 403)
         # Login needs a deliberately tight bucket.  A game setup may legitimately
         # contain several callbacks, and the read-only runtime endpoint is polled
         # while a round is open; both still remain bounded per client and globally.
         elif not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
-                request.client.host if request.client else '', request.url.path == '/api/mini/session',
+                request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/guest/start', '/api/guest/resume'},
                 request.url.path == '/api/mini/runtime'):
             response = JSONResponse({'detail': 'Слишком много запросов'}, 429, headers={'Retry-After': '60'})
         else:
@@ -274,9 +284,21 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         return FileResponse(Path(__file__).parent / 'mini_client' / 'index.html')
 
     @app.get('/app/alchemy')
-    async def alchemy_frontend():
-        # Автономная одиночная игра: один собранный HTML, без обращений к API мини-аппа.
-        return FileResponse(Path(__file__).parent / 'mini_client' / 'alchemy.html')
+    async def alchemy_frontend(request: Request):
+        game_path = Path(__file__).parent / 'mini_client' / 'alchemy.html'
+        mode = request.query_params.get('mode')
+        if mode not in {None, 'guest', 'telegram'}:
+            raise MiniAppError(400, 'Неизвестный режим игры')
+        if mode == 'guest' or (mode is None and request.cookies.get('mqb_guest')):
+            guest_access()
+            profile = await guest_store.profile(request.cookies.get('mqb_guest'))
+            marker = '<script id="mqb-runtime">window.MQB_ALCHEMY_GUEST_ID=null;</script>'
+            content = game_path.read_text(encoding='utf-8')
+            if content.count(marker) != 1:
+                raise RuntimeError('Alchemy runtime marker missing from built game')
+            scoped = marker.replace('=null;', '=' + json.dumps(profile['account_id']) + ';')
+            return HTMLResponse(content.replace(marker, scoped), headers={'Cache-Control': 'no-store'})
+        return FileResponse(game_path)
 
     @app.get('/app/{asset}')
     async def frontend_asset(asset: str):
@@ -292,8 +314,51 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(404, 'Файл не найден')
         return FileResponse(Path(__file__).parent / 'mini_client' / asset)
 
+    # Guest authentication owns an independent Account; existing multiplayer
+    # games keep Telegram authorization until their account migration.
+    guest_cookie = 'mqb_guest'
+    guest_cookie_secure = urlsplit(settings.origin).scheme == 'https'
+
+    def guest_access():
+        if allowed_user_ids is not None:
+            raise MiniAppError(403, 'Гостевой вход закрыт в Telegram private test')
+
+    def guest_response(profile, raw=None):
+        response = JSONResponse(profile)
+        if raw is not None:
+            response.set_cookie(guest_cookie, raw, max_age=SESSION_SECONDS,
+                httponly=True, secure=guest_cookie_secure, samesite='strict', path='/')
+        return response
+
+    @app.post('/api/guest/start')
+    async def guest_start(request: Request):
+        guest_access()
+        profile, raw = await guest_store.start(request.cookies.get(guest_cookie))
+        return guest_response(profile, raw)
+
+    @app.get('/api/guest/me')
+    async def guest_me(request: Request):
+        guest_access()
+        return await guest_store.profile(request.cookies.get(guest_cookie))
+
+    @app.post('/api/guest/resume')
+    async def guest_resume(request: Request):
+        guest_access()
+        profile, raw = await guest_store.resume(request.cookies.get(guest_cookie))
+        return guest_response(profile, raw)
+
+    @app.post('/api/guest/logout')
+    async def guest_logout(request: Request):
+        await guest_store.logout(request.cookies.get(guest_cookie))
+        response = Response(status_code=204)
+        response.delete_cookie(guest_cookie, path='/', httponly=True,
+            secure=guest_cookie_secure, samesite='strict')
+        return response
+
     @app.post('/api/mini/session')
     async def login(request: Request):
+        if not settings.bot_token:
+            raise MiniAppError(503, 'Вход через Telegram не настроен')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
         body = bytearray()
@@ -348,14 +413,14 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         # Рейтинг по числу открытых элементов — очки квиза в нём не участвуют.
         return await store.alchemy_leaderboard(credential(request), limit=limit, offset=offset)
 
-    @app.post('/api/mini/alchemy/sync')
-    async def alchemy_sync(request: Request):
-        # Игра присылает сводку прогресса; очки начисляются только за первое открытие.
+    async def alchemy_body(request: Request):
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 128 * 1024:
-            raise MiniAppError(413, 'Слишком большой прогресс')
+        raw = bytearray()
+        async for chunk in request.stream():
+            raw.extend(chunk)
+            if len(raw) > 128 * 1024:
+                raise MiniAppError(413, 'Слишком большой прогресс')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) - {'discovered', 'crafted', 'attempts'}:
@@ -371,6 +436,28 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, TypeError):
             raise MiniAppError(422, 'Некорректная сводка прогресса') from None
+        return discovered, crafted, attempts
+
+    @app.get('/api/guest/alchemy')
+    async def guest_alchemy_progress(request: Request):
+        guest_access()
+        return await guest_alchemy.guest_progress(request.cookies.get(guest_cookie))
+
+    @app.post('/api/guest/alchemy/sync')
+    async def guest_alchemy_sync(request: Request):
+        guest_access()
+        expected_account_id = request.headers.get('x-guest-account', '')
+        if not re.fullmatch(r'[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}', expected_account_id):
+            raise MiniAppError(422, 'Не указан гостевой профиль игры')
+        discovered, crafted, attempts = await alchemy_body(request)
+        return await guest_alchemy.guest_sync(request.cookies.get(guest_cookie),
+            expected_account_id=expected_account_id, discovered=discovered,
+            crafted=crafted, attempts=attempts)
+
+    @app.post('/api/mini/alchemy/sync')
+    async def alchemy_sync(request: Request):
+        # Игра присылает сводку прогресса; очки начисляются только за первое открытие.
+        discovered, crafted, attempts = await alchemy_body(request)
         return await store.alchemy_sync(credential(request), discovered=discovered,
                                         crafted=crafted, attempts=attempts)
 

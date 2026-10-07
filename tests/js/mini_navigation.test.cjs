@@ -33,7 +33,7 @@ const findButton = (root, label) => {
     const found = root.querySelectorAll('button').find(n => n.textContent === label || n.textContent.startsWith(label));
     assert.ok(found, `Missing button: ${label}`); return found;
 };
-async function application(runtime = true, startParam = '', {overrides = {}, manualTimers = false} = {}) {
+async function application(runtime = true, startParam = '', {overrides = {}, manualTimers = false, guestMode = false, savedGuest = false} = {}) {
     const ids = Object.fromEntries(['content', 'navigation', 'feedback', 'environment'].map(id => [id, new Element('div')]));
     for (const page of ['home', 'chats', 'rating', 'profile']) { const b = new Element('button'); b.dataset.page = page; ids.navigation.append(b); }
     const brand = new Element('a'), mounts = [], timers = [], ui = {prefs: {theme: 'system', haptics: true}, canFullscreen: true,
@@ -49,6 +49,9 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         : clearTimeout;
     const fixtures = {
         '/api/mini/config': {runtime_enabled: runtime, offline: true}, '/api/dev/info': {demo: true},
+        '/api/guest/start': {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Гость', authentication: 'guest', capabilities: ['guest-profile']},
+        '/api/guest/me': {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Гость', authentication: 'guest', capabilities: ['guest-profile']},
+        '/api/guest/logout': null,
         '/api/dev/session': {access_token: 'unit-test'}, '/api/mini/me': {user_id: '42', display_name: 'Игрок', score: 12, answered_count: 3},
         '/api/mini/progress': {best_streak: 2, correct_including_photo: 2, current_streak: 1, achievements: [], legacy_achievements: []},
         '/api/mini/chats?limit=50': {items: [{chat_id: '42', title: 'Личная игра', type: 'private'}], has_more: false}, '/api/mini/runtime': {connected: true, messages: []},
@@ -77,13 +80,29 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         fetch: async path => { assert.ok(path in fixtures || path in overrides, path);
             const override = overrides[path];
             if (override) return {ok: override.status < 400, status: override.status, json: async () => override.body ?? {detail: 'Отказ'}};
+            if (path === '/api/guest/me' && !savedGuest) return {ok: false, status: 401, json: async () => ({detail: 'Нет гостевой сессии'})};
+            if (path === '/api/guest/logout') return {ok: true, status: 204};
             return {ok: true, status: 200, json: async () => fixtures[path]}; },
         AbortController, setTimeout: schedule, clearTimeout: cancel, queueMicrotask, Intl, console,
     });
-    await flush(); await findButton(ids.content, 'Войти как dev-игрок').click(); await flush();
+    await flush();
+    if (!guestMode && !savedGuest) { await findButton(ids.content, 'Войти как dev-игрок').click(); await flush(); }
     const tab = page => ids.navigation.children.find(n => n.dataset.page === page);
     return {...ids, ui, mounts, tab, timers};
 }
+
+test('guest starts in a browser, resumes and logs out without a Telegram session', async () => {
+    const fresh = await application(true, '', {guestMode: true});
+    assert.ok(findButton(fresh.content, 'Продолжить как гость'));
+    await findButton(fresh.content, 'Продолжить как гость').click(); await flush();
+    assert.match(fresh.content.textContent, /Гостевой профиль/);
+    assert.ok(findButton(fresh.content, 'Открыть Алхимию'));
+    assert.doesNotMatch(fresh.content.textContent, /Твои чаты|Гонка за знаниями/);
+    const resumed = await application(true, '', {savedGuest: true});
+    assert.match(resumed.content.textContent, /Гостевой профиль/);
+    await findButton(resumed.content, 'Выйти и потерять доступ к гостю').click(); await flush();
+    assert.ok(findButton(resumed.content, 'Продолжить как гость'));
+});
 
 test('home restores the heading and keeps global settings inside profile', async () => {
     const app = await application();

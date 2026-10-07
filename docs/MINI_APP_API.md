@@ -150,11 +150,15 @@ ID и баллы передаются строками без потери то�
 
 Для отдельной роли Mini App нужны CONNECT/USAGE соответствующей БД/схемы,
 SELECT на `users`, `chats`, `chat_members`, `quiz_sessions`, а также
-SELECT/INSERT/UPDATE/DELETE на `mini_app_sessions`. UPDATE на `users` не нужен:
-лимит входов сериализуется advisory lock, а не row lock профиля. Миграции запускает
-отдельный владелец схемы, не публичный сервис. Роль в production не создавалась;
-в dev используется роль `mqb_dev` на 55433. Pytest работает в отдельной базе
-`morning_quiz_test` того же локального контейнера.
+SELECT/INSERT/UPDATE/DELETE на `mini_app_sessions`. Гостевой вход и сохранение
+«Алхимии» дополнительно требуют SELECT/INSERT/UPDATE на `accounts`,
+`guest_sessions`, `alchemy_progress`; выход отзывает строку в `guest_sessions`.
+Telegram-синхронизация «Алхимии» обновляет `users.global_score` и пишет
+достижения, поэтому для неё требуются соответствующие права на `users` и
+`achievement_grants`. Конкретные GRANT для production-роли нужно проверить
+перед запуском: отдельной роли в репозитории пока нет. Миграции запускает
+владелец схемы, не публичный сервис. В dev используется роль `mqb_dev` на
+55433. Pytest работает в отдельной базе `morning_quiz_test` того же контейнера.
 
 После восстановления production backup нужно отозвать восстановленные Mini App
 сессии (`revoked=true`), чтобы не оживить ранее завершённый вход. Это отдельный

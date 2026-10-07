@@ -1,0 +1,5 @@
+interface:
+  display_name: "MQB Game Design"
+  short_description: "Безопасное серверное проектирование игровых режимов"
+policy:
+  allow_implicit_invocation: true

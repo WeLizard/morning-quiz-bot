@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+if [ -x .venv-local/Scripts/python.exe ]; then
+    python=.venv-local/Scripts/python.exe
+elif [ -x .venv-local/bin/python ]; then
+    python=.venv-local/bin/python
+elif command -v python3 >/dev/null 2>&1; then
+    python=python3
+else
+    python=python
+fi
+exec "$python" scripts/project_checks.py --staged

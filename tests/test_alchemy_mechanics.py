@@ -60,7 +60,7 @@ async def cleanup(db):
 
 async def stored(db, user_id):
     async with db.transaction() as session:
-        return await session.get(AlchemyProgress, user_id)
+        return await session.scalar(select(AlchemyProgress).where(AlchemyProgress.user_id == user_id))
 
 
 async def global_score(db, user_id):
@@ -360,7 +360,7 @@ def test_sync_creates_missing_profile_and_progress(pg_env):
                 assert result['awarded'] == 2.0
                 async with db.transaction() as session:
                     assert await session.get(User, FOURTH_USER) is not None
-                    assert await session.get(AlchemyProgress, FOURTH_USER) is not None
+                    assert await session.scalar(select(AlchemyProgress).where(AlchemyProgress.user_id == FOURTH_USER)) is not None
             finally:
                 await cleanup(db)
     asyncio.run(run())

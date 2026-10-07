@@ -4,6 +4,8 @@
 границы и проверяемые критерии готовности. Мелкие локальные исправления можно не
 оформлять отдельным документом.
 
+Актуальные правила разработки и выпуска: [DEVELOPMENT](../engineering/DEVELOPMENT.md), [RELEASE_CRITERIA](../engineering/RELEASE_CRITERIA.md), [FARM_CONCEPT](../engineering/FARM_CONCEPT.md) и [AGENTS.md](../../AGENTS.md). Концепт фермы — предложение для обсуждения, не обязательный scope.
+
 ## Текущие задачи
 
 | ID | Задача | Статус | Приоритет | Обновлена |

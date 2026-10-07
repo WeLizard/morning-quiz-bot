@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
@@ -19,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
     text,
 )
@@ -59,8 +61,29 @@ class Chat(ModerationMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
+class Account(ModerationMixin, TimestampMixin, Base):
+    """App identity independent of Telegram. Linking is an explicit future flow."""
+    __tablename__ = "accounts"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    display_name: Mapped[str] = mapped_column(String(255), default="Гость", nullable=False)
+
+
+class GuestSession(Base):
+    __tablename__ = "guest_sessions"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+
+
 class User(ModerationMixin, TimestampMixin, Base):
     __tablename__ = "users"
+
+    account_id: Mapped[Optional[UUID]] = mapped_column(Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), unique=True)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     display_name: Mapped[str] = mapped_column(String(255), default="Unknown", nullable=False)
@@ -463,10 +486,14 @@ class AlchemyProgress(Base):
 
     __tablename__ = 'alchemy_progress'
 
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey('users.id', ondelete='CASCADE'),
-        primary_key=True, autoincrement=False,
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True,
     )
+    # Transitional Telegram mapping; account_id alone owns the progress.
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=True,
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
     discovered: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     crafted: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     chapters: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)

@@ -16,8 +16,8 @@
         return Object.prototype.hasOwnProperty.call(LAUNCH_PAGES, raw) ? {page: LAUNCH_PAGES[raw]} : null;
     }
     const launch = launchTarget();
-    const state = {token: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: ''};
-    let generation = 0, playCommand = null, runtimeEnabled = false;
+    const state = {token: null, guest: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: ''};
+    let generation = 0, playCommand = null, runtimeEnabled = false, guestAllowed = true;
     const el = (tag, text, cls) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; };
     const button = (label, action, cls = '') => { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', action); return node; };
     const format = value => new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 3}).format(Number(value));
@@ -42,6 +42,47 @@
             if (error.name === 'AbortError' || error instanceof TypeError) throw new Error('Нет связи с приложением. Проверьте подключение и повторите.');
             throw error;
         } finally { clearTimeout(timeout); }
+    }
+    async function guestRequest(path, method = 'GET') {
+        const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 12000);
+        try {
+            const response = await fetch(path, {method, credentials: 'same-origin', signal: controller.signal,
+                headers: method === 'GET' ? {} : {'X-Guest-CSRF': '1'}});
+            if (response.status === 204) return null;
+            let data; try { data = await response.json(); } catch { throw new Error('Сервис временно недоступен. Повтори позже.'); }
+            if (!response.ok) { const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; throw error; }
+            return data;
+        } catch (error) {
+            if (error.name === 'AbortError' || error instanceof TypeError) throw new Error('Нет связи с приложением. Проверь подключение и повтори.');
+            throw error;
+        } finally { clearTimeout(timeout); }
+    }
+    function guestHome() {
+        generation++; window.QuizGame.stop(); nav.hidden = true; feedback.textContent = ''; content.replaceChildren();
+        const box = el('section', undefined, 'card');
+        box.append(el('span', 'Гостевой профиль', 'eyebrow'), el('h1', 'Рада тебя видеть'));
+        note(box, 'Открытия «Алхимии» сохраняются в приложении. Войти снова можно в этом браузере, пока действует гостевая сессия.');
+        note(box, 'Если очистить данные браузера или выйти, доступ к этому профилю будет потерян. Привязка к Telegram появится позже.', 'muted');
+        box.append(button('Открыть Алхимию', () => { window.location.assign('/app/alchemy?mode=guest'); }, 'primary'));
+        if (tg?.initData) box.append(button('Войти через Telegram', () => {
+            state.guest = null;
+            try { sessionStorage.setItem('mqb-auth-choice', 'telegram'); } catch {}
+            loginScreen();
+        }, 'quiet'));
+        box.append(button('Выйти и потерять доступ к гостю', async event => {
+            event.currentTarget.disabled = true;
+            try {
+                await guestRequest('/api/guest/logout', 'POST');
+                try {
+                    const key = `alchemia.atlas.guest.${state.guest.account_id}`;
+                    localStorage.removeItem(key); localStorage.removeItem(key + '.backup');
+                } catch {}
+                state.guest = null;
+                try { sessionStorage.removeItem('mqb-auth-choice'); } catch {}
+                loginScreen();
+            } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+        }, 'quiet'));
+        content.append(box);
     }
     const RENEW_AFTER_MS = 10 * 60 * 1000;   // сессия живёт 15 минут, продлеваем заранее
     let renewTimer = null;
@@ -69,7 +110,7 @@
             () => { if (state.token) navigate('settings'); }, () => { if (state.token) load(); });
     }
     function loginScreen(message = '') {
-        generation++; window.QuizGame.stop(); nav.hidden = true; content.replaceChildren();
+        generation++; state.guest = null; window.QuizGame.stop(); nav.hidden = true; content.replaceChildren();
         const box = el('section', undefined, 'login');
         const hero = el('div', undefined, 'hero'); const image = el('img'); image.src = '/app/host.webp'; image.alt = 'Филиныч, сова-ведущий Morning Quiz'; hero.append(image); box.append(hero);
         box.append(el('span', 'Morning Quiz · Филиныч на связи', 'eyebrow'), el('h1', 'Играй. Узнавай. Возвращайся.'));
@@ -82,14 +123,43 @@
                 try {
                     const session = await request(state.demo ? '/api/dev/session' : '/api/mini/session', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: state.demo ? '{}' : JSON.stringify({init_data: initData})});
                     state.token = session.access_token;
+                    try { sessionStorage.setItem('mqb-auth-choice', 'telegram'); } catch {}
                     // Токен нужен странице «Алхимии» (тот же origin, своя вкладка), чтобы синхронизировать прогресс.
                     try { sessionStorage.setItem('mqb-mini-token', state.token); localStorage.setItem('mqb-mini-token', state.token); } catch {}
                     scheduleRenewal();
                     await load();
                 } catch (error) { feedback.textContent = error.message; enter.disabled = false; }
             }, 'primary'); box.append(enter);
-            if (initData && !state.demo && !message) queueMicrotask(() => enter.click());
-        } else note(box, 'Открой Mini App из Telegram, чтобы войти в свой профиль. В обычном браузере пользовательский вход недоступен.', 'empty');
+            // Вход выбирает игрок: гостевой профиль не объединяется с Telegram автоматически.
+        }
+        if (guestAllowed) {
+            const guest = button('Продолжить как гость', async () => {
+                guest.disabled = true; feedback.textContent = '';
+                try {
+                    state.guest = await guestRequest('/api/guest/start', 'POST');
+                    try { sessionStorage.setItem('mqb-auth-choice', 'guest'); } catch {}
+                    guestHome();
+                } catch (error) {
+                    feedback.textContent = error.message;
+                    guest.disabled = false;
+                    if (error.status === 401 && !box.querySelector('[data-new-guest]')) {
+                        note(box, 'Прежняя гостевая сессия закончилась. Старый профиль без привязки восстановить нельзя.', 'error');
+                        const fresh = button('Создать нового гостя', async () => {
+                            fresh.disabled = true; feedback.textContent = '';
+                            try {
+                                await guestRequest('/api/guest/logout', 'POST');
+                                state.guest = await guestRequest('/api/guest/start', 'POST');
+                                try { sessionStorage.setItem('mqb-auth-choice', 'guest'); } catch {}
+                                guestHome();
+                            } catch (failed) { feedback.textContent = failed.message; fresh.disabled = false; }
+                        }, 'quiet');
+                        fresh.dataset.newGuest = '1'; box.append(fresh);
+                    }
+                }
+            }, 'quiet');
+            box.append(guest);
+            note(box, 'Гостевой вход работает без Telegram. Открытия «Алхимии» сохраняются на сервере и привязаны к гостевой сессии этого браузера.', 'muted');
+        }
         content.append(box);
     }
     async function load() {
@@ -173,7 +243,7 @@
             description: 'Смешивай стихии, открывай цепочки и заполняй свой атлас. Прогресс синхронизируется с профилем.',
             label: 'Открыть атлас', action: () => {
                 const token = state.token ? `#t=${encodeURIComponent(state.token)}` : '';
-                window.location.assign(`/app/alchemy${token}`);
+                window.location.assign(`/app/alchemy?mode=telegram${token}`);
             }, position: '72% 50%'
         },
     ];
@@ -687,10 +757,19 @@
     request('/api/mini/config').catch(() => null).then(config => {
         state.botUsername = config?.bot_username || '';
         runtimeEnabled = config?.runtime_enabled === true;
+        guestAllowed = config?.private_test !== true;
         return config?.offline ? request('/api/dev/info').catch(() => null) : null;
-    }).then(info => {
+    }).then(async info => {
         state.demo = info?.demo === true;
         if (state.demo) { const banner = document.getElementById('environment'); banner.hidden = false; banner.textContent = info?.synthetic_player ? 'DEV · Тестовый игрок. Без отправки сообщений в Telegram.' : 'DEV · Просмотр твоего профиля из локальной БД.'; }
+        let choice = ''; try { choice = sessionStorage.getItem('mqb-auth-choice') || ''; } catch {}
+        if (guestAllowed && (choice !== 'telegram' || !tg?.initData)) {
+            const saved = await guestRequest('/api/guest/me').catch(() => null);
+            if (saved?.authentication === 'guest') {
+                state.guest = await guestRequest('/api/guest/resume', 'POST').catch(() => saved);
+                guestHome(); return;
+            }
+        }
         loginScreen();
     });
 })();

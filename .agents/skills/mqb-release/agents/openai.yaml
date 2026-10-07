@@ -1,0 +1,5 @@
+interface:
+  display_name: "MQB Release"
+  short_description: "Приёмка релиза на свежих проверяемых данных"
+policy:
+  allow_implicit_invocation: true

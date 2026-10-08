@@ -73,11 +73,32 @@ def path_for(backup_id):
 
 async def fingerprints(session):
     result = {}
-    for table in sorted(Base.metadata.tables):
+    present = set((await session.scalars(text(
+        'SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = current_schema()'
+    ))).all())
+    # During an in-place upgrade the live dev schema may be one revision behind
+    # the checked-out models. Fingerprint only known tables that actually exist;
+    # this makes a pre-migration backup possible without inventing empty tables.
+    for table in sorted(set(Base.metadata.tables) & present):
         # Table names are code-owned, never supplied by an HTTP client.
         row = (await session.execute(text(f'SELECT count(*), md5(coalesce(string_agg(row_to_json(t)::text, chr(10) ORDER BY row_to_json(t)::text), \'\')) FROM "{table}" t'))).one()
         result[table] = {'rows': row[0], 'digest': row[1]}
     return result
+
+
+def validate_table_manifest(tables):
+    if not isinstance(tables, dict):
+        raise ValueError('Неполный манифест архива')
+    known = set(Base.metadata.tables)
+    for name, fingerprint in tables.items():
+        if (not isinstance(name, str) or name not in known
+                or not isinstance(fingerprint, dict)
+                or set(fingerprint) != {'rows', 'digest'}
+                or type(fingerprint['rows']) is not int or fingerprint['rows'] < 0
+                or not isinstance(fingerprint['digest'], str)
+                or not re.fullmatch(r'[a-f0-9]{32}', fingerprint['digest'])):
+            raise ValueError('Некорректный манифест таблиц')
+    return tables
 
 
 async def create(database):
@@ -137,8 +158,9 @@ def read_verified(backup_id):
         if (manifest.get('id') != backup_id or manifest.get('database') != DBNAME
                 or manifest.get('format') not in {1, 2}):
             raise ValueError('Неподдерживаемый архив')
-        if not isinstance(manifest.get('files'), dict) or not isinstance(manifest.get('tables'), dict):
+        if not isinstance(manifest.get('files'), dict):
             raise ValueError('Неполный манифест архива')
+        validate_table_manifest(manifest.get('tables'))
         if set(names) != set(manifest['files']) | {'manifest.json'}:
             raise ValueError('Состав архива не совпадает с манифестом')
         files = {}
@@ -181,7 +203,7 @@ async def verify_restore(database, backup_id):
             command(['createdb', '-U', ROLE, '-T', 'template0', target]); created = True
             command(['pg_restore', '-U', ROLE, '-d', target, '--no-owner', '--exit-on-error'], raw=files['database.dump'])
             actual = {}
-            for table in sorted(Base.metadata.tables):
+            for table in sorted(manifest['tables']):
                 sql = f'SELECT count(*), md5(coalesce(string_agg(row_to_json(t)::text, chr(10) ORDER BY row_to_json(t)::text), \'\')) FROM "{table}" t'
                 count, digest = command(['psql', '-U', ROLE, '-d', target, '-At', '-c', sql]).decode().strip().split('|')
                 actual[table] = {'rows': int(count), 'digest': digest}

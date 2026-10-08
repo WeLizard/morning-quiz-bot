@@ -61,6 +61,17 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
+  game-worker:
+    <<: *app-service
+    command: ["python", "scripts/run_game_worker.py"]
+    environment:
+      <<: *app-environment
+      GAME_WORKER_INTERVAL_SECONDS: "2"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   admin:
     <<: *app-service
     command: ["python", "scripts/run_admin_preview.py"]
@@ -70,6 +81,7 @@ services:
       MQB_DEV_BIND_HOST: 0.0.0.0
       ADMIN_ACCESS_TOKEN: local-tests-only-admin-key-0000012345
       ADMIN_ALLOWED_HOSTS: localhost,127.0.0.1,::1
+      MQB_DEV_SKIP_SEED: "1"
     ports:
       - "127.0.0.1:4184:4184"
     depends_on:

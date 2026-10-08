@@ -17,7 +17,10 @@ from data_manager import DataManager
 from modules.score_manager import ScoreManager
 from storage.database import Database, DatabaseSettings, normalize_database_url
 from storage.members import MemberService, ScoreConflict
-from storage.models import AchievementGrant, Chat, ChatMember, Game, PollAnswer, User, MessageCleanupItem, SystemState
+from storage.models import (
+    AccountIdentity, AchievementGrant, Chat, ChatMember, Game, PollAnswer,
+    MiniAppSession, Room, User, MessageCleanupItem, SystemState,
+)
 from storage.repositories import OperationalRepository
 from storage.runtime import PostgresRuntimeStorage
 from web.postgres_admin import install_postgres_admin
@@ -46,14 +49,23 @@ async def scenario(url):
         yield database
     finally:
         async with database.transaction() as session:
+            chat_ids = [CHAT, OTHER_CHAT, USER, USER + 1]
+            user_ids = range(USER, USER + 4)
             await session.execute(delete(SystemState).where(SystemState.key.in_([
                 "cleanup_retry_until", f"mafia_lobby:{CHAT}", f"mafia_lobby:{OTHER_CHAT}",
                 f"mini_mafia_lobby:{USER}", f"mini_mafia_lobby:{USER + 1}",
             ])))
-            await session.execute(delete(MessageCleanupItem).where(MessageCleanupItem.chat_id.in_([CHAT, OTHER_CHAT])))
-            await session.execute(delete(Game).where(Game.chat_id.in_([CHAT, OTHER_CHAT])))
-            await session.execute(delete(Chat).where(Chat.id.in_([CHAT, OTHER_CHAT])))
-            await session.execute(delete(User).where(User.id.in_(range(USER, USER + 4))))
+            await session.execute(delete(MessageCleanupItem).where(MessageCleanupItem.chat_id.in_(chat_ids)))
+            await session.execute(delete(Game).where(Game.chat_id.in_(chat_ids)))
+            await session.execute(delete(MiniAppSession).where(MiniAppSession.user_id.in_(user_ids)))
+            await session.execute(delete(Chat).where(Chat.id.in_(chat_ids)))
+            await session.execute(delete(Room).where(
+                Room.id.in_([f'telegram:{chat_id}' for chat_id in chat_ids])))
+            await session.execute(delete(AccountIdentity).where(
+                AccountIdentity.provider == 'telegram',
+                AccountIdentity.provider_subject.in_(str(uid) for uid in user_ids),
+            ))
+            await session.execute(delete(User).where(User.id.in_(user_ids)))
         await database.dispose()
 
 
@@ -309,3 +321,10 @@ def test_json_admin_keeps_original_routes(monkeypatch):
     install_postgres_admin(app)
     assert not app.user_middleware
     assert not any(r.path.startswith("/api/") for r in app.routes)
+
+    async def verify_fail_closed():
+        with pytest.raises(RuntimeError, match="requires STORAGE_BACKEND=postgres"):
+            async with app.router.lifespan_context(app):
+                pytest.fail("JSON admin runtime must never start")
+
+    asyncio.run(verify_fail_closed())

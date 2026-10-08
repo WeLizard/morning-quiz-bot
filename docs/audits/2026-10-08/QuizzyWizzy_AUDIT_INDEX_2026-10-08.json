@@ -1,0 +1,242 @@
+{
+  "project": "QuizzyWizzy / Morning Quiz Bot",
+  "date": "2026-10-08",
+  "git_repository": "https://github.com/WeLizard/morning-quiz-bot",
+  "audited_sha": "aeeab2b358014934521d401d7a113a4769b41e46",
+  "audit_method": "read_only_static_code_and_documents_no_runtime_execution",
+  "issues": [
+    {
+      "id": "AUD-001",
+      "priority": "P0",
+      "evidence": "CONFIRMED",
+      "observation": "`AlchemyService.sync` начисляет очки за множество валидных известных `discovered`, **не** за серверно исполненные рецепты. Список ID можно отправить напрямую, не проходя игру. Суточный лимит 30 ограничивает, но не устраняет некорректное начисление",
+      "source_paths_or_lines": "`storage/alchemy.py:192–264`, `web/mini_app.py:416–462`, `tests/test_alchemy_mechanics.py:77–101`",
+      "acceptance": "Фальшивый список элементов не создаёт проверенные открытия и не изменяет `global_score`; проверенное `craft` выдаёт награду однократно"
+    },
+    {
+      "id": "AUD-002",
+      "priority": "P0",
+      "evidence": "CONFIRMED",
+      "observation": "Старый `docker-compose.yml` использует `STORAGE_BACKEND=${STORAGE_BACKEND:-json}`, а новый bot runtime требует `postgres`. Старый `env.example` тоже выставляет JSON",
+      "source_paths_or_lines": "`docker-compose.yml:30–43`, `env.example`, `storage/startup.py:13–18`, `bot.py:359–361`",
+      "acceptance": "Развёртывание с документированными production settings либо поднимает PG стек с миграциями, либо **явно** fail-closed до приёма трафика; нет молчаливого JSON fallback"
+    },
+    {
+      "id": "AUD-003",
+      "priority": "P0",
+      "evidence": "CONFIRMED",
+      "observation": "`python-multipart==0.0.6` в production manifest и `==0.0.20` в dev manifest попадают под известные DoS advisory для парсинга форм/заголовков",
+      "source_paths_or_lines": "`requirements.txt`, `requirements-local-test.txt`, `requirements-local-lock.txt`",
+      "acceptance": "Подтверждённая безопасная совместимая версия (`>=0.0.31` как нижняя цель по рассмотренным advisory либо актуальная security-approved), lock/SBOM/аудит/контрактные тесты загрузки"
+    },
+    {
+      "id": "AUD-004",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "Telegram bearer сохраняется в `localStorage` и `sessionStorage`, передаётся в `#t=...` на странице Алхимии; при XSS/злонамеренном скрипте это долговременный секрет",
+      "source_paths_or_lines": "`web/mini_client/app.js:120–130,237–249`, `minigames/alchemia-1.0/sync.js:17–30`",
+      "acceptance": "Ни один long/short-lived auth-secret не появляется в URL/hash/localStorage; безопасный одноразовый handoff/HttpOnly session, автообновление сохраняется"
+    },
+    {
+      "id": "AUD-005",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "Основной `games` и `game_players` зависят от `chats` и Telegram `users`, ключ игры — `chat_id + mode`; standalone комнаты отсутствуют",
+      "source_paths_or_lines": "`storage/models.py:157–225`, `storage/games.py:28–75`, `application/mafia.py:37–46`",
+      "acceptance": "Browser-only Account создаёт комнату и многопользовательскую игру без Telegram ID; старые TG-чаты сохраняют историю"
+    },
+    {
+      "id": "AUD-006",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "Дедлайны Mafia/Classic/Photo и выгрузка outbox выполняются внутри `MafiaHandlers.deadline_job`, установленного через PTB job queue каждые 5 секунд",
+      "source_paths_or_lines": "`handlers/mafia_handlers.py:372–452,637–643`, `bot.py:609`",
+      "acceptance": "Остановленный Telegram не влияет на завершение фазы/финала/сохранение; отдельный worker с рестартом/lease и журналом"
+    },
+    {
+      "id": "AUD-007",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "Два **разных** участника Mafia, совершившие независимые действия на одной глобальной `revision`, получают конфликт для второго действия",
+      "source_paths_or_lines": "`domain/mafia.py:306–347,416–430`, `application/mafia.py:162–180,241–259`",
+      "acceptance": "Конкурентные действия различных разрешённых участников одной фазы оба принимаются; конфликт только при действительной смене фазы/собственного действия"
+    },
+    {
+      "id": "AUD-008",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "`GameRepository.reserve_command` для повторного `command_id` сравнивает actor/kind/revision/payload, но **не сверяет `existing.game_id`**. Теоретически возврат чужого ранее завершённого результата при повторном ID другого матча",
+      "source_paths_or_lines": "`storage/games.py:248–285`",
+      "acceptance": "Один ID разных матчей отклоняется без выдачи чужого `result` и без изменения состояния; idempotency scoped к `game_id`"
+    },
+    {
+      "id": "AUD-009",
+      "priority": "P1",
+      "evidence": "GAP",
+      "observation": "Гостевой `Account` нельзя восстановить после удаления cookie, нельзя связать с Telegram; срок cookie 30 дней не равен гарантии возврата аккаунта",
+      "source_paths_or_lines": "`storage/guest_accounts.py`, `docs/engineering/STANDALONE_FOUNDATION.md`",
+      "acceptance": "Verified identity-link + recovery flow без silent merge/угонов; после восстановления виден тот же прогресс"
+    },
+    {
+      "id": "AUD-010",
+      "priority": "P1",
+      "evidence": "GAP",
+      "observation": "Гостевой интерфейс `guestHome()` предоставляет только Alchemy, прочие игры требуют Telegram-вход",
+      "source_paths_or_lines": "`web/mini_client/app.js:60–83,113–175`, `web/mini_app.py:317–360`",
+      "acceptance": "Главная capability-aware по идентичности; объявленные standalone игры запускаются без Telegram"
+    },
+    {
+      "id": "AUD-011",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "Сохранились адаптер `MiniBridge`, synthetic `Update.de_json`/`process_update` и мост `runtime/actions`",
+      "source_paths_or_lines": "`modules/mini_bridge_worker.py:17–78`, `web/mini_app.py:1172–1205`, `web/mini_client/play-ui.js:41,70–94`",
+      "acceptance": "Все необходимые use cases переведены на прямые application commands с паритетом UI, только затем удалён bridge; регрессий classic/photo нет"
+    },
+    {
+      "id": "AUD-012",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "Mafia имеет фиксированную ночь 90 с, день 180 с, голосование 90 с — не модель участия в разное время",
+      "source_paths_or_lines": "`domain/mafia.py:10–12`, `:225–229`, `:396–457`",
+      "acceptance": "Настраиваемые длительности, timezone/quiet hours, таймеры сохраняются через рестарт, неактивность имеет предел"
+    },
+    {
+      "id": "AUD-013",
+      "priority": "P1",
+      "evidence": "GAP",
+      "observation": "Нет полного lifecycle async Mafia: выход/AFK/замена, пауза/восстановление, передача host, чат обсуждения в приложении, настройки фазы",
+      "source_paths_or_lines": "`domain/mafia.py`, `application/mafia.py`, `docs/engineering/RELEASE_CRITERIA.md`",
+      "acceptance": "Матрица нормальных/краевых переходов; партия завершается при пропаже ведущего, секреты сохраняются"
+    },
+    {
+      "id": "AUD-014",
+      "priority": "P1",
+      "evidence": "RISK",
+      "observation": "Outbox сознательно переводит неопределённые отправки в `uncertain`/`sending` без автоматического повтора; но нет подтверждённого операционного способа разбора накопленных состояний",
+      "source_paths_or_lines": "`storage/notifications.py:36–103`, `handlers/mafia_handlers.py:404–452`",
+      "acceptance": "Dashboard backlog+age+error; операторское безопасное согласование; никогда не отправлять неизвестно принятую Telegram операцию вслепую"
+    },
+    {
+      "id": "AUD-015",
+      "priority": "P1",
+      "evidence": "CONFIRMED",
+      "observation": "User/App баланс и результаты смешивают исторические рейтинговые и недоверенные offline сведения без явного поля `verification_status` для каждой Alchemy-награды",
+      "source_paths_or_lines": "`storage/alchemy.py`, `storage/models.py:484+`, `minigames/alchemia-1.0/sync.js`",
+      "acceptance": "Награды только за validated server events; существующий прогресс мигрирует со статусами без уничтожения коллекции"
+    },
+    {
+      "id": "AUD-016",
+      "priority": "P1",
+      "evidence": "LEGACY",
+      "observation": "Старый production-контур по сохранённому аудиту был JSON и содержал другую версию кода, миграция PG сделана лишь в rehearsal; текущее production состояние не перепроверялось",
+      "source_paths_or_lines": "`docs/tasks/PROD-DIVERGENCE-REVIEW.md`, `docs/tasks/MQB-007-production-cutover-runbook.md`",
+      "acceptance": "Fresh read-only prod fingerprint+diff, preflight snapshot, проверенный restore, explicit owner go/no-go; не делать reset/checkout на prod"
+    },
+    {
+      "id": "AUD-017",
+      "priority": "P1",
+      "evidence": "RISK",
+      "observation": "Процессные лимиты Mini App хранятся в RAM и привязаны к `request.client.host`; при масштабировании/неверной proxy цепочке лимиты либо обходятся, либо становятся общими",
+      "source_paths_or_lines": "`web/mini_app.py:101–124,201–230`",
+      "acceptance": "Edge rate limit по реальному проверенному IP+account, лимиты распределены; proxy trust строгий, тесты multiple workers"
+    },
+    {
+      "id": "AUD-018",
+      "priority": "P2",
+      "evidence": "CONFIRMED",
+      "observation": "Каталог вопросов: 5 некорректных record и 14 intra-category повторов; один дубль вопроса имеет противоречащие ответы",
+      "source_paths_or_lines": "`data/questions/*.json`; точный реестр в §5",
+      "acceptance": "Валидация всех 6706 seed-строк и активного PG банка; ноль invalid/конфликтующих дублей, сохранён журнал правок"
+    },
+    {
+      "id": "AUD-019",
+      "priority": "P2",
+      "evidence": "RISK",
+      "observation": "Текущий `application/photo.py` принимает ответ только от `creator_id`; исторический фото-квиз опирался на ответы пользователей в групповом чате",
+      "source_paths_or_lines": "`application/photo.py:171–182,323–327`; legacy `modules/photo_quiz_manager.py`",
+      "acceptance": "Product decision private-vs-group + тесты обеих реальных веток, не менять поведение молча"
+    },
+    {
+      "id": "AUD-020",
+      "priority": "P2",
+      "evidence": "CONFIRMED",
+      "observation": "В `HOME_GAME_CARDS` есть 4 карточки; пятая игра отсутствует, нет декларативного feature/capability каталога",
+      "source_paths_or_lines": "`web/mini_client/app.js:217–256`, `docs/engineering/FARM_CONCEPT.md`",
+      "acceptance": "Режимы подключаются единым manifest/API; Farmer отображается только при готовности или явно помечен «в разработке» без ложной кнопки"
+    },
+    {
+      "id": "AUD-021",
+      "priority": "P2",
+      "evidence": "GAP",
+      "observation": "Farmer не имеет state machine, БД, inventory/ledger, API, UI, economy/конкурентных тестов",
+      "source_paths_or_lines": "`docs/engineering/FARM_CONCEPT.md` и отсутствие модулей по дереву HEAD",
+      "acceptance": "Вертикальный MVP из §9: посадка → созревание без клиента → сбор → заказ → расширение, persist/restart/idempotency"
+    },
+    {
+      "id": "AUD-022",
+      "priority": "P2",
+      "evidence": "CONFIRMED",
+      "observation": "Runtime версии и dependency-манифесты разъехались: prod Docker 3.11 vs dev Docker 3.13; `setup.py` placeholder URL, неподтверждённая лицензия и `console_scripts` на `async def main`",
+      "source_paths_or_lines": "`Dockerfile`, `Dockerfile.dev`, `requirements*.txt`, `setup.py:24,78`, `bot.py:339`",
+      "acceptance": "Один проверенный supported runtime, reproducible lock, packaging smoke с корректным синхронным CLI launcher, законная лицензия или «не указана»"
+    },
+    {
+      "id": "AUD-023",
+      "priority": "P2",
+      "evidence": "GAP",
+      "observation": "Нет подтверждённой server-side CI в дереве HEAD; локальные opt-in Git/Codex hooks не заменяют обязательный pipeline",
+      "source_paths_or_lines": "`.githooks/`, `.codex/hooks.json`, `scripts/Test-LocalMilestone.ps1`, отсутствие `.github/workflows` в дереве",
+      "acceptance": "PR gate: DB migrations/pytest/JS E2E/security/asset hash; отчёт SHA, skipped, артефакты, запрет merge при fail"
+    },
+    {
+      "id": "AUD-024",
+      "priority": "P2",
+      "evidence": "RISK",
+      "observation": "Большие legacy модули и веб-монолит повышают вероятность «двух источников истины» и пропусков авторизации",
+      "source_paths_or_lines": "`web/main.py` (~4500 строк), `data_manager.py`, `modules/photo_quiz_manager.py`",
+      "acceptance": "Не переписывать сразу; покрыть boundaries, затем выделять use cases по вертикалям и удалить dead branches"
+    },
+    {
+      "id": "AUD-025",
+      "priority": "P3",
+      "evidence": "GAP",
+      "observation": "AI-ведущий, расследование, narrative rules ещё отсутствуют как игровая система; админский AI не заменяет игровой",
+      "source_paths_or_lines": "`docs/engineering/RELEASE_CRITERIA.md`, `modules/admin_ai.py`",
+      "acceptance": "Опциональный контракт §10; только server-validated typed narrative events; секретные роли не в публичном prompt"
+    },
+    {
+      "id": "AUD-026",
+      "priority": "P2",
+      "evidence": "CONFIRMED",
+      "observation": "UI брендинг пока `Morning Quiz`; стартовый meta-text говорит только про квиз+фото; нет единой карты standalone/Telegram возможностей",
+      "source_paths_or_lines": "`web/mini_client/index.html:7–24`, `web/mini_client/app.js`",
+      "acceptance": "Согласованный нейминг QuizzyWizzy, пять режимов в каталоге, гостю ясно, что доступно, адаптивность и a11y"
+    },
+    {
+      "id": "AUD-027",
+      "priority": "P2",
+      "evidence": "RISK",
+      "observation": "Встроенная сборка Alchemy и контентно-ресурсный граф проверяются скриптами, но при ручной правке HTML можно рассинхронизировать source/artifact/hash",
+      "source_paths_or_lines": "`minigames/alchemia-1.0/build.py`, `verify_content.py`, `web/mini_client/alchemy.html`",
+      "acceptance": "Build в CI воспроизводит byte-identical артефакт; проверяет hash/catalog/art, нельзя коммитить только HTML"
+    },
+    {
+      "id": "AUD-028",
+      "priority": "P2",
+      "evidence": "GAP",
+      "observation": "Нет единого политического/технического договора на восстановление аккаунта, удаление данных, активные игры, экспорт и retention",
+      "source_paths_or_lines": "`storage/models.py`, `web/mini_app.py`, документы",
+      "acceptance": "Account lifecycle, explicit delete/export, linked identities/ban propagation, backups/retention, аудит административных событий"
+    }
+  ],
+  "summary": {
+    "total": 28,
+    "by_priority": {
+      "P0": 3,
+      "P1": 14,
+      "P2": 10,
+      "P3": 1
+    }
+  }
+}

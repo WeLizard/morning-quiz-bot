@@ -606,7 +606,7 @@ async def main() -> None:
             from telegram.ext import CallbackContext
             await quiz_manager.restore_all_active_quizzes()
             if mafia_handlers:
-                mafia_handlers.install_deadlines(application_instance.job_queue)
+                mafia_handlers.install_notification_delivery(application_instance.job_queue)
         
         # Запускаем планировщики после инициализации
         if data_manager.postgres_storage:

@@ -1,6 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -14,6 +15,31 @@ from tests.test_postgres_members import pg_env
 
 
 QUESTION = {'question': 'Кто ведёт квиз?', 'options': ['Сова', 'Лиса'], 'correct': 'Сова', 'explanation': ''}
+
+
+def test_all_seed_questions_are_valid_and_known_editorial_errors_stay_fixed():
+    root = Path(__file__).resolve().parents[1] / 'data' / 'questions'
+    bank = QuestionBank(root)
+    invalid = []
+    total = 0
+    for item in bank.categories():
+        values = bank.read(item['name'])['questions']
+        total += len(values)
+        invalid.extend(f"{item['name']}#{index + 1}" for index, value in enumerate(values)
+                       if not bank.is_valid(value))
+    assert total > 0
+    assert invalid == []
+
+    def question(category, text):
+        return next(value for value in bank.read(category)['questions'] if value['question'] == text)
+
+    assert question('Мода и стиль', 'Кто изобрёл мини-юбку?')['correct'] == 'Оба варианта верны'
+    assert question('Теории заговора', 'Какой таинственный объект якобы упал в 1908 году в Сибири, вызвав мощный взрыв?')['correct'] == 'Тунгусский метеорит'
+    assert question('Фольклор и сказки народов мира', "Кто является автором сказки 'Алиса в Стране чудес'?")['correct'] == 'Льюис Кэрролл'
+    assert question('Фольклор и сказки народов мира', 'Как называется жилище Бабы-Яги?')['correct'] == 'Избушка на курьих ножках'
+    assert question('Искусство', "Кто автор картины 'Опять двойка'?")['correct'] == 'Фёдор Решетников'
+    series = question('Сериалы и телевидение', 'В каком сериале действие разворачивается в Балтиморе и детально показывает работу полиции и наркоторговцев?')
+    assert len(series['options']) == len(set(series['options']))
 
 
 def test_corrupt_file_repair_keeps_original_and_rejects_stale_or_invalid(tmp_path):

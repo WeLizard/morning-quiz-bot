@@ -1,4 +1,5 @@
 """Independent guest profile authentication; game/Alchemy integration is separate."""
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import re
@@ -48,6 +49,13 @@ class GuestAccounts:
                 or account.moderation_revision != row.account_revision):
             raise MiniAppError(401, 'Гостевая сессия завершена')
         return account, row
+
+    @asynccontextmanager
+    async def authorized(self, credential, *, lock=False):
+        """Public transaction boundary for account-owned application services."""
+        async with self.database.transaction() as session:
+            account, guest_session = await self._authorized(session, credential, lock=lock)
+            yield session, account, guest_session
 
     def _session(self, account):
         raw = secrets.token_urlsafe(32)

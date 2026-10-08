@@ -19,6 +19,7 @@ class Element {
     setAttribute(key, value) { this.attrs[key] = value; }
     removeAttribute(key) { delete this.attrs[key]; }
     addEventListener(event, callback) { this.events[event] = callback; }
+    insertBefore(node, reference) { const index = this.children.indexOf(reference); this.children.splice(index < 0 ? this.children.length : index, 0, node); }
     click() { return (this.events.click || this.onclick)?.({currentTarget: this, preventDefault() {}}); }
     querySelectorAll(selector) {
         const all = this.children.flatMap(child => [child, ...child.querySelectorAll('*')]);
@@ -29,6 +30,11 @@ class Element {
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const source = file => readFileSync(join(__dirname, '../../web/mini_client', file), 'utf8');
+const GAME_MODES = [
+    ['classic', 'Классический квиз', 'available'], ['photo', 'Фото-загадки', 'available'],
+    ['night', 'Ночной город', 'development'], ['atlas', 'Атлас маленьких чудес', 'available'],
+    ['farm', 'Весёлый фермер', 'coming_soon'],
+].map(([id, title, status]) => ({id, title, status, interfaces: [], capabilities: []}));
 const findButton = (root, label) => {
     const found = root.querySelectorAll('button').find(n => n.textContent === label || n.textContent.startsWith(label));
     assert.ok(found, `Missing button: ${label}`); return found;
@@ -48,10 +54,11 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         ? handle => { const index = timers.indexOf(handle); if (index >= 0) timers.splice(index, 1); }
         : clearTimeout;
     const fixtures = {
-        '/api/mini/config': {runtime_enabled: runtime, offline: true}, '/api/dev/info': {demo: true},
+        '/api/mini/config': {runtime_enabled: runtime, offline: true, game_modes: GAME_MODES}, '/api/dev/info': {demo: true},
         '/api/guest/start': {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Гость', authentication: 'guest', capabilities: ['guest-profile']},
         '/api/guest/me': {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Гость', authentication: 'guest', capabilities: ['guest-profile']},
         '/api/guest/logout': null,
+        '/api/guest/rooms': {items: []},
         '/api/dev/session': {access_token: 'unit-test'}, '/api/mini/me': {user_id: '42', display_name: 'Игрок', score: 12, answered_count: 3},
         '/api/mini/progress': {best_streak: 2, correct_including_photo: 2, current_streak: 1, achievements: [], legacy_achievements: []},
         '/api/mini/chats?limit=50': {items: [{chat_id: '42', title: 'Личная игра', type: 'private'}], has_more: false}, '/api/mini/runtime': {connected: true, messages: []},
@@ -74,22 +81,137 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
             daily: {enabled: false, times_msk: [], timezone: 'Europe/Moscow', num_questions: 10, interval_seconds: 60, poll_open_seconds: 600, categories_mode: 'random', specific_categories: [], num_random_categories: 3},
             wisdom: {enabled: false, time: '09:00'}, auto_delete: true},
     };
+    let authCookie = false; const requests = [];
     runInNewContext(source('app.js'), {
         window: {QuizTelegram: ui, QuizGame: {stop() {}, async mount(options) { mounts.push(options); }}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}, initDataUnsafe: {start_param: startParam}}}},
         document: {getElementById: id => ids[id], createElement: tag => new Element(tag), querySelector: () => brand},
-        fetch: async path => { assert.ok(path in fixtures || path in overrides, path);
-            const override = overrides[path];
+        fetch: async (path, options = {}) => { requests.push({path, options}); assert.ok(path in fixtures || path in overrides || `${path}:${options.method || 'GET'}` in overrides, path);
+            if (path === '/api/dev/session') authCookie = true;
+            if (path === '/api/mini/me' && !authCookie) return {ok: false, status: 401, json: async () => ({detail: 'Нет сессии'})};
+            const candidate = overrides[`${path}:${options.method || 'GET'}`] || overrides[path];
+            const override = typeof candidate === 'function' ? await candidate(options) : candidate;
             if (override) return {ok: override.status < 400, status: override.status, json: async () => override.body ?? {detail: 'Отказ'}};
             if (path === '/api/guest/me' && !savedGuest) return {ok: false, status: 401, json: async () => ({detail: 'Нет гостевой сессии'})};
             if (path === '/api/guest/logout') return {ok: true, status: 204};
             return {ok: true, status: 200, json: async () => fixtures[path]}; },
-        AbortController, setTimeout: schedule, clearTimeout: cancel, queueMicrotask, Intl, console,
+        AbortController, crypto: {randomUUID: (() => { let id = 0; return () => `00000000-0000-4000-8000-${String(++id).padStart(12, '0')}`; })()},
+        setTimeout: schedule, clearTimeout: cancel, queueMicrotask, Intl, console,
     });
     await flush();
     if (!guestMode && !savedGuest) { await findButton(ids.content, 'Войти как dev-игрок').click(); await flush(); }
     const tab = page => ids.navigation.children.find(n => n.dataset.page === page);
-    return {...ids, ui, mounts, tab, timers};
+    return {...ids, ui, mounts, tab, timers, requests};
 }
+
+const guestRoom = {id: 'room-test', title: 'Компания', role: 'member'};
+const guestMafiaBase = '/api/guest/rooms/room-test/mafia';
+const guestLobby = () => ({revision: 4, phase_revision: 2, status: 'lobby', players: [{name: 'Гость', is_me: true, ready: false, alive: true}], joined: true, is_host: true, can_start: true});
+const guestMafiaOverrides = (lobby, extra = {}) => ({
+    '/api/guest/rooms': {status: 200, body: {items: [guestRoom]}},
+    [guestMafiaBase + '/lobby']: {status: 200, body: {lobby}},
+    [guestMafiaBase + '/discussion']: {status: 200, body: {items: [], enabled: true}},
+    ...extra,
+});
+
+test('standalone Mafia reuses the table and sends guest readiness and start without Telegram identity', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby(), {
+        [guestMafiaBase + '/lobby/ready:POST']: {status: 200, body: {lobby: guestLobby()}},
+        [guestMafiaBase + '/lobby/start:POST']: {status: 200, body: {lobby: guestLobby()}},
+    })});
+    await findButton(app.content, 'Открыть Ночной город').click();
+    assert.match(app.content.textContent, /Ночной город|Стол игроков/);
+    assert.doesNotMatch(app.content.textContent, /Состав дела|Telegram-группе/);
+    await findButton(app.content, 'Я готов').click();
+    await findButton(app.content, 'Начать ночь').click();
+    const writes = app.requests.filter(r => r.path.startsWith(guestMafiaBase) && r.options.method === 'POST');
+    assert.deepEqual(writes.map(r => JSON.parse(r.options.body)), [{ready: true, expected_revision: 4}, {expected_revision: 4}]);
+    for (const {options} of writes) { assert.equal(options.headers['X-Guest-CSRF'], '1'); assert.ok(options.headers['Idempotency-Key']); }
+    assert.ok(!app.requests.some(r => r.path.includes('/api/mini/mafia')));
+});
+
+test('standalone Mafia creates or joins with an empty command and limits creation to room owner', async () => {
+    for (const owner of [true, false]) {
+        const lobby = owner ? null : {...guestLobby(), joined: false};
+        const suffix = owner ? '/lobby' : '/lobby/join';
+        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(lobby, {
+            '/api/guest/rooms': {status: 200, body: {items: [{...guestRoom, role: owner ? 'owner' : 'member'}]}},
+            '/api/guest/rooms/room-test/invites': {status: 200, body: {items: []}},
+            [guestMafiaBase + suffix + ':POST']: {status: 200, body: {lobby: guestLobby()}},
+        })});
+        await findButton(app.content, 'Открыть Ночной город').click();
+        await findButton(app.content, owner ? 'Создать лобби' : 'Сесть за стол').click();
+        assert.deepEqual(JSON.parse(app.requests.find(r => r.path === guestMafiaBase + suffix && r.options.method === 'POST').options.body), {});
+    }
+});
+
+test('standalone Mafia sends private targets, votes, phase advancement and restart through guest scope', async () => {
+    for (const [phase, label, suffix] of [['night', 'Цель', '/action'], ['voting', 'Цель', '/vote'], ['day', 'Открыть голосование', '/advance'], ['finished', 'Собрать реванш', '/restart']]) {
+        const lobby = {...guestLobby(), status: phase, can_advance: true};
+        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(lobby, {
+            [guestMafiaBase + '/role']: {status: 200, body: {phase, role: 'mafia', title: 'Мафия', round: 1, alive: true, targets: [{name: 'Цель', seat: 'p2'}]}},
+            [guestMafiaBase + suffix + ':POST']: {status: 200, body: {lobby}},
+        })});
+        await findButton(app.content, 'Открыть Ночной город').click();
+        await findButton(app.content, label).click();
+        const body = JSON.parse(app.requests.find(r => r.path === guestMafiaBase + suffix && r.options.method === 'POST').options.body);
+        assert.deepEqual(body, ['night', 'voting'].includes(phase) ? {target: 'p2', expected_revision: 2} : {expected_revision: 4});
+    }
+});
+
+test('standalone Mafia preserves an uncertain discussion command across retry and room navigation', async () => {
+    let attempts = 0;
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby(), {
+        [guestMafiaBase + '/discussion:POST']: () => { if (++attempts === 1) throw new TypeError('network'); return {status: attempts === 2 ? 503 : 200, body: {}}; },
+    })});
+    await findButton(app.content, 'Открыть Ночной город').click();
+    app.content.querySelector('textarea').value = 'Привет';
+    await findButton(app.content, 'Отправить').click();
+    assert.ok(findButton(app.feedback, 'Проверить / повторить'));
+    await findButton(app.content, 'К комнатам').click(); await flush();
+    await findButton(app.content, 'Открыть Ночной город').click();
+    await findButton(app.feedback, 'Проверить / повторить').click();
+    await findButton(app.feedback, 'Проверить / повторить').click();
+    const sent = app.requests.filter(r => r.path === guestMafiaBase + '/discussion' && r.options.method === 'POST');
+    assert.equal(sent.length, 3);
+    assert.equal(sent[0].options.headers['Idempotency-Key'], sent[1].options.headers['Idempotency-Key']);
+    assert.equal(sent[0].options.headers['Idempotency-Key'], sent[2].options.headers['Idempotency-Key']);
+    assert.equal(sent[0].options.body, sent[1].options.body);
+});
+
+test('standalone Mafia ignores a late role response after returning to rooms', async () => {
+    let release, started;
+    const waiting = new Promise(resolve => { started = resolve; });
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides({...guestLobby(), status: 'night'}, {
+        [guestMafiaBase + '/role']: () => { started(); return new Promise(resolve => { release = resolve; }); },
+    })});
+    const opening = findButton(app.content, 'Открыть Ночной город').click();
+    await waiting;
+    await findButton(app.content, 'К комнатам').click(); await flush();
+    release({status: 200, body: {phase: 'night', title: 'Секретная роль', role: 'citizen', alive: true}});
+    await opening;
+    assert.match(app.content.textContent, /Твои комнаты/);
+    assert.doesNotMatch(app.content.textContent, /Секретная роль|Полный ход дела/);
+});
+
+test('standalone Mafia polling preserves discussion drafts and stops after leaving the room', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby())});
+    await findButton(app.content, 'Открыть Ночной город').click();
+    const before = app.requests.length;
+    const poll = app.timers.find(t => t.delay === 5000);
+    assert.ok(poll);
+    app.content.querySelector('textarea').value = 'Пишу сообщение';
+    poll.callback(); await flush();
+    assert.equal(app.requests.length, before);
+    assert.equal(app.content.querySelector('textarea').value, 'Пишу сообщение');
+    app.content.querySelector('textarea').value = '';
+    app.timers.filter(t => t.delay === 5000).at(-1).callback(); await flush();
+    assert.ok(app.requests.length > before);
+    const nextPoll = app.timers.filter(t => t.delay === 5000).at(-1);
+    await findButton(app.content, 'К комнатам').click(); await flush();
+    const after = app.requests.length;
+    nextPoll.callback(); await flush();
+    assert.equal(app.requests.length, after);
+});
 
 test('guest starts in a browser, resumes and logs out without a Telegram session', async () => {
     const fresh = await application(true, '', {guestMode: true});
@@ -97,11 +219,65 @@ test('guest starts in a browser, resumes and logs out without a Telegram session
     await findButton(fresh.content, 'Продолжить как гость').click(); await flush();
     assert.match(fresh.content.textContent, /Гостевой профиль/);
     assert.ok(findButton(fresh.content, 'Открыть Алхимию'));
+    assert.ok(findButton(fresh.content, 'Создать комнату'));
     assert.doesNotMatch(fresh.content.textContent, /Твои чаты|Гонка за знаниями/);
     const resumed = await application(true, '', {savedGuest: true});
     assert.match(resumed.content.textContent, /Гостевой профиль/);
     await findButton(resumed.content, 'Выйти и потерять доступ к гостю').click(); await flush();
     assert.ok(findButton(resumed.content, 'Продолжить как гость'));
+});
+
+test('guest creates an account-owned room with retry-stable id and guest CSRF', async () => {
+    const app = await application(true, '', {guestMode: true, overrides: {
+        '/api/guest/rooms:POST': {status: 200, body: {id: '00000000-0000-4000-8000-000000000001', title: 'Компания', kind: 'standalone'}},
+    }});
+    await findButton(app.content, 'Продолжить как гость').click(); await flush();
+    const title = app.content.querySelector('input'); title.value = 'Компания';
+    await findButton(app.content, 'Создать комнату').click(); await flush(); await flush();
+    const post = app.requests.find(item => item.path === '/api/guest/rooms' && item.options.method === 'POST');
+    assert.ok(post);
+    assert.equal(post.options.headers['X-Guest-CSRF'], '1');
+    assert.equal(JSON.parse(post.options.body).request_id, '00000000-0000-4000-8000-000000000001');
+    assert.equal(JSON.parse(post.options.body).title, 'Компания');
+});
+
+test('guest room owner creates and revokes invite codes; guest can join by pasted code', async () => {
+    const roomId = '00000000-0000-4000-8000-000000000099';
+    const inviteId = '00000000-0000-4000-8000-000000000088';
+    const inviteCode = 'A'.repeat(43);
+    const app = await application(true, '', {guestMode: true, overrides: {
+        '/api/guest/rooms': {status: 200, body: {items: [{id: roomId, title: 'Компания', role: 'owner'}]}},
+        [`/api/guest/rooms/${roomId}/invites`]: {status: 200, body: {items: [{
+            id: inviteId, expires_at: '2099-10-09T12:00:00+00:00', max_uses: 2, uses: 0, revoked: false,
+        }]}},
+        [`/api/guest/rooms/${roomId}/invites:POST`]: {status: 200, body: {
+            id: inviteId, invite_code: inviteCode, expires_at: '2026-10-09T12:00:00+00:00', max_uses: 2,
+        }},
+        [`/api/guest/rooms/${roomId}/invites/${inviteId}:DELETE`]: {status: 204},
+        '/api/guest/rooms/join:POST': {status: 200, body: {id: roomId, title: 'Компания', joined: true}},
+    }});
+    await findButton(app.content, 'Продолжить как гость').click(); await flush(); await flush();
+    await findButton(app.content, 'Создать код').click(); await flush(); await flush();
+    const createdCode = app.content.querySelectorAll('input').find(node => node.attrs['aria-label'] === 'Одноразово показанный код приглашения');
+    assert.equal(createdCode?.value, inviteCode);
+    const create = app.requests.find(item => item.path === `/api/guest/rooms/${roomId}/invites` && item.options.method === 'POST');
+    assert.ok(create);
+    assert.equal(create.options.headers['X-Guest-CSRF'], '1');
+    assert.deepEqual(JSON.parse(create.options.body), {expires_in_seconds: 86400, max_uses: 5});
+    const list = app.requests.filter(item => item.path === `/api/guest/rooms/${roomId}/invites` && item.options.method === 'GET');
+    assert.ok(list.length);
+    assert.ok(list.every(item => !item.path.includes(inviteCode)));
+    await findButton(app.content, 'Отозвать').click(); await flush(); await flush();
+    assert.ok(app.requests.some(item => item.path === `/api/guest/rooms/${roomId}/invites/${inviteId}` && item.options.method === 'DELETE'));
+
+    const codeInput = app.content.querySelectorAll('input').find(node => node.attrs['aria-label'] === 'Код приглашения в комнату');
+    assert.ok(codeInput);
+    codeInput.value = inviteCode;
+    await findButton(app.content, 'Присоединиться').click(); await flush(); await flush();
+    const join = app.requests.find(item => item.path === '/api/guest/rooms/join' && item.options.method === 'POST');
+    assert.ok(join);
+    assert.equal(join.options.headers['X-Guest-CSRF'], '1');
+    assert.deepEqual(JSON.parse(join.options.body), {invite_code: inviteCode});
 });
 
 test('home restores the heading and keeps global settings inside profile', async () => {
@@ -130,16 +306,64 @@ test('home restores the heading and keeps global settings inside profile', async
     assert.match(app.content.textContent, /Темы обычного квиза/);
 });
 
-test('home game cards keep alternating sides and palettes', async () => {
+test('home game cards are driven by the canonical five-mode catalog; Farmer is non-launchable', async () => {
     const app = await application();
     const cards = app.content.querySelectorAll('.game-mode-card');
-    assert.equal(cards.length, 4);
-    assert.deepEqual(cards.map(card => card.dataset.gameMode), ['classic', 'photo', 'night', 'atlas']);
+    assert.equal(cards.length, 5);
+    assert.deepEqual(cards.map(card => card.dataset.gameMode), ['classic', 'photo', 'night', 'atlas', 'farm']);
     assert.match(cards[0].className, /palette-green.*image-left/);
     assert.match(cards[1].className, /palette-green.*image-right/);
     assert.match(cards[2].className, /palette-brown.*image-left/);
     assert.match(cards[3].className, /palette-brown.*image-right/);
     assert.match(app.content.textContent, /Атлас маленьких чудес/);
+    assert.equal(cards[4].dataset.modeStatus, 'coming_soon');
+    assert.match(cards[4].textContent, /Скоро/);
+    assert.equal(cards[4].querySelectorAll('button').length, 0);
+});
+
+test('home offers resume from the authenticated shared-game projection', async () => {
+    const app = await application(true, '', {overrides: {
+        '/api/mini/chats/42/games': {status: 200, body: {items: [{kind: 'classic', phase: 'active', question_number: 2, question_count: 5}]}},
+    }});
+    assert.ok(findButton(app.content, 'Вернуться в текущую игру'));
+});
+
+test('native help opens without starting QuizGame or reading the Telegram transcript', async () => {
+    const app = await application(false);
+    await findButton(app.content, 'Как играть').click(); await flush();
+    assert.equal(app.content.querySelector('h1').textContent, 'Как играть');
+    assert.ok(findButton(app.content, 'Открыть классический квиз'));
+    assert.ok(findButton(app.content, 'Открыть фото-загадки'));
+    assert.ok(findButton(app.content, 'Настройки'));
+    assert.equal(app.mounts.length, 0);
+    await findButton(app.content, 'Настройки').click(); await flush();
+    assert.equal(app.content.querySelector('h1').textContent, 'Настройки');
+    assert.doesNotMatch(app.content.textContent, /Открыть настройки в боте/);
+    assert.equal(app.mounts.length, 0);
+});
+
+test('Mafia discussion renders messages as text and sends an idempotent player command', async () => {
+    const chat = '-880000000044';
+    const app = await application(true, '', {overrides: {
+        '/api/mini/chats?limit=50': {status: 200, body: {items: [{chat_id: chat, title: 'Дело', type: 'supergroup'}], has_more: false}},
+        '/api/mini/mafia/draft': {status: 200, body: {title: 'Ночной город', revision: 0, players: 4,
+            roles: [{id: 'mafia', title: 'Мафия', count: 1}, {id: 'citizen', title: 'Мирные', count: 3}]}},
+        [`/api/mini/mafia/chats/${chat}/lobby`]: {status: 200, body: {lobby: {status: 'lobby', revision: 1,
+            players: [{name: '<Игрок>', is_me: true, ready: false}], joined: true, can_start: false, history: []}}},
+        [`/api/mini/mafia/chats/${chat}/discussion`]: {status: 200, body: {enabled: true, items: [
+            {id: 1, author: '<Игрок>', is_me: true, message: '<script>не HTML</script>', created_at: null},
+        ]}},
+        [`/api/mini/mafia/chats/${chat}/discussion:POST`]: {status: 200, body: {id: 2, accepted: true}},
+    }});
+    await findButton(app.content, 'Открыть дело').click(); await flush();
+    assert.match(app.content.textContent, /<script>не HTML<\/script>/);
+    const input = app.content.querySelector('textarea'); assert.ok(input);
+    input.value = 'Голосуем после обсуждения';
+    await findButton(app.content, 'Отправить').click(); await flush(); await flush();
+    const post = app.requests.find(item => item.path === `/api/mini/mafia/chats/${chat}/discussion` && item.options.method === 'POST');
+    assert.ok(post);
+    assert.match(post.options.headers['Idempotency-Key'], /^[A-Za-z0-9._:-]{8,64}$/);
+    assert.equal(JSON.parse(post.options.body).message, input.value);
 });
 
 test('deep link opens the requested page and falls back on unknown parameters', async () => {
@@ -184,8 +408,9 @@ test('expired session returns to login while a server error keeps the session', 
 
 test('read-only preview keeps appearance settings without enabling game writes', async () => {
     const app = await application(false); app.ui.settings(); await flush();
-    assert.match(app.content.textContent, /через чатового бота/);
-    assert.equal(app.content.querySelectorAll('select').length, 2);
+    assert.match(app.content.textContent, /изменение игровых параметров.*preview отключено/i);
+    assert.doesNotMatch(app.content.textContent, /Открыть настройки в боте/);
+    assert.equal(app.content.querySelectorAll('select').length, 1);
     assert.equal(app.mounts.length, 0);
     assert.ok(!app.content.querySelectorAll('button').some(n => n.textContent === 'Параметры и расписание'));
 });
@@ -244,15 +469,15 @@ test('shared classic endpoint wins over the Telegram transcript and answers dire
         answered: false, selected_option: null, closed: false,
     }};
     const request = async (path, options) => {
-        if (path === '/api/mini/runtime') return data;
         if (path.includes('/classic/') && path.endsWith('/sync')) return shared;
-        if (path.includes('/photo/') && path.endsWith('/current')) return null;
+        if (path.includes('/photo/') && path.endsWith('/sync')) return null;
         if (path.includes('/classic/') && path.endsWith('/answer')) {
             answers.push(JSON.parse(options.body));
             shared = {...shared, question: {...shared.question, answered: true, selected_option: 1,
                 correct_option: 1, is_correct: true, points: '1', explanation: 'Наш Филиныч.'}};
             return {applied: true, question: shared.question, points: '1'};
         }
+        assert.notEqual(path, '/api/mini/runtime', 'native Classic/Photo gameplay must not load the synthetic Telegram transcript');
         throw new Error('Unexpected path ' + path);
     };
     await ui.mount({host, request, chatId: '-1001', selection() {}, onHome() {}, onReplay() {}, onProfile() {}});
@@ -264,6 +489,72 @@ test('shared classic endpoint wins over the Telegram transcript and answers dire
     assert.equal(answers[0].selected_option, 1);
     assert.match(answers[0].command_id, /^[0-9a-f-]{36}$/);
     assert.match(host.textContent, /Есть! Именно так.|Наш Филиныч/);
+    ui.stop();
+});
+
+test('classic preparation loads stored settings and starts directly without runtime transcript', async () => {
+    const ui = player(), host = new Element('main'), calls = [];
+    let shared = null;
+    const request = async (path, options = {}) => {
+        calls.push(path);
+        if (path === '/api/mini/chats/42/details') return {classic: {
+            questions: 7, seconds: 45, interval: 12, category_mode: 'specific', categories: ['История'],
+        }};
+        if (path === '/api/mini/classic/chats/42/sync') {
+            if (!shared) throw Object.assign(new Error('Нет активного раунда'), {status: 404});
+            return shared;
+        }
+        if (path === '/api/mini/classic/chats/42/start') {
+            shared = {status: 'active', revision: 1, game: {current: 1, total: 7}, question: {
+                poll_id: 'new-poll', question: 'Первый вопрос?', options: ['Да', 'Нет'],
+                ends_at: new Date(Date.now() + 60000).toISOString(), answered: false, closed: false,
+            }};
+            return shared;
+        }
+        assert.notEqual(path, '/api/mini/runtime', 'Classic setup/start must not use the synthetic Telegram transcript');
+        throw new Error('Unexpected path ' + path);
+    };
+    await ui.mount({host, request, chatId: '42', command: '/quiz', selection() {}, onHome() {}, onReplay() {}, onProfile() {}, onSettings() {}});
+    assert.match(host.textContent, /7 вопросов.*45 секунд.*Пауза 12 секунд.*Темы: История/);
+    assert.ok(findButton(host, 'Настройки квиза'));
+    findButton(host, 'Начать игру').click(); await flush(); await flush();
+    assert.equal(calls.includes('/api/mini/runtime'), false);
+    assert.equal(calls.includes('/api/mini/classic/chats/42/start'), true);
+    assert.equal(host.querySelector('h1').textContent, 'Первый вопрос?');
+    ui.stop();
+});
+
+test('photo preparation uses the backend setup projection and starts without runtime transcript', async () => {
+    const ui = player(), host = new Element('main'), calls = [];
+    let started = false;
+    const game = {status: 'active', revision: 1, score: 0, game: {current: 1, total: 2}, question: {
+        round_id: 'photo-round', question_number: 1, question_count: 2,
+        ends_at: new Date(Date.now() + 60000).toISOString(), image_url: '/image', mask: '□ □', closed: false,
+    }};
+    const request = async (path, options = {}) => {
+        calls.push(path);
+        if (path === '/api/mini/photo/chats/42/setup') return {
+            question_count: 2, open_seconds: 75, hints_enabled: false, available_questions: 8, can_start: true,
+        };
+        if (path === '/api/mini/photo/chats/42/sync') {
+            if (!started) throw Object.assign(new Error('Нет активной серии'), {status: 404});
+            return game;
+        }
+        if (path === '/api/mini/photo/chats/42/start') {
+            started = true;
+            const payload = JSON.parse(options.body);
+            assert.equal(payload.question_count, 2); assert.equal(payload.open_seconds, 75); assert.equal(payload.hints_enabled, false);
+            return game;
+        }
+        assert.notEqual(path, '/api/mini/runtime', 'Photo setup/start must not use the synthetic Telegram transcript');
+        throw new Error('Unexpected path ' + path);
+    };
+    await ui.mount({host, request, chatId: '42', command: '/photo_quiz', selection() {}, onHome() {}, onReplay() {}, onProfile() {}, onSettings() {}, media: async () => new Blob()});
+    assert.match(host.textContent, /2 картинки.*75 секунд на картинку.*Без подсказок.*Доступно загадок: 8/);
+    findButton(host, 'Начать фото-серию').click(); await flush(); await flush();
+    assert.equal(calls.includes('/api/mini/runtime'), false);
+    assert.equal(calls.includes('/api/mini/photo/chats/42/start'), true);
+    assert.equal(host.querySelector('h1').textContent, 'Что скрывается\nна картинке?');
     ui.stop();
 });
 

@@ -451,11 +451,18 @@ STATIC_HANDLER_NAMES = frozenset()  # PG bank uses versioned /api/bank; no legac
 
 
 def install_postgres_admin(app: FastAPI) -> None:
-    backend = os.getenv("STORAGE_BACKEND", "json").strip().lower()
-    if backend == "json":
-        return
+    backend = os.getenv("STORAGE_BACKEND", "postgres").strip().lower()
     if backend != "postgres":
-        raise RuntimeError("STORAGE_BACKEND must be json or postgres")
+        @asynccontextmanager
+        async def reject_legacy_runtime(application):
+            raise RuntimeError(
+                "Admin runtime requires STORAGE_BACKEND=postgres; "
+                "JSON is supported only as an explicit migration input."
+            )
+            yield application
+
+        app.router.lifespan_context = reject_legacy_runtime
+        return
 
     previous_lifespan = app.router.lifespan_context
 

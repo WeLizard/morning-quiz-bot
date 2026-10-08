@@ -19,9 +19,9 @@ def root(tmp_path, monkeypatch):
     return backups.ROOT
 
 
-def archive(files, *, damage=False):
+def archive(files, *, damage=False, tables=None):
     key = uuid4().hex
-    manifest = {'id': key, 'database': backups.DBNAME, 'format': 1, 'tables': {},
+    manifest = {'id': key, 'database': backups.DBNAME, 'format': 1, 'tables': tables or {},
                 'created_at': '2026-08-31T00:00:00+00:00',
                 'files': {name: sha256(value).hexdigest() for name, value in files.items()}}
     with zipfile.ZipFile(backups.path_for(key), 'w') as output:
@@ -57,6 +57,19 @@ def test_backup_rejects_corruption_and_bad_ids(root):
         backups.path_for('../not-an-archive')
 
 
+def test_backup_rejects_unknown_or_malformed_table_fingerprints(root):
+    key = archive({'database.dump': b'dump'}, tables={
+        'room_invites; DROP DATABASE morning_quiz_dev': {'rows': 0, 'digest': '0' * 32},
+    })
+    with pytest.raises(ValueError, match='манифест таблиц'):
+        backups.read_verified(key)
+    key = archive({'database.dump': b'dump'}, tables={
+        'accounts': {'rows': True, 'digest': '0' * 32},
+    })
+    with pytest.raises(ValueError, match='манифест таблиц'):
+        backups.read_verified(key)
+
+
 def test_guard_rejects_nondev_before_any_docker_call(monkeypatch):
     call = Mock(side_effect=AssertionError('Docker must not be called'))
     monkeypatch.setattr(backups.subprocess, 'run', call)
@@ -81,6 +94,28 @@ def test_isolated_restore_drops_only_created_uuid_database_on_failure(root, monk
     assert [c[0] for c in calls] == ['createdb', 'pg_restore', 'dropdb']
     assert calls[0][-1] == calls[-1][-1]
     assert calls[-1][-1].startswith('mqb_restore_') and calls[-1][-1] != backups.DBNAME
+
+
+def test_restore_verifies_only_tables_captured_in_pre_migration_snapshot(root, monkeypatch):
+    digest = 'a' * 32
+    key = archive({'database.dump': b'dump'}, tables={
+        'accounts': {'rows': 0, 'digest': digest},
+    })
+    monkeypatch.setattr(backups, 'guard', lambda _: None)
+    calls = []
+
+    def command(args, **kwargs):
+        calls.append(args)
+        if args[0] == 'psql':
+            return f'0|{digest}'.encode()
+        return b''
+
+    monkeypatch.setattr(backups, 'command', command)
+    result = asyncio.run(backups.verify_restore(None, key))
+    assert result['verified'] is True and result['tables'] == 1
+    checks = [args[-1] for args in calls if args[0] == 'psql']
+    assert len(checks) == 1 and 'FROM "accounts"' in checks[0]
+    assert all('room_invites' not in query for query in checks)
 
 
 def test_inplace_restore_rejects_missing_explicit_offline_intent(monkeypatch):

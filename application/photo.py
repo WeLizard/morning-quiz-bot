@@ -22,6 +22,10 @@ from storage.photo_media import images_root, verified_image_path
 from storage.photos import metadata
 from storage.repositories import OperationalRepository
 
+DEFAULT_PHOTO_QUESTION_COUNT = 3
+DEFAULT_PHOTO_OPEN_SECONDS = 60
+DEFAULT_PHOTO_HINTS_ENABLED = True
+
 
 class PhotoGameConflict(RuntimeError):
     pass
@@ -48,7 +52,7 @@ class PhotoApplicationService:
     async def _current(self, chat_id: int, *, lock: bool = False) -> Game | None:
         return await self.games.current(chat_id=chat_id, mode="photo", lock=lock)
 
-    async def _select_questions(self, count: int) -> list[dict[str, Any]]:
+    async def _available_questions(self) -> list[dict[str, Any]]:
         rows = (await self.session.scalars(
             select(PhotoQuizItem).where(PhotoQuizItem.enabled.is_(True)).order_by(PhotoQuizItem.media_key)
         )).all()
@@ -72,6 +76,24 @@ class PhotoApplicationService:
             })
         if not available:
             raise LookupError("В каталоге нет доступных фото-загадок.")
+        return available
+
+    async def setup(self) -> dict[str, Any]:
+        """Return the server-owned defaults and playable catalog size."""
+        try:
+            available = await self._available_questions()
+        except LookupError:
+            available = []
+        return {
+            "question_count": DEFAULT_PHOTO_QUESTION_COUNT,
+            "open_seconds": DEFAULT_PHOTO_OPEN_SECONDS,
+            "hints_enabled": DEFAULT_PHOTO_HINTS_ENABLED,
+            "available_questions": len(available),
+            "can_start": bool(available),
+        }
+
+    async def _select_questions(self, count: int) -> list[dict[str, Any]]:
+        available = await self._available_questions()
         random.SystemRandom().shuffle(available)
         if count <= len(available):
             return available[:count]

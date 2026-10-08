@@ -79,7 +79,7 @@ async def run_worker(bridge, app, photos, scope, dispatch_lock):
                         game_runtime = app.bot_data.get('game_runtime')
                         if game_runtime is not None:
                             from telegram.ext import CallbackContext
-                            await game_runtime.deadline_job(CallbackContext(app))
+                            await game_runtime.notification_job(CallbackContext(app))
                         await bridge.finish(action['request_id'], active_mini_action.get()['error'], active_mini_action.get().get('notice'))
                         if action['type'] == 'command' and action['value'] in {'/stopquiz', '/stop_photo_quiz'}:
                             scope.disable_local_delivery()

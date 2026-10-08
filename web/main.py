@@ -318,7 +318,7 @@ async def index():
     html_file = TEMPLATES_DIR / "index.html"
     with open(html_file, 'r', encoding='utf-8') as f:
         html = f.read()
-    if os.getenv("STORAGE_BACKEND", "json").strip().lower() == "postgres":
+    if os.getenv("STORAGE_BACKEND", "postgres").strip().lower() == "postgres":
         # PG adapters use local scripts only; legacy chart/AI widgets are hidden.
         import re
         # Server-side marker applies the theme before JS/auth finishes (no white flash).

@@ -17,7 +17,7 @@ from sqlalchemy import func, select, text
 from storage.database import Database, DatabaseSettings
 from storage.models import (
     Game, GameDeadline, GameDelivery, GameEvent, GamePlayer, PollAnswer,
-    QuizSession, SystemState,
+    QuizSession, SystemState, User,
 )
 
 
@@ -78,10 +78,25 @@ def test_0008_moves_legacy_mafia_without_losing_private_state():
             try:
                 async with database.transaction() as session:
                     game = await session.scalar(select(Game).where(Game.chat_id == -777123))
-                    assert game and game.state == payload and game.revision == 9
+                    assert game and game.revision == 9
+                    assert game.state['state_version'] == 2
+                    assert game.state['room_id'] == f'telegram:{game.chat_id}'
+                    host = await session.get(User, 701)
+                    assert game.state['host_account_id'] == str(host.account_id)
+                    assert [player['account_id'] for player in game.state['players']] == [
+                        str((await session.get(User, user_id)).account_id)
+                        for user_id in (701, 702, 703, 704)
+                    ]
+                    assert game.state['assignments'][str(host.account_id)] == 'mafia'
+                    assert game.state['night_actions']['mafia'][str(host.account_id)] == str(
+                        (await session.get(User, 702)).account_id
+                    )
+                    assert not {'chat_id', 'host_id', 'scope'} & game.state.keys()
+                    assert all('user_id' not in player for player in game.state['players'])
                     assert await session.get(SystemState, 'mafia_lobby:-777123') is None
                     assert await session.scalar(select(func.count()).select_from(GamePlayer)) == 4
-                    mafia = await session.get(GamePlayer, (game.id, 701))
+                    mafia = await session.scalar(select(GamePlayer).where(
+                        GamePlayer.game_id == game.id, GamePlayer.user_id == 701))
                     assert mafia.private_state == {'role': 'mafia'}
                     assert await session.scalar(select(func.count()).select_from(GameEvent)) == 1
                     deadline = await session.scalar(select(GameDeadline))

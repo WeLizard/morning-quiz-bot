@@ -12,7 +12,7 @@ async def main():
             raise RuntimeError('Refusing gameplay against a non-synthetic profile')
         login = await client.post('/api/dev/session', json={})
         login.raise_for_status()
-        client.headers['Authorization'] = 'Bearer ' + login.json()['access_token']
+        client.headers.update({'Origin': 'http://127.0.0.1:4185', 'X-Mini-CSRF': '1'})
         try:
             me = (await client.get('/api/mini/me')).json()
             assert me['user_id'] == '900000000091'

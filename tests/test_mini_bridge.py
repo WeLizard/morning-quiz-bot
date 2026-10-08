@@ -56,7 +56,8 @@ def test_bridge_http_privacy_queue_idempotency_and_no_spoilers(pg_env):
                 assert asset.status_code == 200 and 'script-src' in asset.headers['content-security-policy']
                 assert (await client.get('/api/mini/runtime')).status_code == 401
                 login = await client.post('/api/mini/session', json={'init_data': signed()})
-                headers = {'Authorization': 'Bearer ' + login.json()['access_token']}
+                assert login.json().get('access_token') is None
+                headers = {'Cookie': f"mqb_mini={client.cookies.get('mqb_mini')}", 'X-Mini-CSRF': '1', 'Origin': ORIGIN}
                 response = await client.get('/api/mini/runtime', headers=headers)
                 assert response.status_code == 200 and response.json()['connected']
                 assert '_answer' not in response.text and 'SECRET_EXPLANATION' not in response.text
@@ -71,7 +72,7 @@ def test_bridge_http_privacy_queue_idempotency_and_no_spoilers(pg_env):
                 result = (await client.get('/api/mini/runtime', headers=headers)).json()
                 assert result['requests'][-1]['status'] == 'uncertain'
                 other = await client.post('/api/mini/session', json={'init_data': signed(USER + 1)})
-                other_headers = {'Authorization': 'Bearer ' + other.json()['access_token']}
+                other_headers = {'Cookie': f"mqb_mini={client.cookies.get('mqb_mini')}", 'X-Mini-CSRF': '1', 'Origin': ORIGIN}
                 assert not (await client.get('/api/mini/runtime', headers=other_headers)).json()['messages']
                 assert (await client.get('/api/mini/runtime/media/10', headers=other_headers)).status_code == 404
                 assert (await client.post('/api/mini/runtime/actions', headers=other_headers, json=action)).status_code == 503
@@ -101,7 +102,7 @@ def test_native_game_projection_uses_own_ledger_without_bank_or_other_players(pg
                 photo['last_result'] = {'round_id': photo['current_round_id'], 'question_number': 1,
                                         'correct': False, 'points': 0, 'answer': 'OUTCOME_SECRET',
                                         'reason': 'timeout'}
-                s.add(Game(id=str(uuid4()), chat_id=USER, mode='photo', status='active',
+                s.add(Game(id=str(uuid4()), chat_id=USER, room_id=f'telegram:{USER}', mode='photo', status='active',
                            phase='question_open', revision=photo['revision'], state=photo,
                            is_current=True, started_at=datetime.now(timezone.utc)))
             bridge = MiniBridge(env.db, 'unit', USER)

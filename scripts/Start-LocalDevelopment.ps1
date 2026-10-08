@@ -25,7 +25,7 @@ try {
     $arguments = @('compose', '-p', 'mqb-local-dev', '-f', $composeFile)
     if ($WithTelegram) { $arguments += @('--profile', 'telegram') }
     $arguments += @('up', '--build', '-d', '--wait')
-    if (-not $WithTelegram) { $arguments += @('postgres', 'migrate', 'seed', 'admin', 'mini-app') }
+    if (-not $WithTelegram) { $arguments += @('postgres', 'migrate', 'seed', 'game-worker', 'admin', 'mini-app') }
     Invoke-LocalChecked docker $arguments
     if (-not $WithTelegram) {
         & docker compose -p mqb-local-dev -f $composeFile --profile telegram stop telegram 2>$null | Out-Null

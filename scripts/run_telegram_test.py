@@ -160,13 +160,12 @@ async def dispatch(app, config, scope, update):
     kind = 'callback' if update.callback_query else 'poll_answer' if update.poll_answer else 'message'
     scope.event('accepted_update', kind=kind)
     await app.process_update(update)
-    # The private dev runner acknowledges transactionally queued effects before
-    # returning control to tests/the local bridge. Periodic deadlines remain the
-    # fallback for time-based transitions and process restarts.
+    # Deliver transactionally queued Telegram effects before returning control.
+    # Deadline transitions belong to the independent game-worker process.
     from telegram.ext import CallbackContext
     game_runtime = app.bot_data.get('game_runtime')
     if game_runtime is not None:
-        await game_runtime.deadline_job(CallbackContext(app))
+        await game_runtime.notification_job(CallbackContext(app))
 
 
 async def run(args):
@@ -227,7 +226,7 @@ async def run(args):
         if hook.url:
             raise ValueError('Existing webhook detected: left untouched; polling not started')
         await app.start()
-        app.bot_data['game_runtime'].install_deadlines(app.job_queue)
+        app.bot_data['game_runtime'].install_notification_delivery(app.job_queue)
         # Only this private chat receives a command menu; the global bot menu is untouched.
         await app.bot.set_my_commands([
             BotCommand('start', 'Главное меню'), BotCommand('quiz', 'Начать квиз'),

@@ -27,6 +27,9 @@
 - [Играть в боте или Mini App: функции и незакрытые сценарии](MINI_APP_GAMEPLAY.md)
 - [Общее ядро и равноправные интерфейсы](tasks/MQB-005-application-core-and-adapters.md)
 - [Главная программа развития: PostgreSQL-only платформа](tasks/MQB-006-platform-postgresql-cutover.md)
+- [Аудит и последовательное устранение 28 находок (2026-10-08)](tasks/QUIZZYWIZZY-2026-10-08.md)
+- [Безопасный read-only аудит банка вопросов](engineering/QUESTION_BANK_AUDIT.md)
+- [Безопасный read-only аудит очереди уведомлений](engineering/NOTIFICATION_OUTBOX_AUDIT.md)
 - [Временный HTTPS-тест Mini App и безопасная остановка](TELEGRAM_MINI_APP_TEST.md)
 - [Правила ведения документации](DOCUMENTATION_RULES.md)
 - [Активные задачи](tasks/README.md)
@@ -71,4 +74,4 @@
 4. профильный документ из `docs/`;
 5. исторические отчёты и аудиты.
 
-Последняя проверка индекса: 2026-08-30.
+Последняя проверка индекса: 2026-10-08.

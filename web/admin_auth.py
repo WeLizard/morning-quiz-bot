@@ -105,7 +105,7 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         policy = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
-        if os.getenv("STORAGE_BACKEND", "json").strip().lower() == "postgres":
+        if os.getenv("STORAGE_BACKEND", "postgres").strip().lower() == "postgres":
             policy += "; default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'"
         response.headers["Content-Security-Policy"] = policy
         return response
@@ -156,7 +156,7 @@ def install_admin_auth(app, *, auth=None):
     @app.get("/auth/session", include_in_schema=False)
     async def session_info(request: Request):
         return {"authenticated": True, "csrf_token": request.state.admin_session.csrf,
-                "storage_backend": os.getenv("STORAGE_BACKEND", "json").strip().lower()}
+                "storage_backend": os.getenv("STORAGE_BACKEND", "postgres").strip().lower()}
 
     @app.post("/auth/logout", include_in_schema=False)
     async def logout(request: Request):

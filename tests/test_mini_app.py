@@ -13,19 +13,22 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from starlette.requests import Request
 from sqlalchemy import delete, func, select
 
 from tests.test_postgres_members import CHAT, OTHER_CHAT, USER, pg_env, scenario
 from storage.admin_actions import AdminActions
 from storage.classic_sessions import ClassicSessions
+from storage.games import GameRepository
 from storage.mini_app import MiniAppError, MiniAppStore
-from storage.models import (AchievementGrant, Chat, ChatMember, Game, GamePlayer, MiniAppSession,
-                            PollAnswer, QuizSession, User)
+from storage.models import (AchievementGrant, AlchemyProgress, Chat, ChatMember, Game, GamePlayer,
+                            MiniAppSession, PollAnswer, QuizSession, User)
 from storage.repositories import OperationalRepository
 from storage.question_bank import BankConflict, PostgresQuestionBank
 from storage.settings import SettingsService
 from web.mini_auth import InvalidInitData, validate_init_data
-from web.mini_app import MiniAppSettings, RequestLimits, TelegramMembership, create_app
+from web.mini_app import (MiniAppSettings, RequestLimits, TelegramMembership,
+                          bounded_request_body, create_app)
 from web import mini_app as mini_app_module
 
 TOKEN = '123456:LOCAL_TEST_ONLY_012345678901234567890'
@@ -88,7 +91,30 @@ async def environment(url, *, membership=True, runtime_enabled=False):
 async def login(env, uid=USER, **extras):
     response = await env.client.post('/api/mini/session', json={'init_data': signed(uid, **extras)})
     assert response.status_code == 200, response.text
-    return {'Authorization': 'Bearer ' + response.json()['access_token']}
+    token = env.client.cookies.get('mqb_mini')
+    assert token and response.json().get('access_token') is None
+    env.client.cookies.delete('mqb_mini')
+    return {'Authorization': 'Bearer ' + token}
+
+
+def test_login_uses_http_only_cookie_and_cookie_writes_require_csrf(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            signed_in = await env.client.post('/api/mini/session', json={'init_data': signed()})
+            assert signed_in.status_code == 200
+            assert 'access_token' not in signed_in.json()
+            cookie = signed_in.headers['set-cookie'].lower()
+            cookie_attributes = {part.strip() for part in cookie.split(';')[1:]}
+            assert 'mqb_mini=' in cookie and 'httponly' in cookie_attributes and 'samesite=strict' in cookie
+            assert 'secure' not in cookie_attributes  # test origin is loopback HTTP; HTTPS deployments set Secure.
+            assert (await env.client.get('/api/mini/me')).status_code == 200
+            payload = {'discovered': [], 'crafted': [], 'attempts': 0}
+            denied = await env.client.post('/api/mini/alchemy/sync', json=payload)
+            assert denied.status_code == 403
+            accepted = await env.client.post('/api/mini/alchemy/sync', json=payload,
+                headers={'Origin': ORIGIN, 'X-Mini-CSRF': '1'})
+            assert accepted.status_code == 200
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize('extras', [{}, {'signature': 'signed-extra-field'}, {'start_param': 'hello_world'}, {'chat': '{"id":123}'}])
@@ -114,6 +140,49 @@ def test_hmac_rejects_tampering_duplicates_expiry_and_invalid_identity(raw):
 def test_wrong_bot_token_cannot_validate_init_data():
     with pytest.raises(InvalidInitData):
         validate_init_data(signed(), TOKEN + 'other', now=NOW)
+
+
+def test_bounded_body_rejects_declared_size_before_reading():
+    async def run():
+        async def unexpected_read():
+            raise AssertionError('oversized body must be rejected before streaming')
+        request = Request({'type': 'http', 'headers': [(b'content-length', b'2001')]}, unexpected_read)
+        with pytest.raises(MiniAppError) as error:
+            await bounded_request_body(request, max_bytes=2000)
+        assert error.value.status == 413
+    asyncio.run(run())
+
+
+def test_bounded_body_rejects_oversized_stream_without_joining_it():
+    async def run():
+        delivered = False
+        async def receive():
+            nonlocal delivered
+            if delivered:
+                return {'type': 'http.request', 'body': b'', 'more_body': False}
+            delivered = True
+            return {'type': 'http.request', 'body': b'x' * 2001, 'more_body': False}
+        request = Request({'type': 'http', 'headers': []}, receive)
+        with pytest.raises(MiniAppError) as error:
+            await bounded_request_body(request, max_bytes=2000)
+        assert error.value.status == 413
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(('path', 'limit'), [
+    ('/api/mini/alchemy/sync', 128 * 1024),
+    ('/api/mini/alchemy/craft', 512),
+    (f'/api/mini/mafia/chats/{USER}/discussion', 5000),
+])
+def test_write_routes_reject_oversized_declared_body_before_parsing(pg_env, path, limit):
+    async def run():
+        async with environment(pg_env) as env:
+            response = await env.client.post(
+                path, content=b'x' * (limit + 1),
+                headers={'Content-Type': 'application/json'},
+            )
+            assert response.status_code == 413
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize('origin,offline', [('http://public.example', False), ('http://public.example', True),
@@ -310,9 +379,12 @@ def test_history_projection_covers_games_answers_and_chat_totals(pg_env):
         async with environment(pg_env) as env:
             moment = datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc)
             async with env.db.transaction() as session:
-                session.add(Game(id='game-1', chat_id=CHAT, mode='photo', status='finished', phase='finished',
+                await GameRepository(session).ensure_telegram_room(CHAT)
+                session.add(Game(id='game-1', chat_id=CHAT, room_id=f'telegram:{CHAT}', mode='photo', status='finished', phase='finished',
                                  is_current=False, started_at=moment - timedelta(minutes=10), ended_at=moment))
-                session.add(GamePlayer(game_id='game-1', user_id=USER, seat='player'))
+                account_id = await GameRepository(session).account_for_telegram_user(USER)
+                session.add(GamePlayer(
+                    game_id='game-1', account_id=account_id, user_id=USER, seat='player'))
                 session.add(PollAnswer(poll_id='p-1', user_id=USER, chat_id=CHAT, is_correct=True,
                                        points_delta=Decimal('1.500'), answered_at=moment,
                                        game_id='game-1', round_id='r-1'))
@@ -507,7 +579,7 @@ def test_mafia_start_and_private_role_api_share_application_state(pg_env):
             assert 'assignments' not in started.text and 'user_id' not in started.text
             own = await env.client.get(f'/api/mini/mafia/chats/{CHAT}/role', headers=host)
             other = await env.client.get(f'/api/mini/mafia/chats/{CHAT}/role', headers=second)
-            assert own.status_code == other.status_code == 200
+            assert own.status_code == other.status_code == 200, (own.text, other.text)
             assert own.json()['role'] in {'mafia', 'citizen'}
             assert other.json()['role'] in {'mafia', 'citizen'}
     asyncio.run(run())
@@ -601,7 +673,8 @@ def test_games_never_expose_answers_or_other_players_photo_session(pg_env):
                     {'display_answer': 'SPOILER', 'media': {'media_key': 'secret-one'}},
                     {'display_answer': 'PRIVATE_METADATA', 'media': {'media_key': 'secret-two'}},
                 ])
-                session.add(Game(id=str(uuid4()), chat_id=CHAT, mode='photo', status='active',
+                await GameRepository(session).ensure_telegram_room(CHAT)
+                session.add(Game(id=str(uuid4()), chat_id=CHAT, room_id=f'telegram:{CHAT}', mode='photo', status='active',
                                  phase='question_open', revision=photo['revision'], state=photo,
                                  is_current=True, started_at=datetime.now(timezone.utc)))
             headers = await login(env)
@@ -687,11 +760,16 @@ def test_photo_projection_serves_current_image_without_answer_or_path(pg_env, tm
                 now=started,
             )
             async with env.db.transaction() as session:
-                session.add(Game(id=str(uuid4()), chat_id=CHAT, mode='photo', status='active',
+                await GameRepository(session).ensure_telegram_room(CHAT)
+                session.add(Game(id=str(uuid4()), chat_id=CHAT, room_id=f'telegram:{CHAT}', mode='photo', status='active',
                                  phase='question_open', revision=state['revision'], state=state,
                                  is_current=True, started_at=started))
             headers = await login(env)
             path = f'/api/mini/photo/chats/{CHAT}/current'
+            from application.photo import PhotoApplicationService
+            async def forbid_settlement(self, **kwargs):
+                raise AssertionError('GET current must not execute due-state transitions')
+            monkeypatch.setattr(PhotoApplicationService, 'settle_due', forbid_settlement)
             current = await env.client.get(path, headers=headers)
             assert current.status_code == 200
             assert current.json()['question']['mask'] and 'СЕКРЕТНЫЙ' not in current.json()['question']['mask']
@@ -714,13 +792,24 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
         monkeypatch.setenv('PHOTO_IMAGES_DIR', str(root))
         async with environment(pg_env, runtime_enabled=True) as env:
             await PhotoCatalog(env.db).get_or_create('Сова')
-            headers = await login(env)
             base = f'/api/mini/photo/chats/{CHAT}'
+            assert (await env.client.get(base + '/setup')).status_code == 401
+            headers = await login(env)
+            setup = await env.client.get(base + '/setup', headers=headers)
+            assert setup.status_code == 200, setup.text
+            assert setup.json() == {
+                'question_count': 3, 'open_seconds': 60, 'hints_enabled': True,
+                'available_questions': 1, 'can_start': True,
+            }
             started = await env.client.post(base + '/start', headers=headers,
                 json={'command_id': str(uuid4()), 'question_count': 1,
                       'open_seconds': 60, 'hints_enabled': True})
             assert started.status_code == 200, started.text
             question = started.json()['question']
+            synced = await env.client.post(base + '/sync', headers=headers, json={})
+            assert synced.status_code == 200 and synced.json()['question']['round_id'] == question['round_id']
+            current = await env.client.get(base + '/current', headers=headers)
+            assert current.status_code == 200 and current.json()['question']['round_id'] == question['round_id']
             assert (await env.client.get(base + '/current/image', headers=headers)).content == (root / 'Сова.webp').read_bytes()
             wrong_id = str(uuid4())
             wrong = await env.client.post(base + '/answer', headers=headers,
@@ -802,6 +891,14 @@ def test_native_preferences_save_categories_and_schedules_without_bot_bridge(pg_
             group = await env.client.put(f'/api/mini/chats/{CHAT}/preferences', headers=headers,
                                          json={**payload, 'expected_revision': 0})
             assert group.status_code == 403
+            env.verifier.status = AsyncMock(return_value={'status': 'administrator'})
+            group_details = (await env.client.get(f'/api/mini/chats/{CHAT}/details', headers=headers)).json()
+            assert group_details['can_edit'] is True
+            saved_group = await env.client.put(f'/api/mini/chats/{CHAT}/preferences', headers=headers,
+                                               json={**payload, 'expected_revision': group_details['settings_revision']})
+            assert saved_group.status_code == 200, saved_group.text
+            group_settings = (await SettingsService(env.db).get(CHAT)).values
+            assert group_settings['quiz']['num_questions'] == 8
     asyncio.run(run())
 
 
@@ -835,7 +932,7 @@ def test_mafia_full_cycle_uses_private_actions_and_public_results(pg_env, monkey
             victim = candidates[0] if candidates else next(uid for uid in users if uid != mafia)
             lobby = (await env.client.get(base + '/lobby', headers=headers[mafia])).json()['lobby']
             action = await env.client.post(base + '/action', headers=headers[mafia],
-                json={'target': roles[victim]['seat'], 'expected_revision': lobby['revision']})
+                json={'target': roles[victim]['seat'], 'expected_revision': lobby['phase_revision']})
             assert action.status_code == 200
             lobby = (await env.client.get(base + '/lobby', headers=headers[USER])).json()['lobby']
             assert lobby['can_advance'] is True and 'role' not in str(lobby)
@@ -848,10 +945,11 @@ def test_mafia_full_cycle_uses_private_actions_and_public_results(pg_env, monkey
             assert opened.status_code == 200 and opened.json()['lobby']['status'] == 'voting'
             living = [uid for uid in users if uid != victim]
             revision = opened.json()['lobby']['revision']
+            phase_revision = opened.json()['lobby']['phase_revision']
             for uid in living:
                 target = roles[mafia]['seat'] if uid != mafia else roles[next(x for x in living if x != mafia)]['seat']
                 result = await env.client.post(base + '/vote', headers=headers[uid],
-                    json={'target': target, 'expected_revision': revision})
+                    json={'target': target, 'expected_revision': phase_revision})
                 assert result.status_code == 200, result.text
                 revision = result.json()['lobby']['revision']
             finished = await env.client.post(base + '/advance', headers=headers[USER],
@@ -895,10 +993,12 @@ def test_alchemia_atlas_is_served_as_self_contained_mini_app_page(pg_env):
             assert page.headers['content-type'].startswith('text/html')
             html = page.text
             assert 'атлас маленьких чудес' in html and 'alchemia.atlas.v1' in html
-            # Ресурсы автономны: ни внешних ссылок, ни сторонних скриптов. Сеть у
-            # страницы ровно одна — синхронизация прогресса с нашим же API.
+            # Ресурсы автономны; обе сетевые команды ведут только в наш API.
             assert 'src="http' not in html and 'href="http' not in html
             assert '/api/mini/alchemy/sync' in html
+            assert '/api/mini/alchemy/craft' in html
+            assert '#t=' not in html and 'mqb-mini-token' not in html
+            assert 'Authorization: `Bearer' not in html
             # Инлайн-стили и скрипты обязаны быть разрешены: со строгой политикой
             # мини-аппа страница открывается без оформления и без игры.
             csp = page.headers['content-security-policy']
@@ -909,6 +1009,47 @@ def test_alchemia_atlas_is_served_as_self_contained_mini_app_page(pg_env):
                 "default-src 'none'; frame-ancestors 'none'"
             # Новый маршрут объявлен раньше обработчика ассетов и не перехватывается им.
             assert (await env.client.get('/app/alchemy.html')).status_code == 404
+    asyncio.run(run())
+
+
+def test_alchemy_sync_imports_without_reward_and_craft_is_server_authoritative(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            headers = await login(env)
+            imported = await env.client.post(
+                '/api/mini/alchemy/sync', headers=headers,
+                json={'discovered': ['water', 'earth', 'fire', 'air', 'steam'],
+                      'crafted': ['air+water'], 'attempts': 100_000},
+            )
+            assert imported.status_code == 200, imported.text
+            assert imported.json()['awarded'] == 0
+            assert imported.json()['reward_eligible'] is False
+            assert imported.json()['discovered'] == ['air', 'earth', 'fire', 'steam', 'water']
+            assert imported.json()['verified_discovered'] == ['air', 'earth', 'fire', 'water']
+            async with env.db.transaction() as session:
+                assert (await session.get(User, USER)).global_score == Decimal('12.250')
+
+            payload = {'command_id': f'http-craft-{uuid4().hex}',
+                       'ingredient_a': 'water', 'ingredient_b': 'fire'}
+            crafted = await env.client.post(
+                '/api/mini/alchemy/craft', headers=headers, json=payload)
+            assert crafted.status_code == 200, crafted.text
+            assert crafted.json()['verified'] is True
+            assert crafted.json()['result'] == 'steam'
+            replay = await env.client.post(
+                '/api/mini/alchemy/craft', headers=headers, json=payload)
+            assert replay.status_code == 200 and replay.json() == crafted.json()
+            conflicting_replay = await env.client.post(
+                '/api/mini/alchemy/craft', headers=headers,
+                json={**payload, 'ingredient_a': 'earth'},
+            )
+            assert conflicting_replay.status_code == 409
+            async with env.db.transaction() as session:
+                user = await session.get(User, USER)
+                row = await session.scalar(select(AlchemyProgress).where(
+                    AlchemyProgress.user_id == USER))
+                assert user.global_score == Decimal('12.250') + Decimal(str(crafted.json()['awarded']))
+                assert 'steam' in row.verified_discovered
     asyncio.run(run())
 
 
@@ -967,6 +1108,23 @@ def test_membership_verifier_uses_fresh_admin_and_user_checks(status, extra, exp
             verifier = TelegramMembership(TOKEN, client=client)
             assert await verifier.allowed(CHAT, USER) is expected
             assert [call['user_id'] for call in calls] == [123456, USER]
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('status,extra,expected', [
+    ('creator', {}, True), ('administrator', {}, True), ('member', {}, False),
+    ('restricted', {'is_member': True}, False), ('left', {}, False),
+])
+def test_membership_verifier_distinguishes_chat_admins(status, extra, expected):
+    async def run():
+        def handler(request):
+            uid = json.loads(request.content)['user_id']
+            role = 'administrator' if uid == 123456 else status
+            result = {'user': {'id': uid}, 'status': role, **(extra if uid != 123456 else {})}
+            return httpx.Response(200, json={'ok': True, 'result': result})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            verifier = TelegramMembership(TOKEN, client=client)
+            assert await verifier.allowed(CHAT, USER, administrators_only=True) is expected
     asyncio.run(run())
 
 

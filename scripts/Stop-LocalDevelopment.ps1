@@ -17,7 +17,7 @@ if ($telegramId) {
     } while ([DateTime]::UtcNow -lt $deadline)
 }
 
-$services = @('admin', 'mini-app', 'telegram')
+$services = @('admin', 'mini-app', 'telegram', 'game-worker')
 if ($StopDatabase) { $services += @('postgres') }
 Push-Location -LiteralPath $workspacePath
 try {

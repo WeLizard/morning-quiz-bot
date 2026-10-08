@@ -33,13 +33,15 @@ function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {
         },
         localStorage: localStore,
         sessionStorage: sessionStore,
-        location: {hash: token ? `#t=${token}` : '', reload: () => { reloads.count += 1; }},
+        location: {hash: '', reload: () => { reloads.count += 1; }},
+        crypto: {randomUUID: () => 'command-0001'},
         document: {
             hidden: false,
             createElement: () => ({style: {}, remove() {}, set textContent(value) { banners.push(value); }, get textContent() { return banners[banners.length - 1]; }}),
             body: {append() {}},
         },
         fetch: async (url, options) => {
+            if (url === '/api/mini/me') return {ok: Boolean(token), status: token ? 200 : 401, json: async () => ({})};
             calls.push({url, options});
             if (fail) throw new Error('сеть недоступна');
             return {ok: status >= 200 && status < 300, status, json: async () => response};
@@ -72,7 +74,8 @@ test('отправляет сводку и подставляет серверн
     assert.equal(env.calls.length, 1);
     assert.equal(env.calls[0].url, '/api/mini/alchemy/sync');
     assert.equal(env.calls[0].options.method, 'POST');
-    assert.equal(env.calls[0].options.headers.Authorization, `Bearer ${env.token}`);
+    assert.equal(env.calls[0].options.headers.Authorization, undefined);
+    assert.equal(env.calls[0].options.headers['X-Mini-CSRF'], '1');
     const body = JSON.parse(env.calls[0].options.body);
     assert.deepEqual(body.discovered, ['water', 'earth', 'fire', 'air', 'steam']);
     assert.deepEqual(body.crafted, ['air+water']);
@@ -82,6 +85,20 @@ test('отправляет сводку и подставляет серверн
     assert.equal(env.applied.length, 1, 'прогресс вливается в живую игру, а не только в localStorage');
     assert.equal(env.reloads.count, 0, 'перезагружать страницу не нужно, если игра приняла прогресс');
     assert.match(env.banners.join(' '), /\+8 очков/);
+});
+
+test('подтверждает новый рецепт отдельной серверной командой', async () => {
+    const env = bridge({response: {verified: true, awarded: 2, points_total: 2}});
+    await env.window.MQBAlchemySync.verifyCraft('water', 'fire');
+    assert.equal(env.calls.length, 1);
+    assert.equal(env.calls[0].url, '/api/mini/alchemy/craft');
+    assert.equal(env.calls[0].options.method, 'POST');
+    assert.equal(env.calls[0].options.headers.Authorization, undefined);
+    assert.equal(env.calls[0].options.headers['X-Mini-CSRF'], '1');
+    assert.deepEqual(JSON.parse(env.calls[0].options.body), {
+        command_id: 'command-0001', ingredient_a: 'water', ingredient_b: 'fire',
+    });
+    assert.match(env.banners.join(' '), /Подтверждено сервером/);
 });
 
 test('без токена сессии ничего не отправляет', async () => {
@@ -150,16 +167,16 @@ test('на новом устройстве создаёт сохранение �
     assert.equal(env.reloads.count, 1, 'страница перезагружается, чтобы движок прочитал сохранение');
 });
 
-test('берёт токен из localStorage, если его нет в sessionStorage', async () => {
+test('не читает токены из браузерного хранилища и использует HttpOnly cookie', async () => {
     const env = bridge({
-        token: '',
         local: {'mqb-mini-token': 'y'.repeat(32), 'alchemia.atlas': save(['water'])},
         response: {discovered: []},
     });
     env.listeners.load();
     await flush();
     assert.equal(env.calls.length, 1);
-    assert.equal(env.calls[0].options.headers.Authorization, `Bearer ${'y'.repeat(32)}`);
+    assert.equal(env.calls[0].options.headers.Authorization, undefined);
+    assert.equal(env.calls[0].options.headers['X-Mini-CSRF'], '1');
 });
 
 test('гость использует отдельное сохранение и не отправляет оставшийся Telegram token', async () => {

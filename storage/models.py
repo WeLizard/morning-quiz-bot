@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -67,6 +68,103 @@ class Account(ModerationMixin, TimestampMixin, Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     display_name: Mapped[str] = mapped_column(String(255), default="Гость", nullable=False)
+
+
+class AccountIdentity(Base):
+    """Verified external identity linked explicitly to one platform account."""
+    __tablename__ = "account_identities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider_subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index(
+            "uq_account_identities_active_subject", "provider", "provider_subject",
+            unique=True, postgresql_where=text("revoked_at IS NULL"),
+        ),
+        Index("ix_account_identities_account_provider", "account_id", "provider"),
+    )
+
+
+class Room(TimestampMixin, Base):
+    """A game space that can outlive any one transport such as Telegram."""
+    __tablename__ = "rooms"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    owner_account_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), index=True
+    )
+    state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class RoomMembership(TimestampMixin, Base):
+    __tablename__ = "room_memberships"
+
+    room_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True
+    )
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    role: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="active", server_default="active", nullable=False)
+
+
+class RoomInvite(Base):
+    """Hashed, expiring capability for joining an account-owned room."""
+    __tablename__ = "room_invites"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    room_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    max_uses: Mapped[int] = mapped_column(Integer, nullable=False)
+    uses: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("max_uses BETWEEN 1 AND 100", name="ck_room_invites_max_uses"),
+        CheckConstraint("uses BETWEEN 0 AND max_uses", name="ck_room_invites_uses"),
+        UniqueConstraint("token_hash", name="uq_room_invites_token_hash"),
+        Index("ix_room_invites_room_created", "room_id", "created_at"),
+    )
+
+
+class RoomTransport(TimestampMixin, Base):
+    """Maps an external chat/group to a room without inferring account identity."""
+    __tablename__ = "room_transports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    room_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("kind", "external_id", name="uq_room_transport_external"),
+        Index("ix_room_transports_room_id", "room_id"),
+    )
 
 
 class GuestSession(Base):
@@ -159,8 +257,11 @@ class Game(TimestampMixin, Base):
     __tablename__ = 'games'
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    chat_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey('chats.id', ondelete='CASCADE'), nullable=False
+    room_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey('rooms.id', ondelete='RESTRICT'), nullable=False, index=True
+    )
+    chat_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey('chats.id', ondelete='CASCADE')
     )
     mode: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -172,9 +273,14 @@ class Game(TimestampMixin, Base):
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
+        Index('ix_games_room_mode_history', 'room_id', 'mode', 'created_at'),
         Index('ix_games_chat_mode_history', 'chat_id', 'mode', 'created_at'),
         Index(
             'uq_games_current_chat_mode', 'chat_id', 'mode', unique=True,
+            postgresql_where=text('is_current'),
+        ),
+        Index(
+            'uq_games_current_room_mode', 'room_id', 'mode', unique=True,
             postgresql_where=text('is_current'),
         ),
     )
@@ -186,8 +292,11 @@ class GamePlayer(Base):
     game_id: Mapped[str] = mapped_column(
         String(64), ForeignKey('games.id', ondelete='CASCADE'), primary_key=True
     )
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), primary_key=True
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), primary_key=True
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey('users.id', ondelete='RESTRICT')
     )
     seat: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default='active', server_default='active', nullable=False)
@@ -197,7 +306,17 @@ class GamePlayer(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (UniqueConstraint('game_id', 'seat', name='uq_game_player_seat'),)
+    __table_args__ = (
+        # Account is the stable platform principal. Telegram user_id remains a
+        # nullable identity projection for legacy Bot-facing game adapters.
+        # The database PK follows account identity so web-only guests are first-class.
+        UniqueConstraint('game_id', 'seat', name='uq_game_player_seat'),
+        Index(
+            'uq_game_player_user', 'game_id', 'user_id', unique=True,
+            postgresql_where=text('user_id IS NOT NULL'),
+        ),
+        Index('ix_game_players_account_id', 'account_id'),
+    )
 
 
 class GameCommand(Base):
@@ -210,6 +329,9 @@ class GameCommand(Base):
     )
     actor_user_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey('users.id', ondelete='SET NULL')
+    )
+    actor_account_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='SET NULL'), index=True
     )
     kind: Mapped[str] = mapped_column(String(64), nullable=False)
     expected_revision: Mapped[Optional[int]] = mapped_column(Integer)
@@ -238,6 +360,9 @@ class GameEvent(Base):
     visibility: Mapped[str] = mapped_column(String(24), default='public', server_default='public', nullable=False)
     actor_user_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey('users.id', ondelete='SET NULL')
+    )
+    actor_account_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='SET NULL'), index=True
     )
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -496,6 +621,11 @@ class AlchemyProgress(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
     discovered: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     crafted: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # Claims imported from offline/local saves remain visible but never drive rating.
+    verified_discovered: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    verified_crafted: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    verified_chapters: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    verified_achievements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     chapters: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     achievements: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     points_total: Mapped[Decimal] = mapped_column(
@@ -510,4 +640,26 @@ class AlchemyProgress(Base):
     last_goal_day: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AlchemyCraftCommand(Base):
+    """Idempotent server-validated craft command and its immutable result."""
+    __tablename__ = 'alchemy_craft_commands'
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    ingredient_a: Mapped[str] = mapped_column(String(64), nullable=False)
+    ingredient_b: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_element: Mapped[str] = mapped_column(String(64), nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint('account_id', 'ingredient_a', 'ingredient_b',
+                         name='uq_alchemy_craft_account_recipe'),
     )

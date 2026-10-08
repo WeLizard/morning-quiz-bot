@@ -104,6 +104,14 @@ pwsh -File scripts/Test-LocalMilestone.ps1
 Он собирает образ, пересоздаёт только `morning_quiz_test`, применяет миграции,
 выполняет Alembic check, pytest и проверки backup/restore согласно конфигурации.
 Не направляй этот скрипт на dev/production БД. Проверяй итоговые skipped и причины.
+Для PR и push в `main` та же обязательная последовательность задана workflow
+[`CI`](../../.github/workflows/ci.yml), использующим отдельную disposable PostgreSQL 17.
+Dev-контейнер и CI ставят Python-набор из `requirements-local-lock.txt` с проверкой
+хешей; отдельный тест не даст lock-файлу разойтись с прямыми зависимостями. Workflow
+аудирует и dev/test lock, и разрешённый runtime `requirements.txt`, сохраняет их
+CycloneDX SBOM вместе с JUnit-отчётом тестов на 14 дней. Обновляй lock через
+`uv pip compile --generate-hashes --python-version 3.13 -o requirements-local-lock.txt
+requirements-local-test.txt`.
 Исторические `tests/run_all_tests.py` и `*_test.py` работают с прежним JSON-контуром
 и не заменяют этот gate. Инструкции запуска: [LOCAL_DEVELOPMENT](../LOCAL_DEVELOPMENT.md).
 

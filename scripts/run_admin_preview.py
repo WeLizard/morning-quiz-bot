@@ -72,7 +72,11 @@ if __name__ == "__main__":
         raise SystemExit('Preview images must stay inside the local workspace')
     preview_images.mkdir(parents=True, exist_ok=True)
     os.environ['PHOTO_IMAGES_DIR'] = str(preview_images)
-    asyncio.run(seed())
+    # The unified Compose stack has a dedicated, dependency-ordered seed
+    # service. Avoid repeating the full question/photo import in the admin
+    # process on every restart; direct local preview still bootstraps by default.
+    if os.getenv('MQB_DEV_SKIP_SEED') != '1':
+        asyncio.run(seed())
     from web.main import app
     from fastapi.responses import JSONResponse
 

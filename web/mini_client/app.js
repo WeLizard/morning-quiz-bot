@@ -16,7 +16,7 @@
         return Object.prototype.hasOwnProperty.call(LAUNCH_PAGES, raw) ? {page: LAUNCH_PAGES[raw]} : null;
     }
     const launch = launchTarget();
-    const state = {token: null, guest: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: ''};
+    const state = {authenticated: false, guest: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: '', gameModes: []};
     let generation = 0, playCommand = null, runtimeEnabled = false, guestAllowed = true;
     const el = (tag, text, cls) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; };
     const button = (label, action, cls = '') => { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', action); return node; };
@@ -26,15 +26,16 @@
         const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 12000);
         try {
             const method = String(options.method || 'GET').toUpperCase();
-            const headers = {...(options.headers || {}), ...(state.token ? {Authorization: `Bearer ${state.token}`} : {})};
+            const headers = {...(options.headers || {})};
+            if (!['GET', 'HEAD'].includes(method)) headers['X-Mini-CSRF'] = '1';
             if (!['GET', 'HEAD'].includes(method) && path.includes('/api/mini/mafia/chats/') && !headers['Idempotency-Key']) {
                 headers['Idempotency-Key'] = globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
             }
-            const response = await fetch(path, {...options, method, signal: controller.signal, headers});
+            const response = await fetch(path, {...options, method, credentials: 'same-origin', signal: controller.signal, headers});
             if (response.status === 204) return null;
             let data; try { data = await response.json(); } catch { throw new Error('Сервис временно недоступен. Повторите позже.'); }
             if (!response.ok) {
-                if (response.status === 401) state.token = null;
+                if (response.status === 401) state.authenticated = false;
                 const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; throw error;
             }
             return data;
@@ -43,11 +44,11 @@
             throw error;
         } finally { clearTimeout(timeout); }
     }
-    async function guestRequest(path, method = 'GET') {
+    async function guestRequest(path, method = 'GET', options = {}) {
         const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 12000);
         try {
-            const response = await fetch(path, {method, credentials: 'same-origin', signal: controller.signal,
-                headers: method === 'GET' ? {} : {'X-Guest-CSRF': '1'}});
+            const response = await fetch(path, {...options, method, credentials: 'same-origin', signal: controller.signal,
+                headers: {...(options.headers || {}), ...(method === 'GET' ? {} : {'X-Guest-CSRF': '1'})}});
             if (response.status === 204) return null;
             let data; try { data = await response.json(); } catch { throw new Error('Сервис временно недоступен. Повтори позже.'); }
             if (!response.ok) { const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; throw error; }
@@ -64,6 +65,136 @@
         note(box, 'Открытия «Алхимии» сохраняются в приложении. Войти снова можно в этом браузере, пока действует гостевая сессия.');
         note(box, 'Если очистить данные браузера или выйти, доступ к этому профилю будет потерян. Привязка к Telegram появится позже.', 'muted');
         box.append(button('Открыть Алхимию', () => { window.location.assign('/app/alchemy?mode=guest'); }, 'primary'));
+        const rooms = el('section', undefined, 'card guest-rooms');
+        rooms.append(el('h2', 'Твои комнаты'));
+        note(rooms, 'Создавай закрытые комнаты, приглашай друзей и играйте в Ночной город.');
+        const title = el('input'); title.type = 'text'; title.maxLength = 80;
+        title.placeholder = 'Например, «Вечерняя компания»'; title.setAttribute('aria-label', 'Название комнаты');
+        const secureIds = typeof globalThis.crypto?.randomUUID === 'function';
+        let requestId = secureIds ? globalThis.crypto.randomUUID() : null;
+        let attemptedTitle = null;
+        const create = button('Создать комнату', async event => {
+            if (!requestId) { feedback.textContent = 'Безопасное создание комнаты не поддерживается этим браузером.'; return; }
+            if (attemptedTitle === null) attemptedTitle = title.value;
+            event.currentTarget.disabled = true; title.disabled = true;
+            try {
+                await guestRequest('/api/guest/rooms', 'POST', {
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({request_id: requestId, title: attemptedTitle}),
+                });
+                guestHome();
+            } catch (error) {
+                feedback.textContent = error.message; event.currentTarget.disabled = false;
+                if (error.status === 400 || error.status === 409) {
+                    requestId = secureIds ? globalThis.crypto.randomUUID() : null;
+                    attemptedTitle = null; title.disabled = false;
+                }
+            }
+        }, 'primary');
+        if (!secureIds) create.disabled = true;
+        rooms.append(title, create);
+        const joinPanel = el('div', undefined, 'guest-room-join');
+        joinPanel.append(el('h3', 'Войти по приглашению'));
+        const inviteInput = el('input'); inviteInput.type = 'text'; inviteInput.maxLength = 64;
+        inviteInput.autocomplete = 'off'; inviteInput.spellcheck = false;
+        inviteInput.placeholder = 'Вставь код от владельца комнаты';
+        inviteInput.setAttribute('aria-label', 'Код приглашения в комнату');
+        const joinButton = button('Присоединиться', async event => {
+            const inviteCode = inviteInput.value.trim();
+            if (!inviteCode) { feedback.textContent = 'Вставь код приглашения.'; inviteInput.focus(); return; }
+            event.currentTarget.disabled = true;
+            try {
+                const joined = await guestRequest('/api/guest/rooms/join', 'POST', {
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({invite_code: inviteCode}),
+                });
+                guestHome();
+                feedback.textContent = joined.joined ? `Ты присоединилась к комнате «${joined.title}».`
+                    : `Ты уже состоишь в комнате «${joined.title}».`;
+            } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+        }, 'quiet');
+        joinPanel.append(inviteInput, joinButton); rooms.append(joinPanel);
+        const roomList = el('div', undefined, 'guest-room-list'); rooms.append(roomList);
+        const requestVersion = generation;
+        const refreshInvites = async (roomId, list) => {
+            list.replaceChildren();
+            const data = await guestRequest(`/api/guest/rooms/${encodeURIComponent(roomId)}/invites`);
+            if (requestVersion !== generation) return;
+            const now = Date.now();
+            const items = data.items || [];
+            if (!items.length) note(list, 'Активных кодов пока нет.', 'muted');
+            for (const invite of items) {
+                const row = el('div', undefined, 'guest-invite-row');
+                const expired = Date.parse(invite.expires_at) <= now;
+                const full = invite.uses >= invite.max_uses;
+                row.append(el('span', invite.revoked ? 'Отозван' : expired ? 'Срок истёк'
+                    : full ? 'Лимит использований исчерпан'
+                        : `Использований: ${invite.uses} из ${invite.max_uses}`));
+                if (!invite.revoked && !expired && !full) row.append(button('Отозвать', async event => {
+                    event.currentTarget.disabled = true;
+                    try {
+                        await guestRequest(`/api/guest/rooms/${encodeURIComponent(roomId)}/invites/${encodeURIComponent(invite.id)}`, 'DELETE');
+                        await refreshInvites(roomId, list);
+                    } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                }, 'quiet'));
+                list.append(row);
+            }
+        };
+        guestRequest('/api/guest/rooms').then(data => {
+            if (requestVersion !== generation) return;
+            if (!data.items?.length) note(roomList, 'Комнат пока нет.', 'muted');
+            else for (const room of data.items) {
+                const item = el('article', undefined, 'guest-room-item');
+                item.append(el('strong', room.title), el('span', room.role === 'owner' ? 'Ты владелец' : 'Ты участник'));
+                item.append(button('Открыть Ночной город', () => openGuestMafia(room), 'primary'));
+                if (room.role === 'owner') {
+                    const details = el('details', undefined, 'guest-room-invite');
+                    details.append(el('summary', 'Пригласить друзей'));
+                    const controls = el('div', undefined, 'guest-invite-controls');
+                    const expiry = el('select'); expiry.setAttribute('aria-label', 'Срок действия кода');
+                    for (const [seconds, text] of [[3600, '1 час'], [86400, '1 день'], [604800, '7 дней'], [2592000, '30 дней']]) {
+                        const option = el('option', text); option.value = String(seconds); expiry.append(option);
+                    }
+                    expiry.value = '86400';
+                    const uses = el('select'); uses.setAttribute('aria-label', 'Число приглашённых');
+                    for (const count of [1, 2, 5, 10, 25, 100]) {
+                        const option = el('option', String(count)); option.value = String(count); uses.append(option);
+                    }
+                    uses.value = '5';
+                    const issue = button('Создать код', async event => {
+                        event.currentTarget.disabled = true;
+                        try {
+                            const created = await guestRequest(`/api/guest/rooms/${encodeURIComponent(room.id)}/invites`, 'POST', {
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({expires_in_seconds: Number(expiry.value), max_uses: Number(uses.value)}),
+                            });
+                            const codeBox = el('div', undefined, 'guest-invite-created');
+                            codeBox.append(el('span', `Код действует до ${new Date(created.expires_at).toLocaleString('ru-RU')}. Отправь его только приглашённым игрокам.`, 'muted'));
+                            const code = el('input'); code.type = 'text'; code.readOnly = true; code.value = created.invite_code;
+                            code.setAttribute('aria-label', 'Одноразово показанный код приглашения');
+                            const copy = button('Скопировать код', async () => {
+                                try {
+                                    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+                                    await navigator.clipboard.writeText(code.value);
+                                    feedback.textContent = 'Код скопирован. Его можно отправить друзьям.';
+                                } catch { code.focus(); code.select(); feedback.textContent = 'Выделила код — скопируй его вручную.'; }
+                            }, 'quiet');
+                            codeBox.append(code, copy); details.insertBefore(codeBox, inviteList);
+                            await refreshInvites(room.id, inviteList);
+                        } catch (error) { feedback.textContent = error.message; }
+                        finally { event.currentTarget.disabled = false; }
+                    }, 'quiet');
+                    controls.append(expiry, uses, issue); details.append(controls);
+                    const inviteList = el('div', undefined, 'guest-invite-list'); details.append(inviteList);
+                    item.append(details);
+                    refreshInvites(room.id, inviteList).catch(error => {
+                        if (requestVersion === generation) note(inviteList, error.message, 'error');
+                    });
+                }
+                roomList.append(item);
+            }
+        }).catch(error => { if (requestVersion === generation) note(roomList, error.message, 'error'); });
+        content.append(rooms);
         if (tg?.initData) box.append(button('Войти через Telegram', () => {
             state.guest = null;
             try { sessionStorage.setItem('mqb-auth-choice', 'telegram'); } catch {}
@@ -88,26 +219,26 @@
     let renewTimer = null;
     function scheduleRenewal() {
         clearTimeout(renewTimer);
-        if (!state.token) return;
+        if (!state.authenticated) return;
         renewTimer = setTimeout(renewSession, RENEW_AFTER_MS);
         // В браузере это число, в Node — объект таймера: unref не даёт таймеру
         // держать event loop в юнит-тестах.
         renewTimer?.unref?.();
     }
     async function renewSession() {
-        if (!state.token) return;
+        if (!state.authenticated) return;
         try {
             await request('/api/mini/session/renew', {method: 'POST'});
             scheduleRenewal();
         } catch (error) {
             clearTimeout(renewTimer);
-            if (!state.token) loginScreen('Сессия истекла. Откройте Mini App из Telegram заново.');
+            if (!state.authenticated) loginScreen('Сессия истекла. Откройте Mini App из Telegram заново.');
             else feedback.textContent = error.message;
         }
     }
     function configureTelegram() {
-        window.QuizTelegram.configure(() => { if (state.token) navigate(state.page === 'settings' ? 'profile' : 'home'); },
-            () => { if (state.token) navigate('settings'); }, () => { if (state.token) load(); });
+        window.QuizTelegram.configure(() => { if (state.authenticated) navigate(state.page === 'settings' ? 'profile' : 'home'); },
+            () => { if (state.authenticated) navigate('settings'); }, () => { if (state.authenticated) load(); });
     }
     function loginScreen(message = '') {
         generation++; state.guest = null; window.QuizGame.stop(); nav.hidden = true; content.replaceChildren();
@@ -122,10 +253,8 @@
                 enter.disabled = true; feedback.textContent = '';
                 try {
                     const session = await request(state.demo ? '/api/dev/session' : '/api/mini/session', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: state.demo ? '{}' : JSON.stringify({init_data: initData})});
-                    state.token = session.access_token;
+                    state.authenticated = true;
                     try { sessionStorage.setItem('mqb-auth-choice', 'telegram'); } catch {}
-                    // Токен нужен странице «Алхимии» (тот же origin, своя вкладка), чтобы синхронизировать прогресс.
-                    try { sessionStorage.setItem('mqb-mini-token', state.token); localStorage.setItem('mqb-mini-token', state.token); } catch {}
                     scheduleRenewal();
                     await load();
                 } catch (error) { feedback.textContent = error.message; enter.disabled = false; }
@@ -163,11 +292,11 @@
         content.append(box);
     }
     async function load() {
-        const version = ++generation; window.QuizGame.stop();
+        const version = ++generation; window.QuizPlay?.stop(); window.QuizGame.stop();
         content.replaceChildren(el('p', 'Получаем твои данные…', 'muted'));
         try {
             const [me, progress, chats, achievements] = await Promise.all([request('/api/mini/me'), request('/api/mini/progress'), request('/api/mini/chats?limit=50'), request('/api/mini/achievements')]);
-            if (version !== generation || !state.token) return;
+            if (version !== generation || !state.authenticated) return;
             Object.assign(state, {me, progress, chats: chats.items, moreChats: chats.has_more, chatOffset: chats.items.length, achievements});
             if (state.selected && !state.chats.some(c => c.chat_id === state.selected)) {
                 state.launchLost = true;      // чат из ссылки недоступен: не подменяем молча
@@ -177,7 +306,7 @@
             nav.hidden = false; await navigate(state.page);
         } catch (error) {
             if (version !== generation) return;
-            if (!state.token) loginScreen(error.message);
+            if (!state.authenticated) loginScreen(error.message);
             else { content.replaceChildren(el('p', error.message, 'error'), button('Повторить', load, 'primary')); }
         }
     }
@@ -195,8 +324,10 @@
         select.addEventListener('change', () => { state.selected = select.value; onChange(); });
     }
     async function command(text) {
+        if (text === '/help') { navigate('help'); return; }
+        if (text === '/adminsettings') { navigate('settings'); return; }
         const selected = state.chats.find(chat => chat.chat_id === state.selected);
-        const action = {'/quiz': 'quiz', '/photo_quiz': 'photo', '/adminsettings': 'settings'}[text];
+        const action = {'/quiz': 'quiz', '/photo_quiz': 'photo'}[text];
         if (action && selected?.type === 'private' && window.QuizTelegram.openBot(state.botUsername, action)) return;
         try { await navigator.clipboard.writeText(text); feedback.textContent = `${text} скопирована. Отправь её боту в нужном чате.`; }
         catch { feedback.replaceChildren(el('span', 'Отправь в чат: '), el('code', text)); }
@@ -208,8 +339,7 @@
             note(item, `Вопрос ${active.question_number} из ${active.question_count}`);
             const progress = el('progress'); progress.max = Math.max(1, active.question_count); progress.value = active.question_number; progress.setAttribute('aria-label', `Прогресс: ${active.question_number} из ${active.question_count}`); item.append(progress);
         }
-        const canOpen = state.botUsername && state.chats.find(chat => chat.chat_id === state.selected)?.type === 'private';
-        item.append(button(canOpen ? (active ? 'Вернуться к боту' : 'Настроить и играть') : `Скопировать ${cmd}`, () => active && canOpen ? window.QuizTelegram.openBot(state.botUsername, 'home') : command(cmd), 'primary'));
+        item.append(button(active ? 'Продолжить игру' : 'Настроить и играть', () => play(cmd), 'primary'));
         if (active) item.append(button('Команда остановки', () => command(cmd === '/quiz' ? '/stopquiz' : '/stop_photo_quiz'), 'quiet'));
         parent.append(item);
     }
@@ -242,23 +372,39 @@
             title: 'Атлас маленьких чудес',
             description: 'Смешивай стихии, открывай цепочки и заполняй свой атлас. Прогресс синхронизируется с профилем.',
             label: 'Открыть атлас', action: () => {
-                const token = state.token ? `#t=${encodeURIComponent(state.token)}` : '';
-                window.location.assign(`/app/alchemy?mode=telegram${token}`);
+                window.location.assign('/app/alchemy?mode=telegram');
             }, position: '72% 50%'
+        },
+        {
+            id: 'farm', side: 'left', illustration: '🌱',
+            alt: 'Саженец для будущего режима Филиныча', eyebrow: 'ТИХО РАСТЁТ · СКОРО',
+            title: 'Весёлый фермер',
+            description: 'Свой маленький участок, урожай и заказы. Готовим игру — пока без фальшивой кнопки запуска.',
+            label: 'Скоро', action: null,
         },
     ];
     function homeGameCard(spec) {
-        const card = el('article', undefined, `card play-choice game-mode-card palette-${spec.palette} image-${spec.side} mode-${spec.id}`);
-        card.dataset.gameMode = spec.id;
-        const image = el('img'); image.src = spec.image; image.alt = spec.alt; image.className = 'mode-choice-host';
-        image.style.objectPosition = spec.position || (spec.side === 'left' ? '25% center' : '75% center');
+        const classes = ['card', 'play-choice', 'game-mode-card', spec.palette && `palette-${spec.palette}`,
+            spec.side && `image-${spec.side}`, `mode-${spec.id}`].filter(Boolean).join(' ');
+        const card = el('article', undefined, classes);
+        card.dataset.gameMode = spec.id; card.dataset.modeStatus = spec.status || 'available';
+        if (spec.image) {
+            const image = el('img'); image.src = spec.image; image.alt = spec.alt; image.className = 'mode-choice-host';
+            image.style.objectPosition = spec.position || (spec.side === 'left' ? '25% center' : '75% center'); card.append(image);
+        } else {
+            const illustration = el('span', spec.illustration, 'mode-coming-illustration'); illustration.setAttribute('aria-hidden', 'true'); card.append(illustration);
+        }
         const body = el('div', undefined, 'choice-copy');
         body.append(el('span', spec.eyebrow, 'eyebrow'), el('h2', spec.title));
         note(body, spec.description);
-        const start = button(spec.label, spec.action, 'primary');
-        if (spec.runtime) start.disabled = !runtimeEnabled;
-        body.append(start);
-        card.append(image, body);
+        if (spec.action) {
+            const start = button(spec.label, spec.action, 'primary');
+            if (spec.runtime) start.disabled = !runtimeEnabled;
+            body.append(start);
+        } else {
+            const status = el('span', spec.label, 'mode-coming-status'); status.setAttribute('aria-label', 'Режим пока не запущен'); body.append(status);
+        }
+        card.append(body);
         return card;
     }
     async function home(version) {
@@ -270,35 +416,104 @@
         const rhythm = el('div', undefined, 'player-rhythm');
         rhythm.append(el('span', `${format(state.me.score)} баллов`), el('span', `Лучшая серия · ${format(state.progress.best_streak)}`)); content.append(rhythm);
         const choices = el('section', undefined, 'play-choices game-mode-list');
-        HOME_GAME_CARDS.forEach(spec => choices.append(homeGameCard(spec)));
+        const modes = new Map((state.gameModes || []).map(mode => [mode.id, mode]));
+        HOME_GAME_CARDS.filter(spec => modes.has(spec.id)).forEach(spec => {
+            const mode = modes.get(spec.id);
+            choices.append(homeGameCard({...spec, title: mode.title, status: mode.status}));
+        });
         content.append(choices);
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
-            const current = await request('/api/mini/runtime'); if (version !== generation) return;
-            if (current.games?.some(game => game.status === 'active') || current.photo_round || current.messages.some(message => message.poll && !message.poll.closed && !message.feedback)) content.append(button('Вернуться в текущую игру', () => play(null), 'resume-game'));
-            else if (!current.connected) note(content, 'Telegram-ведущий сейчас не подключён. Классический квиз в Mini App доступен независимо.', 'empty');
+            const active = state.selected ? await request(`/api/mini/chats/${state.selected}/games`) : {items: []};
+            if (version !== generation) return;
+            if (active.items?.length) content.append(button('Вернуться в текущую игру', () => play(null), 'resume-game'));
         }
         const shortcuts = el('div', undefined, 'home-shortcuts');
-        for (const [label, cmd] of [['Как играть', '/help']]) {
-            const b = button(label, () => play(cmd), 'quiet'); b.disabled = !runtimeEnabled; shortcuts.append(b);
-        } content.append(shortcuts);
+        shortcuts.append(button('Как играть', () => navigate('help'), 'quiet')); content.append(shortcuts);
         const inChat = el('section', undefined, 'chat-alternative'); note(inChat, 'Можно и по-старому. Баллы останутся общими.');
         inChat.append(button('Играть в чате', () => window.QuizTelegram.openBot(state.botUsername, 'home'), 'quiet')); content.append(inChat);
     }
-    async function mafia(version) {
-        const group = state.chats.find(chat => ['group', 'supergroup'].includes(chat.type));
-        const draft = await request('/api/mini/mafia/draft');
+    function help() {
+        content.append(el('span', 'Короткий маршрут', 'eyebrow'), el('h1', 'Как играть'));
+        note(content, 'Выбирай режим на главной. Вопросы, ответы и игровой прогресс обрабатывает сервер.');
+        const classic = el('section', undefined, 'card');
+        classic.append(el('h2', 'Классический квиз'));
+        note(classic, 'Выбери чат и настрой раунд. Отвечай на вопросы до конца серии; результаты сохраняются в общей статистике.');
+        classic.append(button('Открыть классический квиз', () => play('/quiz'), 'primary'));
+        content.append(classic);
+        const photo = el('section', undefined, 'card');
+        photo.append(el('h2', 'Фото-загадки'));
+        note(photo, 'Рассмотри квадратную картинку и подсказку, затем введи слово-ответ.');
+        photo.append(button('Открыть фото-загадки', () => play('/photo_quiz'), 'primary'));
+        content.append(photo);
+        const profileCard = el('section', undefined, 'card');
+        profileCard.append(el('h2', 'Твой профиль'));
+        note(profileCard, 'В профиле собраны личный прогресс, история, достижения и настройки. Результат доступен и через интерфейс бота.');
+        profileCard.append(button('Настройки', () => navigate('settings'), 'quiet'));
+        profileCard.append(button('Мой профиль', () => navigate('profile'), 'quiet'));
+        content.append(profileCard);
+    }
+    async function openGuestMafia(room) {
+        const version = ++generation;
+        window.QuizGame.stop(); window.QuizPlay?.stop();
+        nav.hidden = true; state.page = 'guest-mafia'; feedback.textContent = ''; content.replaceChildren();
+        content.append(button('К комнатам', () => guestHome(), 'quiet'));
+        try { await mafia(version, room); }
+        catch (error) { if (version === generation) { note(content, error.message, 'error'); content.append(button('Повторить', () => openGuestMafia(room))); } }
+    }
+    const telegramMafiaRequest = request;
+    const telegramMafiaNavigate = navigate;
+    const guestMafiaCommands = new Map();
+    async function mafia(version, room = null) {
+        let pendingCommand = room ? guestMafiaCommands.get(room.id) || null : null;
+        const showPending = message => {
+            if (version !== generation) return;
+            feedback.replaceChildren(el('span', message + ' '), button('Проверить / повторить', async () => {
+                const command = pendingCommand;
+                if (!command) return;
+                try {
+                    await guestRequest(command.endpoint, 'POST', {headers: {'Content-Type': 'application/json', 'Idempotency-Key': command.id}, body: command.body});
+                    pendingCommand = null; guestMafiaCommands.delete(room.id);
+                    await navigate('mafia');
+                } catch (error) {
+                    if (error.status && error.status < 500) { pendingCommand = null; guestMafiaCommands.delete(room.id); if (version === generation) { feedback.textContent = error.message; await navigate('mafia'); } }
+                    else showPending(error.message);
+                }
+            }, 'quiet'));
+        };
+        const request = room ? async (path, options = {}) => {
+            const endpoint = path;
+            if (!options.method || options.method === 'GET') return guestRequest(endpoint);
+            const body = options.body || '{}';
+            if (pendingCommand && (pendingCommand.endpoint !== endpoint || pendingCommand.body !== body)) throw new Error('Сначала повтори предыдущее действие, чтобы узнать его результат.');
+            if (!pendingCommand) { pendingCommand = {endpoint, body, id: crypto.randomUUID()}; guestMafiaCommands.set(room.id, pendingCommand); }
+            try {
+                const result = await guestRequest(endpoint, 'POST', {headers: {'Content-Type': 'application/json', 'Idempotency-Key': pendingCommand.id}, body});
+                pendingCommand = null; guestMafiaCommands.delete(room.id); return result;
+            } catch (error) {
+                if (error.status && error.status < 500) { pendingCommand = null; guestMafiaCommands.delete(room.id); }
+                else showPending(error.message);
+                throw error;
+            }
+        } : telegramMafiaRequest;
+        const navigate = page => version !== generation ? undefined : room ? (page === 'mafia' ? openGuestMafia(room) : guestHome()) : telegramMafiaNavigate(page);
+        const group = room || state.chats.find(chat => ['group', 'supergroup'].includes(chat.type));
+        const base = room ? `/api/guest/rooms/${encodeURIComponent(room.id)}/mafia` : group ? `/api/mini/mafia/chats/${group.chat_id}` : null;
+        const draft = room ? {title: 'Ночной город'} : await request('/api/mini/mafia/draft');
         let lobbyData = null;
         if (group) {
-            try { lobbyData = await request(`/api/mini/mafia/chats/${group.chat_id}/lobby`); }
-            catch (error) { feedback.textContent = error.message; }
+            try { lobbyData = await request(`${base}/lobby`); }
+            catch (error) { if (version === generation) feedback.textContent = error.message; }
         }
+        if (version !== generation) return;
+        if (pendingCommand) showPending('Действие могло быть принято. Проверь его результат.');
         const top = el('section', undefined, 'mafia-case');
         const image = el('img'); image.src = '/app/mafia.webp'; image.alt = 'Филиныч в капюшоне у стола детектива';
         const copy = el('div', undefined, 'mafia-case-copy');
         copy.append(el('span', 'НОЧНОЙ ГОРОД · ДЕЛО 01', 'eyebrow'), el('h1', draft.title));
-        note(copy, 'Первый рабочий слой мафии: собери состав стола. Черновик сохранится и не влияет на очки квиза.');
+        note(copy, room ? 'Собери друзей за столом. Город засыпает, а ваше дело продолжается.' : 'Собери состав стола. Черновик сохранится и не влияет на очки квиза.');
         top.append(image, copy); content.append(top);
+        if (!room) {
         const setup = el('section', undefined, 'card mafia-setup');
         setup.append(el('h2', 'Состав дела'));
         note(setup, 'Сколько человек сядет за стол? Роли пересчитаются автоматически.');
@@ -309,7 +524,7 @@
                 try {
                     await request('/api/mini/mafia/draft', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({players: count, expected_revision: draft.revision})});
                     await navigate('mafia');
-                } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                } catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
             }, `mafia-person ${draft.players === count ? 'selected' : ''}`);
             choice.setAttribute('aria-pressed', String(draft.players === count)); people.append(choice);
         }
@@ -320,17 +535,19 @@
             item.append(el('strong', String(role.count)), el('span', role.title)); roles.append(item);
         }
         setup.append(roles); content.append(setup);
+        }
         const table = el('section', undefined, 'card mafia-table');
         table.append(el('h2', 'Стол игроков'));
         if (!group) note(table, 'Для лобби нужен групповой чат, где бот может видеть участников. В личной игре пока доступен только черновик ролей.', 'muted');
         else if (!lobbyData) note(table, 'Не удалось прочитать лобби этого чата.');
         else if (!lobbyData.lobby) {
             note(table, `Создай лобби в «${group.title}». Никого автоматически не добавляем.`);
-            table.append(button('Создать лобби', async event => {
+            if (!room || room.role === 'owner') table.append(button('Создать лобби', async event => {
                 event.currentTarget.disabled = true;
-                try { await request(`/api/mini/mafia/chats/${group.chat_id}/lobby/join`, {method: 'POST'}); await navigate('mafia'); }
-                catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                try { await request(`${base}/${room ? 'lobby' : 'lobby/join'}`, {method: 'POST'}); if (version === generation) await navigate('mafia'); }
+                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
             }, 'primary'));
+            else note(table, 'Владелец комнаты скоро соберёт стол.');
         } else {
               const lobby = lobbyData.lobby;
               note(table, `${group.title} · ${lobby.players.length} из 12 за столом`);
@@ -348,13 +565,13 @@
             table.append(list);
             if (!lobby.joined) table.append(button('Сесть за стол', async event => {
                 event.currentTarget.disabled = true;
-                try { await request(`/api/mini/mafia/chats/${group.chat_id}/lobby/join`, {method: 'POST'}); await navigate('mafia'); }
-                catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                try { await request(`${base}/lobby/join`, {method: 'POST'}); await navigate('mafia'); }
+                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
             }, 'primary'));
             else if (lobby.status !== 'lobby') {
                 const roleCard = el('section', undefined, 'mafia-role-card');
                 try {
-                    const role = await request(`/api/mini/mafia/chats/${group.chat_id}/role`);
+                    const role = await request(`${base}/role`);
                     const phaseTitle = {night: `НОЧЬ ${role.round}`, day: `ДЕНЬ ${role.round}`, voting: 'ГОРОД ГОЛОСУЕТ', finished: 'ДЕЛО ЗАКРЫТО'}[role.phase] || role.phase;
                     roleCard.append(el('span', phaseTitle, 'eyebrow'), el('strong', role.title));
                     if (!role.alive) note(roleCard, 'Ты выбыл из дела, но можешь наблюдать за общим ходом.', 'muted');
@@ -367,12 +584,12 @@
                             const targets = el('div', undefined, 'mafia-targets');
                             for (const target of role.targets || []) targets.append(button(target.name, async event => {
                                 event.currentTarget.disabled = true;
-                                try { await request(`/api/mini/mafia/chats/${group.chat_id}/action`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: target.seat, expected_revision: lobby.revision})}); await navigate('mafia'); }
-                                catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                                try { await request(`${base}/action`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: target.seat, expected_revision: lobby.phase_revision})}); await navigate('mafia'); }
+                                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
                             }));
                             roleCard.append(targets);
                         }
-                    } else if (role.phase === 'day') note(roleCard, 'Обсудите события в чате. Ведущий откроет голосование, когда город будет готов.');
+                    } else if (role.phase === 'day') note(roleCard, 'Обсудите события ниже. Ведущий откроет голосование, когда город будет готов.');
                     else if (role.phase === 'voting' && role.alive) {
                         if (role.voted) note(roleCard, 'Голос принят. Ждём остальных игроков.', 'mafia-next');
                         else {
@@ -380,13 +597,14 @@
                             const targets = el('div', undefined, 'mafia-targets');
                             for (const target of role.targets || []) targets.append(button(target.name, async event => {
                                 event.currentTarget.disabled = true;
-                                try { await request(`/api/mini/mafia/chats/${group.chat_id}/vote`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: target.seat, expected_revision: lobby.revision})}); await navigate('mafia'); }
-                                catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                                try { await request(`${base}/vote`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: target.seat, expected_revision: lobby.phase_revision})}); await navigate('mafia'); }
+                                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
                             }));
                             roleCard.append(targets);
                         }
                     } else if (role.phase === 'finished') note(roleCard, role.winner === 'citizens' ? 'Город победил. Мафия раскрыта.' : 'Мафия подчинила Ночной город.', 'mafia-next');
                 } catch (error) { roleCard.append(el('p', error.message)); }
+                if (version !== generation) return;
                 table.append(roleCard);
                 if (lobby.history?.length) {
                     const history = el('div', undefined, 'mafia-history'); history.append(el('h3', 'Ход дела'));
@@ -402,40 +620,82 @@
                     const label = lobby.status === 'night' ? 'Объявить итоги ночи' : lobby.status === 'day' ? 'Открыть голосование' : 'Подвести итоги голосования';
                     table.append(button(label, async event => {
                         event.currentTarget.disabled = true;
-                        try { await request(`/api/mini/mafia/chats/${group.chat_id}/advance`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
-                        catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                        try { await request(`${base}/advance`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
+                        catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
                       }, 'primary'));
                   }
                   if (lobby.status === 'finished' && lobby.is_host) table.append(button('Собрать реванш', async event => {
                       event.currentTarget.disabled = true;
-                      try { await request(`/api/mini/mafia/chats/${group.chat_id}/restart`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
-                      catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                      try { await request(`${base}/restart`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
+                      catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
                   }, 'primary'));
             } else {
                 const mine = lobby.players.find(player => player.is_me);
                 table.append(button(mine?.ready ? 'Я не готов' : 'Я готов', async event => {
                     event.currentTarget.disabled = true;
-                    try { await request(`/api/mini/mafia/chats/${group.chat_id}/lobby/ready`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ready: !mine?.ready, expected_revision: lobby.revision})}); await navigate('mafia'); }
-                    catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                    try { await request(`${base}/lobby/ready`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ready: !mine?.ready, expected_revision: lobby.revision})}); await navigate('mafia'); }
+                    catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
                 }, mine?.ready ? 'quiet' : 'primary'));
                 if (lobby.can_start) {
                     note(table, 'Стол собран. Роли будут выданы каждому игроку приватно.', 'mafia-next');
                     if (lobby.is_host) table.append(button('Начать ночь', async event => {
                         event.currentTarget.disabled = true;
-                        try { await request(`/api/mini/mafia/chats/${group.chat_id}/lobby/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
-                        catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                        try { await request(`${base}/lobby/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
+                        catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
                     }, 'primary'));
                 }
                 else note(table, `До старта нужно минимум 4 готовых игрока. Сейчас готово: ${lobby.players.filter(player => player.ready).length}.`, 'muted');
             }
         }
         content.append(table);
+        if (group && lobbyData?.lobby?.joined) {
+            const discussion = el('section', undefined, 'card mafia-discussion');
+            discussion.append(el('h2', 'Обсуждение'));
+            note(discussion, 'Сообщения видны участникам стола. Писать можно во время сбора игроков и дневной фазы.');
+            try {
+                const feed = await request(`${base}/discussion`);
+                if (version !== generation) return;
+                if (!feed.items?.length) note(discussion, 'Пока тихо. Начните разговор здесь.', 'muted');
+                for (const message of feed.items || []) {
+                    const item = el('article', undefined, `mafia-message ${message.is_me ? 'mine' : ''}`);
+                    item.append(el('strong', message.author), el('p', message.message));
+                    if (message.created_at) item.append(el('time', new Date(message.created_at).toLocaleString('ru-RU')));
+                    discussion.append(item);
+                }
+                if (feed.enabled) {
+                    const input = el('textarea'); input.maxLength = 1000; input.rows = 3;
+                    input.placeholder = 'Напиши участникам стола…'; input.setAttribute('aria-label', 'Сообщение участникам стола');
+                    discussion.append(input);
+                    discussion.append(button('Отправить', async event => {
+                        const message = input.value;
+                        if (!message.trim()) { feedback.textContent = 'Напиши сообщение перед отправкой.'; return; }
+                        event.currentTarget.disabled = true;
+                        const commandId = globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                        try {
+                            await request(`${base}/discussion`, {
+                                method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': commandId},
+                                body: JSON.stringify({message}),
+                            });
+                            await navigate('mafia');
+                        } catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
+                    }, 'primary'));
+                } else note(discussion, 'Новая переписка сейчас закрыта до начала следующей дневной фазы.', 'muted');
+            } catch (error) { note(discussion, error.message, 'error'); }
+            if (version !== generation) return;
+            content.append(discussion);
+        }
+        if (version !== generation) return;
         const boundary = el('section', undefined, 'mafia-boundary');
         boundary.append(el('h2', 'Полный ход дела'), el('p', 'Лобби, тайные роли, ночные действия, обсуждение, голосование, выбывание и победа сохраняются в общей партии.'));
-          boundary.append(el('h2', 'Ещё предстоит'), el('p', 'Живая проверка большого стола в отдельной тестовой Telegram-группе.'));
+          if (!room) boundary.append(el('h2', 'Ещё предстоит'), el('p', 'Живая проверка большого стола в отдельной тестовой Telegram-группе.'));
           content.append(boundary, button('К играм', () => navigate('home'), 'quiet'));
-          if (lobbyData?.lobby && !['lobby', 'finished'].includes(lobbyData.lobby.status)) {
-              setTimeout(() => { if (generation === version && state.page === 'mafia') navigate('mafia'); }, 5000);
+          if (!pendingCommand && (room || (lobbyData?.lobby && !['lobby', 'finished'].includes(lobbyData.lobby.status)))) {
+              const poll = () => {
+                  if (generation !== version || state.page !== (room ? 'guest-mafia' : 'mafia')) return;
+                  if (pendingCommand || content.querySelector('textarea')?.value) { setTimeout(poll, 5000); return; }
+                  navigate('mafia');
+              };
+              setTimeout(poll, 5000);
           }
     }
     async function chatHome(version) {
@@ -502,11 +762,18 @@
         content.append(button('К профилю', () => navigate('profile'), 'quiet'), el('span', 'Профиль / Настройки', 'eyebrow settings-path'), el('h1', 'Настройки'));
         const game = el('section', undefined, 'card'); game.append(el('h2', 'Игра и расписание'));
         const personal = state.chats.find(chat => chat.type === 'private' && chat.chat_id === state.me.user_id);
-        if (runtimeEnabled && personal) {
+        const target = state.chats.find(chat => chat.chat_id === state.selected) || personal;
+        if (state.chats.length > 1) chatSelect(game, () => navigate('settings'));
+        if (runtimeEnabled && target) {
             const [details, categoryData] = await Promise.all([
-                request(`/api/mini/chats/${personal.chat_id}/details`), request('/api/mini/categories'),
+                request(`/api/mini/chats/${target.chat_id}/details`), request('/api/mini/categories'),
             ]);
-            note(game, 'Личные параметры общие для Mini App и бота. Изменение применяется к следующему раунду.');
+            if (!details.can_edit) {
+                note(game, 'Настройки доступны только администраторам этого чата. Войти в Mini App нужно с Telegram-аккаунта администратора.', 'muted');
+            } else {
+            note(game, target.type === 'private'
+                ? 'Личные параметры общие для Mini App и бота. Изменение применяется к следующему раунду.'
+                : 'Изменения применяются к этому чату и сразу видны в Telegram-боте.');
             const form = el('form', undefined, 'native-settings');
             const numeric = (title, value, min, max) => {
                 const field = el('label', title, 'field'), input = el('input'); input.type = 'number'; input.min = String(min); input.max = String(max); input.value = String(value); field.append(input); form.append(field); return input;
@@ -562,7 +829,7 @@
                 try {
                     const chosen = picker => [...picker.selected].filter(([, input]) => input.checked).map(([name]) => name);
                     const times = dailyTimes.value.split(',').map(value => value.trim()).filter(Boolean);
-                    await request(`/api/mini/chats/${personal.chat_id}/preferences`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                    await request(`/api/mini/chats/${target.chat_id}/preferences`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
                         classic: {questions: Number(questions.value), seconds: Number(seconds.value), interval: Number(interval.value), announce: announce.checked,
                             announce_delay: Number(announceDelay.value), category_mode: classicCategories.mode.value,
                             categories: chosen(classicCategories), random_categories: Number(classicCategories.random.value)},
@@ -572,14 +839,16 @@
                         wisdom: {enabled: wisdomEnabled.checked, time: wisdomTime.value.trim()}, auto_delete: autoDelete.checked,
                         expected_revision: details.settings_revision,
                     })});
-                    feedback.textContent = 'Параметры сохранены для приложения и бота.'; await navigate('settings');
+                    feedback.textContent = 'Параметры сохранены для этого чата и бота.'; await navigate('settings');
                 } catch (error) { feedback.textContent = error.message; save.disabled = false; }
             };
             game.append(form);
-            note(game, 'Настройки групп меняет администратор соответствующего чата.', 'muted');
+            }
         } else {
-            note(game, 'Редактирование в этой версии доступно через чатового бота.');
-            if (state.chats.length) { chatSelect(game, () => {}); game.append(button('Открыть настройки в боте', () => command('/adminsettings'))); }
+            note(game, state.chats.length
+                ? 'Изменение игровых параметров в этом preview отключено. В рабочем Mini App они сохраняются для выбранного чата.'
+                : 'Сначала открой бота и добавь чат — тогда здесь появятся игровые параметры.', 'muted');
+            if (state.chats.length > 1) chatSelect(game, () => navigate('settings'));
         }
         content.append(game);
         const preferences = el('section', undefined, 'card'); preferences.append(el('h2', 'Как тебе удобно'));
@@ -591,7 +860,7 @@
         if (window.QuizTelegram.canFullscreen) preferences.append(button('Развернуть на весь экран', () => window.QuizTelegram.fullscreen(), 'quiet'));
         content.append(preferences);
         const actions = el('div', undefined, 'actions'); actions.append(button('Выйти', async () => {
-            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.token = null; state.me = null; state.page = 'home'; try { sessionStorage.removeItem('mqb-mini-token'); localStorage.removeItem('mqb-mini-token'); } catch {} loginScreen(); }
+            try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home'; loginScreen(); }
             catch (error) { feedback.textContent = error.message; }
         }, 'quiet')); content.append(actions);
     }
@@ -616,7 +885,7 @@
         for (const chat of state.chats) { const option = el('option', chat.title); option.value = chat.chat_id; select.append(option); }
         select.value = state.selected; field.append(select); content.append(field);
         const list = el('ol', undefined, 'list'); content.append(list); let offset = 0, requestSequence = 0;
-        const failure = error => { if (!state.token) loginScreen(error.message); else feedback.textContent = error.message; more.disabled = false; };
+        const failure = error => { if (!state.authenticated) loginScreen(error.message); else feedback.textContent = error.message; more.disabled = false; };
         const more = button('Показать ещё', () => fetchPage().catch(failure)); more.hidden = true; content.append(more);
         async function fetchPage() {
             more.disabled = true; const selection = select.value, sequence = ++requestSequence;
@@ -644,7 +913,7 @@
             const card = el('section', undefined, 'card');
             const goal = alchemy.daily_goal || {target: 10, progress: alchemy.points_today || 0, done: false};
             card.append(el('h2', 'Атлас маленьких чудес'));
-            note(card, `Открыто элементов: ${alchemy.discovered} · глав ${alchemy.chapters} · достижений ${alchemy.achievements}`);
+            note(card, `Коллекция: ${alchemy.discovered} элементов · рейтинг: ${alchemy.verified_discovered ?? 0} · подтверждено глав ${alchemy.verified_chapters ?? 0} и достижений ${alchemy.verified_achievements ?? 0}`);
             note(card, `Очки из Алхимии: ${format(alchemy.points_total)} · место ${alchemy.rank} из ${alchemy.total_players}`);
             note(card, goal.done
                 ? `Цель дня выполнена: ${format(goal.progress)} из ${format(goal.target)} очков.`
@@ -711,7 +980,7 @@
         content.append(el('span', 'Атлас маленьких чудес', 'eyebrow'), el('h1', 'Рейтинг атласа'));
         const data = await request('/api/mini/alchemy/leaderboard?limit=20');
         if (version !== generation) return;
-        note(content, 'Считаем открытые элементы, а не очки: фарм Алхимии не влияет на рейтинг квиза.');
+        note(content, 'В рейтинг входят только открытия, подтверждённые сервером. Старые и офлайн-сохранения остаются в коллекции, но сами по себе не дают место в рейтинге.');
         const list = el('section', undefined, 'card');
         if (!data.items.length) note(list, 'Пока никто не открыл ни одного элемента.', 'empty');
         else for (const row of data.items) list.append(el('p', `${row.rank}. ${row.display_name}${row.is_me ? ' — это ты' : ''} · ${row.discovered}`, row.is_me ? '' : 'muted'));
@@ -719,7 +988,8 @@
         content.append(button('Обновить', () => navigate('alchemy-top'), 'quiet'));
     }
     async function navigate(page) {
-        if (!state.token) { loginScreen(); return; }
+        if (!state.authenticated) { loginScreen(); return; }
+        window.QuizPlay?.stop();
         window.QuizGame.stop();
         window.QuizTelegram.selection();
         state.page = page; const version = ++generation; feedback.textContent = ''; content.replaceChildren();
@@ -731,8 +1001,8 @@
             else if (page === 'play') {
                 const command = playCommand; playCommand = null;
                 const engine = [null, '/quiz', '/photo_quiz'].includes(command) ? (window.QuizPlay || window.QuizGame) : window.QuizGame;
-                await engine.mount({host: content, request, command, chatId: state.selected, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
-                    const response = await fetch(path, {headers: {Authorization: `Bearer ${state.token}`}});
+                await engine.mount({host: content, request, command, chatId: state.selected, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => navigate('settings'), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
+                    const response = await fetch(path, {credentials: 'same-origin'});
                     if (!response.ok) throw new Error('Фото недоступно'); return response.blob();
                 }});
             }
@@ -742,20 +1012,22 @@
             else if (page === 'alchemy-top') await alchemyTop(version);
             else if (page === 'history') await historyPage(version);
             else if (page === 'settings') await settings();
+            else if (page === 'help') help();
             else if (page === 'chats') chats();
             else if (page === 'mafia') await mafia(version);
             else await rating(version);
         } catch (error) {
             if (version !== generation) return;
-            if (!state.token) loginScreen(error.message);
+            if (!state.authenticated) loginScreen(error.message);
             else { note(content, error.message, 'error'); content.append(button('Повторить', () => navigate(page))); }
         }
     }
     nav.querySelectorAll('button').forEach(node => node.addEventListener('click', () => navigate(node.dataset.page)));
-    document.querySelector('.brand').addEventListener('click', event => { if (state.token) { event.preventDefault(); navigate('home'); } });
+    document.querySelector('.brand').addEventListener('click', event => { if (state.authenticated) { event.preventDefault(); navigate('home'); } });
     configureTelegram();
     request('/api/mini/config').catch(() => null).then(config => {
         state.botUsername = config?.bot_username || '';
+        state.gameModes = Array.isArray(config?.game_modes) ? config.game_modes : [];
         runtimeEnabled = config?.runtime_enabled === true;
         guestAllowed = config?.private_test !== true;
         return config?.offline ? request('/api/dev/info').catch(() => null) : null;
@@ -770,6 +1042,13 @@
                 guestHome(); return;
             }
         }
+        try {
+            await request('/api/mini/me');
+            state.authenticated = true;
+            scheduleRenewal();
+            await load();
+            return;
+        } catch { /* expired or absent cookie: show the explicit sign-in screen */ }
         loginScreen();
     });
 })();

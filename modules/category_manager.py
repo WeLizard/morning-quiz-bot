@@ -22,7 +22,7 @@ class CategoryManager:
         self.data_manager = data_manager
         self._postgres_storage = (
             getattr(data_manager, "postgres_storage", None)
-            if getattr(app_config, "storage_backend", "json") == "postgres"
+            if getattr(app_config, "storage_backend", "postgres") == "postgres"
             else None
         )
         # Инициализируем статистику использования категорий

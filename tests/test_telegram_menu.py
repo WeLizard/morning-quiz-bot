@@ -55,6 +55,8 @@ def test_private_mini_app_signed_owner_only_and_client_contract(pg_env):
                 config = (await client.get('/api/mini/config')).json()
                 assert config['bot_username'] == 'TestQuizBot' and config['private_test'] is True
                 assert TOKEN not in str(config)
+                assert [item['id'] for item in config['game_modes']] == ['classic', 'photo', 'night', 'atlas', 'farm']
+                assert next(item for item in config['game_modes'] if item['id'] == 'farm')['status'] == 'coming_soon'
                 assert (await client.get('/app/telegram-ui.js')).status_code == 200
                 assert (await client.post('/api/dev/session')).status_code == 404
                 assert (await client.get('/api/mini/me')).status_code == 401
@@ -62,7 +64,7 @@ def test_private_mini_app_signed_owner_only_and_client_contract(pg_env):
                 assert denied.status_code == 403
                 signed_in = await client.post('/api/mini/session', json={'init_data': signed(USER)})
                 assert signed_in.status_code == 200
-                headers = {'Authorization': 'Bearer ' + signed_in.json()['access_token']}
+                headers = {'Cookie': f"mqb_mini={client.cookies.get('mqb_mini')}", 'Origin': origin}
                 profile = await client.get('/api/mini/me', headers=headers)
                 assert profile.status_code == 200 and profile.json()['user_id'] == str(USER)
                 # A later restriction invalidates an otherwise still-valid session.

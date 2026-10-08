@@ -277,6 +277,7 @@ function mix(id1,id2,snapshot=true){
  let newToken=null,isNew=false;
  if(r){
   isNew=!found.has(r.result);found.add(r.result);knownRecipes.add(key);
+  window.MQBAlchemySync?.verifyCraft(t1.id,t2.id);
   state.bench=state.bench.filter(t=>t.uid!==id1&&t.uid!==id2);
   newToken=addToken(r.result,{u:(t1.u+t2.u)/2,v:(t1.v+t2.v)/2});
   if(isNew){newThisSession.add(r.result);state.latest=r.result;if(state.pinned===r.result)state.pinned=null;if(hint?.recipe?.result===r.result)hint=null;}

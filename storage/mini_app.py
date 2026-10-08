@@ -419,13 +419,17 @@ class MiniAppStore:
             return user.id
 
     async def alchemy_sync(self, token, *, discovered, crafted, attempts):
-        """Принять сводку «Алхимии» и начислить очки в общий профиль.
-
-        Очки идут только за первое открытие, суточный потолок считает сервис.
-        """
+        """Импортировать локальную сводку без рейтинговых наград."""
         from .alchemy import AlchemyService
         return await AlchemyService(self.database).sync(
             await self._alchemy_identity(token), discovered=discovered, crafted=crafted, attempts=attempts)
+
+    async def alchemy_craft(self, token, *, command_id, ingredient_a, ingredient_b):
+        """Run one authenticated, server-validated Alchemy recipe command."""
+        from .alchemy import AlchemyService
+        return await AlchemyService(self.database).craft(
+            await self._alchemy_identity(token), command_id=command_id,
+            ingredient_a=ingredient_a, ingredient_b=ingredient_b)
 
     async def alchemy_progress(self, token):
         from .alchemy import AlchemyService

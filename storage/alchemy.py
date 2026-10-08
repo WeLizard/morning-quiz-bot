@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -23,7 +24,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import Database
-from .models import Account, AlchemyProgress, User
+from .models import Account, AlchemyCraftCommand, AlchemyProgress, User
 from .guest_accounts import GuestAccounts
 from .mini_app import MiniAppError
 from .repositories import OperationalRepository
@@ -45,6 +46,7 @@ ACHIEVEMENT_CODE_PREFIX = 'alchemy_'
 MAX_LEADERBOARD_LIMIT = 100
 
 ACHIEVEMENT_TYPES = ('count', 'elements', 'tried', 'recipes')
+BASE_ELEMENTS = frozenset({'water', 'earth', 'fire', 'air'})
 
 
 @dataclass(frozen=True)
@@ -53,8 +55,13 @@ class AlchemyCatalog:
 
     element_ids: frozenset[str]
     recipe_keys: frozenset[str]
+    recipes: dict[str, tuple[str, str, str]]
     chapters: tuple[tuple[str, frozenset[str]], ...]
     achievements: tuple[dict[str, Any], ...]
+
+    def recipe(self, ingredient_a: str, ingredient_b: str):
+        key = '+'.join(sorted((ingredient_a, ingredient_b)))
+        return key, self.recipes.get(key)
 
     def known_elements(self, values: Iterable[Any]) -> set[str]:
         """Оставить только id, которые есть в каталоге: клиенту не доверяем."""
@@ -132,7 +139,12 @@ def _load_catalog(path: Path) -> AlchemyCatalog:
     if not isinstance(raw, dict):
         raise RuntimeError(f'Каталог «Алхимии» повреждён: {path}')
     elements = {str(item['id']) for item in _records(raw.get('elements')) if item.get('id')}
-    recipes = {str(item['key']) for item in _records(raw.get('recipes')) if item.get('key')}
+    recipe_map = {
+        str(item['key']): (str(item['a']), str(item['b']), str(item['result']))
+        for item in _records(raw.get('recipes'))
+        if item.get('key') and item.get('a') and item.get('b') and item.get('result')
+    }
+    recipes = set(recipe_map)
     chapters = tuple(
         (str(item['id']), frozenset(str(goal) for goal in _texts(item.get('goals'))))
         for item in _records(raw.get('chapters')) if item.get('id')
@@ -153,7 +165,8 @@ def _load_catalog(path: Path) -> AlchemyCatalog:
         })
     if not elements or not chapters:
         raise RuntimeError(f'Каталог «Алхимии» неполон: {path}')
-    return AlchemyCatalog(frozenset(elements), frozenset(recipes), chapters, tuple(achievements))
+    return AlchemyCatalog(frozenset(elements), frozenset(recipes), recipe_map,
+                          chapters, tuple(achievements))
 
 
 def _records(value: Any) -> list[dict[str, Any]]:
@@ -179,8 +192,8 @@ def _moscow_day(moment: datetime) -> date:
 
 
 def _discovered_rank_expression():
-    # json_array_length даёт NULL для не-массива, поэтому coalesce обязателен.
-    return func.coalesce(func.json_array_length(AlchemyProgress.discovered), 0)
+    # Рейтинг строится только по открытиям подтверждённых серверных рецептов.
+    return func.coalesce(func.json_array_length(AlchemyProgress.verified_discovered), 0)
 
 
 class AlchemyService:
@@ -198,11 +211,10 @@ class AlchemyService:
         attempts: int = 0,
         now: Optional[datetime] = None,
     ) -> dict[str, Any]:
-        """Принять состояние игры, досчитать новое и начислить очки.
+        """Импортировать офлайн-сводку без подтверждения рейтинговых наград.
 
-        Очки идут только за первое открытие: элемент — 2, закрытая глава — 3,
-        достижение — 5. Суточный потолок (30, сутки по Москве) лишнее отсекает
-        без переноса на следующий день.
+        Клиентское сохранение остаётся доступным в коллекции, но только команда
+        ``craft`` может изменять verified-поля, рейтинг или общий счёт.
         """
         catalog = load_catalog()
         moment = _resolve_now(now)
@@ -226,54 +238,153 @@ class AlchemyService:
                 merged_elements, merged_recipes, max(row.attempts, tried)
             )
 
-            new_chapters = merged_chapters - stored_chapters
-            new_achievements = merged_achievements - stored_achievements
-            requested = (
-                POINTS_PER_ELEMENT * len(merged_elements - stored_elements)
-                + POINTS_PER_CHAPTER * len(new_chapters)
-                + POINTS_PER_ACHIEVEMENT * len(new_achievements)
-            )
-            if row.points_day != day:
-                row.points_day = day
-                row.points_today = Decimal('0')
-            available = max(DAILY_POINTS_LIMIT - row.points_today, Decimal('0'))
-            awarded = min(requested, available)
-            if awarded < requested:
-                logger.debug(
-                    'Алхимия: суточный потолок срезал %s очков у %s', requested - awarded, user_id
-                )
-
             row.attempts = max(row.attempts, tried)
             row.discovered = sorted(merged_elements)
             row.crafted = sorted(merged_recipes)
             row.chapters = sorted(merged_chapters)
             row.achievements = sorted(merged_achievements)
-            row.points_today += awarded
-            row.points_total += awarded
-            # Серия дней: день закрыт, когда набрана цель дня. Повторная синхронизация
-            # в тот же день серию не накручивает, а пропуск дня начинает её заново.
-            if row.points_today >= DAILY_GOAL_POINTS and row.last_goal_day != day:
-                row.goal_streak = (row.goal_streak or 0) + 1 if row.last_goal_day == day - timedelta(days=1) else 1
-                row.last_goal_day = day
             row.updated_at = moment
-            if awarded:
-                await session.execute(
-                    update(User).where(User.id == user_id)
-                    .values(global_score=User.global_score + awarded)
-                )
-            await self._grant(session, user_id, new_achievements)
+            points_today = row.points_today if row.points_day == day else Decimal('0')
 
             result = {
-                'awarded': float(awarded),
-                'points_today': float(row.points_today),
+                'awarded': 0.0,
+                'reward_eligible': False,
+                'points_today': float(points_today),
                 'points_total': float(row.points_total),
-                'remaining_today': float(max(DAILY_POINTS_LIMIT - row.points_today, Decimal('0'))),
+                'remaining_today': float(max(DAILY_POINTS_LIMIT - points_today, Decimal('0'))),
                 'goal_streak': int(row.goal_streak or 0),
                 'discovered': list(row.discovered),
+                'verified_discovered': list(row.verified_discovered),
+                'verified_crafted': list(row.verified_crafted),
                 'chapters': list(row.chapters),
                 'achievements': list(row.achievements),
             }
         return result
+
+    async def craft(
+        self, user_id: int, *, command_id: str,
+        ingredient_a: str, ingredient_b: str,
+        now: Optional[datetime] = None,
+    ) -> dict[str, Any]:
+        """Validate one recipe server-side and award only newly verified progress."""
+        if not isinstance(command_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{8,64}', command_id):
+            raise MiniAppError(422, 'Некорректный идентификатор опыта')
+        if not isinstance(ingredient_a, str) or not isinstance(ingredient_b, str):
+            raise MiniAppError(422, 'Некорректные ингредиенты опыта')
+        catalog = load_catalog()
+        key, recipe = catalog.recipe(ingredient_a, ingredient_b)
+        if (recipe is None or ingredient_a not in catalog.element_ids
+                or ingredient_b not in catalog.element_ids):
+            raise MiniAppError(422, 'Такого превращения нет в каталоге')
+        moment = _resolve_now(now)
+        day = _moscow_day(moment)
+        ingredient_a, ingredient_b = sorted((ingredient_a, ingredient_b))
+        result_element = recipe[2]
+
+        async with self.database.transaction() as session:
+            row = await self._locked_progress(session, user_id)
+            inserted = await session.scalar(pg_insert(AlchemyCraftCommand).values(
+                id=command_id, account_id=row.account_id,
+                ingredient_a=ingredient_a, ingredient_b=ingredient_b,
+                result_element=result_element, result={},
+            ).on_conflict_do_nothing()
+                .returning(AlchemyCraftCommand.id))
+            if not inserted:
+                existing = await session.scalar(select(AlchemyCraftCommand).where(
+                    AlchemyCraftCommand.id == command_id).with_for_update())
+                if existing is None:
+                    existing = await session.scalar(select(AlchemyCraftCommand).where(
+                        AlchemyCraftCommand.account_id == row.account_id,
+                        AlchemyCraftCommand.ingredient_a == ingredient_a,
+                        AlchemyCraftCommand.ingredient_b == ingredient_b,
+                    ).with_for_update())
+                    if existing is not None and existing.result:
+                        replay = dict(existing.result)
+                        replay['awarded'] = 0.0
+                        return replay
+                if (existing is None or existing.account_id != row.account_id
+                        or existing.ingredient_a != ingredient_a
+                        or existing.ingredient_b != ingredient_b):
+                    raise MiniAppError(409, 'Идентификатор уже использован для другого опыта')
+                if not existing.result:
+                    raise MiniAppError(409, 'Опыт ещё обрабатывается; повтори позже')
+                return existing.result
+
+            verified_elements = _stored(row.verified_discovered) | BASE_ELEMENTS
+            verified_recipes = _stored(row.verified_crafted)
+            verified = ingredient_a in verified_elements and ingredient_b in verified_elements
+
+            # Keep the player's collection intact even when this particular craft
+            # depends on an offline/imported ingredient and therefore is unrated.
+            row.discovered = sorted(_stored(row.discovered) | {result_element})
+            row.crafted = sorted(_stored(row.crafted) | {key})
+            row.updated_at = moment
+            awarded = Decimal('0')
+
+            if verified:
+                previous_elements = set(verified_elements)
+                verified_elements.add(result_element)
+                verified_recipes.add(key)
+                chapters = _stored(row.verified_chapters)
+                new_chapters = catalog.closed_chapters(verified_elements) - chapters
+                chapters.update(new_chapters)
+                achievements = _stored(row.verified_achievements)
+                earned = catalog.earned_achievements(
+                    verified_elements, verified_recipes, attempts=0
+                ) - achievements
+                # A legacy grant may already exist. Only a newly inserted grant can
+                # contribute achievement points, preventing a second payout.
+                newly_granted = await self._grant(session, user_id, earned)
+                requested = (
+                    POINTS_PER_ELEMENT * len(verified_elements - previous_elements)
+                    + POINTS_PER_CHAPTER * len(new_chapters)
+                    + POINTS_PER_ACHIEVEMENT * newly_granted
+                )
+                if row.points_day != day:
+                    row.points_day = day
+                    row.points_today = Decimal('0')
+                available = max(DAILY_POINTS_LIMIT - row.points_today, Decimal('0'))
+                awarded = min(requested, available)
+                row.points_today += awarded
+                row.points_total += awarded
+                if row.points_today >= DAILY_GOAL_POINTS and row.last_goal_day != day:
+                    row.goal_streak = (
+                        (row.goal_streak or 0) + 1
+                        if row.last_goal_day == day - timedelta(days=1) else 1
+                    )
+                    row.last_goal_day = day
+                row.verified_discovered = sorted(verified_elements)
+                row.verified_crafted = sorted(verified_recipes)
+                row.verified_chapters = sorted(chapters)
+                row.verified_achievements = sorted(achievements | earned)
+                row.chapters = sorted(_stored(row.chapters) | catalog.closed_chapters(row.discovered))
+                row.achievements = sorted(
+                    _stored(row.achievements)
+                    | catalog.earned_achievements(row.discovered, row.crafted, row.attempts)
+                    | earned
+                )
+                if awarded:
+                    await session.execute(
+                        update(User).where(User.id == user_id)
+                        .values(global_score=User.global_score + awarded)
+                    )
+
+            points_today = row.points_today if row.points_day == day else Decimal('0')
+            response = {
+                'result': result_element,
+                'recipe': key,
+                'verified': verified,
+                'awarded': float(awarded),
+                'points_today': float(points_today),
+                'points_total': float(row.points_total),
+                'remaining_today': float(max(DAILY_POINTS_LIMIT - points_today, Decimal('0'))),
+                'discovered': list(row.discovered),
+                'verified_discovered': list(row.verified_discovered),
+                'verified_crafted': list(row.verified_crafted),
+            }
+            receipt = await session.get(AlchemyCraftCommand, command_id)
+            receipt.result = response
+        return response
 
     async def progress(self, user_id: int, *, now: Optional[datetime] = None) -> dict[str, Any]:
         """Сводка игрока: место, очки за всё время и дневная цель."""
@@ -282,6 +393,7 @@ class AlchemyService:
         async with self.database.transaction() as session:
             row = await session.scalar(select(AlchemyProgress).where(AlchemyProgress.user_id == user_id))
             discovered = len(_stored(row.discovered)) if row else 0
+            verified_discovered = len(_stored(row.verified_discovered)) if row else len(BASE_ELEMENTS)
             total_players = await session.scalar(
                 select(func.count()).select_from(AlchemyProgress).where(AlchemyProgress.user_id.is_not(None))
             ) or 0
@@ -290,14 +402,19 @@ class AlchemyService:
                 total_players += 1
             ahead = await session.scalar(
                 select(func.count()).select_from(AlchemyProgress)
-                .where(rank_expression > discovered, AlchemyProgress.user_id.is_not(None))
+                .where(rank_expression > (len(_stored(row.verified_discovered)) if row else len(BASE_ELEMENTS)),
+                       AlchemyProgress.user_id.is_not(None))
             ) or 0
             # Счётчик дня обнуляется сам: очки прошлых суток к цели не относятся.
             points_today = float(row.points_today) if row and row.points_day == today else 0.0
             return {
                 'discovered': discovered,
+                'verified_discovered': verified_discovered,
+                'reward_eligible': False,
                 'chapters': len(_stored(row.chapters)) if row else 0,
                 'achievements': len(_stored(row.achievements)) if row else 0,
+                'verified_chapters': len(_stored(row.verified_chapters)) if row else 0,
+                'verified_achievements': len(_stored(row.verified_achievements)) if row else 0,
                 'points_total': float(row.points_total) if row else 0.0,
                 'points_today': points_today,
                 'daily_limit': float(DAILY_POINTS_LIMIT),
@@ -324,7 +441,7 @@ class AlchemyService:
         if not limit:
             return {'items': []}
         statement = (
-            select(AlchemyProgress.user_id, AlchemyProgress.discovered, User.display_name)
+            select(AlchemyProgress.user_id, AlchemyProgress.verified_discovered, User.display_name)
             .join(User, User.id == AlchemyProgress.user_id)
             .order_by(_discovered_rank_expression().desc(), AlchemyProgress.user_id)
             .limit(limit)
@@ -337,6 +454,7 @@ class AlchemyService:
                 'rank': position,
                 'display_name': display_name or f'User {row_user_id}',
                 'discovered': len(_stored(discovered)),
+                'verified_discovered': len(_stored(discovered)),
                 'is_me': row_user_id == user_id,
             }
             for position, (row_user_id, discovered, display_name) in enumerate(rows, offset + 1)
@@ -359,7 +477,9 @@ class AlchemyService:
         statement = select(AlchemyProgress).where(
             AlchemyProgress.account_id == account_id).with_for_update()
         await session.execute(pg_insert(AlchemyProgress).values(
-            account_id=account_id, user_id=user_id, discovered=[], crafted=[], chapters=[],
+            account_id=account_id, user_id=user_id, discovered=[], crafted=[],
+            verified_discovered=sorted(BASE_ELEMENTS), verified_crafted=[],
+            verified_chapters=[], verified_achievements=[], chapters=[],
             achievements=[], attempts=0, points_total=Decimal('0'),
             points_today=Decimal('0'), points_day=None,
         ).on_conflict_do_nothing(index_elements=[AlchemyProgress.account_id]))

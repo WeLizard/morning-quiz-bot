@@ -191,7 +191,7 @@ class DevRuntime:
                 await sync.run_once()
                 sync.install(app.job_queue)
                 schedule_cleanup_job(app.job_queue, state)
-                mafia.install_deadlines(app.job_queue)
+                mafia.install_notification_delivery(app.job_queue)
                 quiz.schedule_quiz_auto_save()
                 wisdom.start()
                 await app.start()
@@ -267,7 +267,7 @@ class DevRuntime:
                 raise ValueError('Нет действия')
             await app.process_update(Update.de_json(raw, app.bot))
             # Keep the interactive preview deterministic: transactionally queued
-            # game effects are delivered before the HTTP response is returned.
+            # Telegram effects are delivered before the HTTP response is returned.
             if self.game_runtime is not None:
-                await self.game_runtime.deadline_job(CallbackContext(app))
+                await self.game_runtime.notification_job(CallbackContext(app))
             return self.status()

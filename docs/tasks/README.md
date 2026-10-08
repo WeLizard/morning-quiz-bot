@@ -16,6 +16,7 @@
 | MQB-004 | [«Ночной город»: фундамент мафии](MQB-004-night-city-mafia.md) | `in_progress` | high | 2026-09-01 |
 | MQB-005 | [Общее ядро Morning Quiz и равноправные интерфейсы](MQB-005-application-core-and-adapters.md) | `in_progress` | high | 2026-09-01 |
 | MQB-006 | [PostgreSQL-only игровая платформа](MQB-006-platform-postgresql-cutover.md) | `in_progress` | critical | 2026-09-04 |
+| QW-2026-10-08 | [QuizzyWizzy audit remediation](QUIZZYWIZZY-2026-10-08.md) | `in_progress` | critical | 2026-10-08 |
 
 ## Как добавить задачу
 

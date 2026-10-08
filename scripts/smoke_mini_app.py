@@ -21,7 +21,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -89,7 +89,9 @@ async def main() -> int:
         if not report.check(login_name, login.status_code == 200, f'{login.status_code}'):
             print('Дальше идти нельзя: сессия не создана.', file=sys.stderr)
             return 1
-        headers = {'Authorization': f"Bearer {login.json()['access_token']}"}
+        headers = {'Cookie': f"mqb_mini={client.cookies.get('mqb_mini')}"}
+        parsed_origin = urlsplit(args.base_url)
+        client.headers.update({'Origin': f'{parsed_origin.scheme}://{parsed_origin.netloc}', 'X-Mini-CSRF': '1'})
 
         for path, marker in (('/api/mini/me', 'user_id'), ('/api/mini/config', 'runtime_enabled'),
                              ('/api/mini/progress', 'correct_including_photo'),

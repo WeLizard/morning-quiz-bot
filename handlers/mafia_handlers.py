@@ -127,7 +127,7 @@ def render_private_card(role: dict, lobby: dict, *, group_chat_id: int):
     }.get(phase, phase)
     text = f'🌒 <b>{escape(phase_title)}</b>\n\nТвоя роль: <b>{escape(role["title"])}</b>'
     rows = []
-    revision = lobby['revision']
+    revision = lobby.get('phase_revision', lobby['revision'])
     if not role.get('alive', True):
         text += '\n\nТы выбыл из дела. Наблюдай за ходом партии в общем чате.'
     elif phase == 'night':
@@ -369,36 +369,8 @@ class MafiaHandlers:
         await acknowledge(query)
         await self._show(update, context, lobby)
 
-    async def deadline_job(self, context):
-        """Advance expired games and drain their transactionally-created outbox."""
-        async with self.database.transaction() as session:
-            chat_ids = await MafiaApplicationService(session).due_chat_ids()
-            from application.classic import ClassicApplicationService
-            classic_due = await ClassicApplicationService(
-                self.database, session
-            ).due()
-            from application.photo import PhotoApplicationService
-            photo_due = await PhotoApplicationService(self.database, session).due()
-        for chat_id in chat_ids:
-            try:
-                async with self.database.transaction() as session:
-                    await MafiaApplicationService(session).advance_due(chat_id=chat_id)
-            except (LookupError, PermissionError, RuntimeError, ValueError):
-                logger.info('Mafia phase already changed for chat %s', chat_id)
-        for chat_id in sorted({item[0] for item in classic_due}):
-            try:
-                async with self.database.transaction() as session:
-                    await ClassicApplicationService(
-                        self.database, session
-                    ).settle_due(chat_id=chat_id)
-            except (LookupError, PermissionError, RuntimeError, ValueError):
-                logger.info('Classic deadline already changed for chat %s', chat_id)
-        for chat_id in photo_due:
-            try:
-                async with self.database.transaction() as session:
-                    await PhotoApplicationService(self.database, session).settle_due(chat_id=chat_id)
-            except (LookupError, PermissionError, RuntimeError, ValueError):
-                logger.info('Photo deadline already changed for chat %s', chat_id)
+    async def notification_job(self, context):
+        """Telegram is only a delivery adapter; game rules run in game-worker."""
         await self._deliver_notifications(context)
 
     async def _deliver_notifications(self, context):
@@ -634,13 +606,15 @@ class MafiaHandlers:
         else:
             await queue.delivered(item['id'], worker_id)
 
-    def install_deadlines(self, job_queue):
+    def install_notification_delivery(self, job_queue):
         if job_queue is None:
             return None
-        name = 'game_deadlines_and_notifications'
+        name = 'game_notification_delivery'
         for job in job_queue.get_jobs_by_name(name):
             job.schedule_removal()
-        return job_queue.run_repeating(self.deadline_job, interval=5, first=1, name=name)
+        return job_queue.run_repeating(
+            self.notification_job, interval=5, first=1, name=name,
+        )
 
     def get_handlers(self):
         return [

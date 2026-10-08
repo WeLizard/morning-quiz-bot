@@ -25,11 +25,12 @@
     window.QuizPlay = {
         model,
         stop() { dispose(); dispose = () => {}; },
-        async mount({host, request, media, command, chatId, selection, onHome, onReplay, onProfile}) {
+        async mount({host, request, media, command, chatId, selection, onHome, onReplay, onProfile, onSettings}) {
             window.QuizPlay.stop();
             document.body?.classList.add('is-playing');
-            let active = true, timer, ticker, snapshot, direct, directPhoto, current, busy = false, pending = null, lastHash = '', chosen = null, questionKey = '', draft = '', offset = 0, starting = !!command;
-            const preferred = command === '/photo_quiz' ? 'photo' : command === '/quiz' ? 'classic' : null;
+            let active = true, timer, ticker, snapshot, direct, directPhoto, current, setupDetails = null, photoSetup = null, setupError = null, busy = false, pending = null, lastHash = '', chosen = null, questionKey = '', draft = '', offset = 0, starting = false;
+            let preferred = command === '/photo_quiz' ? 'photo' : command === '/quiz' ? 'classic' : null;
+            const directPlay = !!chatId && (command === null || command === undefined || ['/quiz', '/photo_quiz'].includes(command));
             const images = new Map();
             const page = el('section', undefined, 'play-screen'), top = el('div', undefined, 'play-topline');
             const button = (text, fn, cls = '') => { const b = el('button', text, cls); b.type = 'button'; b.onclick = fn; return b; };
@@ -81,6 +82,76 @@
                     stage.append(grid);
                     if (/введите|напишите|отправьте/i.test(text)) inputForm('Твоё значение', null);
                 }
+            }
+            function directSetup() {
+                stage.append(el('span', 'ПЕРЕД ПЕРВЫМ ВОПРОСОМ', 'eyebrow'));
+                if (setupError) {
+                    stage.append(el('h1', 'Не удалось подготовить игру'), el('p', setupError, 'muted'));
+                    stage.append(button('Повторить', async () => {
+                        try { await loadDirectSetup(preferred); await refresh(); }
+                        catch (error) { setupError = error.message; lastHash = ''; render(); }
+                    }, 'quiet'));
+                    return;
+                }
+                if (preferred === 'classic') {
+                    const config = setupDetails?.classic;
+                    if (!config) { stage.append(hostLine('Загружаю параметры квиза…')); return; }
+                    stage.append(el('h1', 'Проверим интуицию?'));
+                    stage.append(hostLine('Вопросы и правила берутся из настроек выбранного чата. Ответы и очки будут общими с игрой в чате.'));
+                    const facts = el('div', undefined, 'preparation-facts');
+                    facts.append(el('span', `${number(config.questions)} вопросов`), el('span', `${number(config.seconds)} секунд на ответ`));
+                    if (Number(config.interval) > 0) facts.append(el('span', `Пауза ${number(config.interval)} секунд`));
+                    const categoryText = config.category_mode === 'specific' && config.categories?.length
+                        ? `Темы: ${config.categories.join(', ')}`
+                        : config.category_mode === 'exclude' && config.categories?.length
+                            ? `Без тем: ${config.categories.join(', ')}` : 'Темы — по настройкам чата';
+                    facts.append(el('span', categoryText)); stage.append(facts);
+                    if (typeof onSettings === 'function') stage.append(button('Настройки квиза', onSettings, 'quiet play-secondary'));
+                    stage.append(button('Начать игру', startDirect, 'primary play-primary'));
+                } else if (preferred === 'photo') {
+                    if (!photoSetup) { stage.append(hostLine('Проверяю фото-каталог…')); return; }
+                    stage.append(el('h1', 'Присмотримся?'));
+                    stage.append(hostLine('Каждая загадка соединяет образы в слово. Ответы через Mini App сохраняются в ту же игровую систему.'));
+                    const facts = el('div', undefined, 'preparation-facts');
+                    facts.append(el('span', `${photoSetup.question_count} картинки`),
+                        el('span', `${photoSetup.open_seconds} секунд на картинку`),
+                        el('span', photoSetup.hints_enabled ? 'Подсказки включены' : 'Без подсказок'),
+                        el('span', `Доступно загадок: ${photoSetup.available_questions}`));
+                    stage.append(facts);
+                    stage.append(button('Начать фото-серию', startPhotoDirect, 'primary play-primary'));
+                    if (photoSetup.available_questions < photoSetup.question_count) {
+                        stage.append(el('p', 'В каталоге пока меньше картинок, чем вопросов в серии — некоторые загадки могут повториться.', 'play-footnote'));
+                    }
+                    if (!photoSetup.can_start) {
+                        stage.querySelector('button')?.setAttribute('disabled', '');
+                        stage.append(el('p', 'Сейчас в каталоге нет доступных изображений.', 'play-notice'));
+                    }
+                } else {
+                    stage.append(el('h1', 'Выбери игру'));
+                    stage.append(hostLine('Можно начать классический квиз или фото-загадки. Настройки квиза находятся в Профиль → Настройки.'));
+                    stage.append(button('Классический квиз', () => chooseDirectMode('classic'), 'primary play-primary'));
+                    stage.append(button('Фото-загадки', () => chooseDirectMode('photo'), 'primary play-secondary'));
+                }
+                stage.append(el('p', 'Глобальные настройки доступны в Профиль → Настройки. Этот раунд использует состояние выбранного чата.', 'play-footnote'));
+            }
+            async function loadDirectSetup(kind) {
+                setupError = null;
+                try {
+                    if (kind === 'classic') {
+                        setupDetails = await request(`/api/mini/chats/${chatId}/details`);
+                        photoSetup = null;
+                    } else {
+                        photoSetup = await request(`/api/mini/photo/chats/${chatId}/setup`);
+                        setupDetails = null;
+                    }
+                } catch (error) { setupError = error.message; throw error; }
+            }
+            async function chooseDirectMode(kind) {
+                if (busy || !active) return;
+                preferred = kind; direct = null; directPhoto = null; lastHash = '';
+                stage.replaceChildren(hostLine('Загружаю параметры игры…'));
+                try { await loadDirectSetup(kind); await refresh(); }
+                catch (error) { notice.textContent = error.message; stage.replaceChildren(button('Повторить', () => chooseDirectMode(kind), 'quiet')); }
             }
             function inputForm(title, round, disabled = false, directPhotoAnswer = false) {
                 const form = el('form', undefined, 'play-answer-form'), field = el('label', title), input = el('input');
@@ -216,6 +287,14 @@
                     if (directKey !== questionKey) { chosen = null; questionKey = directKey; }
                     lastHash = hash; stage.replaceChildren(); mode.textContent = 'Классический квиз'; sharedQuestion(direct); tick(); return;
                 }
+                if (directPlay) {
+                    const hash = JSON.stringify([preferred, setupDetails, photoSetup, busy]);
+                    if (hash === lastHash) return;
+                    lastHash = hash; stage.replaceChildren();
+                    mode.textContent = preferred === 'photo' ? 'Фото-загадки' : preferred === 'classic' ? 'Классический квиз' : 'Выбор игры';
+                    directSetup();
+                    return;
+                }
                 current = model(snapshot, preferred);
                 const hash = JSON.stringify([current, snapshot.photo_round, snapshot.connected, busy, chosen]); if (hash === lastHash) return;
                 const key = current.question?.poll?.id || snapshot.photo_round || current.menu?.id || current.game?.key;
@@ -256,14 +335,25 @@
             async function refresh(renderPage = true) {
                 if (!active) return; clearTimeout(timer);
                 try {
-                    const [data, shared, sharedPhotoView] = await Promise.all([
-                        request('/api/mini/runtime'),
-                        preferred === 'photo' || !chatId ? Promise.resolve(null) : request(`/api/mini/classic/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (direct?.status && direct.status !== 'active' ? direct : null) : Promise.reject(error)),
-                        preferred === 'classic' || !chatId ? Promise.resolve(null) : request(`/api/mini/photo/chats/${chatId}/current`).catch(error => error.status === 404 ? null : Promise.reject(error)),
-                    ]);
-                    if (!active) return; snapshot = data; direct = shared; directPhoto = sharedPhotoView; offset = data.server_time * 1000 - Date.now();
-                    status.textContent = direct || directPhoto ? '' : data.connected ? '' : 'Связь с ведущим прервалась. Попробуем подключиться снова.';
-                    if (pending) { const receipt = data.requests.find(r => r.id === pending.request_id); if (receipt && !['pending', 'running'].includes(receipt.status)) { busy = false; starting = false; pending = null; notice.textContent = receipt.error || receipt.notice || ''; } }
+                    if (directPlay) {
+                        const [shared, sharedPhotoView] = await Promise.all([
+                            preferred === 'photo' ? Promise.resolve(null) : request(`/api/mini/classic/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (direct?.status && direct.status !== 'active' ? direct : null) : Promise.reject(error)),
+                            preferred === 'classic' ? Promise.resolve(null) : request(`/api/mini/photo/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (directPhoto?.status && directPhoto.status !== 'active' ? directPhoto : null) : Promise.reject(error)),
+                        ]);
+                        if (!active) return;
+                        direct = shared; directPhoto = sharedPhotoView;
+                        snapshot = {connected: true, server_time: Date.now() / 1000, games: [], messages: [], requests: []};
+                        offset = 0; status.textContent = '';
+                    } else {
+                        const [data, shared, sharedPhotoView] = await Promise.all([
+                            request('/api/mini/runtime'),
+                            preferred === 'photo' || !chatId ? Promise.resolve(null) : request(`/api/mini/classic/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (direct?.status && direct.status !== 'active' ? direct : null) : Promise.reject(error)),
+                            preferred === 'classic' || !chatId ? Promise.resolve(null) : request(`/api/mini/photo/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? null : Promise.reject(error)),
+                        ]);
+                        if (!active) return; snapshot = data; direct = shared; directPhoto = sharedPhotoView; offset = data.server_time * 1000 - Date.now();
+                        status.textContent = direct || directPhoto ? '' : data.connected ? '' : 'Связь с ведущим прервалась. Попробуем подключиться снова.';
+                        if (pending) { const receipt = data.requests.find(r => r.id === pending.request_id); if (receipt && !['pending', 'running'].includes(receipt.status)) { busy = false; starting = false; pending = null; notice.textContent = receipt.error || receipt.notice || ''; } }
+                    }
                     if (renderPage) render();
                 } catch (error) { if (active) { status.textContent = error.message; stage.querySelectorAll('button').forEach(b => { b.disabled = true; }); lastHash = ''; } }
                 finally { if (active) timer = setTimeout(refresh, document.hidden ? 10000 : busy ? 1000 : 2000); }
@@ -310,7 +400,10 @@
                 if (!active || busy) return;
                 busy = true; starting = true; notice.textContent = 'Раскладываю фото-загадки…'; render();
                 try {
-                    directPhoto = await request(`/api/mini/photo/chats/${chatId}/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({command_id: crypto.randomUUID()})});
+                    directPhoto = await request(`/api/mini/photo/chats/${chatId}/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                        command_id: crypto.randomUUID(), question_count: photoSetup.question_count,
+                        open_seconds: photoSetup.open_seconds, hints_enabled: photoSetup.hints_enabled,
+                    })});
                     starting = false; notice.textContent = '';
                 } catch (error) { starting = false; notice.textContent = error.message; }
                 finally { busy = false; lastHash = ''; await refresh(); }
@@ -337,10 +430,12 @@
                 }; await transmit();
             }
             stage.append(hostLine('Филиныч раскладывает карточки…'));
+            if (directPlay && preferred) {
+                try { await loadDirectSetup(preferred); }
+                catch (error) { notice.textContent = error.message; }
+            }
             await refresh(false);
-            if (command === '/quiz' && active && snapshot) await startDirect();
-            else if (command === '/photo_quiz' && active && snapshot) await startPhotoDirect();
-            else if (command && active && snapshot) await send({type: 'command', value: command});
+            if (command && active && snapshot && !directPlay) await send({type: 'command', value: command});
             else render();
             if (active) ticker = setInterval(tick, 500);
         },

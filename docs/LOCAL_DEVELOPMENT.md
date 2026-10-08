@@ -25,6 +25,9 @@ dev-seed, админку на <http://127.0.0.1:4184> и Mini App на
 <http://127.0.0.1:4185/app>. Для живого
 тестового Telegram-адаптера используйте `-WithTelegram`; он читает только
 явно выбранный локальный `.env` и ограничен тестовым ботом/личным чатом.
+Compose выполняет импорт через отдельный одноразовый `seed` перед сервисами;
+админка не повторяет этот импорт при каждом рестарте. При отдельном запуске
+`scripts/run_admin_preview.py` bootstrap остаётся включён по умолчанию.
 
 ```powershell
 .\scripts\Start-LocalDevelopment.ps1 -WithTelegram
@@ -35,6 +38,8 @@ dev-seed, админку на <http://127.0.0.1:4184> и Mini App на
 `Stop-LocalDevelopment.ps1 -StopDatabase` останавливает и контейнер, сохраняя
 volume. Dev и тесты используют один сервер `127.0.0.1:55433`, но разные базы:
 `morning_quiz_dev` и `morning_quiz_test`.
+Сервис `game-worker` независимо от Telegram polling исполняет дедлайны Classic,
+Photo и Mafia; бот остаётся адаптером доставки сообщений из PostgreSQL outbox.
 
 Логи всех контейнеров:
 

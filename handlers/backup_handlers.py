@@ -16,7 +16,7 @@ class BackupHandlers:
     
     def get_handlers(self):
         """Возвращает список обработчиков команд для бекапов"""
-        if getattr(self.app_config, 'storage_backend', 'json') == 'postgres':
+        if getattr(self.app_config, 'storage_backend', 'postgres') == 'postgres':
             from handlers.postgres_backup_handlers import PostgresBackupHandlers
             return PostgresBackupHandlers(self.app_config).get_handlers()
         return [

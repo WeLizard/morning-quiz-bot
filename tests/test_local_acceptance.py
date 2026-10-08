@@ -191,7 +191,10 @@ def test_local_pg_dump_restores_synthetic_schema_exactly(pg_env, tmp_path):
                                               for row in (await session.execute(select(table))).mappings())
                             for table in Base.metadata.sorted_tables}
             original = await rows()
-            if os.getenv('MQB_DEV_CONTAINER') == '1' and Path('/.dockerenv').is_file():
+            use_host_pg_tools = (
+                os.getenv('MQB_DEV_CONTAINER') == '1' and Path('/.dockerenv').is_file()
+            ) or os.getenv('MQB_CI_POSTGRES_SERVICE') == '1'
+            if use_host_pg_tools:
                 parsed = urlsplit(pg_env)
                 command = ['pg_dump', '-h', parsed.hostname, '-p', str(parsed.port)]
                 restore_command = ['pg_restore', '-h', parsed.hostname, '-p', str(parsed.port)]

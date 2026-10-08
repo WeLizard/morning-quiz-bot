@@ -53,6 +53,7 @@ def create_dev_app():
         identity = TelegramIdentity(player_id, int(time.time()), sha256(uuid4().bytes).hexdigest())
         # Loopback preview tabs are disposable and can be reopened frequently.
         # The public Telegram path keeps the default cap of five active sessions.
-        return await app.state.mini_store.create_session(identity, session_limit=100)
+        payload = await app.state.mini_store.create_session(identity, session_limit=100)
+        return app.state.mini_session_response(payload)
 
     return app

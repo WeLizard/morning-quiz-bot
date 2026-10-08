@@ -121,7 +121,7 @@ class AppConfig:
             f"AppConfig: TELEGRAM_PROXY_URL считан: {'Да' if self.telegram_proxy_url else 'Нет'}"
         )
 
-        self.storage_backend = os.getenv("STORAGE_BACKEND", "json").strip().lower()
+        self.storage_backend = os.getenv("STORAGE_BACKEND", "postgres").strip().lower()
         if self.storage_backend not in {"json", "postgres"}:
             raise ValueError("STORAGE_BACKEND должен быть 'json' или 'postgres'")
         self.database_url: Optional[str] = os.getenv("DATABASE_URL") or None

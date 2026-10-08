@@ -12125,6 +12125,7 @@ function mix(id1,id2,snapshot=true){
  let newToken=null,isNew=false;
  if(r){
   isNew=!found.has(r.result);found.add(r.result);knownRecipes.add(key);
+  window.MQBAlchemySync?.verifyCraft(t1.id,t2.id);
   state.bench=state.bench.filter(t=>t.uid!==id1&&t.uid!==id2);
   newToken=addToken(r.result,{u:(t1.u+t2.u)/2,v:(t1.v+t2.v)/2});
   if(isNew){newThisSession.add(r.result);state.latest=r.result;if(state.pinned===r.result)state.pinned=null;if(hint?.recipe?.result===r.result)hint=null;}
@@ -12660,26 +12661,18 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
     const guestId = /^[0-9a-f-]{36}$/.test(window.MQB_ALCHEMY_GUEST_ID || '')
         ? window.MQB_ALCHEMY_GUEST_ID : null;
     const ENDPOINT = guestId ? '/api/guest/alchemy/sync' : '/api/mini/alchemy/sync';
+    const CRAFT_ENDPOINT = '/api/mini/alchemy/craft';
     const PRIMARY = guestId ? `alchemia.atlas.guest.${guestId}` : 'alchemia.atlas';
     const LEGACY = guestId ? [] : ['alchemia.atlas.v5', 'alchemia.atlas.v4', 'alchemia.atlas.v3',
                     'alchemia.atlas.v2', 'alchemia.atlas.v1', 'elementAlchemyDiscovered'];
-    const TOKEN_KEY = 'mqb-mini-token';
     const RELOADED_KEY = 'mqb-alchemy-restored';
     const INTERVAL_MS = 60000;
     const MAX_DISCOVERED = 2000;
     const MAX_CRAFTED = 4000;
     let busy = false;
     let staleGuest = false;
-
-    function token() {
-        const fromHash = /(?:^|[#&])t=([A-Za-z0-9_-]{20,})/.exec(location.hash || '');
-        if (fromHash) return fromHash[1];
-        // Мини-апп кладёт токен в sessionStorage (та же вкладка) и в localStorage
-        // (страница игры могла быть открыта позже и в другой вкладке).
-        try { const stored = sessionStorage.getItem(TOKEN_KEY); if (stored) return stored; } catch {}
-        try { const stored = localStorage.getItem(TOKEN_KEY); if (stored) return stored; } catch {}
-        return '';
-    }
+    let unverifiedNoticeShown = false;
+    let telegramSession = false;
 
     function readState() {
         let best = null;
@@ -12720,6 +12713,30 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
             requestAnimationFrame(() => { node.style.opacity = '1'; });
             setTimeout(() => { node.style.opacity = '0'; setTimeout(() => node.remove(), 400); }, 6000);
         } catch { /* оформление не критично */ }
+    }
+
+    async function verifyCraft(ingredientA, ingredientB) {
+        if (guestId) return; // Guests keep their local collection; no rated rewards.
+        if (!telegramSession && !(await establishSession())) return;
+        try {
+            const commandId = typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `alchemy-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+            const response = await fetch(CRAFT_ENDPOINT, {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'X-Mini-CSRF': '1'},
+                body: JSON.stringify({command_id: commandId,
+                    ingredient_a: ingredientA, ingredient_b: ingredientB}),
+            });
+            if (!response.ok) return;
+            const result = await response.json();
+            if (result.awarded > 0) {
+                banner(`Подтверждено сервером: +${result.awarded} очков · всего ${result.points_total}`);
+            } else if (!result.verified && !unverifiedNoticeShown) {
+                unverifiedNoticeShown = true;
+                banner('Старые открытия сохранены, но не дают рейтинговых очков. Новые подтверждённые открытия начинаются с базовых элементов.');
+            }
+        } catch { /* Offline play remains available; the local save is preserved. */ }
     }
 
     // Свежее состояние в формате движка. Нужно, когда игра ещё ни разу не
@@ -12773,8 +12790,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
 
     async function sync() {
         if (busy || staleGuest) return;
-        const bearer = guestId ? '' : token();
-        if (!guestId && !bearer) return;          // автономный HTML без аккаунта
+        if (!guestId && !telegramSession) return;  // автономный HTML без аккаунта
         // Спрашиваем сервер даже без локального сохранения: на новом устройстве
         // игра ещё ничего не записала, и именно так подтягивается чужой прогресс.
         const state = readState() || EMPTY;
@@ -12784,7 +12800,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
                 method: 'POST', credentials: 'same-origin',
                 headers: guestId
                     ? {'Content-Type': 'application/json', 'X-Guest-CSRF': '1', 'X-Guest-Account': guestId}
-                    : {'Content-Type': 'application/json', Authorization: `Bearer ${bearer}`},
+                    : {'Content-Type': 'application/json', 'X-Mini-CSRF': '1'},
                 body: JSON.stringify(summary(state)),
             });
             if (guestId && response.status === 409) {
@@ -12802,7 +12818,16 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         } catch { /* игра не должна страдать из-за сети */ } finally { busy = false; }
     }
 
-    addEventListener('load', () => { sync(); setInterval(sync, INTERVAL_MS); });
+    window.MQBAlchemySync = Object.freeze({verifyCraft});
+    async function establishSession() {
+        if (guestId) return true;
+        try {
+            const response = await fetch('/api/mini/me', {credentials: 'same-origin'});
+            telegramSession = response.ok;
+        } catch { telegramSession = false; }
+        return telegramSession;
+    }
+    addEventListener('load', async () => { if (await establishSession()) sync(); setInterval(sync, INTERVAL_MS); });
     addEventListener('visibilitychange', () => { if (document.hidden) sync(); });
 })();
 </script>

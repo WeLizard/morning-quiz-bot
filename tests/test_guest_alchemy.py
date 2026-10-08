@@ -84,7 +84,10 @@ def test_telegram_and_guest_progress_have_independent_owners(guest_alchemy_url):
                 rows = (await session.scalars(select(AlchemyProgress))).all()
                 assert len(rows) == 2 and user.account_id is not None
                 assert next(row for row in rows if row.user_id == 901).account_id == user.account_id
-                assert user.global_score > 0
+                assert user.global_score == Decimal('0')
+                assert next(row for row in rows if row.user_id == 901).verified_discovered == [
+                    'air', 'earth', 'fire', 'water'
+                ]
     asyncio.run(run())
 
 

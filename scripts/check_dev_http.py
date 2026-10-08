@@ -32,7 +32,7 @@ async def main():
         (await mini.get('/app')).raise_for_status()
         response = await mini.post('/api/dev/session')
         response.raise_for_status()
-        mini.headers['Authorization'] = 'Bearer ' + response.json()['access_token']
+        mini.headers.update({'Origin': 'http://127.0.0.1:4185', 'X-Mini-CSRF': '1'})
         for path in ('/api/mini/me', '/api/mini/progress', '/api/mini/chats', '/api/mini/leaderboard', '/api/mini/chats/-900000000091/details'):
             (await mini.get(path)).raise_for_status()
         (await mini.delete('/api/mini/session')).raise_for_status()

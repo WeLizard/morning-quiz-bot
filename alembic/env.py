@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from storage.database import DatabaseSettings
 from storage.models import Base
+from qw_farm.integration import register_models
 
 
 config = context.config
@@ -17,6 +18,7 @@ if config.config_file_name is not None:
 
 settings = DatabaseSettings.from_env()
 config.set_main_option("sqlalchemy.url", settings.url.replace("%", "%%"))
+register_models()
 target_metadata = Base.metadata
 
 

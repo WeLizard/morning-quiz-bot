@@ -1,0 +1,5788 @@
+{
+ "cases": [
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3396
+    ],
+    [
+     3608,
+     8499
+    ],
+    [
+     9659,
+     13029
+    ]
+   ],
+   "name": "pond_bank/s1/perfect",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": 1000
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3851
+    ],
+    [
+     3608,
+     8954
+    ],
+    [
+     9659,
+     13484
+    ]
+   ],
+   "name": "pond_bank/s1/late",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     1301
+    ],
+    [
+     3608,
+     3908
+    ],
+    [
+     9659,
+     9959
+    ]
+   ],
+   "name": "pond_bank/s1/early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": 0
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     2946
+    ],
+    [
+     3608,
+     8049
+    ],
+    [
+     9659,
+     12579
+    ]
+   ],
+   "name": "pond_bank/s1/edge",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": 640
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     null
+    ],
+    [
+     3608,
+     null
+    ],
+    [
+     9659,
+     null
+    ]
+   ],
+   "name": "pond_bank/s1/miss",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3396
+    ],
+    [
+     3608,
+     8499
+    ]
+   ],
+   "name": "pond_bank/s1/short",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1.5,
+     3000
+    ],
+    [
+     3608,
+     8499
+    ],
+    [
+     9659,
+     13029
+    ]
+   ],
+   "name": "pond_bank/s1/float",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     10,
+     4000
+    ],
+    [
+     3608,
+     8499
+    ],
+    [
+     9659,
+     13029
+    ]
+   ],
+   "name": "pond_bank/s1/aim_early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5668
+    ],
+    [
+     5917,
+     10008
+    ],
+    [
+     10751,
+     15358
+    ]
+   ],
+   "name": "pond_bank/s2/perfect",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": 1000
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     6123
+    ],
+    [
+     5917,
+     10463
+    ],
+    [
+     10751,
+     15813
+    ]
+   ],
+   "name": "pond_bank/s2/late",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     1762
+    ],
+    [
+     5917,
+     6217
+    ],
+    [
+     10751,
+     11051
+    ]
+   ],
+   "name": "pond_bank/s2/early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": 0
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5218
+    ],
+    [
+     5917,
+     9558
+    ],
+    [
+     10751,
+     14908
+    ]
+   ],
+   "name": "pond_bank/s2/edge",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": 640
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     null
+    ],
+    [
+     5917,
+     null
+    ],
+    [
+     10751,
+     null
+    ]
+   ],
+   "name": "pond_bank/s2/miss",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5668
+    ],
+    [
+     5917,
+     10008
+    ]
+   ],
+   "name": "pond_bank/s2/short",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1.5,
+     3000
+    ],
+    [
+     5917,
+     10008
+    ],
+    [
+     10751,
+     15358
+    ]
+   ],
+   "name": "pond_bank/s2/float",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     10,
+     4000
+    ],
+    [
+     5917,
+     10008
+    ],
+    [
+     10751,
+     15358
+    ]
+   ],
+   "name": "pond_bank/s2/aim_early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     }
+    ],
+    "window": 900
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3346
+    ],
+    [
+     3346,
+     8187
+    ],
+    [
+     8401,
+     11721
+    ],
+    [
+     11758,
+     15021
+    ]
+   ],
+   "name": "lake_inlet/s1/perfect",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": 1000
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3751
+    ],
+    [
+     3346,
+     8592
+    ],
+    [
+     8401,
+     12126
+    ],
+    [
+     11758,
+     15426
+    ]
+   ],
+   "name": "lake_inlet/s1/late",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     1301
+    ],
+    [
+     3346,
+     3646
+    ],
+    [
+     8401,
+     8701
+    ],
+    [
+     11758,
+     12058
+    ]
+   ],
+   "name": "lake_inlet/s1/early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": 0
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     2946
+    ],
+    [
+     3346,
+     7787
+    ],
+    [
+     8401,
+     11321
+    ],
+    [
+     11758,
+     14621
+    ]
+   ],
+   "name": "lake_inlet/s1/edge",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": 640
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     null
+    ],
+    [
+     3346,
+     null
+    ],
+    [
+     8401,
+     null
+    ],
+    [
+     11758,
+     null
+    ]
+   ],
+   "name": "lake_inlet/s1/miss",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3346
+    ],
+    [
+     3346,
+     8187
+    ],
+    [
+     8401,
+     11721
+    ]
+   ],
+   "name": "lake_inlet/s1/short",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1.5,
+     3000
+    ],
+    [
+     3346,
+     8187
+    ],
+    [
+     8401,
+     11721
+    ],
+    [
+     11758,
+     15021
+    ]
+   ],
+   "name": "lake_inlet/s1/float",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     10,
+     4000
+    ],
+    [
+     3346,
+     8187
+    ],
+    [
+     8401,
+     11721
+    ],
+    [
+     11758,
+     15021
+    ]
+   ],
+   "name": "lake_inlet/s1/aim_early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5618
+    ],
+    [
+     5917,
+     9958
+    ],
+    [
+     10751,
+     15308
+    ],
+    [
+     15637,
+     20569
+    ]
+   ],
+   "name": "lake_inlet/s2/perfect",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": 1000
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     6023
+    ],
+    [
+     5917,
+     10363
+    ],
+    [
+     10751,
+     15713
+    ],
+    [
+     15637,
+     20974
+    ]
+   ],
+   "name": "lake_inlet/s2/late",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     1762
+    ],
+    [
+     5917,
+     6217
+    ],
+    [
+     10751,
+     11051
+    ],
+    [
+     15637,
+     15937
+    ]
+   ],
+   "name": "lake_inlet/s2/early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": 0
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5218
+    ],
+    [
+     5917,
+     9558
+    ],
+    [
+     10751,
+     14908
+    ],
+    [
+     15637,
+     20169
+    ]
+   ],
+   "name": "lake_inlet/s2/edge",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": 640
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     null
+    ],
+    [
+     5917,
+     null
+    ],
+    [
+     10751,
+     null
+    ],
+    [
+     15637,
+     null
+    ]
+   ],
+   "name": "lake_inlet/s2/miss",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5618
+    ],
+    [
+     5917,
+     9958
+    ],
+    [
+     10751,
+     15308
+    ]
+   ],
+   "name": "lake_inlet/s2/short",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1.5,
+     3000
+    ],
+    [
+     5917,
+     9958
+    ],
+    [
+     10751,
+     15308
+    ],
+    [
+     15637,
+     20569
+    ]
+   ],
+   "name": "lake_inlet/s2/float",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     10,
+     4000
+    ],
+    [
+     5917,
+     9958
+    ],
+    [
+     10751,
+     15308
+    ],
+    [
+     15637,
+     20569
+    ]
+   ],
+   "name": "lake_inlet/s2/aim_early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     }
+    ],
+    "window": 800
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3296
+    ],
+    [
+     3344,
+     8135
+    ],
+    [
+     8401,
+     11671
+    ],
+    [
+     11758,
+     14971
+    ],
+    [
+     15663,
+     19566
+    ]
+   ],
+   "name": "river_bend/s1/perfect",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": 1000
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3651
+    ],
+    [
+     3344,
+     8490
+    ],
+    [
+     8401,
+     12026
+    ],
+    [
+     11758,
+     15326
+    ],
+    [
+     15663,
+     19921
+    ]
+   ],
+   "name": "river_bend/s1/late",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     1301
+    ],
+    [
+     3344,
+     3644
+    ],
+    [
+     8401,
+     8701
+    ],
+    [
+     11758,
+     12058
+    ],
+    [
+     15663,
+     15963
+    ]
+   ],
+   "name": "river_bend/s1/early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": 0
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     2946
+    ],
+    [
+     3344,
+     7785
+    ],
+    [
+     8401,
+     11321
+    ],
+    [
+     11758,
+     14621
+    ],
+    [
+     15663,
+     19216
+    ]
+   ],
+   "name": "river_bend/s1/edge",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": 640
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     null
+    ],
+    [
+     3344,
+     null
+    ],
+    [
+     8401,
+     null
+    ],
+    [
+     11758,
+     null
+    ],
+    [
+     15663,
+     null
+    ]
+   ],
+   "name": "river_bend/s1/miss",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1001,
+     3296
+    ],
+    [
+     3344,
+     8135
+    ],
+    [
+     8401,
+     11671
+    ],
+    [
+     11758,
+     14971
+    ]
+   ],
+   "name": "river_bend/s1/short",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1.5,
+     3000
+    ],
+    [
+     3344,
+     8135
+    ],
+    [
+     8401,
+     11671
+    ],
+    [
+     11758,
+     14971
+    ],
+    [
+     15663,
+     19566
+    ]
+   ],
+   "name": "river_bend/s1/float",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     10,
+     4000
+    ],
+    [
+     3344,
+     8135
+    ],
+    [
+     8401,
+     11671
+    ],
+    [
+     11758,
+     14971
+    ],
+    [
+     15663,
+     19566
+    ]
+   ],
+   "name": "river_bend/s1/aim_early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1039,
+      "wait": 1795,
+      "zone": 554
+     },
+     {
+      "phase": 520,
+      "wait": 4291,
+      "zone": 835
+     },
+     {
+      "phase": 1366,
+      "wait": 2770,
+      "zone": 213
+     },
+     {
+      "phase": 605,
+      "wait": 2713,
+      "zone": 541
+     },
+     {
+      "phase": 1003,
+      "wait": 3403,
+      "zone": 837
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5568
+    ],
+    [
+     5917,
+     9908
+    ],
+    [
+     9934,
+     14441
+    ],
+    [
+     14727,
+     19609
+    ],
+    [
+     19942,
+     22417
+    ]
+   ],
+   "name": "river_bend/s2/perfect",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": 1000
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5923
+    ],
+    [
+     5917,
+     10263
+    ],
+    [
+     9934,
+     14796
+    ],
+    [
+     14727,
+     19964
+    ],
+    [
+     19942,
+     22772
+    ]
+   ],
+   "name": "river_bend/s2/late",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     1762
+    ],
+    [
+     5917,
+     6217
+    ],
+    [
+     9934,
+     10234
+    ],
+    [
+     14727,
+     15027
+    ],
+    [
+     19942,
+     20242
+    ]
+   ],
+   "name": "river_bend/s2/early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": 0
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5218
+    ],
+    [
+     5917,
+     9558
+    ],
+    [
+     9934,
+     14091
+    ],
+    [
+     14727,
+     19259
+    ],
+    [
+     19942,
+     22067
+    ]
+   ],
+   "name": "river_bend/s2/edge",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": 640
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     null
+    ],
+    [
+     5917,
+     null
+    ],
+    [
+     9934,
+     null
+    ],
+    [
+     14727,
+     null
+    ],
+    [
+     19942,
+     null
+    ]
+   ],
+   "name": "river_bend/s2/miss",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1462,
+     5568
+    ],
+    [
+     5917,
+     9908
+    ],
+    [
+     9934,
+     14441
+    ],
+    [
+     14727,
+     19609
+    ]
+   ],
+   "name": "river_bend/s2/short",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     1.5,
+     3000
+    ],
+    [
+     5917,
+     9908
+    ],
+    [
+     9934,
+     14441
+    ],
+    [
+     14727,
+     19609
+    ],
+    [
+     19942,
+     22417
+    ]
+   ],
+   "name": "river_bend/s2/float",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "fish",
+   "log": [
+    [
+     10,
+     4000
+    ],
+    [
+     5917,
+     9908
+    ],
+    [
+     9934,
+     14441
+    ],
+    [
+     14727,
+     19609
+    ],
+    [
+     19942,
+     22417
+    ]
+   ],
+   "name": "river_bend/s2/aim_early",
+   "plan": {
+    "casts": [
+     {
+      "phase": 1577,
+      "wait": 3606,
+      "zone": 196
+     },
+     {
+      "phase": 739,
+      "wait": 3491,
+      "zone": 325
+     },
+     {
+      "phase": 54,
+      "wait": 4007,
+      "zone": 489
+     },
+     {
+      "phase": 14,
+      "wait": 4382,
+      "zone": 431
+     },
+     {
+      "phase": 257,
+      "wait": 1975,
+      "zone": 746
+     }
+    ],
+    "window": 700
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRR",
+   "name": "timber_path/s1/golden",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "timber_path/s1/empty",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UUURUL",
+   "name": "timber_path/s1/half",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 545
+  },
+  {
+   "kind": "forage",
+   "log": "RRRLUUULLURU",
+   "name": "timber_path/s1/best",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 636
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "timber_path/s1/off",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRU",
+   "name": "timber_path/s1/long",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "timber_path/s1/bad",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "wood",
+     "1": "wood",
+     "12": "wood",
+     "13": "wood",
+     "14": "wood",
+     "15": "wood",
+     "18": "wood",
+     "2": "wood",
+     "20": "wood",
+     "24": "wood",
+     "4": "wood",
+     "5": "wood",
+     "6": "wood",
+     "7": "wood"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRL",
+   "name": "timber_path/s2/golden",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "timber_path/s2/empty",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRD",
+   "name": "timber_path/s2/half",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 666
+  },
+  {
+   "kind": "forage",
+   "log": "RRRLLUUURUUR",
+   "name": "timber_path/s2/best",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "timber_path/s2/off",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLU",
+   "name": "timber_path/s2/long",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "timber_path/s2/bad",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "wood",
+     "19": "wood",
+     "2": "wood",
+     "24": "wood",
+     "25": "wood",
+     "3": "wood",
+     "30": "wood",
+     "31": "wood",
+     "32": "wood"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURU",
+   "name": "timber_path/s3/golden",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "timber_path/s3/empty",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULU",
+   "name": "timber_path/s3/half",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 666
+  },
+  {
+   "kind": "forage",
+   "log": "RRRURLLUUUUL",
+   "name": "timber_path/s3/best",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "timber_path/s3/off",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURUU",
+   "name": "timber_path/s3/long",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "timber_path/s3/bad",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "wood",
+     "12": "wood",
+     "2": "wood",
+     "20": "wood",
+     "26": "wood",
+     "28": "wood",
+     "31": "wood",
+     "32": "wood",
+     "8": "wood"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRR",
+   "name": "mushroom_wood/s1/golden",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "mushroom_wood/s1/empty",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UUURUL",
+   "name": "mushroom_wood/s1/half",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 545
+  },
+  {
+   "kind": "forage",
+   "log": "RRRLUUULLURU",
+   "name": "mushroom_wood/s1/best",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": 636
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "mushroom_wood/s1/off",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRU",
+   "name": "mushroom_wood/s1/long",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "mushroom_wood/s1/bad",
+   "plan": {
+    "budget": 12,
+    "gold": 11,
+    "h": 6,
+    "items": {
+     "0": "mushroom",
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "13": "mushroom",
+     "14": "chanterelle",
+     "15": "mushroom",
+     "18": "chanterelle",
+     "2": "chanterelle",
+     "20": "mushroom",
+     "24": "mushroom",
+     "4": "chanterelle",
+     "5": "mushroom",
+     "6": "mushroom",
+     "7": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     23,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRL",
+   "name": "mushroom_wood/s2/golden",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "mushroom_wood/s2/empty",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRD",
+   "name": "mushroom_wood/s2/half",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 666
+  },
+  {
+   "kind": "forage",
+   "log": "RRRLLUUURUUR",
+   "name": "mushroom_wood/s2/best",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "mushroom_wood/s2/off",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLU",
+   "name": "mushroom_wood/s2/long",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "mushroom_wood/s2/bad",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "17": "mushroom",
+     "19": "mushroom",
+     "2": "chanterelle",
+     "24": "mushroom",
+     "25": "chanterelle",
+     "3": "chanterelle",
+     "30": "mushroom",
+     "31": "chanterelle",
+     "32": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     4,
+     7,
+     20
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURU",
+   "name": "mushroom_wood/s3/golden",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "mushroom_wood/s3/empty",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULU",
+   "name": "mushroom_wood/s3/half",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 666
+  },
+  {
+   "kind": "forage",
+   "log": "RRRURLLUUUUL",
+   "name": "mushroom_wood/s3/best",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "mushroom_wood/s3/off",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURUU",
+   "name": "mushroom_wood/s3/long",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "mushroom_wood/s3/bad",
+   "plan": {
+    "budget": 12,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "12": "chanterelle",
+     "2": "mushroom",
+     "20": "mushroom",
+     "26": "mushroom",
+     "28": "chanterelle",
+     "31": "mushroom",
+     "32": "mushroom",
+     "8": "chanterelle"
+    },
+    "start": 30,
+    "traps": [
+     9,
+     17,
+     34
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRDD",
+   "name": "herb_meadow/s1/golden",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "herb_meadow/s1/empty",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULU",
+   "name": "herb_meadow/s1/half",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": 538
+  },
+  {
+   "kind": "forage",
+   "log": "RRRLULLURULU",
+   "name": "herb_meadow/s1/best",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": 615
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "herb_meadow/s1/off",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRDDU",
+   "name": "herb_meadow/s1/long",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "herb_meadow/s1/bad",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "wildberry",
+     "1": "wildberry",
+     "11": "herbs",
+     "12": "herbs",
+     "13": "herbs",
+     "17": "wildberry",
+     "18": "wildberry",
+     "19": "herbs",
+     "24": "wildberry",
+     "25": "herbs",
+     "26": "herbs",
+     "3": "wildberry",
+     "4": "herbs",
+     "5": "herbs",
+     "6": "herbs",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [
+     8,
+     14,
+     32
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLUR",
+   "name": "herb_meadow/s2/golden",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "herb_meadow/s2/empty",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDL",
+   "name": "herb_meadow/s2/half",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRLRLLULULL",
+   "name": "herb_meadow/s2/best",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "herb_meadow/s2/off",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLURU",
+   "name": "herb_meadow/s2/long",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "herb_meadow/s2/bad",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "11": "wildberry",
+     "18": "herbs",
+     "19": "wildberry",
+     "20": "wildberry",
+     "26": "herbs",
+     "27": "wildberry",
+     "30": "wildberry",
+     "31": "herbs",
+     "32": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     4,
+     17
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURURD",
+   "name": "herb_meadow/s3/golden",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "herb_meadow/s3/empty",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULUL",
+   "name": "herb_meadow/s3/half",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": 428
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRLLULULUUU",
+   "name": "herb_meadow/s3/best",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": 714
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "herb_meadow/s3/off",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURURDU",
+   "name": "herb_meadow/s3/long",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "herb_meadow/s3/bad",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "10": "wildberry",
+     "18": "wildberry",
+     "2": "wildberry",
+     "26": "herbs",
+     "27": "herbs",
+     "31": "herbs",
+     "4": "wildberry",
+     "7": "wildberry"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     15,
+     25
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRDDLL",
+   "name": "old_grove/s1/golden",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "old_grove/s1/empty",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULUR",
+   "name": "old_grove/s1/half",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": 466
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRLLLULLUURUL",
+   "name": "old_grove/s1/best",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": 466
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "old_grove/s1/off",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRDDLLU",
+   "name": "old_grove/s1/long",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "old_grove/s1/bad",
+   "plan": {
+    "budget": 16,
+    "gold": 15,
+    "h": 6,
+    "items": {
+     "0": "hazelnut",
+     "11": "hazelnut",
+     "12": "mushroom",
+     "13": "hazelnut",
+     "15": "blackberry",
+     "16": "hazelnut",
+     "17": "blackberry",
+     "18": "hazelnut",
+     "2": "blackberry",
+     "20": "hazelnut",
+     "24": "hazelnut",
+     "26": "hazelnut",
+     "3": "mushroom",
+     "4": "blackberry",
+     "5": "mushroom",
+     "6": "hazelnut",
+     "7": "mushroom",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     10,
+     21,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLURUU",
+   "name": "old_grove/s2/golden",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": 857
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "old_grove/s2/empty",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLU",
+   "name": "old_grove/s2/half",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": 714
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRLRLLLULLUUR",
+   "name": "old_grove/s2/best",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "old_grove/s2/off",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLURUUU",
+   "name": "old_grove/s2/long",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "old_grove/s2/bad",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "10": "mushroom",
+     "12": "mushroom",
+     "13": "mushroom",
+     "18": "hazelnut",
+     "25": "blackberry",
+     "26": "blackberry",
+     "30": "hazelnut",
+     "31": "blackberry",
+     "32": "hazelnut",
+     "33": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     3,
+     5,
+     7
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURURDDL",
+   "name": "old_grove/s3/golden",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "old_grove/s3/empty",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULL",
+   "name": "old_grove/s3/half",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": 428
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRLLLLUUUULUR",
+   "name": "old_grove/s3/best",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": 857
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "old_grove/s3/off",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURURDDLU",
+   "name": "old_grove/s3/long",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "old_grove/s3/bad",
+   "plan": {
+    "budget": 16,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "0": "blackberry",
+     "1": "hazelnut",
+     "14": "hazelnut",
+     "16": "blackberry",
+     "19": "mushroom",
+     "27": "hazelnut",
+     "33": "blackberry",
+     "6": "mushroom",
+     "7": "hazelnut",
+     "9": "mushroom"
+    },
+    "start": 30,
+    "traps": [
+     5,
+     15,
+     29
+    ],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRDD",
+   "name": "night_glade/s1/golden",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "night_glade/s1/empty",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULU",
+   "name": "night_glade/s1/half",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 538
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRUUUUULLLL",
+   "name": "night_glade/s1/best",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 538
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "night_glade/s1/off",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UUURULURRRRRDDU",
+   "name": "night_glade/s1/long",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "night_glade/s1/bad",
+   "plan": {
+    "budget": 14,
+    "gold": 13,
+    "h": 6,
+    "items": {
+     "0": "herbs",
+     "1": "herbs",
+     "11": "chanterelle",
+     "12": "chanterelle",
+     "13": "chanterelle",
+     "17": "herbs",
+     "18": "herbs",
+     "20": "chanterelle",
+     "21": "herbs",
+     "24": "herbs",
+     "3": "herbs",
+     "35": "herbs",
+     "4": "chanterelle",
+     "5": "chanterelle",
+     "6": "chanterelle",
+     "7": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLUR",
+   "name": "night_glade/s2/golden",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "night_glade/s2/empty",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDL",
+   "name": "night_glade/s2/half",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRLRLLLULUL",
+   "name": "night_glade/s2/best",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 833
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "night_glade/s2/off",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UURDRDLUDLRLURU",
+   "name": "night_glade/s2/long",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "night_glade/s2/bad",
+   "plan": {
+    "budget": 14,
+    "gold": 6,
+    "h": 6,
+    "items": {
+     "0": "chanterelle",
+     "18": "chanterelle",
+     "19": "herbs",
+     "2": "herbs",
+     "26": "chanterelle",
+     "30": "herbs",
+     "31": "chanterelle",
+     "32": "herbs",
+     "5": "chanterelle"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURURD",
+   "name": "night_glade/s3/golden",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 1000
+  },
+  {
+   "kind": "forage",
+   "log": "",
+   "name": "night_glade/s3/empty",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 0
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULUL",
+   "name": "night_glade/s3/half",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 428
+  },
+  {
+   "kind": "forage",
+   "log": "RRRRRUULLDLLLU",
+   "name": "night_glade/s3/best",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": 857
+  },
+  {
+   "kind": "forage",
+   "log": "DD",
+   "name": "night_glade/s3/off",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "RRRULULLUURURDU",
+   "name": "night_glade/s3/long",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  },
+  {
+   "kind": "forage",
+   "log": "UX",
+   "name": "night_glade/s3/bad",
+   "plan": {
+    "budget": 14,
+    "gold": 7,
+    "h": 6,
+    "items": {
+     "1": "chanterelle",
+     "18": "herbs",
+     "2": "herbs",
+     "23": "herbs",
+     "24": "herbs",
+     "26": "chanterelle",
+     "27": "chanterelle",
+     "3": "chanterelle",
+     "31": "chanterelle",
+     "7": "herbs"
+    },
+    "start": 30,
+    "traps": [],
+    "w": 6
+   },
+   "score": null
+  }
+ ],
+ "outputs": [
+  {
+   "base": {
+    "x": 1
+   },
+   "out": {
+    "x": 1
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 2
+   },
+   "out": {
+    "x": 2
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 3
+   },
+   "out": {
+    "x": 3
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 4
+   },
+   "out": {
+    "x": 4
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 5
+   },
+   "out": {
+    "x": 5
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 6
+   },
+   "out": {
+    "x": 6
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 8
+   },
+   "out": {
+    "x": 8
+   },
+   "q": 1000
+  },
+  {
+   "base": {
+    "x": 1
+   },
+   "out": {
+    "x": 1
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 2
+   },
+   "out": {
+    "x": 2
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 3
+   },
+   "out": {
+    "x": 3
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 4
+   },
+   "out": {
+    "x": 4
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 5
+   },
+   "out": {
+    "x": 5
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 6
+   },
+   "out": {
+    "x": 6
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 8
+   },
+   "out": {
+    "x": 8
+   },
+   "q": 1060
+  },
+  {
+   "base": {
+    "x": 1
+   },
+   "out": {
+    "x": 1
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 2
+   },
+   "out": {
+    "x": 2
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 3
+   },
+   "out": {
+    "x": 3
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 4
+   },
+   "out": {
+    "x": 5
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 5
+   },
+   "out": {
+    "x": 6
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 6
+   },
+   "out": {
+    "x": 7
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 8
+   },
+   "out": {
+    "x": 9
+   },
+   "q": 1125
+  },
+  {
+   "base": {
+    "x": 1
+   },
+   "out": {
+    "x": 1
+   },
+   "q": 1250
+  },
+  {
+   "base": {
+    "x": 2
+   },
+   "out": {
+    "x": 3
+   },
+   "q": 1250
+  },
+  {
+   "base": {
+    "x": 3
+   },
+   "out": {
+    "x": 4
+   },
+   "q": 1250
+  },
+  {
+   "base": {
+    "x": 4
+   },
+   "out": {
+    "x": 5
+   },
+   "q": 1250
+  },
+  {
+   "base": {
+    "x": 5
+   },
+   "out": {
+    "x": 6
+   },
+   "q": 1250
+  },
+  {
+   "base": {
+    "x": 6
+   },
+   "out": {
+    "x": 8
+   },
+   "q": 1250
+  },
+  {
+   "base": {
+    "x": 8
+   },
+   "out": {
+    "x": 10
+   },
+   "q": 1250
+  }
+ ],
+ "rules": {
+  "acc_span": 300,
+  "bonus": 250,
+  "budget": {
+   "berry_edge": 12,
+   "herb_meadow": 14,
+   "mushroom_wood": 12,
+   "night_glade": 14,
+   "old_grove": 16,
+   "timber_path": 12
+  },
+  "casts": {
+   "lake_inlet": 4,
+   "pond_bank": 3,
+   "river_bend": 5
+  },
+  "dead_zone": 60,
+  "first_aim_ms": 500,
+  "grid": 6,
+  "mark_period": 1600,
+  "react": 150,
+  "step_cs": 20,
+  "trap_cost": 2,
+  "ttl": 900,
+  "window": {
+   "lake_inlet": 800,
+   "pond_bank": 900,
+   "river_bend": 700
+  }
+ }
+}

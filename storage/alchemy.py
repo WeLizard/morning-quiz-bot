@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -18,6 +19,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Optional
 from zoneinfo import ZoneInfo
+from domain.alchemy_journey import catalog_revision, expedition_stages
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -58,6 +60,8 @@ class AlchemyCatalog:
     recipes: dict[str, tuple[str, str, str]]
     chapters: tuple[tuple[str, frozenset[str]], ...]
     achievements: tuple[dict[str, Any], ...]
+    revision: str
+    stages: dict
 
     def recipe(self, ingredient_a: str, ingredient_b: str):
         key = '+'.join(sorted((ingredient_a, ingredient_b)))
@@ -166,7 +170,7 @@ def _load_catalog(path: Path) -> AlchemyCatalog:
     if not elements or not chapters:
         raise RuntimeError(f'Каталог «Алхимии» неполон: {path}')
     return AlchemyCatalog(frozenset(elements), frozenset(recipes), recipe_map,
-                          chapters, tuple(achievements))
+                          chapters, tuple(achievements), catalog_revision(raw), expedition_stages(raw))
 
 
 def _records(value: Any) -> list[dict[str, Any]]:
@@ -202,6 +206,14 @@ class AlchemyService:
     def __init__(self, database: Database):
         self.database = database
 
+    @asynccontextmanager
+    async def _transaction(self, session=None):
+        if session is not None:
+            yield session
+        else:
+            async with self.database.transaction() as owned:
+                yield owned
+
     async def sync(
         self,
         user_id: int,
@@ -210,6 +222,7 @@ class AlchemyService:
         crafted: Iterable[str] = (),
         attempts: int = 0,
         now: Optional[datetime] = None,
+        _session=None,
     ) -> dict[str, Any]:
         """Импортировать офлайн-сводку без подтверждения рейтинговых наград.
 
@@ -223,7 +236,7 @@ class AlchemyService:
         incoming_recipes = catalog.known_recipes(crafted)
         tried = _count(attempts)
 
-        async with self.database.transaction() as session:
+        async with self._transaction(_session) as session:
             row = await self._locked_progress(session, user_id)
             stored_elements = _stored(row.discovered)
             stored_recipes = _stored(row.crafted)
@@ -247,6 +260,7 @@ class AlchemyService:
             points_today = row.points_today if row.points_day == day else Decimal('0')
 
             result = {
+                **await self._journey_projection(session, row.account_id),
                 'awarded': 0.0,
                 'reward_eligible': False,
                 'points_today': float(points_today),
@@ -256,6 +270,8 @@ class AlchemyService:
                 'discovered': list(row.discovered),
                 'verified_discovered': list(row.verified_discovered),
                 'verified_crafted': list(row.verified_crafted),
+                'crafted': list(row.crafted),
+                'attempts': row.attempts,
                 'chapters': list(row.chapters),
                 'achievements': list(row.achievements),
             }
@@ -265,6 +281,7 @@ class AlchemyService:
         self, user_id: int, *, command_id: str,
         ingredient_a: str, ingredient_b: str,
         now: Optional[datetime] = None,
+        _session=None, _account_id=None,
     ) -> dict[str, Any]:
         """Validate one recipe server-side and award only newly verified progress."""
         if not isinstance(command_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{8,64}', command_id):
@@ -281,8 +298,9 @@ class AlchemyService:
         ingredient_a, ingredient_b = sorted((ingredient_a, ingredient_b))
         result_element = recipe[2]
 
-        async with self.database.transaction() as session:
-            row = await self._locked_progress(session, user_id)
+        async with self._transaction(_session) as session:
+            row = (await self._locked_progress(session, user_id) if _account_id is None
+                   else await self._locked_account_progress(session, _account_id))
             inserted = await session.scalar(pg_insert(AlchemyCraftCommand).values(
                 id=command_id, account_id=row.account_id,
                 ingredient_a=ingredient_a, ingredient_b=ingredient_b,
@@ -292,16 +310,6 @@ class AlchemyService:
             if not inserted:
                 existing = await session.scalar(select(AlchemyCraftCommand).where(
                     AlchemyCraftCommand.id == command_id).with_for_update())
-                if existing is None:
-                    existing = await session.scalar(select(AlchemyCraftCommand).where(
-                        AlchemyCraftCommand.account_id == row.account_id,
-                        AlchemyCraftCommand.ingredient_a == ingredient_a,
-                        AlchemyCraftCommand.ingredient_b == ingredient_b,
-                    ).with_for_update())
-                    if existing is not None and existing.result:
-                        replay = dict(existing.result)
-                        replay['awarded'] = 0.0
-                        return replay
                 if (existing is None or existing.account_id != row.account_id
                         or existing.ingredient_a != ingredient_a
                         or existing.ingredient_b != ingredient_b):
@@ -334,12 +342,15 @@ class AlchemyService:
                 ) - achievements
                 # A legacy grant may already exist. Only a newly inserted grant can
                 # contribute achievement points, preventing a second payout.
-                newly_granted = await self._grant(session, user_id, earned)
+                newly_granted = (await self._grant(session, user_id, earned)
+                                 if user_id is not None else 0)
                 requested = (
                     POINTS_PER_ELEMENT * len(verified_elements - previous_elements)
                     + POINTS_PER_CHAPTER * len(new_chapters)
                     + POINTS_PER_ACHIEVEMENT * newly_granted
                 )
+                if user_id is None:
+                    requested = Decimal('0')
                 if row.points_day != day:
                     row.points_day = day
                     row.points_today = Decimal('0')
@@ -371,6 +382,9 @@ class AlchemyService:
 
             points_today = row.points_today if row.points_day == day else Decimal('0')
             response = {
+                **await self._journey_projection(session, row.account_id),
+                'crafted': list(row.crafted),
+                'attempts': row.attempts,
                 'result': result_element,
                 'recipe': key,
                 'verified': verified,
@@ -386,28 +400,36 @@ class AlchemyService:
             receipt.result = response
         return response
 
-    async def progress(self, user_id: int, *, now: Optional[datetime] = None) -> dict[str, Any]:
+    async def progress(self, user_id: int, *, now: Optional[datetime] = None, _session=None) -> dict[str, Any]:
         """Сводка игрока: место, очки за всё время и дневная цель."""
         rank_expression = _discovered_rank_expression()
         today = _moscow_day(_resolve_now(now))
-        async with self.database.transaction() as session:
-            row = await session.scalar(select(AlchemyProgress).where(AlchemyProgress.user_id == user_id))
+        async with self._transaction(_session) as session:
+            user = await session.get(User, user_id)
+            owner = (AlchemyProgress.account_id == user.account_id
+                     if user is not None and user.account_id is not None
+                     else AlchemyProgress.user_id == user_id)
+            row = await session.scalar(select(AlchemyProgress).where(owner))
             discovered = len(_stored(row.discovered)) if row else 0
             verified_discovered = len(_stored(row.verified_discovered)) if row else len(BASE_ELEMENTS)
             total_players = await session.scalar(
-                select(func.count()).select_from(AlchemyProgress).where(AlchemyProgress.user_id.is_not(None))
+                select(func.count()).select_from(AlchemyProgress)
+                .join(User, User.account_id == AlchemyProgress.account_id)
             ) or 0
             if row is None:
                 # Игрок без строки прогресса всё равно участник: место не выше числа игроков.
                 total_players += 1
             ahead = await session.scalar(
                 select(func.count()).select_from(AlchemyProgress)
-                .where(rank_expression > (len(_stored(row.verified_discovered)) if row else len(BASE_ELEMENTS)),
-                       AlchemyProgress.user_id.is_not(None))
+                .join(User, User.account_id == AlchemyProgress.account_id)
+                .where(rank_expression > (len(_stored(row.verified_discovered)) if row else len(BASE_ELEMENTS)))
             ) or 0
             # Счётчик дня обнуляется сам: очки прошлых суток к цели не относятся.
             points_today = float(row.points_today) if row and row.points_day == today else 0.0
             return {
+                **await self._journey_projection(session, user.account_id if user else None),
+                'verified_discovered_ids': list(row.verified_discovered) if row else sorted(BASE_ELEMENTS),
+                'verified_crafted': list(row.verified_crafted) if row else [],
                 'discovered': discovered,
                 'verified_discovered': verified_discovered,
                 'reward_eligible': False,
@@ -441,9 +463,9 @@ class AlchemyService:
         if not limit:
             return {'items': []}
         statement = (
-            select(AlchemyProgress.user_id, AlchemyProgress.verified_discovered, User.display_name)
-            .join(User, User.id == AlchemyProgress.user_id)
-            .order_by(_discovered_rank_expression().desc(), AlchemyProgress.user_id)
+            select(User.id, AlchemyProgress.verified_discovered, User.display_name)
+            .join(User, User.account_id == AlchemyProgress.account_id)
+            .order_by(_discovered_rank_expression().desc(), User.id)
             .limit(limit)
             .offset(offset)
         )
@@ -471,12 +493,23 @@ class AlchemyService:
             session.add(account)
             await session.flush()
             user.account_id = account.id
+            # Session autoflush is disabled; the account resolver below reads
+            # the canonical User mapping from SQL in this same transaction.
+            await session.flush()
         return await self._locked_account_progress(session, user.account_id, user_id=user_id)
 
     async def _locked_account_progress(self, session, account_id, *, user_id=None):
+        # Account owns progress in both channels. A linked browser session still
+        # calls craft with user_id=None and cannot earn Telegram rating points.
+        owner_user_id = await session.scalar(select(User.id).where(User.account_id == account_id))
+        if user_id is not None and owner_user_id != user_id:
+            raise MiniAppError(409, 'Владелец прогресса не совпадает; требуется явная привязка')
         statement = select(AlchemyProgress).where(
             AlchemyProgress.account_id == account_id).with_for_update()
         await session.execute(pg_insert(AlchemyProgress).values(
+            # Guest holds Account before progress; acquiring a User FK lock here
+            # would invert linking's User -> Account order. Telegram callers
+            # already hold User and may fill the transitional mapping safely.
             account_id=account_id, user_id=user_id, discovered=[], crafted=[],
             verified_discovered=sorted(BASE_ELEMENTS), verified_crafted=[],
             verified_chapters=[], verified_achievements=[], chapters=[],
@@ -484,14 +517,19 @@ class AlchemyService:
             points_today=Decimal('0'), points_day=None,
         ).on_conflict_do_nothing(index_elements=[AlchemyProgress.account_id]))
         row = await session.scalar(statement)
-        if row.user_id != user_id:
+        if row.user_id is None and user_id is not None:
+            row.user_id = user_id
+        if row.user_id is not None and row.user_id != owner_user_id:
             raise MiniAppError(409, 'Владелец прогресса не совпадает; требуется явная привязка')
         return row
 
     @staticmethod
-    def _guest_projection(row):
+    async def _guest_projection(session, account_id, row):
         # Imported offline discoveries are saved, never evidence for rated rewards.
-        return {'awarded': 0, 'discovered': list(row.discovered) if row else [],
+        return {**await AlchemyService._journey_projection(session, account_id),
+                'verified_discovered': list(row.verified_discovered) if row else sorted(BASE_ELEMENTS),
+                'verified_crafted': list(row.verified_crafted) if row else [],
+                'awarded': 0, 'discovered': list(row.discovered) if row else [],
                 'crafted': list(row.crafted) if row else [], 'attempts': row.attempts if row else 0,
                 'chapters': list(row.chapters) if row else [],
                 'achievements': list(row.achievements) if row else [],
@@ -501,21 +539,17 @@ class AlchemyService:
     async def guest_progress(self, credential, *, now=None):
         moment = _resolve_now(now)
         auth = GuestAccounts(self.database, clock=lambda: moment.timestamp())
-        async with self.database.transaction() as session:
-            account, _ = await auth._authorized(session, credential, lock=True)
+        async with auth.authorized(credential, lock=True) as (session, account, _):
             row = await session.get(AlchemyProgress, account.id)
-            if row is not None and row.user_id is not None:
-                raise MiniAppError(409, 'Для этого прогресса требуется подтверждённый вход')
-            return self._guest_projection(row)
+            return await self._guest_projection(session, account.id, row)
 
     async def guest_sync(self, credential, *, expected_account_id, discovered=(), crafted=(), attempts=0, now=None):
         moment = _resolve_now(now)
         catalog = load_catalog()
         auth = GuestAccounts(self.database, clock=lambda: moment.timestamp())
-        async with self.database.transaction() as session:
-            account, _ = await auth._authorized(session, credential, lock=True)
+        async with auth.authorized(credential, lock=True) as (session, account, _):
             if str(account.id) != expected_account_id:
-                raise MiniAppError(409, 'Гостевой профиль изменился. Открой игру заново.')
+                raise MiniAppError(409, 'Гостевой профиль изменился. Открой игру заново.', code='profile_changed')
             row = await self._locked_account_progress(session, account.id)
             opened = _stored(row.discovered) | catalog.known_elements(discovered)
             recipes = _stored(row.crafted) | catalog.known_recipes(crafted)
@@ -525,7 +559,31 @@ class AlchemyService:
             row.achievements = sorted(_stored(row.achievements) |
                 catalog.earned_achievements(opened, recipes, row.attempts))
             row.updated_at = moment
-            return self._guest_projection(row)
+            return await self._guest_projection(session, account.id, row)
+
+    @staticmethod
+    async def _journey_projection(session, account_id):
+        from application.alchemy_journey import journey_projection
+        return await journey_projection(session, account_id)
+
+    async def guest_craft(self, credential, *, expected_account_id, command_id,
+                          ingredient_a, ingredient_b, now=None):
+        moment = _resolve_now(now)
+        auth = GuestAccounts(self.database, clock=lambda: moment.timestamp())
+        async with auth.authorized(credential, lock=True) as (session, account, _):
+            if str(account.id) != expected_account_id:
+                raise MiniAppError(409, 'Гостевой профиль изменился. Открой игру заново.', code='profile_changed')
+            return await self.craft(None, command_id=command_id, ingredient_a=ingredient_a,
+                ingredient_b=ingredient_b, now=moment, _session=session, _account_id=account.id)
+
+    async def guest_claim_stage(self, credential, *, expected_account_id, **command):
+        from application.alchemy_journey import AlchemyJourneyService
+        auth = GuestAccounts(self.database)
+        async with auth.authorized(credential, lock=True) as (session, account, _):
+            if str(account.id) != expected_account_id:
+                raise MiniAppError(409, 'Гостевой профиль изменился. Открой игру заново.', code='profile_changed')
+            return await AlchemyJourneyService(self.database, session).claim_stage(
+                account_id=account.id, **command)
 
     @staticmethod
     async def _grant(session: AsyncSession, user_id: int, achievement_ids: Iterable[str]) -> int:

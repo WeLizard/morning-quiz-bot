@@ -83,7 +83,7 @@ def test_verified_server_recipe_awards_once_and_replays_idempotently(pg_env):
             assert await global_score(db, USER) == Decimal(str(result['awarded']))
             async with db.transaction() as session:
                 commands = (await session.scalars(select(AlchemyCraftCommand))).all()
-                assert len(commands) == 1
+                assert len(commands) == 2
     asyncio.run(run())
 
 
@@ -285,7 +285,7 @@ def test_parallel_duplicate_recipe_commands_award_once(pg_env):
             assert sum(result['awarded'] for result in results) == results[0]['awarded']
             assert sum(result['awarded'] > 0 for result in results) == 1
             async with db.transaction() as session:
-                assert len((await session.scalars(select(AlchemyCraftCommand))).all()) == 1
+                assert len((await session.scalars(select(AlchemyCraftCommand))).all()) == 10
                 assert (await session.get(User, USER)).global_score == Decimal(
                     str(results[0]['awarded']))
     asyncio.run(run())

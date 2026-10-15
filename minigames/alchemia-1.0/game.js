@@ -6,6 +6,7 @@
 (() => {
 'use strict';
 const DATA=JSON.parse(document.getElementById('gameData').textContent);
+const CATALOG_REVISION='/*__CATALOG_REVISION__*/';
 const E=new Map(DATA.elements.map(e=>[e.id,e]));
 const R=new Map(DATA.recipes.map(r=>[r.key,r]));
 const C=new Map(DATA.categories.map(c=>[c.id,c]));
@@ -30,7 +31,7 @@ const listen=(target,event,callback,opts={})=>target.addEventListener(event,call
 let serial=0;
 const uid=()=>`t${Date.now().toString(36)}_${++serial}`;
 function freshState(){return {
- format:'alchemia',version:2,release:'5.1-refined',claims:[],activeCampaign:null,updatedAt:Date.now(),discovered:[...BASE],recipeKeys:[],tried:[],favorites:[],achievements:[],history:[],attempts:0,
+ format:'alchemia',version:2,release:'5.1-refined',claims:[],serverClaims:[],expeditionPoints:0,claimReceipts:[],catalogRevision:null,activeCampaign:null,updatedAt:Date.now(),discovered:[...BASE],recipeKeys:[],tried:[],favorites:[],achievements:[],history:[],attempts:0,
  bench:BASE.map((id,i)=>({uid:uid(),id,u:i%2?.72:.28,v:i<2?.26:.76})),
  pinned:null,latest:null,settings:{sound:false,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,sort:'new',world:'origins'},created:Date.now()
 };}
@@ -64,10 +65,18 @@ function cleanSave(raw){
   if(!requested.has(step.id)||!eligible)break;
   s.claims.push(step.id);
  }
+ // Cached receipts survive collection-only restores, but imports never establish
+ // server eligibility. Only applyRemoteState can populate the live projection.
+ const stages=new Set((DATA.campaigns||[]).flatMap(c=>c.stages.map(step=>step.id)));
+ s.serverClaims=[...new Set(arr(raw.serverClaims,200).filter(id=>stages.has(id)))];
+ s.expeditionPoints=Math.max(0,Math.floor(finite(raw.expeditionPoints)));
+ s.claimReceipts=arr(raw.claimReceipts,200).filter(r=>r&&typeof r==='object'&&stages.has(r.stage_id));
+ s.catalogRevision=typeof raw.catalogRevision==='string'?raw.catalogRevision:null;
  return s;
 }
 let storageOK=true,loaded=false,migrated=0,loadWarning='',storageLocked=false;
 let state=freshState();
+let serverJourney={status:GUEST_ID?'connecting':'local',claims:[],verifiedDiscovered:[],verifiedCrafted:[],points:0};
 try{
  const saved=localStorage.getItem(STORE);
  if(saved){
@@ -100,7 +109,7 @@ function persist(){
  syncState();state.updatedAt=Date.now();
  if(storageLocked){$('saveLabel').textContent='Нужно восстановление';return;}
  try{const previous=localStorage.getItem(STORE);if(previous){try{cleanSave(JSON.parse(previous));localStorage.setItem(STORE+'.backup',previous);}catch(e){}}
- localStorage.setItem(STORE,JSON.stringify(state));storageOK=true;$('saveLabel').innerHTML='<span class="save-dot"></span>Сохранено';}
+ localStorage.setItem(STORE,JSON.stringify(state));storageOK=true;$('saveLabel').innerHTML='<span class="save-dot"></span>Сохранено локально';}
  catch(err){storageOK=false;$('saveLabel').textContent='Нет автосохранения';$('saveWarning').textContent='Браузер не разрешил автосохранение. Сохрани прогресс файлом в настройках.';$('saveWarning').classList.remove('hidden');}
 }
 function announce(text){$('liveAnnouncer').textContent=text;}
@@ -463,31 +472,31 @@ function showHelp(){
  * Costs only decrease in a finite relaxation; recursion explicitly guards cycles.
  * Every returned hint has both ingredients already in the player's collection.
  */
-function findHint(target=null){
- const cost=new Map(DATA.elements.map(e=>[e.id,found.has(e.id)?0:Infinity])),best=new Map();
+function findHint(target=null,opened=found,recipes=knownRecipes){
+ const cost=new Map(DATA.elements.map(e=>[e.id,opened.has(e.id)?0:Infinity])),best=new Map();
  for(let pass=0;pass<E.size;pass++){
   let changed=false;
   for(const r of DATA.recipes){const value=cost.get(r.a)+cost.get(r.b)+1;if(value<cost.get(r.result)){cost.set(r.result,value);best.set(r.result,r);changed=true;}}
   if(!changed)break;
  }
  const nextNeeded=(id,visited=new Set())=>{
-  if(found.has(id)||visited.has(id))return null;visited.add(id);const r=best.get(id);if(!r)return null;
-  if(found.has(r.a)&&found.has(r.b))return r;
+  if(opened.has(id)||visited.has(id))return null;visited.add(id);const r=best.get(id);if(!r)return null;
+  if(opened.has(r.a)&&opened.has(r.b))return r;
   return nextNeeded(r.a,new Set(visited))||nextNeeded(r.b,new Set(visited));
  };
- if(target&&!found.has(target)){const recipe=nextNeeded(target);if(recipe)return {recipe,target};}
- const goals=currentChapter().goals.filter(id=>!found.has(id)).sort((a,b)=>cost.get(a)-cost.get(b));
+ if(target&&!opened.has(target)){const recipe=nextNeeded(target);if(recipe)return {recipe,target};}
+ const goals=currentChapter().goals.filter(id=>!opened.has(id)).sort((a,b)=>cost.get(a)-cost.get(b));
  for(const id of goals){const recipe=nextNeeded(id);if(recipe)return {recipe,target:id};}
- const frontier=DATA.recipes.filter(r=>found.has(r.a)&&found.has(r.b)&&!found.has(r.result));
+ const frontier=DATA.recipes.filter(r=>opened.has(r.a)&&opened.has(r.b)&&!opened.has(r.result));
  if(frontier.length){const recipe=frontier[Math.floor(Math.random()*Math.min(frontier.length,14))];return {recipe,target:recipe.result};}
- const alternative=DATA.recipes.find(r=>found.has(r.a)&&found.has(r.b)&&!knownRecipes.has(r.key));
+ const alternative=DATA.recipes.find(r=>opened.has(r.a)&&opened.has(r.b)&&!recipes.has(r.key));
  return alternative?{recipe:alternative,target:alternative.result,alternative:true}:null;
 }
 function showHint(reset=false){
  if(reset||!hint||!found.has(hint.recipe.a)||!found.has(hint.recipe.b)||found.has(hint.recipe.result)&&!hint.alternative||hint.target!==state.pinned&&state.pinned){const info=findHint(state.pinned);hint=info?{...info,stage:1}:null;}
  if(!hint){openModal('Все тайны раскрыты','Великое делание завершено',emptyState('philosopher','Атлас заполнен до последней строчки','Ты открыл все элементы и все способы их получения. Можно любоваться коллекцией, продолжать эксперименты или сохранить этот мир отдельным файлом.')+`<div class="button-row" style="justify-content:center"><button class="primary" data-action="export">${icon('download')} Сохранить этот мир</button><button class="secondary" data-action="atlas">Открыть атлас</button></div>`,'hint');return;}
  const r=hint.recipe,e=E.get(r.result),stage=hint.stage;
- const goal=hint.target!==r.result?`Это шаг на пути к открытию «${name(hint.target)}».`:'Небольшое открытие, которое уже тебе по силам.';
+ const goal=hint.verified?'Повтори этот опыт онлайн: сервер подтвердит результат для печати экспедиции.':hint.target!==r.result?`Это шаг на пути к открытию «${name(hint.target)}».`:'Небольшое открытие, которое уже тебе по силам.';
  const title=stage===1?'Начни с одной знакомой вещи':stage===2?'Кажется, эти двое подружатся':hint.alternative?'Ещё один путь к знакомому':'Вот какое чудо тебя ждёт';
  const description=stage===1?`Возьми «${name(r.a)}». Второй ингредиент ${r.a===r.b?'— ещё один такой же элемент':`найдётся в категории «${C.get(E.get(r.b).category).name}»`}. Оба уже есть в твоей коллекции.`:stage===2?`Соедини «${name(r.a)}» и «${name(r.b)}». Ответ пока останется маленьким сюрпризом.`:e.description;
  const content=`<div class="hint-card">${art(stage===3?r.result:'potion')}<div class="eyebrow">Подсказка ${stage} из 3 · без ограничений</div><h3 style="margin-top:10px">${title}</h3><p>${description}</p><div class="hint-formula"><div class="hint-ingredient">${art(r.a)}<span>${name(r.a)}</span></div><span>+</span><div class="hint-ingredient">${stage>=2?art(r.b):'<div class="mystery">?</div>'}<span>${stage>=2?name(r.b):'Второй ингредиент'}</span></div>${stage===3?`<span>=</span><div class="hint-ingredient">${art(r.result)}<span>${name(r.result)}</span></div>`:''}</div><p style="font-size:10px;margin-bottom:13px">${goal}</p><div class="button-row" style="justify-content:center">${stage<3?`<button class="primary" data-action="hint-next">${stage===1?'Открыть второй ингредиент':'Показать результат'} ${icon('arrow')}</button>`:''}${stage>=2?`<button class="${stage===3?'primary':'secondary'}" data-load-recipe="${r.key}">${icon('lab')} На рабочий стол</button>`:''}<button class="text-btn" data-action="hint-other">Другая искра</button></div><div class="hint-stages">${[1,2,3].map(i=>`<span class="${i<=stage?'active':''}"></span>`).join('')}</div></div>`;
@@ -697,12 +706,35 @@ function applyRemoteState(remote){
  if(recipes)for(const key of recipes)if(!knownRecipes.has(key)){knownRecipes.add(key);recipesAdded++;}
  const previousAttempts=state.attempts;
  if(Number.isInteger(remote.attempts)&&remote.attempts>=0)state.attempts=Math.max(state.attempts,remote.attempts);
+ let claimsChanged=false;
+ if(Array.isArray(remote.claims)){
+  const stageIds=new Set((DATA.campaigns||[]).flatMap(c=>c.stages.map(s=>s.id)));
+  const claims=[...new Set([...serverJourney.claims,...remote.claims.filter(id=>stageIds.has(id))])];
+  const points=Math.max(serverJourney.points,Number.isInteger(remote.expedition_points)&&remote.expedition_points>=0?remote.expedition_points:0);
+  claimsChanged=JSON.stringify(serverJourney.claims)!==JSON.stringify(claims)||serverJourney.points!==points;
+  const receipts=new Map((serverJourney.receipts||[]).map(r=>[r.stage_id,r]));
+  for(const receipt of Array.isArray(remote.claim_receipts)?remote.claim_receipts:[])if(receipt&&stageIds.has(receipt.stage_id))receipts.set(receipt.stage_id,receipt);
+  serverJourney={status:remote.catalog_revision===CATALOG_REVISION?'ready':'catalog-mismatch',claims,
+   verifiedDiscovered:[...new Set([...serverJourney.verifiedDiscovered,...(Array.isArray(remote.verified_discovered)?remote.verified_discovered.filter(id=>E.has(id)):[])])],
+   verifiedCrafted:[...new Set([...serverJourney.verifiedCrafted,...(Array.isArray(remote.verified_crafted)?remote.verified_crafted.filter(key=>R.has(key)):[])])],points,receipts:[...receipts.values()]};
+  state.serverClaims=claims;state.expeditionPoints=points;state.catalogRevision=remote.catalog_revision;
+  state.claimReceipts=serverJourney.receipts.slice(0,200);
+ }
  updateAchievements();
  if(added){renderAll();playSound('discovered');}
+ renderCampaignTracker();
+ if(modalPage==='campaign')showCampaign();
+ if(modalPage==='campaign-detail')showCampaign(modalContext);
  persist();
- return {added,recipesAdded,attemptsAdded:state.attempts>previousAttempts};
+ return {added,recipesAdded,claimsChanged,attemptsAdded:state.attempts>previousAttempts,accepted:true};
 }
-Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'5.1-refined',getState:()=>{syncState();return clone(state);},applyRemoteState,audit:auditContent}),writable:false});
+function setServerStatus(status){
+ if(status==='profile-changed')serverJourney={status,claims:[],verifiedDiscovered:[],verifiedCrafted:[],points:0,receipts:[]};
+ serverJourney.status=status;renderCampaignTracker();
+ if(modalPage==='campaign')showCampaign();
+ if(modalPage==='campaign-detail')showCampaign(modalContext);
+}
+Object.defineProperty(window,'Alchemia',{value:Object.freeze({version:'5.1-refined',catalogRevision:CATALOG_REVISION,getState:()=>{syncState();return clone(state);},applyRemoteState,setServerStatus,audit:auditContent}),writable:false});
 updateAchievements();applySettings();renderAll();sizeCanvas();
 if(!loaded)arrangeBench(false);
 lastBoardSize={w:board.clientWidth,h:board.clientHeight};

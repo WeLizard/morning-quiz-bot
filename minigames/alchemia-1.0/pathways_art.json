@@ -1,0 +1,2322 @@
+{
+  "electricmotor": {
+    "base": "engine",
+    "badge": "electricity",
+    "group": "rail"
+  },
+  "tire": {
+    "base": "wheel",
+    "badge": "rubber",
+    "group": "rail"
+  },
+  "coil": {
+    "base": "circuit",
+    "badge": "copper",
+    "group": "rail"
+  },
+  "rotor": {
+    "base": "engine",
+    "badge": "wheel",
+    "group": "rail"
+  },
+  "railway": {
+    "base": "train",
+    "badge": "steel",
+    "group": "rail"
+  },
+  "electrictrain": {
+    "base": "train",
+    "badge": "electricity",
+    "group": "rail"
+  },
+  "freighttrain": {
+    "base": "train",
+    "badge": "factory",
+    "group": "rail"
+  },
+  "tram": {
+    "base": "train",
+    "badge": "city",
+    "group": "rail"
+  },
+  "subway": {
+    "base": "train",
+    "badge": "earth",
+    "group": "rail"
+  },
+  "maglev": {
+    "base": "train",
+    "badge": "magnetism",
+    "group": "rail"
+  },
+  "railwaystation": {
+    "base": "house",
+    "badge": "train",
+    "group": "rail"
+  },
+  "undergroundstation": {
+    "base": "house",
+    "badge": "earth",
+    "group": "rail"
+  },
+  "tunnel": {
+    "base": "mountain",
+    "badge": "tool",
+    "group": "rail"
+  },
+  "bridge": {
+    "base": "river",
+    "badge": "steel",
+    "group": "rail"
+  },
+  "snowplow": {
+    "base": "car",
+    "badge": "snow",
+    "group": "rail"
+  },
+  "railnetwork": {
+    "base": "train",
+    "badge": "internet",
+    "group": "rail"
+  },
+  "transporthub": {
+    "base": "city",
+    "badge": "train",
+    "group": "rail"
+  },
+  "logistics": {
+    "base": "algorithm",
+    "badge": "train",
+    "group": "rail"
+  },
+  "road": {
+    "base": "earth",
+    "badge": "wheel",
+    "group": "roads"
+  },
+  "bicycle": {
+    "base": "wheel",
+    "badge": "human",
+    "group": "roads"
+  },
+  "pedal": {
+    "base": "tool",
+    "badge": "wheel",
+    "group": "roads"
+  },
+  "ebike": {
+    "base": "wheel",
+    "badge": "battery",
+    "group": "roads"
+  },
+  "bus": {
+    "base": "car",
+    "badge": "human",
+    "group": "roads"
+  },
+  "electricbus": {
+    "base": "car",
+    "badge": "electricity",
+    "group": "roads"
+  },
+  "truck": {
+    "base": "car",
+    "badge": "factory",
+    "group": "roads"
+  },
+  "electriccar": {
+    "base": "car",
+    "badge": "battery",
+    "group": "roads"
+  },
+  "chargingstation": {
+    "base": "powergrid",
+    "badge": "battery",
+    "group": "roads"
+  },
+  "busstation": {
+    "base": "house",
+    "badge": "car",
+    "group": "roads"
+  },
+  "warehouse": {
+    "base": "house",
+    "badge": "factory",
+    "group": "roads"
+  },
+  "container": {
+    "base": "steel",
+    "badge": "house",
+    "group": "roads"
+  },
+  "navigation": {
+    "base": "starmap",
+    "badge": "sensor",
+    "group": "roads"
+  },
+  "compass": {
+    "base": "clock",
+    "badge": "magnetism",
+    "group": "roads"
+  },
+  "map": {
+    "base": "paper",
+    "badge": "earth",
+    "group": "roads"
+  },
+  "rescuevehicle": {
+    "base": "car",
+    "badge": "medicine",
+    "group": "roads"
+  },
+  "sailboat": {
+    "base": "boat",
+    "badge": "sail",
+    "group": "seaair"
+  },
+  "ship": {
+    "base": "boat",
+    "badge": "steel",
+    "group": "seaair"
+  },
+  "motorboat": {
+    "base": "boat",
+    "badge": "engine",
+    "group": "seaair"
+  },
+  "ferry": {
+    "base": "boat",
+    "badge": "car",
+    "group": "seaair"
+  },
+  "harbor": {
+    "base": "city",
+    "badge": "boat",
+    "group": "seaair"
+  },
+  "lighthouse": {
+    "base": "house",
+    "badge": "light",
+    "group": "seaair"
+  },
+  "submarine": {
+    "base": "boat",
+    "badge": "ocean",
+    "group": "seaair"
+  },
+  "bathyscaphe": {
+    "base": "boat",
+    "badge": "research",
+    "group": "seaair"
+  },
+  "helicopter": {
+    "base": "airplane",
+    "badge": "dragonfly",
+    "group": "seaair"
+  },
+  "airship": {
+    "base": "boat",
+    "badge": "cloud",
+    "group": "seaair"
+  },
+  "balloon": {
+    "base": "air",
+    "badge": "fabric",
+    "group": "seaair"
+  },
+  "airport": {
+    "base": "house",
+    "badge": "airplane",
+    "group": "seaair"
+  },
+  "weatherballoon": {
+    "base": "satellite",
+    "badge": "cloud",
+    "group": "seaair"
+  },
+  "coastwatch": {
+    "base": "house",
+    "badge": "sensor",
+    "group": "seaair"
+  },
+  "cablecar": {
+    "base": "train",
+    "badge": "mountain",
+    "group": "seaair"
+  },
+  "electriccable": {
+    "base": "thread",
+    "badge": "electricity",
+    "group": "energyhome"
+  },
+  "insulation": {
+    "base": "rubber",
+    "badge": "lightning",
+    "group": "energyhome"
+  },
+  "generator": {
+    "base": "engine",
+    "badge": "magnetism",
+    "group": "energyhome"
+  },
+  "turbine": {
+    "base": "wheel",
+    "badge": "wind",
+    "group": "energyhome"
+  },
+  "waterwheel": {
+    "base": "wheel",
+    "badge": "river",
+    "group": "energyhome"
+  },
+  "windmill": {
+    "base": "house",
+    "badge": "wind",
+    "group": "energyhome"
+  },
+  "pump": {
+    "base": "engine",
+    "badge": "water",
+    "group": "energyhome"
+  },
+  "pipe": {
+    "base": "metal",
+    "badge": "water",
+    "group": "energyhome"
+  },
+  "dam": {
+    "base": "stone",
+    "badge": "river",
+    "group": "energyhome"
+  },
+  "hydropower": {
+    "base": "powergrid",
+    "badge": "water",
+    "group": "energyhome"
+  },
+  "transformer": {
+    "base": "battery",
+    "badge": "circuit",
+    "group": "energyhome"
+  },
+  "lamp": {
+    "base": "light",
+    "badge": "glass",
+    "group": "energyhome"
+  },
+  "led": {
+    "base": "chip",
+    "badge": "light",
+    "group": "energyhome"
+  },
+  "refrigerator": {
+    "base": "house",
+    "badge": "cold",
+    "group": "energyhome"
+  },
+  "kettle": {
+    "base": "pottery",
+    "badge": "heat",
+    "group": "energyhome"
+  },
+  "electricoven": {
+    "base": "house",
+    "badge": "heat",
+    "group": "energyhome"
+  },
+  "fan": {
+    "base": "wind",
+    "badge": "electricity",
+    "group": "energyhome"
+  },
+  "heatpump": {
+    "base": "engine",
+    "badge": "cold",
+    "group": "energyhome"
+  },
+  "powerbank": {
+    "base": "battery",
+    "badge": "smartphone",
+    "group": "energyhome"
+  },
+  "smarthome": {
+    "base": "house",
+    "badge": "chip",
+    "group": "energyhome"
+  },
+  "microphone": {
+    "base": "sensor",
+    "badge": "sound",
+    "group": "arts"
+  },
+  "speaker": {
+    "base": "signal",
+    "badge": "music",
+    "group": "arts"
+  },
+  "radio": {
+    "base": "circuit",
+    "badge": "sound",
+    "group": "arts"
+  },
+  "antenna": {
+    "base": "satellite",
+    "badge": "copper",
+    "group": "arts"
+  },
+  "guitar": {
+    "base": "wood",
+    "badge": "music",
+    "group": "arts"
+  },
+  "string": {
+    "base": "thread",
+    "badge": "sound",
+    "group": "arts"
+  },
+  "violin": {
+    "base": "music",
+    "badge": "horse",
+    "group": "arts"
+  },
+  "bow": {
+    "base": "tool",
+    "badge": "horse",
+    "group": "arts"
+  },
+  "synthesizer": {
+    "base": "computer",
+    "badge": "music",
+    "group": "arts"
+  },
+  "orchestra": {
+    "base": "music",
+    "badge": "human",
+    "group": "arts"
+  },
+  "concert": {
+    "base": "music",
+    "badge": "city",
+    "group": "arts"
+  },
+  "camera": {
+    "base": "lens",
+    "badge": "sensor",
+    "group": "arts"
+  },
+  "boxcamera": {
+    "base": "house",
+    "badge": "lens",
+    "group": "arts"
+  },
+  "photograph": {
+    "base": "paper",
+    "badge": "lens",
+    "group": "arts"
+  },
+  "cinema": {
+    "base": "art",
+    "badge": "clock",
+    "group": "arts"
+  },
+  "theater": {
+    "base": "house",
+    "badge": "art",
+    "group": "arts"
+  },
+  "story": {
+    "base": "book",
+    "badge": "thought",
+    "group": "arts"
+  },
+  "costume": {
+    "base": "fabric",
+    "badge": "art",
+    "group": "arts"
+  },
+  "memory": {
+    "base": "thought",
+    "badge": "clock",
+    "group": "arts"
+  },
+  "library": {
+    "base": "book",
+    "badge": "house",
+    "group": "arts"
+  },
+  "museum": {
+    "base": "house",
+    "badge": "book",
+    "group": "arts"
+  },
+  "printingpress": {
+    "base": "printer",
+    "badge": "book",
+    "group": "arts"
+  },
+  "machinepress": {
+    "base": "tool",
+    "badge": "pressure",
+    "group": "arts"
+  },
+  "newspaper": {
+    "base": "paper",
+    "badge": "city",
+    "group": "arts"
+  },
+  "news": {
+    "base": "signal",
+    "badge": "book",
+    "group": "arts"
+  },
+  "farmer": {
+    "base": "human",
+    "badge": "plant",
+    "group": "farmcraft"
+  },
+  "tractor": {
+    "base": "car",
+    "badge": "plant",
+    "group": "farmcraft"
+  },
+  "harvester": {
+    "base": "car",
+    "badge": "wheat",
+    "group": "farmcraft"
+  },
+  "harvest": {
+    "base": "plant",
+    "badge": "wheat",
+    "group": "farmcraft"
+  },
+  "field": {
+    "base": "earth",
+    "badge": "plant",
+    "group": "farmcraft"
+  },
+  "irrigation": {
+    "base": "water",
+    "badge": "plant",
+    "group": "farmcraft"
+  },
+  "compost": {
+    "base": "soil",
+    "badge": "mushroom",
+    "group": "farmcraft"
+  },
+  "leaflitter": {
+    "base": "tree",
+    "badge": "earth",
+    "group": "farmcraft"
+  },
+  "leaf": {
+    "base": "plant",
+    "badge": "light",
+    "group": "farmcraft"
+  },
+  "autumn": {
+    "base": "tree",
+    "badge": "cold",
+    "group": "farmcraft"
+  },
+  "foodwaste": {
+    "base": "fruit",
+    "badge": "recycling",
+    "group": "farmcraft"
+  },
+  "foodbasket": {
+    "base": "wood",
+    "badge": "fruit",
+    "group": "farmcraft"
+  },
+  "fertilizer": {
+    "base": "soil",
+    "badge": "mineral",
+    "group": "farmcraft"
+  },
+  "orchard": {
+    "base": "tree",
+    "badge": "fruit",
+    "group": "farmcraft"
+  },
+  "vineyard": {
+    "base": "plant",
+    "badge": "fruit",
+    "group": "farmcraft"
+  },
+  "apiary": {
+    "base": "house",
+    "badge": "bee",
+    "group": "farmcraft"
+  },
+  "grainmill": {
+    "base": "house",
+    "badge": "wheat",
+    "group": "farmcraft"
+  },
+  "sawmill": {
+    "base": "factory",
+    "badge": "wood",
+    "group": "farmcraft"
+  },
+  "plywood": {
+    "base": "wood",
+    "badge": "fabric",
+    "group": "farmcraft"
+  },
+  "glue": {
+    "base": "pottery",
+    "badge": "bond",
+    "group": "farmcraft"
+  },
+  "resin": {
+    "base": "tree",
+    "badge": "water",
+    "group": "farmcraft"
+  },
+  "pine": {
+    "base": "tree",
+    "badge": "mountain",
+    "group": "farmcraft"
+  },
+  "cone": {
+    "base": "seed",
+    "badge": "wood",
+    "group": "farmcraft"
+  },
+  "furniture": {
+    "base": "wood",
+    "badge": "house",
+    "group": "textiles"
+  },
+  "chair": {
+    "base": "house",
+    "badge": "human",
+    "group": "textiles"
+  },
+  "table": {
+    "base": "wood",
+    "badge": "book",
+    "group": "textiles"
+  },
+  "wardrobe": {
+    "base": "house",
+    "badge": "fabric",
+    "group": "textiles"
+  },
+  "rest": {
+    "base": "human",
+    "badge": "moon",
+    "group": "textiles"
+  },
+  "rope": {
+    "base": "thread",
+    "badge": "tool",
+    "group": "textiles"
+  },
+  "fiber": {
+    "base": "thread",
+    "badge": "plant",
+    "group": "textiles"
+  },
+  "flax": {
+    "base": "plant",
+    "badge": "fabric",
+    "group": "textiles"
+  },
+  "weavingloom": {
+    "base": "factory",
+    "badge": "thread",
+    "group": "textiles"
+  },
+  "sewingmachine": {
+    "base": "engine",
+    "badge": "thread",
+    "group": "textiles"
+  },
+  "clothing": {
+    "base": "fabric",
+    "badge": "human",
+    "group": "textiles"
+  },
+  "raincoat": {
+    "base": "fabric",
+    "badge": "rain",
+    "group": "textiles"
+  },
+  "boots": {
+    "base": "rubber",
+    "badge": "human",
+    "group": "textiles"
+  },
+  "tent": {
+    "base": "house",
+    "badge": "sail",
+    "group": "textiles"
+  },
+  "backpack": {
+    "base": "fabric",
+    "badge": "house",
+    "group": "textiles"
+  },
+  "basket": {
+    "base": "wood",
+    "badge": "thread",
+    "group": "textiles"
+  },
+  "net": {
+    "base": "thread",
+    "badge": "fish",
+    "group": "textiles"
+  },
+  "fishingrod": {
+    "base": "tool",
+    "badge": "fish",
+    "group": "textiles"
+  },
+  "camp": {
+    "base": "house",
+    "badge": "forest",
+    "group": "textiles"
+  },
+  "lantern": {
+    "base": "lamp",
+    "badge": "backpack",
+    "group": "textiles"
+  },
+  "handle": {
+    "base": "tool",
+    "badge": "wood",
+    "group": "textiles"
+  },
+  "rabbit": {
+    "base": "animal",
+    "badge": "carrot",
+    "group": "wildlife"
+  },
+  "fox": {
+    "base": "dog",
+    "badge": "forest",
+    "group": "wildlife"
+  },
+  "burrow": {
+    "base": "earth",
+    "badge": "mouse",
+    "group": "wildlife"
+  },
+  "foxden": {
+    "base": "earth",
+    "badge": "dog",
+    "group": "wildlife"
+  },
+  "bear": {
+    "base": "animal",
+    "badge": "honey",
+    "group": "wildlife"
+  },
+  "deer": {
+    "base": "horse",
+    "badge": "tree",
+    "group": "wildlife"
+  },
+  "antler": {
+    "base": "wood",
+    "badge": "animal",
+    "group": "wildlife"
+  },
+  "squirrel": {
+    "base": "mouse",
+    "badge": "tree",
+    "group": "wildlife"
+  },
+  "hedgehog": {
+    "base": "animal",
+    "badge": "plant",
+    "group": "wildlife"
+  },
+  "spine": {
+    "base": "plant",
+    "badge": "tool",
+    "group": "wildlife"
+  },
+  "bat": {
+    "base": "mouse",
+    "badge": "night",
+    "group": "wildlife"
+  },
+  "owl": {
+    "base": "bird",
+    "badge": "night",
+    "group": "wildlife"
+  },
+  "beaver": {
+    "base": "animal",
+    "badge": "wood",
+    "group": "wildlife"
+  },
+  "frog": {
+    "base": "animal",
+    "badge": "water",
+    "group": "wildlife"
+  },
+  "snail": {
+    "base": "animal",
+    "badge": "house",
+    "group": "wildlife"
+  },
+  "shell": {
+    "base": "stone",
+    "badge": "sea",
+    "group": "wildlife"
+  },
+  "earthworm": {
+    "base": "animal",
+    "badge": "earth",
+    "group": "wildlife"
+  },
+  "ant": {
+    "base": "insect",
+    "badge": "earth",
+    "group": "wildlife"
+  },
+  "anthill": {
+    "base": "house",
+    "badge": "insect",
+    "group": "wildlife"
+  },
+  "spider": {
+    "base": "insect",
+    "badge": "thread",
+    "group": "wildlife"
+  },
+  "web": {
+    "base": "thread",
+    "badge": "insect",
+    "group": "wildlife"
+  },
+  "echolocation": {
+    "base": "sound",
+    "badge": "animal",
+    "group": "wildlife"
+  },
+  "echo": {
+    "base": "sound",
+    "badge": "mountain",
+    "group": "wildlife"
+  },
+  "foodchain": {
+    "base": "animal",
+    "badge": "fish",
+    "group": "wildlife"
+  },
+  "migration": {
+    "base": "bird",
+    "badge": "starmap",
+    "group": "wildlife"
+  },
+  "teamwork": {
+    "base": "human",
+    "badge": "bee",
+    "group": "wildlife"
+  },
+  "pond": {
+    "base": "lake",
+    "badge": "house",
+    "group": "habitats"
+  },
+  "garden": {
+    "base": "plant",
+    "badge": "house",
+    "group": "habitats"
+  },
+  "rose": {
+    "base": "flower",
+    "badge": "love",
+    "group": "habitats"
+  },
+  "moss": {
+    "base": "plant",
+    "badge": "stone",
+    "group": "habitats"
+  },
+  "fern": {
+    "base": "plant",
+    "badge": "mushroom",
+    "group": "habitats"
+  },
+  "cactus": {
+    "base": "plant",
+    "badge": "desert",
+    "group": "habitats"
+  },
+  "bamboo": {
+    "base": "grass",
+    "badge": "wood",
+    "group": "habitats"
+  },
+  "lichen": {
+    "base": "mushroom",
+    "badge": "algae",
+    "group": "habitats"
+  },
+  "spore": {
+    "base": "seed",
+    "badge": "mushroom",
+    "group": "habitats"
+  },
+  "fungalsymbiosis": {
+    "base": "mushroom",
+    "badge": "tree",
+    "group": "habitats"
+  },
+  "pollination": {
+    "base": "flower",
+    "badge": "bee",
+    "group": "habitats"
+  },
+  "beehive": {
+    "base": "house",
+    "badge": "honey",
+    "group": "habitats"
+  },
+  "aquarium": {
+    "base": "glass",
+    "badge": "fish",
+    "group": "habitats"
+  },
+  "terrarium": {
+    "base": "glass",
+    "badge": "lizard",
+    "group": "habitats"
+  },
+  "naturepark": {
+    "base": "forest",
+    "badge": "animal",
+    "group": "habitats"
+  },
+  "seedbank": {
+    "base": "seed",
+    "badge": "database",
+    "group": "habitats"
+  },
+  "branch": {
+    "base": "wood",
+    "badge": "plant",
+    "group": "habitats"
+  },
+  "wetlandreserve": {
+    "base": "swamp",
+    "badge": "bird",
+    "group": "habitats"
+  },
+  "reefreserve": {
+    "base": "coral",
+    "badge": "fish",
+    "group": "habitats"
+  },
+  "botanicalgarden": {
+    "base": "plant",
+    "badge": "research",
+    "group": "habitats"
+  },
+  "chicken": {
+    "base": "bird",
+    "badge": "egg",
+    "group": "livestock"
+  },
+  "duck": {
+    "base": "bird",
+    "badge": "water",
+    "group": "livestock"
+  },
+  "goose": {
+    "base": "bird",
+    "badge": "grass",
+    "group": "livestock"
+  },
+  "cow": {
+    "base": "animal",
+    "badge": "milk",
+    "group": "livestock"
+  },
+  "sheep": {
+    "base": "animal",
+    "badge": "fabric",
+    "group": "livestock"
+  },
+  "goat": {
+    "base": "animal",
+    "badge": "mountain",
+    "group": "livestock"
+  },
+  "pig": {
+    "base": "animal",
+    "badge": "mud",
+    "group": "livestock"
+  },
+  "pasture": {
+    "base": "grass",
+    "badge": "animal",
+    "group": "livestock"
+  },
+  "wool": {
+    "base": "fabric",
+    "badge": "animal",
+    "group": "livestock"
+  },
+  "feather": {
+    "base": "bird",
+    "badge": "thread",
+    "group": "livestock"
+  },
+  "beeswax": {
+    "base": "honey",
+    "badge": "bee",
+    "group": "livestock"
+  },
+  "feed": {
+    "base": "wheat",
+    "badge": "animal",
+    "group": "livestock"
+  },
+  "poultryyard": {
+    "base": "house",
+    "badge": "bird",
+    "group": "livestock"
+  },
+  "shepherd": {
+    "base": "human",
+    "badge": "dog",
+    "group": "livestock"
+  },
+  "woolblanket": {
+    "base": "fabric",
+    "badge": "cold",
+    "group": "livestock"
+  },
+  "apple": {
+    "base": "fruit",
+    "badge": "tree",
+    "group": "crops"
+  },
+  "grape": {
+    "base": "fruit",
+    "badge": "thread",
+    "group": "crops"
+  },
+  "vine": {
+    "base": "plant",
+    "badge": "rope",
+    "group": "crops"
+  },
+  "lemon": {
+    "base": "fruit",
+    "badge": "sun",
+    "group": "crops"
+  },
+  "carrot": {
+    "base": "vegetable",
+    "badge": "earth",
+    "group": "crops"
+  },
+  "potato": {
+    "base": "vegetable",
+    "badge": "soil",
+    "group": "crops"
+  },
+  "tomato": {
+    "base": "fruit",
+    "badge": "vegetable",
+    "group": "crops"
+  },
+  "corn": {
+    "base": "wheat",
+    "badge": "sun",
+    "group": "crops"
+  },
+  "rice": {
+    "base": "wheat",
+    "badge": "water",
+    "group": "crops"
+  },
+  "pumpkin": {
+    "base": "vegetable",
+    "badge": "moon",
+    "group": "crops"
+  },
+  "strawberry": {
+    "base": "fruit",
+    "badge": "grass",
+    "group": "crops"
+  },
+  "blueberry": {
+    "base": "fruit",
+    "badge": "forest",
+    "group": "crops"
+  },
+  "raspberry": {
+    "base": "fruit",
+    "badge": "flower",
+    "group": "crops"
+  },
+  "nut": {
+    "base": "fruit",
+    "badge": "wood",
+    "group": "crops"
+  },
+  "berry": {
+    "base": "fruit",
+    "badge": "seed",
+    "group": "crops"
+  },
+  "shrub": {
+    "base": "plant",
+    "badge": "tree",
+    "group": "crops"
+  },
+  "root": {
+    "base": "plant",
+    "badge": "earth",
+    "group": "crops"
+  },
+  "grain": {
+    "base": "wheat",
+    "badge": "seed",
+    "group": "crops"
+  },
+  "starch": {
+    "base": "flour",
+    "badge": "plant",
+    "group": "crops"
+  },
+  "berrypatch": {
+    "base": "forest",
+    "badge": "fruit",
+    "group": "crops"
+  },
+  "sugar": {
+    "base": "salt",
+    "badge": "honey",
+    "group": "kitchen"
+  },
+  "butter": {
+    "base": "cheese",
+    "badge": "milk",
+    "group": "kitchen"
+  },
+  "cream": {
+    "base": "milk",
+    "badge": "cheese",
+    "group": "kitchen"
+  },
+  "yogurt": {
+    "base": "milk",
+    "badge": "bacteria",
+    "group": "kitchen"
+  },
+  "yeast": {
+    "base": "bacteria",
+    "badge": "bread",
+    "group": "kitchen"
+  },
+  "fermentation": {
+    "base": "bacteria",
+    "badge": "time",
+    "group": "kitchen"
+  },
+  "sourdough": {
+    "base": "dough",
+    "badge": "bacteria",
+    "group": "kitchen"
+  },
+  "oven": {
+    "base": "house",
+    "badge": "fire",
+    "group": "kitchen"
+  },
+  "jam": {
+    "base": "fruit",
+    "badge": "pottery",
+    "group": "kitchen"
+  },
+  "juice": {
+    "base": "water",
+    "badge": "fruit",
+    "group": "kitchen"
+  },
+  "lemonade": {
+    "base": "water",
+    "badge": "lemon",
+    "group": "kitchen"
+  },
+  "bubbles": {
+    "base": "water",
+    "badge": "air",
+    "group": "kitchen"
+  },
+  "icecream": {
+    "base": "ice",
+    "badge": "milk",
+    "group": "kitchen"
+  },
+  "popcorn": {
+    "base": "wheat",
+    "badge": "fire",
+    "group": "kitchen"
+  },
+  "applepie": {
+    "base": "cake",
+    "badge": "fruit",
+    "group": "kitchen"
+  },
+  "pumpkinpie": {
+    "base": "cake",
+    "badge": "vegetable",
+    "group": "kitchen"
+  },
+  "pastry": {
+    "base": "bread",
+    "badge": "milk",
+    "group": "kitchen"
+  },
+  "salad": {
+    "base": "vegetable",
+    "badge": "plant",
+    "group": "kitchen"
+  },
+  "omelette": {
+    "base": "egg",
+    "badge": "milk",
+    "group": "kitchen"
+  },
+  "mushroomsoup": {
+    "base": "soup",
+    "badge": "mushroom",
+    "group": "kitchen"
+  },
+  "honeycake": {
+    "base": "cake",
+    "badge": "honey",
+    "group": "kitchen"
+  },
+  "teapot": {
+    "base": "pottery",
+    "badge": "tea",
+    "group": "kitchen"
+  },
+  "cup": {
+    "base": "pottery",
+    "badge": "coffee",
+    "group": "kitchen"
+  },
+  "drink": {
+    "base": "water",
+    "badge": "tea",
+    "group": "kitchen"
+  },
+  "thermos": {
+    "base": "pottery",
+    "badge": "cold",
+    "group": "kitchen"
+  },
+  "pot": {
+    "base": "pottery",
+    "badge": "plant",
+    "group": "kitchen"
+  },
+  "pan": {
+    "base": "metal",
+    "badge": "fire",
+    "group": "kitchen"
+  },
+  "herb": {
+    "base": "plant",
+    "badge": "tea",
+    "group": "kitchen"
+  },
+  "truffle": {
+    "base": "mushroom",
+    "badge": "earth",
+    "group": "kitchen"
+  },
+  "glacier": {
+    "base": "ice",
+    "badge": "mountain",
+    "group": "geography"
+  },
+  "iceberg": {
+    "base": "ice",
+    "badge": "sea",
+    "group": "geography"
+  },
+  "avalanche": {
+    "base": "snow",
+    "badge": "mountain",
+    "group": "geography"
+  },
+  "snowdrift": {
+    "base": "snow",
+    "badge": "earth",
+    "group": "geography"
+  },
+  "springwater": {
+    "base": "water",
+    "badge": "stone",
+    "group": "geography"
+  },
+  "groundwater": {
+    "base": "water",
+    "badge": "earth",
+    "group": "geography"
+  },
+  "waterfall": {
+    "base": "river",
+    "badge": "mountain",
+    "group": "geography"
+  },
+  "cliff": {
+    "base": "mountain",
+    "badge": "sea",
+    "group": "geography"
+  },
+  "canyon": {
+    "base": "mountain",
+    "badge": "river",
+    "group": "geography"
+  },
+  "cave": {
+    "base": "mountain",
+    "badge": "darkness",
+    "group": "geography"
+  },
+  "stalactite": {
+    "base": "stone",
+    "badge": "water",
+    "group": "geography"
+  },
+  "geyser": {
+    "base": "steam",
+    "badge": "water",
+    "group": "geography"
+  },
+  "hotspring": {
+    "base": "water",
+    "badge": "heat",
+    "group": "geography"
+  },
+  "tundra": {
+    "base": "earth",
+    "badge": "cold",
+    "group": "geography"
+  },
+  "savanna": {
+    "base": "grass",
+    "badge": "sun",
+    "group": "geography"
+  },
+  "mangrove": {
+    "base": "tree",
+    "badge": "sea",
+    "group": "geography"
+  },
+  "oasis": {
+    "base": "plant",
+    "badge": "water",
+    "group": "geography"
+  },
+  "archipelago": {
+    "base": "island",
+    "badge": "sea",
+    "group": "geography"
+  },
+  "lagoon": {
+    "base": "lake",
+    "badge": "sea",
+    "group": "geography"
+  },
+  "tide": {
+    "base": "sea",
+    "badge": "moon",
+    "group": "geography"
+  },
+  "weatherstation": {
+    "base": "house",
+    "badge": "cloud",
+    "group": "geography"
+  },
+  "barometer": {
+    "base": "clock",
+    "badge": "pressure",
+    "group": "geography"
+  },
+  "thermometer": {
+    "base": "glass",
+    "badge": "heat",
+    "group": "geography"
+  },
+  "anemometer": {
+    "base": "wind",
+    "badge": "clock",
+    "group": "geography"
+  },
+  "oxygen": {
+    "base": "gas",
+    "badge": "plant",
+    "group": "materials2"
+  },
+  "hydrogen": {
+    "base": "atom",
+    "badge": "water",
+    "group": "materials2"
+  },
+  "nitrogen": {
+    "base": "gas",
+    "badge": "atom",
+    "group": "materials2"
+  },
+  "carbondioxide": {
+    "base": "gas",
+    "badge": "carbon",
+    "group": "materials2"
+  },
+  "electrolysis": {
+    "base": "circuit",
+    "badge": "molecule",
+    "group": "materials2"
+  },
+  "breathing": {
+    "base": "animal",
+    "badge": "air",
+    "group": "materials2"
+  },
+  "limestone": {
+    "base": "stone",
+    "badge": "coral",
+    "group": "materials2"
+  },
+  "chalk": {
+    "base": "stone",
+    "badge": "paper",
+    "group": "materials2"
+  },
+  "cement": {
+    "base": "stone",
+    "badge": "bond",
+    "group": "materials2"
+  },
+  "concrete": {
+    "base": "stone",
+    "badge": "house",
+    "group": "materials2"
+  },
+  "wall": {
+    "base": "brick",
+    "badge": "house",
+    "group": "materials2"
+  },
+  "ceramicinsulator": {
+    "base": "pottery",
+    "badge": "electricity",
+    "group": "materials2"
+  },
+  "fiberglass": {
+    "base": "glass",
+    "badge": "fabric",
+    "group": "materials2"
+  },
+  "stainlesssteel": {
+    "base": "steel",
+    "badge": "water",
+    "group": "materials2"
+  },
+  "charcoal": {
+    "base": "coal",
+    "badge": "wood",
+    "group": "materials2"
+  },
+  "activatedcarbon": {
+    "base": "coal",
+    "badge": "water",
+    "group": "materials2"
+  },
+  "waterfilter": {
+    "base": "water",
+    "badge": "sand",
+    "group": "materials2"
+  },
+  "waterpurifier": {
+    "base": "water",
+    "badge": "nanofilter",
+    "group": "materials2"
+  },
+  "biogas": {
+    "base": "gas",
+    "badge": "recycling",
+    "group": "materials2"
+  },
+  "soap": {
+    "base": "pottery",
+    "badge": "bubbles",
+    "group": "materials2"
+  },
+  "candle": {
+    "base": "fire",
+    "badge": "thread",
+    "group": "materials2"
+  },
+  "perfume": {
+    "base": "potion",
+    "badge": "flower",
+    "group": "materials2"
+  },
+  "pigment": {
+    "base": "paint",
+    "badge": "mineral",
+    "group": "materials2"
+  },
+  "ink": {
+    "base": "paint",
+    "badge": "paper",
+    "group": "materials2"
+  },
+  "dye": {
+    "base": "paint",
+    "badge": "fabric",
+    "group": "materials2"
+  },
+  "stainedglass": {
+    "base": "glass",
+    "badge": "art",
+    "group": "materials2"
+  },
+  "mosaic": {
+    "base": "pottery",
+    "badge": "art",
+    "group": "materials2"
+  },
+  "sculpture": {
+    "base": "stone",
+    "badge": "art",
+    "group": "materials2"
+  },
+  "paperlantern": {
+    "base": "paper",
+    "badge": "light",
+    "group": "materials2"
+  },
+  "smartfarm": {
+    "base": "farm",
+    "badge": "chip",
+    "group": "instruments"
+  },
+  "harvestrobot": {
+    "base": "robot",
+    "badge": "fruit",
+    "group": "instruments"
+  },
+  "irrigationcontroller": {
+    "base": "circuit",
+    "badge": "water",
+    "group": "instruments"
+  },
+  "weatherforecast": {
+    "base": "cloud",
+    "badge": "computer",
+    "group": "instruments"
+  },
+  "seismograph": {
+    "base": "sensor",
+    "badge": "earth",
+    "group": "instruments"
+  },
+  "sonar": {
+    "base": "sensor",
+    "badge": "fish",
+    "group": "instruments"
+  },
+  "radar": {
+    "base": "sensor",
+    "badge": "satellite",
+    "group": "instruments"
+  },
+  "biomimeticdrone": {
+    "base": "drone",
+    "badge": "dragonfly",
+    "group": "instruments"
+  },
+  "rescuebeacon": {
+    "base": "signal",
+    "badge": "medicine",
+    "group": "instruments"
+  },
+  "smartwarehouse": {
+    "base": "house",
+    "badge": "database",
+    "group": "instruments"
+  },
+  "coldchain": {
+    "base": "car",
+    "badge": "cold",
+    "group": "instruments"
+  },
+  "fulfillmentcenter": {
+    "base": "factory",
+    "badge": "internet",
+    "group": "instruments"
+  },
+  "recyclingplant": {
+    "base": "factory",
+    "badge": "recycling",
+    "group": "instruments"
+  },
+  "repairshop": {
+    "base": "tool",
+    "badge": "house",
+    "group": "instruments"
+  },
+  "musicplayer": {
+    "base": "smartphone",
+    "badge": "music",
+    "group": "instruments"
+  },
+  "headphones": {
+    "base": "sound",
+    "badge": "human",
+    "group": "instruments"
+  },
+  "projector": {
+    "base": "lens",
+    "badge": "light",
+    "group": "instruments"
+  },
+  "solarcharger": {
+    "base": "solarcell",
+    "badge": "battery",
+    "group": "instruments"
+  },
+  "vegetableoil": {
+    "base": "water",
+    "badge": "seed",
+    "group": "instruments"
+  },
+  "bioprinter": {
+    "base": "printer",
+    "badge": "cell",
+    "group": "biology2"
+  },
+  "organonchip": {
+    "base": "chip",
+    "badge": "cell",
+    "group": "biology2"
+  },
+  "artificialorgan": {
+    "base": "organ",
+    "badge": "prosthetic",
+    "group": "biology2"
+  },
+  "artificialleaf": {
+    "base": "plant",
+    "badge": "solarcell",
+    "group": "biology2"
+  },
+  "biosensor": {
+    "base": "sensor",
+    "badge": "cell",
+    "group": "biology2"
+  },
+  "myceliumpanel": {
+    "base": "wood",
+    "badge": "mushroom",
+    "group": "biology2"
+  },
+  "biocomposite": {
+    "base": "fabric",
+    "badge": "plant",
+    "group": "biology2"
+  },
+  "enzymereactor": {
+    "base": "reactor",
+    "badge": "enzyme",
+    "group": "biology2"
+  },
+  "labrobot": {
+    "base": "robot",
+    "badge": "microscope",
+    "group": "biology2"
+  },
+  "sequencer": {
+    "base": "lab",
+    "badge": "dna",
+    "group": "biology2"
+  },
+  "bioinformatics": {
+    "base": "computer",
+    "badge": "dna",
+    "group": "biology2"
+  },
+  "biocomputer": {
+    "base": "computer",
+    "badge": "cell",
+    "group": "biology2"
+  },
+  "neurointerface": {
+    "base": "circuit",
+    "badge": "neuron",
+    "group": "biology2"
+  },
+  "biobank": {
+    "base": "database",
+    "badge": "cell",
+    "group": "biology2"
+  },
+  "soilcommunity": {
+    "base": "soil",
+    "badge": "bacteria",
+    "group": "biology2"
+  },
+  "carboncycle": {
+    "base": "carbon",
+    "badge": "plant",
+    "group": "biology2"
+  },
+  "bioluminescence": {
+    "base": "light",
+    "badge": "bacteria",
+    "group": "biology2"
+  },
+  "aquaponics": {
+    "base": "fish",
+    "badge": "plant",
+    "group": "biology2"
+  },
+  "livingbuilding": {
+    "base": "house",
+    "badge": "plant",
+    "group": "biology2"
+  },
+  "climateobservatory": {
+    "base": "observatory",
+    "badge": "cloud",
+    "group": "biology2"
+  },
+  "boardgame": {
+    "base": "book",
+    "badge": "wheel",
+    "group": "community"
+  },
+  "chess": {
+    "base": "castle",
+    "badge": "knight",
+    "group": "community"
+  },
+  "strategy": {
+    "base": "thought",
+    "badge": "starmap",
+    "group": "community"
+  },
+  "detective": {
+    "base": "human",
+    "badge": "lens",
+    "group": "community"
+  },
+  "clue": {
+    "base": "question",
+    "badge": "lens",
+    "group": "community"
+  },
+  "footprint": {
+    "base": "earth",
+    "badge": "animal",
+    "group": "community"
+  },
+  "fingerprint": {
+    "base": "glass",
+    "badge": "human",
+    "group": "community"
+  },
+  "mystery": {
+    "base": "question",
+    "badge": "night",
+    "group": "community"
+  },
+  "evidenceboard": {
+    "base": "book",
+    "badge": "thread",
+    "group": "community"
+  },
+  "nightcity": {
+    "base": "city",
+    "badge": "night",
+    "group": "community"
+  },
+  "hiddenrole": {
+    "base": "question",
+    "badge": "human",
+    "group": "community"
+  },
+  "mafiatable": {
+    "base": "book",
+    "badge": "city",
+    "group": "community"
+  },
+  "filinych": {
+    "base": "bird",
+    "badge": "book",
+    "group": "community"
+  },
+  "alchemistsfair": {
+    "base": "farm",
+    "badge": "art",
+    "group": "community"
+  },
+  "protestsong": {
+    "base": "music",
+    "badge": "fire",
+    "group": "community"
+  },
+  "debate": {
+    "base": "thought",
+    "badge": "question",
+    "group": "community"
+  },
+  "lullaby": {
+    "base": "music",
+    "badge": "moon",
+    "group": "community"
+  },
+  "comedy": {
+    "base": "art",
+    "badge": "joy",
+    "group": "community"
+  },
+  "adventure": {
+    "base": "book",
+    "badge": "starmap",
+    "group": "community"
+  },
+  "naturejournal": {
+    "base": "book",
+    "badge": "butterfly",
+    "group": "community"
+  },
+  "plankton": {
+    "base": "algae",
+    "badge": "water",
+    "group": "deepsea"
+  },
+  "jellyfish": {
+    "base": "animal",
+    "badge": "glass",
+    "group": "deepsea"
+  },
+  "gel": {
+    "base": "water",
+    "badge": "polymer",
+    "group": "deepsea"
+  },
+  "octopus": {
+    "base": "animal",
+    "badge": "sea",
+    "group": "deepsea"
+  },
+  "seahorse": {
+    "base": "fish",
+    "badge": "horse",
+    "group": "deepsea"
+  },
+  "subseacable": {
+    "base": "thread",
+    "badge": "sea",
+    "group": "deepsea"
+  },
+  "oceanobservatory": {
+    "base": "observatory",
+    "badge": "ocean",
+    "group": "deepsea"
+  },
+  "reefnursery": {
+    "base": "coral",
+    "badge": "plant",
+    "group": "deepsea"
+  },
+  "tidalpower": {
+    "base": "powergrid",
+    "badge": "moon",
+    "group": "deepsea"
+  },
+  "underwaterhabitat": {
+    "base": "house",
+    "badge": "ocean",
+    "group": "deepsea"
+  },
+  "meteorite": {
+    "base": "asteroid",
+    "badge": "earth",
+    "group": "comets"
+  },
+  "meteorshower": {
+    "base": "comet",
+    "badge": "sky",
+    "group": "comets"
+  },
+  "comettail": {
+    "base": "comet",
+    "badge": "light",
+    "group": "comets"
+  },
+  "cometprobe": {
+    "base": "probe",
+    "badge": "comet",
+    "group": "comets"
+  },
+  "cometbase": {
+    "base": "habitat",
+    "badge": "comet",
+    "group": "comets"
+  },
+  "cometgarden": {
+    "base": "plant",
+    "badge": "comet",
+    "group": "comets"
+  },
+  "solarwind": {
+    "base": "wind",
+    "badge": "sun",
+    "group": "comets"
+  },
+  "magneticsail": {
+    "base": "sail",
+    "badge": "magnetism",
+    "group": "comets"
+  },
+  "lightsail": {
+    "base": "sail",
+    "badge": "light",
+    "group": "comets"
+  },
+  "laserarray": {
+    "base": "laser",
+    "badge": "circuit",
+    "group": "comets"
+  },
+  "beamstation": {
+    "base": "spacestation",
+    "badge": "laser",
+    "group": "comets"
+  },
+  "solarsailship": {
+    "base": "spaceship",
+    "badge": "sail",
+    "group": "comets"
+  },
+  "interstellarprobe": {
+    "base": "probe",
+    "badge": "star",
+    "group": "comets"
+  },
+  "exoplanetatlas": {
+    "base": "book",
+    "badge": "exoplanet",
+    "group": "comets"
+  },
+  "vacuumchamber": {
+    "base": "lab",
+    "badge": "pressure",
+    "group": "frontier"
+  },
+  "vacuumrail": {
+    "base": "train",
+    "badge": "gas",
+    "group": "frontier"
+  },
+  "orbitaltrain": {
+    "base": "train",
+    "badge": "spacestation",
+    "group": "frontier"
+  },
+  "interstellarhub": {
+    "base": "city",
+    "badge": "stargate",
+    "group": "frontier"
+  },
+  "galactictransit": {
+    "base": "stargate",
+    "badge": "internet",
+    "group": "frontier"
+  },
+  "xenoseedbank": {
+    "base": "seed",
+    "badge": "alienflora",
+    "group": "frontier"
+  },
+  "xenocuisine": {
+    "base": "soup",
+    "badge": "alienflora",
+    "group": "frontier"
+  },
+  "kitchenlab": {
+    "base": "lab",
+    "badge": "soup",
+    "group": "frontier"
+  },
+  "unioncharter": {
+    "base": "book",
+    "badge": "alliance",
+    "group": "frontier"
+  },
+  "diplomaticfleet": {
+    "base": "spaceship",
+    "badge": "alliance",
+    "group": "frontier"
+  },
+  "cultureexchange": {
+    "base": "art",
+    "badge": "alliance",
+    "group": "frontier"
+  },
+  "xenoorchestra": {
+    "base": "music",
+    "badge": "alien",
+    "group": "frontier"
+  },
+  "cosmicacademy": {
+    "base": "book",
+    "badge": "spacestation",
+    "group": "frontier"
+  },
+  "alliancecapital": {
+    "base": "city",
+    "badge": "alliance",
+    "group": "frontier"
+  },
+  "stellarnavigation": {
+    "base": "starmap",
+    "badge": "clock",
+    "group": "frontier"
+  },
+  "dreamjournal": {
+    "base": "book",
+    "badge": "night",
+    "group": "memorygardens"
+  },
+  "dreamseed": {
+    "base": "seed",
+    "badge": "night",
+    "group": "memorygardens"
+  },
+  "memoryseed": {
+    "base": "seed",
+    "badge": "book",
+    "group": "memorygardens"
+  },
+  "archivegarden": {
+    "base": "tree",
+    "badge": "book",
+    "group": "memorygardens"
+  },
+  "livingarchive": {
+    "base": "book",
+    "badge": "cell",
+    "group": "memorygardens"
+  },
+  "temporalreserve": {
+    "base": "forest",
+    "badge": "timecrystal",
+    "group": "memorygardens"
+  },
+  "chronoharvest": {
+    "base": "fruit",
+    "badge": "timecrystal",
+    "group": "memorygardens"
+  },
+  "seasontree": {
+    "base": "tree",
+    "badge": "clock",
+    "group": "memorygardens"
+  },
+  "dreamobservatory": {
+    "base": "observatory",
+    "badge": "night",
+    "group": "memorygardens"
+  },
+  "dreamcity": {
+    "base": "city",
+    "badge": "noosphere",
+    "group": "memorygardens"
+  },
+  "chronicleweave": {
+    "base": "book",
+    "badge": "timecrystal",
+    "group": "memorygardens"
+  },
+  "timeanchor": {
+    "base": "clock",
+    "badge": "stone",
+    "group": "memorygardens"
+  },
+  "paradoxcompass": {
+    "base": "clock",
+    "badge": "question",
+    "group": "memorygardens"
+  },
+  "cosmicnectar": {
+    "base": "honey",
+    "badge": "star",
+    "group": "memorygardens"
+  },
+  "starhoney": {
+    "base": "honey",
+    "badge": "space",
+    "group": "memorygardens"
+  },
+  "lumengarden": {
+    "base": "flower",
+    "badge": "star",
+    "group": "memorygardens"
+  },
+  "ethicscouncil": {
+    "base": "human",
+    "badge": "book",
+    "group": "livingfuture"
+  },
+  "digitalcivilization": {
+    "base": "computer",
+    "badge": "city",
+    "group": "livingfuture"
+  },
+  "cosmicgardener": {
+    "base": "human",
+    "badge": "planet",
+    "group": "livingfuture"
+  },
+  "cityseed": {
+    "base": "seed",
+    "badge": "city",
+    "group": "livingfuture"
+  },
+  "worldnursery": {
+    "base": "plant",
+    "badge": "planet",
+    "group": "livingfuture"
+  },
+  "sentientbioship": {
+    "base": "spaceship",
+    "badge": "neuron",
+    "group": "livingfuture"
+  },
+  "ecosystemark": {
+    "base": "spaceship",
+    "badge": "plant",
+    "group": "livingfuture"
+  },
+  "seedfleet": {
+    "base": "spaceship",
+    "badge": "seed",
+    "group": "livingfuture"
+  },
+  "migratoryworld": {
+    "base": "planet",
+    "badge": "spaceship",
+    "group": "livingfuture"
+  },
+  "alliancegarden": {
+    "base": "plant",
+    "badge": "alliance",
+    "group": "livingfuture"
+  },
+  "sharedmemory": {
+    "base": "book",
+    "badge": "mindcloud",
+    "group": "livingfuture"
+  },
+  "horizonweave": {
+    "base": "fabric",
+    "badge": "galaxy",
+    "group": "livingfuture"
+  },
+  "constellationgarden": {
+    "base": "plant",
+    "badge": "galaxy",
+    "group": "livingfuture"
+  },
+  "cosmicfestival": {
+    "base": "art",
+    "badge": "galaxy",
+    "group": "livingfuture"
+  },
+  "sandwich": {
+    "base": "bread",
+    "badge": "cheese",
+    "group": "everydaylinks"
+  },
+  "smoothie": {
+    "base": "milk",
+    "badge": "fruit",
+    "group": "everydaylinks"
+  },
+  "banana": {
+    "base": "fruit",
+    "badge": "plant",
+    "group": "everydaylinks"
+  },
+  "breakfast": {
+    "base": "bread",
+    "badge": "tea",
+    "group": "everydaylinks"
+  },
+  "porridge": {
+    "base": "soup",
+    "badge": "wheat",
+    "group": "everydaylinks"
+  },
+  "picnic": {
+    "base": "soup",
+    "badge": "forest",
+    "group": "everydaylinks"
+  },
+  "dessert": {
+    "base": "cake",
+    "badge": "ice",
+    "group": "everydaylinks"
+  },
+  "herbaltea": {
+    "base": "tea",
+    "badge": "plant",
+    "group": "everydaylinks"
+  },
+  "fishsoup": {
+    "base": "soup",
+    "badge": "fish",
+    "group": "everydaylinks"
+  },
+  "vegetablestew": {
+    "base": "soup",
+    "badge": "vegetable",
+    "group": "everydaylinks"
+  },
+  "cheesecake": {
+    "base": "cake",
+    "badge": "cheese",
+    "group": "everydaylinks"
+  },
+  "fruiticecream": {
+    "base": "ice",
+    "badge": "fruit",
+    "group": "everydaylinks"
+  },
+  "pancake": {
+    "base": "bread",
+    "badge": "egg",
+    "group": "everydaylinks"
+  },
+  "bakery": {
+    "base": "house",
+    "badge": "bread",
+    "group": "everydaylinks"
+  },
+  "restaurant": {
+    "base": "house",
+    "badge": "soup",
+    "group": "everydaylinks"
+  },
+  "market": {
+    "base": "city",
+    "badge": "fruit",
+    "group": "everydaylinks"
+  },
+  "festival": {
+    "base": "art",
+    "badge": "music",
+    "group": "everydaylinks"
+  },
+  "outdoorkitchen": {
+    "base": "soup",
+    "badge": "house",
+    "group": "everydaylinks"
+  },
+  "fieldexpedition": {
+    "base": "research",
+    "badge": "forest",
+    "group": "everydaylinks"
+  },
+  "ecosystematlas": {
+    "base": "book",
+    "badge": "plant",
+    "group": "everydaylinks"
+  },
+  "climateatlas": {
+    "base": "book",
+    "badge": "cloud",
+    "group": "everydaylinks"
+  },
+  "sciencefair": {
+    "base": "lab",
+    "badge": "art",
+    "group": "everydaylinks"
+  },
+  "outdoorconcert": {
+    "base": "music",
+    "badge": "tree",
+    "group": "everydaylinks"
+  },
+  "tropics": {
+    "base": "forest",
+    "badge": "sun",
+    "group": "everydaylinks"
+  },
+  "festivalchronicle": {
+    "base": "book",
+    "badge": "galaxy",
+    "group": "horizons"
+  },
+  "futureatlas": {
+    "base": "starmap",
+    "badge": "timecrystal",
+    "group": "horizons"
+  },
+  "horizoncompass": {
+    "base": "clock",
+    "badge": "galaxy",
+    "group": "horizons"
+  },
+  "pilgrimfleet": {
+    "base": "spaceship",
+    "badge": "book",
+    "group": "horizons"
+  },
+  "worldmosaic": {
+    "base": "planet",
+    "badge": "art",
+    "group": "horizons"
+  },
+  "atlasheart": {
+    "base": "heart",
+    "badge": "galaxy",
+    "group": "horizons"
+  },
+  "herd": {
+    "base": "animal",
+    "badge": "grass",
+    "group": "smallbridges"
+  },
+  "foam": {
+    "base": "water",
+    "badge": "cloud",
+    "group": "smallbridges"
+  },
+  "pickles": {
+    "base": "vegetable",
+    "badge": "salt",
+    "group": "smallbridges"
+  },
+  "cocoa": {
+    "base": "coffee",
+    "badge": "chocolate",
+    "group": "smallbridges"
+  },
+  "jackolantern": {
+    "base": "vegetable",
+    "badge": "light",
+    "group": "smallbridges"
+  }
+}

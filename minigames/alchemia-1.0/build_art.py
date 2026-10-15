@@ -332,6 +332,7 @@ A['worldseed']=group(A['seed'],'translate(-2 4) scale(.86)')+group(A['planet'],'
 A['starbloom']=group(flower('#d8b6d8'),'translate(0 4) scale(.93)')+star(35,27,5)+star(81,24,6)+star(94,56,4)+path('M32 25Q58 36 84 25','none','#f0ddb0',2)
 A['skyport']=group(A['city'],'translate(-4 18) scale(.55)')+group(A['stargate'],'translate(40 14) scale(.48)')+group(A['worldship'],'translate(40 60) scale(.42)')+line('M21 96H99','#c7c69e',4)+circle(28,92,5,'url(#gold)')+circle(92,92,5,'url(#gold)')
 exec((ROOT/'detail_art.py').read_text(encoding='utf-8'),globals())
+exec((ROOT/'pathways_art.py').read_text(encoding='utf-8'),globals())
 data=json.loads((ROOT/'data.json').read_text(encoding='utf-8'))
 missing=[e['id'] for e in data['elements'] if not A.get(e['id'])]
 assert not missing,missing

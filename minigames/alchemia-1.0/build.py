@@ -10,6 +10,9 @@ def build():
  report=validate(check_art=True)
  html=(ROOT/'shell.html').read_text(encoding='utf-8')
  js=(ROOT/'game.js').read_text(encoding='utf-8')
+ catalog=json.loads((ROOT/'data.json').read_text(encoding='utf-8'))
+ revision=hashlib.sha256(json.dumps(catalog,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode('utf-8')).hexdigest()
+ js=js.replace('/*__CATALOG_REVISION__*/',revision)
  js=js.replace('/*__JOURNEY__*/',(ROOT/'journey.js').read_text(encoding='utf-8'))
  sources={'/*__STYLE__*/':(ROOT/'style.css').read_text(encoding='utf-8'),'<!--__ART__-->':(ROOT/'art.svg').read_text(encoding='utf-8'),'/*__DATA__*/':(ROOT/'data.json').read_text(encoding='utf-8'),'/*__SCRIPT__*/':js,'/*__SYNC__*/':(ROOT/'sync.js').read_text(encoding='utf-8')}
  for marker,value in sources.items():

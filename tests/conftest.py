@@ -18,10 +18,10 @@ def _farm_fractional_clock(request, monkeypatch):
     from qw_farm import service
     original = service.FarmService.__init__
 
-    def init(self, unit, principal, *, clock=None, speed=1):
+    def init(self, unit, principal, *, clock=None, speed=1, **kwargs):
         if clock is None:
             import time
             clock = time.time
-        original(self, unit, principal, clock=lambda: clock() + fraction, speed=speed)
+        original(self, unit, principal, clock=lambda: clock() + fraction, speed=speed, **kwargs)
 
     monkeypatch.setattr(service.FarmService, '__init__', init)

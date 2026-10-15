@@ -1,0 +1,790 @@
+{
+  "schema": "night-city-case/1",
+  "meta": {
+    "id": "quiet_pier_demo",
+    "version": 1,
+    "title": "Тихая пристань (учебный пример)",
+    "genre": "noir",
+    "language": "ru",
+    "players": {
+      "min": 4,
+      "max": 5
+    },
+    "supernatural": {
+      "real": false,
+      "rules": ""
+    },
+    "content_flags": [
+      "none"
+    ],
+    "author": {
+      "kind": "human",
+      "name": "Образец для внешних авторов"
+    },
+    "summary": "В ночь перед началом недели из конторы портового склада пропал бухгалтерский журнал. Виновных двое возможных, но на деле — один.",
+    "npc_name_era": "ru_1930_1960"
+  },
+  "setting": {
+    "blurb": "Небольшой портовый город в тумане. Пристань, склад, кафе у воды, клиника и контора связаны узкими улицами.",
+    "crime": "Из конторы склада исчез бухгалтерский журнал. Замок открыт ключом, а не взломан.",
+    "days": 7
+  },
+  "locations": [
+    {
+      "id": "pier",
+      "name": "Пристань",
+      "text": "Скрипящие мостки, лодки и будка сторожа.",
+      "connects": [
+        "warehouse"
+      ]
+    },
+    {
+      "id": "warehouse",
+      "name": "Склад",
+      "text": "Низкое здание с тяжёлой дверью и тусклой лампой.",
+      "connects": [
+        "pier",
+        "cafe",
+        "office"
+      ]
+    },
+    {
+      "id": "cafe",
+      "name": "Кафе «Причал»",
+      "text": "Тёплое место, где вечерами собирается весь район.",
+      "connects": [
+        "warehouse",
+        "clinic",
+        "office"
+      ]
+    },
+    {
+      "id": "clinic",
+      "name": "Клиника",
+      "text": "Маленькая клиника с одним кабинетом и шкафом для ключей.",
+      "connects": [
+        "cafe"
+      ]
+    },
+    {
+      "id": "office",
+      "name": "Контора",
+      "text": "Тесная комната со столами и сейфом.",
+      "connects": [
+        "warehouse",
+        "cafe"
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "id": "marta",
+      "title": "Фельдшерица",
+      "title_forms": {
+        "gen": "фельдшерицы",
+        "dat": "фельдшерице",
+        "acc": "фельдшерицу",
+        "ins": "фельдшерицей",
+        "prep": "фельдшерице"
+      },
+      "gender": "f",
+      "bio": "Работает в клинике, знает почти всех жителей.",
+      "tier": "core",
+      "can_be_player": true,
+      "faction": "investigation",
+      "personal_goal": "Чтобы никто не узнал, что она на время брала ключ от склада.",
+      "secret": "Брала ключ у {t:vera|gen} в половине двенадцатого и вернула до полуночи.",
+      "home": "clinic",
+      "schedule_overrides": [],
+      "voice": "Спокойно, по-врачебному."
+    },
+    {
+      "id": "vera",
+      "title": "Хозяйка кафе",
+      "title_forms": {
+        "gen": "хозяйки кафе",
+        "dat": "хозяйке кафе",
+        "acc": "хозяйку кафе",
+        "ins": "хозяйкой кафе",
+        "prep": "хозяйке кафе"
+      },
+      "gender": "f",
+      "bio": "Держит кафе у воды и хранит запасные ключи соседей.",
+      "tier": "core",
+      "can_be_player": true,
+      "faction": "investigation",
+      "personal_goal": "Не допустить скандала вокруг кафе.",
+      "secret": "Выдавала запасной ключ без записи.",
+      "home": "cafe",
+      "schedule_overrides": [],
+      "voice": "Быстро, с шутками."
+    },
+    {
+      "id": "lena",
+      "title": "Конторская служащая",
+      "title_forms": {
+        "gen": "конторской служащей",
+        "dat": "конторской служащей",
+        "acc": "конторскую служащую",
+        "ins": "конторской служащей",
+        "prep": "конторской служащей"
+      },
+      "gender": "f",
+      "bio": "Ведёт текущие бумаги склада.",
+      "tier": "core",
+      "can_be_player": true,
+      "faction": "investigation",
+      "personal_goal": "Найти журнал, пока не обвинили её.",
+      "secret": "Видела подделку в журнале и промолчала.",
+      "home": "office",
+      "schedule_overrides": [
+        {
+          "windows": [
+            2,
+            4
+          ],
+          "location": "cafe"
+        }
+      ],
+      "voice": "Сухо, по пунктам."
+    },
+    {
+      "id": "igor",
+      "title": "Докер",
+      "title_forms": {
+        "gen": "докера",
+        "dat": "докеру",
+        "acc": "докера",
+        "ins": "докером",
+        "prep": "докере"
+      },
+      "gender": "m",
+      "bio": "Грузит лодки на пристани.",
+      "tier": "core",
+      "can_be_player": true,
+      "faction": "independent",
+      "personal_goal": "Вернуть долг, не потеряв работу.",
+      "secret": "Должен {t:gleb|dat} крупную сумму.",
+      "home": "pier",
+      "schedule_overrides": [],
+      "voice": "Коротко, грубовато."
+    },
+    {
+      "id": "gleb",
+      "title": "Торговец",
+      "title_forms": {
+        "gen": "торговца",
+        "dat": "торговцу",
+        "acc": "торговца",
+        "ins": "торговцем",
+        "prep": "торговце"
+      },
+      "gender": "m",
+      "bio": "Богатеет на перевозках, ссужает деньги.",
+      "tier": "core",
+      "can_be_player": true,
+      "faction": "independent",
+      "personal_goal": "Сохранить репутацию честного дельца.",
+      "secret": "Знал о подделках в журнале.",
+      "home": "cafe",
+      "schedule_overrides": [
+        {
+          "windows": [
+            3,
+            4
+          ],
+          "location": "warehouse"
+        }
+      ],
+      "voice": "Вежливо, с расчётом."
+    },
+    {
+      "id": "pavel",
+      "title": "Сторож",
+      "title_forms": {
+        "gen": "сторожа",
+        "dat": "сторожу",
+        "acc": "сторожа",
+        "ins": "сторожем",
+        "prep": "стороже"
+      },
+      "gender": "m",
+      "bio": "Ночами обходит пристань и склад.",
+      "tier": "support",
+      "can_be_player": false,
+      "faction": "independent",
+      "personal_goal": "Дослужить до пенсии без проблем.",
+      "secret": "Ему могли заплатить за молчание.",
+      "home": "warehouse",
+      "schedule_overrides": [
+        {
+          "windows": [
+            2,
+            4,
+            6
+          ],
+          "location": "pier"
+        }
+      ],
+      "voice": "Медленно, ворчливо."
+    }
+  ],
+  "facts": [
+    {
+      "id": "f_ledger_missing",
+      "text": "Из конторы пропал бухгалтерский журнал.",
+      "kind": "event",
+      "visibility": "public",
+      "true_in": "all"
+    },
+    {
+      "id": "f_key_used",
+      "text": "Склад открыли настоящим ключом, не взломали.",
+      "kind": "object",
+      "visibility": "hidden",
+      "true_in": "all"
+    },
+    {
+      "id": "f_igor_debt",
+      "text": "{c:igor} задолжал {t:gleb|dat} крупную сумму.",
+      "kind": "relation",
+      "visibility": "hidden",
+      "true_in": "all"
+    },
+    {
+      "id": "f_ledger_forged",
+      "text": "В журнале были подделанные записи.",
+      "kind": "motive",
+      "visibility": "hidden",
+      "true_in": "all"
+    },
+    {
+      "id": "f_vera_gave_key",
+      "text": "{c:vera} выдала запасной ключ {t:marta|dat} в 23:30.",
+      "kind": "event",
+      "visibility": "hidden",
+      "true_in": "all"
+    },
+    {
+      "id": "f_marta_returned",
+      "text": "{c:marta} вернула ключ до полуночи.",
+      "kind": "event",
+      "visibility": "hidden",
+      "true_in": "all"
+    },
+    {
+      "id": "f_igor_left_pier",
+      "text": "{c:igor} ушёл с пристани в девять вечера.",
+      "kind": "alibi",
+      "visibility": "hidden",
+      "true_in": [
+        "v_igor"
+      ],
+      "at": {
+        "character": "igor",
+        "location": "warehouse",
+        "window": 0
+      }
+    },
+    {
+      "id": "f_igor_stayed_pier",
+      "text": "{c:igor} всю ночь оставался на пристани.",
+      "kind": "alibi",
+      "visibility": "hidden",
+      "true_in": [
+        "v_gleb"
+      ],
+      "at": {
+        "character": "igor",
+        "location": "pier",
+        "window": 0
+      }
+    },
+    {
+      "id": "f_gleb_cafe",
+      "text": "{c:gleb} до закрытия сидел в кафе.",
+      "kind": "alibi",
+      "visibility": "hidden",
+      "true_in": [
+        "v_igor"
+      ],
+      "at": {
+        "character": "gleb",
+        "location": "cafe",
+        "window": 0
+      }
+    },
+    {
+      "id": "f_gleb_boat",
+      "text": "Лодку {t:gleb|gen} видели у склада в два часа ночи.",
+      "kind": "event",
+      "visibility": "hidden",
+      "true_in": [
+        "v_gleb"
+      ],
+      "at": {
+        "character": "gleb",
+        "location": "warehouse",
+        "window": 0
+      }
+    },
+    {
+      "id": "f_pavel_saw_nothing",
+      "text": "{c:pavel} никого не видел этой ночью.",
+      "kind": "event",
+      "visibility": "hidden",
+      "true_in": [
+        "v_igor"
+      ]
+    },
+    {
+      "id": "f_pavel_paid",
+      "text": "За молчание заплатили {t:pavel|dat}.",
+      "kind": "secret",
+      "visibility": "hidden",
+      "true_in": [
+        "v_gleb"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "e_lock",
+      "title": "Замок склада",
+      "text": "На замке нет следов взлома: дверь открыли ключом.",
+      "kind": "physical",
+      "fact": "f_key_used",
+      "found": {
+        "via": "examine",
+        "location": "warehouse",
+        "windows": [
+          1,
+          14
+        ]
+      },
+      "exists_in": "all",
+      "requires": [],
+      "reliability": "solid",
+      "mentions": [
+        "f_key_used"
+      ]
+    },
+    {
+      "id": "e_debt",
+      "title": "Долговая расписка",
+      "text": "Расписка: {c:igor} обязуется вернуть {t:gleb|dat} крупную сумму.",
+      "kind": "document",
+      "fact": "f_igor_debt",
+      "found": {
+        "via": "examine",
+        "location": "office",
+        "windows": [
+          1,
+          14
+        ]
+      },
+      "exists_in": "all",
+      "requires": [],
+      "reliability": "solid",
+      "key_for": [
+        "v_igor"
+      ],
+      "misleads_toward": [
+        "igor"
+      ],
+      "debunked_by": [
+        "e_pier_stay"
+      ],
+      "mentions": [
+        "f_igor_debt"
+      ]
+    },
+    {
+      "id": "e_forged",
+      "title": "Копия страницы журнала",
+      "text": "Черновик страницы, где суммы исправлены чужой рукой.",
+      "kind": "document",
+      "fact": "f_ledger_forged",
+      "found": {
+        "via": "examine",
+        "location": "office",
+        "windows": [
+          3,
+          14
+        ]
+      },
+      "exists_in": "all",
+      "requires": [
+        "e_lock"
+      ],
+      "reliability": "solid",
+      "key_for": [
+        "v_gleb"
+      ],
+      "mentions": [
+        "f_ledger_forged"
+      ]
+    },
+    {
+      "id": "e_pier_left",
+      "title": "Журнал причала",
+      "text": "Отметка о выходе {t:igor|gen} с пристани в 21:00.",
+      "kind": "trace",
+      "fact": "f_igor_left_pier",
+      "found": {
+        "via": "examine",
+        "location": "pier",
+        "windows": [
+          1,
+          4
+        ]
+      },
+      "exists_in": [
+        "v_igor"
+      ],
+      "requires": [],
+      "reliability": "solid",
+      "key_for": [
+        "v_igor"
+      ],
+      "mentions": [
+        "f_igor_left_pier"
+      ]
+    },
+    {
+      "id": "e_pier_stay",
+      "title": "Журнал причала",
+      "text": "{c:igor} ночью не отмечался на выходе.",
+      "kind": "trace",
+      "fact": "f_igor_stayed_pier",
+      "found": {
+        "via": "examine",
+        "location": "pier",
+        "windows": [
+          1,
+          4
+        ]
+      },
+      "exists_in": [
+        "v_gleb"
+      ],
+      "requires": [],
+      "reliability": "solid",
+      "key_for": [
+        "v_gleb"
+      ],
+      "mentions": [
+        "f_igor_stayed_pier"
+      ]
+    },
+    {
+      "id": "e_cafe_tape",
+      "title": "Кассовая лента кафе",
+      "text": "Лента показывает, что {c:gleb} расплатился перед самым закрытием.",
+      "kind": "document",
+      "fact": "f_gleb_cafe",
+      "found": {
+        "via": "examine",
+        "location": "cafe",
+        "windows": [
+          1,
+          6
+        ]
+      },
+      "exists_in": [
+        "v_igor"
+      ],
+      "requires": [],
+      "reliability": "solid",
+      "key_for": [
+        "v_igor"
+      ],
+      "mentions": [
+        "f_gleb_cafe"
+      ]
+    },
+    {
+      "id": "e_boat_photo",
+      "title": "Снимок лодки",
+      "text": "Старый снимок: лодка {t:gleb|gen} у склада поздней ночью.",
+      "kind": "physical",
+      "fact": "f_gleb_boat",
+      "found": {
+        "via": "examine",
+        "location": "pier",
+        "windows": [
+          2,
+          7
+        ]
+      },
+      "exists_in": [
+        "v_gleb"
+      ],
+      "requires": [],
+      "reliability": "solid",
+      "key_for": [
+        "v_gleb"
+      ],
+      "mentions": [
+        "f_gleb_boat"
+      ]
+    },
+    {
+      "id": "e_pavel_envelope",
+      "title": "Конверт под матрасом",
+      "text": "В будке сторожа лежит конверт с деньгами.",
+      "kind": "physical",
+      "fact": "f_pavel_paid",
+      "found": {
+        "via": "examine",
+        "location": "warehouse",
+        "windows": [
+          4,
+          10
+        ]
+      },
+      "exists_in": [
+        "v_gleb"
+      ],
+      "requires": [
+        "e_boat_photo"
+      ],
+      "reliability": "doubtful",
+      "key_for": [
+        "v_gleb"
+      ],
+      "mentions": [
+        "f_pavel_paid"
+      ]
+    },
+    {
+      "id": "e_pavel_word",
+      "title": "Слова сторожа",
+      "text": "{c:pavel} говорит, что никого не видел.",
+      "kind": "testimony",
+      "fact": "f_pavel_saw_nothing",
+      "found": {
+        "via": "dialogue"
+      },
+      "exists_in": "all",
+      "requires": [],
+      "reliability": "doubtful",
+      "mentions": [
+        "f_pavel_saw_nothing"
+      ]
+    },
+    {
+      "id": "e_vera_word",
+      "title": "Слова хозяйки кафе",
+      "text": "{c:vera} говорит, что в половине двенадцатого выдала ключ {t:marta|dat}.",
+      "kind": "testimony",
+      "fact": "f_vera_gave_key",
+      "found": {
+        "via": "dialogue"
+      },
+      "exists_in": "all",
+      "requires": [],
+      "reliability": "doubtful",
+      "misleads_toward": [
+        "marta"
+      ],
+      "debunked_by": [
+        "e_key_receipt"
+      ],
+      "mentions": [
+        "f_vera_gave_key"
+      ]
+    },
+    {
+      "id": "e_key_receipt",
+      "title": "Записка о возврате ключа",
+      "text": "Записка в шкафу клиники: ключ возвращён до полуночи.",
+      "kind": "document",
+      "fact": "f_marta_returned",
+      "found": {
+        "via": "examine",
+        "location": "clinic",
+        "windows": [
+          1,
+          14
+        ]
+      },
+      "exists_in": "all",
+      "requires": [],
+      "reliability": "solid",
+      "mentions": [
+        "f_marta_returned"
+      ]
+    }
+  ],
+  "dialogues": [
+    {
+      "id": "d_pavel_1",
+      "character": "pavel",
+      "text": "Сторож хмурится: «Чего надо?»",
+      "valid_in": "all",
+      "mentions": [],
+      "options": [
+        {
+          "label": "Вы что-нибудь видели ночью?",
+          "goto": "d_pavel_2",
+          "grants": [],
+          "requires": []
+        },
+        {
+          "label": "Ничего. До свидания.",
+          "goto": null,
+          "grants": [],
+          "requires": []
+        }
+      ]
+    },
+    {
+      "id": "d_pavel_2",
+      "character": "pavel",
+      "text": "«Никого не видел. Ночь как ночь».",
+      "valid_in": "all",
+      "mentions": [
+        "f_pavel_saw_nothing"
+      ],
+      "options": [
+        {
+          "label": "Понятно.",
+          "goto": null,
+          "grants": [
+            "e_pavel_word"
+          ],
+          "requires": []
+        }
+      ]
+    },
+    {
+      "id": "d_vera_1",
+      "character": "vera",
+      "text": "{c:vera} протирает стойку и кивает вам.",
+      "valid_in": "all",
+      "mentions": [],
+      "options": [
+        {
+          "label": "Кто брал запасной ключ от склада?",
+          "goto": "d_vera_2",
+          "grants": [],
+          "requires": []
+        },
+        {
+          "label": "Просто зашёл.",
+          "goto": null,
+          "grants": [],
+          "requires": []
+        }
+      ]
+    },
+    {
+      "id": "d_vera_2",
+      "character": "vera",
+      "text": "«Давала ключ {t:marta|dat}, в половине двенадцатого».",
+      "valid_in": "all",
+      "mentions": [
+        "f_vera_gave_key"
+      ],
+      "options": [
+        {
+          "label": "Спасибо.",
+          "goto": null,
+          "grants": [
+            "e_vera_word"
+          ],
+          "requires": []
+        }
+      ]
+    }
+  ],
+  "variants": [
+    {
+      "id": "v_igor",
+      "culprit": "igor",
+      "accomplices": [],
+      "motive": "{c:igor} не мог вернуть долг и хотел уничтожить записи о нём.",
+      "method": "Взял запасной ключ и ушёл с пристани, пока сторож обходил склад.",
+      "key_evidence": [
+        "e_pier_left",
+        "e_cafe_tape",
+        "e_debt"
+      ],
+      "min_key": 2,
+      "compositions": [
+        4,
+        5
+      ],
+      "final_text": "{t:igor|acc} задерживают у причала. Журнал находят в лодке — долг больше не имеет значения."
+    },
+    {
+      "id": "v_gleb",
+      "culprit": "gleb",
+      "accomplices": [],
+      "motive": "{c:gleb} скрывал подделки в журнале.",
+      "method": "Приплыл на лодке, открыл склад ключом и заплатил сторожу за молчание.",
+      "key_evidence": [
+        "e_boat_photo",
+        "e_forged",
+        "e_pier_stay",
+        "e_pavel_envelope"
+      ],
+      "min_key": 3,
+      "compositions": [
+        4,
+        5
+      ],
+      "final_text": "{c:gleb} пытается уплыть на рассвете, но лодку останавливают. Подделки вскрыты."
+    }
+  ],
+  "events": [
+    {
+      "id": "ev_storm",
+      "window": 5,
+      "text": "Шторм: пристань закрыта на сутки.",
+      "effect": {
+        "kind": "lock_location",
+        "location": "pier",
+        "windows": [
+          5,
+          6
+        ]
+      }
+    }
+  ],
+  "endings": [
+    {
+      "id": "end_proven_igor",
+      "trigger": "accusation_proven",
+      "variant": "v_igor",
+      "text": "Обвинение доказано: виновен {c:igor}."
+    },
+    {
+      "id": "end_proven_gleb",
+      "trigger": "accusation_proven",
+      "variant": "v_gleb",
+      "text": "Обвинение доказано: виновен {c:gleb}."
+    },
+    {
+      "id": "end_unproven",
+      "trigger": "accusation_unproven",
+      "text": "Верно или нет — улик не хватает, дело не закрыто."
+    },
+    {
+      "id": "end_framed",
+      "trigger": "shadow_framed",
+      "text": "Дело закрыто на невиновного. Настоящий виновный на свободе."
+    },
+    {
+      "id": "end_hearing",
+      "trigger": "final_hearing",
+      "text": "Неделя прошла. Итоговое слушание назначено."
+    },
+    {
+      "id": "end_frozen",
+      "trigger": "frozen",
+      "text": "Город затих. Дело заморожено без виновного."
+    }
+  ]
+}

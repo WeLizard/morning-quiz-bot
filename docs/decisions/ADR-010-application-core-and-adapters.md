@@ -49,23 +49,30 @@ inline-кнопки, уведомления, групповые права и з
 4. Telegram adapter;
 5. удаление старого формирования состояния из handlers после проверки паритета.
 
-До переноса legacy PTB handlers могут вызываться переходным bridge, но новая
-доменная логика не добавляется внутрь них. Мафия развивается сразу по новой схеме.
-По состоянию на 2026-10-06 пункты 1–4 выполнены для classic и photo: оба режима
-работают на общих application services (`application/classic.py`,
-`application/photo.py`), состояние живёт в PostgreSQL, события доставки идут через
-транзакционный outbox (`NotificationQueue` → `handlers/mafia_handlers.py`), а
-прямые маршруты Mini App (`/api/mini/classic/...`, `/api/mini/photo/...`) не
-фабрикуют `telegram.Update`. Мафия работает по новой схеме с самого начала.
+По состоянию на 2026-10-09 прямые маршруты Mini App для Classic и Photo используют
+общие application services (`application/classic.py`, `application/photo.py`),
+состояние живёт в PostgreSQL, а события доставки проходят транзакционный outbox
+(`NotificationQueue` → `handlers/mafia_handlers.py`). Legacy MiniBridge, его
+PTB-worker, очередь действий, runtime/media API и клиентский fallback удалены из
+dev-контуров. Mini App не создаёт synthetic `telegram.Update` и не отправляет
+действия через `Application.process_update`.
 
-У переходного bridge осталось одно оправданное основание: ответ на уже
-существующий Telegram-опрос, запущенный в чате. Через Bot API нельзя отметить голос
-за пользователя, поэтому такой ответ идёт штатным обработчиком через мост
-(`send({type:'vote'})`), а не прямым маршрутом. Судьба этой точки — предмет
-отдельного продуктового решения (см. MQB-006). Новой доменной логики в bridge
-по-прежнему нет.
+Ответ из Mini App является игровым действием, но не поддельным голосом в
+нативном Telegram poll: запись общего результата/ledger выполняет application
+service. Повтор команды с тем же `command_id` возвращает сохранённую квитанцию.
+Тестовый Telegram transport остаётся отдельным egress allowlist для реального
+приватного test-bot и не участвует в игровых командах Mini App. Проверка полного
+Bot↔Mini App цикла на одной PostgreSQL-партии остаётся отдельным acceptance gate.
 
 ## Последствия
+
+Dev-срез 2026-10-09: `RoomPhotoApplicationService` использует общий Photo domain,
+каталог и scoring с явными `room_id`/`creator_account_id`, без fake Telegram IDs.
+Owner комнаты управляет своей личной creator-only серией; другие участники видят
+только занятость. Room deadlines исполняются worker по `game_id`, Telegram paths
+отфильтровывают `chat_id IS NULL`. Очки серии сохраняются в game state и не сливаются
+с историческими Telegram-баллами. Это не решение групповой Photo-политики AUD-019
+и не свидетельство браузерной/WebView приёмки.
 
 - Mini App и Telegram обязаны иметь матрицу функционального паритета.
 - Исправление правила игры делается один раз в ядре.

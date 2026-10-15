@@ -5,8 +5,8 @@
 личные настройки и DB-backed лобби/действия мафии. Полный асинхронный цикл Mafia
 ещё не готов. Основной путь Classic/Photo использует прямые игровые API и отдельный
 экран подготовки: настройки Classic читаются из общей проекции чата, параметры Photo
-выдаёт backend. Для запуска этих режимов PTB-транскрипт не нужен; bridge остаётся
-только для ещё не перенесённых legacy-сценариев.
+выдаёт backend. Classic и Photo работают через прямые application API; MiniBridge,
+синтетические PTB Updates и API транскрипта удалены.
 [Игровые функции и оставшиеся сценарии](MINI_APP_GAMEPLAY.md).
 
 ## Граница сервисов
@@ -16,9 +16,11 @@
   Оно не импортирует админку, не монтирует её маршруты/статику и не читает `.env`.
 - Общая PostgreSQL, отдельный `MINI_APP_DATABASE_URL`. В production нужны отдельные
   учётные данные БД и отдельный HTTPS origin. Этот перенос не выполнялся.
-- По умолчанию фабрика read-only, кроме таблицы коротких сессий. Явный
-  `runtime_enabled=True` добавляет ограниченную очередь действий общего runtime;
-  только dev-фабрики включают её. Правка банка/системное администрирование не добавлены.
+- По умолчанию игровые API фабрики read-only; вход пишет короткую сессию и
+  при первом Telegram-входе создаёт User/Account/AccountIdentity. Явный
+  `runtime_enabled=True` включает защищённые игровые команды Classic/Photo и Mafia;
+  только dev/test фабрики пока включают игровые записи. Правка банка/системное
+  администрирование не добавлены.
 
 `GET /api/mini/config` отдаёт канонический каталог режимов `game_modes`:
 стабильный `id`, название, состояние (`available`, `development` или
@@ -30,29 +32,119 @@ Mini App строит список режимов по этому manifest; `com
 `POST .../sync` — авторизованное выполнение просроченных переходов и получение
 обновлённой проекции. Чтение само по себе не меняет состояние игры.
 
-### Игровые маршруты при runtime_enabled
+Farm 0.2.0 подключается отдельно через `QW_FARM_ENABLED=1` только после
+`qw_farm_010` и dev-приёмки. При выключенном флаге каталог оставляет Farm
+незапускаемой. При включённом `/app/farm` и `/api/mini/farm/...` используют
+существующие guest/Telegram cookie, общую PostgreSQL и moderation fence;
+`identity=guest|telegram` обязателен при наличии обеих cookie. Монеты Farm
+не связаны с баллами квиза. Состояние проверки и невыполненные ворота —
+[MQB-007](tasks/MQB-007-farm-020-integration.md); наличие маршрутов само по себе
+не означает принятую PG/Telegram-интеграцию.
 
-- `GET /api/mini/runtime`: только собственные отображаемые сообщения, кнопки,
-  варианты, таймер и результаты. Правильный ответ/пояснение скрыты до собственного
-  записанного ответа. Никаких сырых checkpoints, чужих mailbox или путей файлов.
-- `POST /api/mini/runtime/actions`: максимум 4 КБ JSON, idempotency `request_id`,
-  тип command/callback/vote/text. Identity берётся из сессии cookie или legacy Bearer. Команды из
-  белого списка; callback сверяется с текущей карточкой/revision, голос с дедлайном,
-  фото-ответ с раундом. Очки/правильность не принимаются от клиента.
-- `GET /api/mini/runtime/media/{message_id}`: авторизованное фото собственной
-  карточки, только разрешённый локальный media root. Токен не передаётся в URL.
+### Игровые маршруты
 
-Worker в private dev runner пока выполняет классический и фото-квиз в той же PTB
-Application, что и Telegram. Это переходный bridge, а не место для новой логики.
-Счёт/достижения/параметры — существующие сервисы; данные `system_states`
-нужны только для ограниченных очереди и представления. UI опрашивает API без
-ручной верхней кнопки обновления. При неизвестном исходе повтор использует тот же
-request ID; после падения running не исполняется автоматически ещё раз.
+- `/api/mini/classic/chats/{chat_id}/...`: защищённые start/sync/answer/stop;
+  команды применяют общие Classic application services и idempotency `command_id`.
+- `/api/mini/photo/chats/{chat_id}/...`: защищённые setup/start/sync/answer/stop
+  и выдача изображения текущей сессии; переходы дедлайнов выполняются через POST
+  `/sync`, а изображение не раскрывает путь или ответ до проверки.
+- `/api/mini/mafia/...`: состояние и команды проходят через общий Mafia application
+  service; роли и действия проецируются с учётом участника.
+- Legacy `/api/mini/runtime`, `/actions` и `/media` больше не существуют. Bot и Mini App
+  не обмениваются фальшивыми Telegram-сообщениями; оба используют общее состояние PG.
+
+Повтор команды с тем же `command_id` возвращает её сохранённый результат; клиент
+сохраняет ID при сетевой неопределённости. Telegram-уведомления о переходах доставляет
+durable outbox, а не HTTP-запрос Mini App.
 [Целевая архитектура приложения и адаптеров](decisions/ADR-010-application-core-and-adapters.md).
 
-«Ночной город» bridge не использует: `MafiaApplicationService` выполняет команды,
+«Ночной город» использует тот же принцип: `MafiaApplicationService` выполняет команды,
 дедлайны и безопасные проекции, а HTTP и Telegram только проверяют вход и
 отображают результат. Тайные действия Telegram выполняются в личной карточке.
+
+## Dev-срез: Classic в самостоятельной комнате
+
+`GET /api/guest/rooms/{room_id}/classic/current` возвращает `{current: ...}`:
+текущий вопрос, собственный принятый ответ и очки участников этой партии.
+Только активные участники комнаты имеют доступ; будущие ответы не раскрываются.
+Сервер применяет истёкшие переходы при чтении и независимым game-worker по `game_id`.
+
+Команды требуют гостевую HttpOnly cookie, Origin, `X-Guest-CSRF: 1` и
+`Idempotency-Key` (8–64 разрешённых символов):
+
+- `POST .../classic/start`: `{count, open_seconds, interval_seconds}`, только владелец;
+  1–50 вопросов, 5–600 секунд ответа, 0–600 секунд интервала. Вопросы выбирает сервер
+  из PostgreSQL. Повтор привязан к исходным параметрам до случайного выбора и к партии.
+- `POST .../classic/answer`: `{game_id, round_id, selected_option}`, один неизменяемый
+  ответ Account на вопрос. Общая revision не препятствует ответу другого игрока.
+  `accepted_answer` в ответе показывает именно отправленный вопрос и собственный
+  результат даже если другой участник или worker уже открыли следующий вопрос.
+- `POST .../classic/stop`: `{game_id, expected_revision}`, только владелец.
+
+Правила переходов и арифметика совпадают с Telegram Classic. Очки этого среза
+хранятся в `GamePlayer` и `classic_account_answers`; они не начисляются в исторические
+Telegram `ChatMember`/global scores и не объединяются с ними без решения о связывании.
+Room-команды и дедлайны не создают Telegram Users/Chats или notification outbox.
+
+Новые старты по умолчанию отключены (`create_app(room_classic_enabled=False)`);
+чтение, ответы, остановка и worker существующих партий продолжают работать.
+Защищённая loopback dev-factory допускает гостевой вход только при отдельном явном
+`MQB_DEV_GUEST_ENABLED=1` для синтетического dev-игрока; Telegram whitelist сохраняется.
+В этом контуре `MQB_ROOM_CLASSIC_ENABLED=1` разрешает новые старты. Реальный dev-player
+остаётся private test при любых значениях этих флагов. Persistent dev ещё требует
+аддитивной миграции `20261009_0024`; она применена к постоянной dev-БД 2026-10-09
+после backup, чей список успешно проверен (`pg_restore -l`), но восстановление этого
+архива не репетировалось. Это не является разрешением применять миграцию в production.
+UI/браузер и настоящие Telegram WebView пока не прошли ручную приёмку.
+
+## Dev-срез: личный Photo в самостоятельной комнате
+
+`GET /api/guest/rooms/{room_id}/photo/setup` выдаёт серверные настройки и число
+доступных проверенных изображений. `GET .../photo/current` возвращает
+`{current, occupied}` и применяет просроченные переходы. Владелец комнаты может
+начать свою личную серию; только её creator Account получает вопрос, feedback,
+результаты, изображение и отвечает. Другой активный участник получает
+`{current: null, occupied: true}` во время серии. Участник вне комнаты получает 404.
+Это ограниченный личный сценарий; групповая политика Photo (`AUD-019`) не выбрана.
+
+Команды используют ту же гостевую cookie, Origin, `X-Guest-CSRF: 1` и
+`Idempotency-Key`, что Room Classic:
+
+- `POST .../photo/start`: `{question_count, open_seconds, hints_enabled}`,
+  только owner; 1–10 картинок, 5–600 секунд, bool подсказок. Сервер по умолчанию
+  предлагает 3 картинки/60 секунд/подсказки. Если доступных картинок меньше числа
+  вопросов, действующие Photo-правила допускают повтор изображения.
+- `POST .../photo/answer`: `{game_id, round_id, answer}`, только creator;
+  неправильные попытки, почти правильный ответ, подсказки и начисление используют
+  те же доменные правила и арифметику, что Telegram Photo.
+- `POST .../photo/stop`: `{game_id, expected_revision}`, только owner своей серии.
+- `GET .../photo/current/image?game_id=...&round_id=...`: cookie-авторизация,
+  активная комната/creator/точная текущая партия и вопрос, проверка SHA-256 при
+  наличии подписи в каталоге (legacy-совместимость общих Photo-правил);
+  закрытый, чужой или заменённый вопрос — 404. Ответ `no-store` с нейтральным
+  `filename="photo.webp"`, без ответа или имени файла каталога в URL/headers.
+
+Квитанция start проверяется до случайного выбора и замещения серии; ответ/stop
+привязаны к actor/room/game и откатываются вместе с квитанцией при отказе.
+Очки личной серии сохраняются в `Game.state`, без Telegram Users/Chats,
+`PollAnswer`, исторических/global баллов или notification outbox. Миграция этого
+среза не нужна. Независимый worker выбирает Room Photo по `game_id`, а Telegram
+Photo due/delivery исключают партии с `chat_id IS NULL`.
+
+`create_app(room_photo_enabled=False)` по умолчанию запрещает новые старты;
+продолжение существующих серий работает при выключенном флаге start. В защищённой
+loopback dev-factory нужны отдельные `MQB_DEV_GUEST_ENABLED=1` и
+`MQB_ROOM_PHOTO_ENABLED=1`; реальный dev-player сохраняет private test whitelist.
+Эти флаги добавлены в Compose с default `0`, постоянная конфигурация не включалась.
+Все guest application boundaries берут shared moderation fence до чтения/locks
+Session/Account; Classic/Photo дополнительно проверяют Account после fence.
+PG-проверка обоих порядков guest/admin подтверждает отсутствие прежней инверсии
+locks и отказ 401 после блокировки/revision change до игровых мутаций.
+
+Экран комнаты сохраняет черновик и фокус при подсказках, повторяет неопределённую
+команду с тем же ID, предлагает retry каталога/изображения и отменяет polling и
+ожидающие запросы при выходе. Ручная браузерная/Telegram WebView приёмка этого
+среза ещё не выполнена; автоматические PG/ASGI/DOM-сценарии не заменяют её.
 
 ## Вход и сессия
 
@@ -67,8 +159,17 @@ cookie админки и query-параметр с токеном не прин�
 Дубликаты полей/JSON-ключей, повреждённое кодирование и неверный ID отклоняются.
 Алгоритм сверён с [документацией Telegram](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app).
 
-После проверки разрешён вход только существующему незаблокированному игроку.
-Из входа не перезаписываются имя, профиль или очки. Ответ содержит время истечения;
+После проверки подписи первый вход атомарно создаёт отсутствующий `User`, отдельный
+`Account` и активную подтверждённую Telegram `AccountIdentity`. Предварительный
+`/start` боту не требуется; Chat, Room и игровые данные этим входом не создаются.
+В закрытом тестовом контуре allowlist проверяется до записей. Для существующего
+игрока сохраняются Account ID, имя, профиль, очки и прогресс; вход дополняет только
+отсутствующую связь. Гостевой аккаунт не объединяется и не перепривязывается.
+Заблокированные/архивные User или Account, отозванная либо неподтверждённая identity
+и несовпадение identity с `User.account_id` отклоняются. Та же связь проверяется
+при каждом запросе и renew; её отзыв закрывает Mini App и Farm доступ. Параллельные
+первые входы создают один профиль/аккаунт/identity; повтор initData остаётся 409.
+Ответ содержит время истечения;
 секрет выдаётся только в cookie:
 
 ```json
@@ -101,20 +202,71 @@ Bearer-путь оставлен для переходной совместим�
 бан и revision пользователя; ban → unban не оживляет старую сессию. Смена
 `MINI_APP_BOT_TOKEN` также инвалидирует прежние сессии этого сервиса.
 
+## Явное связывание текущего аккаунта с Telegram
+
+В dev и песочнице `mqb-rehearsal` из гостевого/парольного профиля внутри Telegram WebView можно запросить
+серверную сводку связывания и отдельно подтвердить согласие. Нужны текущая cookie
+`mqb_guest` и свежая подписанная `initData` в одном окне; перенос через одноразовую
+ссылку между браузерами не реализован. После подтверждения `Account.id`, ферма,
+комнаты, пароль, прогресс и гостевая сессия сохраняются. Следующий Telegram login
+откроет тот же Account; само связывание не создаёт `mqb_mini` и не переключает UI.
+Гостевой профиль дополнительно возвращает `telegram_user_id` либо `null`.
+Первый запуск WebView без действующей сессии показывает явный выбор входа: до
+Telegram provisioning клиент предлагает компактный первый старт с явной кнопкой
+«Начать играть» и отдельным вариантом входа по существующему логину. При выборе
+«Начать играть» `POST /api/mini/session` создаёт Telegram User/Account/identity
+лишь если их ещё нет. Для уже известного Telegram игрока клиент сначала пробует
+`POST /api/mini/session/resume` с его подписанной `init_data`: endpoint возобновляет
+только уже существующую Telegram identity и не создаёт User или Account. Действующая
+guest/password или Telegram cookie-сессия возобновляется как прежде.
+
+Явный logout записывает клиентский marker, подавляющий автоматический bootstrap
+новой Mini App и Farm-сессии; повторное открытие или Farm invite не авторизует
+пользователя автоматически. Marker снимается только при ручном выборе входа
+(например, «Начать играть» или вход по логину). После входа в гостевой/парольный
+профиль с уже привязанной к тому же Account Telegram identity Farm invite не
+показывает chooser профиля.
+
+Preview не делает записей. Confirm перепроверяет ID из сводки, cookie ownership,
+срок сессии, moderation revision, User и identity под operation fence,
+`mini-login:<uid>` advisory lock и row locks. Повтор той же пары идемпотентен.
+Чужой `User.account_id` или identity, отозванная/неподтверждённая identity,
+другая Telegram связь текущего Account и несовместимый Alchemy progress дают
+409 с `code=telegram_link_conflict`: нужна отдельная функция слияния, которая
+пока не реализована. Даже пустой второй Account автоматически не переносится.
+Все изменения откатываются при конфликте. Недоступный User/Account и закрытый
+allowlist отклоняются; изменившаяся пара из preview даёт 409 `profile_changed`.
+
+Alchemy остаётся одной строкой по Account; связывание дополняет только transitional
+`user_id`. Offline discoveries не становятся verified, очки и receipts сохраняются,
+старые открытия не получают повторные награды. Гостевой канал по-прежнему не
+начисляет Telegram рейтинг; Telegram канал использует тот же прогресс. Для этого
+пути новой миграции не требуется. Сброс пароля через Telegram ещё не реализован.
+Telegram чтение и рейтинг соединяют прогресс через canonical `User.account_id`,
+в том числе если строка создана гостем уже после связывания без transitional `user_id`.
+Свежие тесты и пользовательская приёмка связывания в Telegram не проводились.
+
 ## Маршруты и разрешённые данные
 
 | Маршрут | Результат и ограничение |
 | --- | --- |
 | `GET /`, `GET /healthz` | Описание API и проверка БД, без пользовательских данных |
 | `POST /api/guest/start`, `GET /api/guest/me`, `POST /api/guest/resume`, `POST /api/guest/logout` | Гостевая identity с HttpOnly cookie и хэшированным session token |
+| `POST /api/guest/profile` | JSON `{display_name}`: ручное имя текущего гостевого/парольного Account, 1–40 символов после удаления управляющих символов и схлопывания пробелов; ownership только по guest cookie, Origin + `X-Guest-CSRF: 1` |
+| `POST /api/guest/telegram-name` | JSON `{init_data}`: first_name + last_name только после HMAC и проверки срока 300 секунд; меняет имя лишь при текущем значении `Гость`, обрезает до 40 символов, возвращает гостевой профиль. Не создаёт Telegram identity/session и не меняет cookie или прогресс. UI ожидает импорт до открытия приглашённой фермы. Название существующей фермы — отдельное поле, меняется её настройками |
+| `POST /api/account/address-form?identity=guest\|telegram` | JSON `{address_form: 'm'\|'f'\|'n'}`: форма обращения к игроку («он», «она», «не указывать»), одна настройка Account для всех игр и каналов (`accounts.address_form`, NULL = ещё не спрашивали, читается как `n`; пол из Telegram не угадывается). Канал выбирает `identity` (обязателен, если есть обе cookie), Origin + `X-Guest-CSRF: 1`. Возвращает `{account_id, address_form, address_form_chosen: true}`. Значение приходит в `/api/guest/me`, `/api/mini/me` и ответах фермы (`address_form`, `address_form_chosen`); `POST /api/account/register` принимает необязательный `address_form`. Формулировки выбирает `domain.address.g(form, м, ж, нейтр)` (Python) и `QWAddress.g` (`web/mini_client/address.js`, копия для фермы `qw_farm/static/address.js`; идентичность файлов проверяет `tests/test_address_form.py`). Бот: кнопка «Как к тебе обращаться» в главном меню |
+| `POST /api/account/telegram-link/preview` | JSON `{init_data}`; текущая guest/password cookie + HMAC Telegram, TTL 300 секунд, Origin + `X-Guest-CSRF: 1`. Без записей возвращает `{account_id, display_name, telegram_user_id, telegram_display_name, already_linked}`; проверяет возможность связать текущий Account |
+| `POST /api/account/telegram-link/confirm` | JSON `{init_data, confirm: true, account_id, telegram_user_id}` из явного согласия с preview. Повторно проверяет владение и ID, атомарно добавляет verified Telegram identity и `User.account_id`, сохраняет текущий Account и данные. Возвращает `{linked: true, already_linked: true, profile, ...preview}`; одинаковая пара идемпотентна, Mini App session не создаётся |
 | `POST /api/guest/rooms` | Создание приватной account-owned комнаты; owner берётся из сессии, UUID повтора возвращает ту же комнату |
 | `GET /api/guest/rooms` | Только standalone-комнаты текущего Account |
 | `GET /api/guest/rooms/{id}` | Своя комната; чужая комната скрывается ответом 404 |
+| `POST /api/guest/rooms/{id}/leave` | Выход активного участника, кроме owner; JSON `{membership_version}` из проекции комнаты. Origin и guest CSRF обязательны. Чужая/неизвестная комната — 404, owner — 403, незавершённая Classic/Photo/Mafia (включая lobby) или устаревшая версия участия — 409. Повтор после выхода — `{left: false}` |
 | `POST /api/guest/rooms/{id}/invites` | Только владелец задаёт срок 5 минут–30 дней и лимит 1–100; случайный код возвращается один раз, в PostgreSQL хранится только SHA-256 |
 | `GET /api/guest/rooms/{id}/invites` | Только владелец; метаданные без кода, включая срок, использование и отзыв |
 | `DELETE /api/guest/rooms/{id}/invites/{invite_id}` | Отзыв кода владельцем; повторный отзыв идемпотентен |
 | `POST /api/guest/rooms/join` | Гостевой Account вступает по коду; квота блокируется транзакционно, повтор уже состоявшегося вступления не расходует использование |
 | `POST /api/mini/session` | Обмен проверенного `initData` на короткую сессию |
+| `POST /api/mini/session/resume` | Возобновление по подписанному `init_data` только для уже существующей Telegram identity; не создаёт User/Account/identity |
 | `DELETE /api/mini/session` | Выход; никакие игровые записи не удаляются |
 | `GET /api/mini/me` | Только свой ID, имя из БД, точный счёт и число ответов |
 | `GET /api/mini/chats` | Своя история участия и собственные счётчики по чатам |
@@ -181,6 +333,67 @@ ID и баллы передаются строками без потери то�
 сохраняются через тот же revisioned `SettingsService`, что и настройки бота; обычные
 участники видят только доступную им статистику и не могут менять параметры чата.
 
+## Alchemy: подтверждённые экспедиции
+
+После миграции `20261009_0025` доступны
+`POST /api/{guest|mini}/alchemy/claim-stage` и гостевой `/alchemy/craft`.
+Команда этапа принимает только `{command_id, stage_id, catalog_revision}`;
+команда опыта — только `{command_id, ingredient_a, ingredient_b}`. JSON до 512
+байт, неизвестные и дублирующиеся поля отклоняются. Cookie-записи требуют точный
+Origin и `X-Guest-CSRF: 1` / `X-Mini-CSRF: 1`; гостевые craft/claim/sync также
+требуют `X-Guest-Account` текущего аккаунта.
+Telegram sync/craft/claim также требуют `X-Mini-User` — десятичную строку
+`user_id` из исходного `/api/mini/me`. Сервер сверяет её с текущим User в той же
+транзакции до записи: смена cookie в другой вкладке даёт 409 `profile_changed`,
+а отсутствие заголовка — 422. GET `/api/mini/alchemy` тоже сверяет этот заголовок,
+если он передан; старые карточки без заголовка сохраняют совместимость.
+Авторизация, блокировка прогресса,
+проверка условий и запись квитанции выполняются одной транзакцией под moderation
+fence. Telegram `User` для гостя не создаётся.
+
+Сервер проверяет все `goals` по `verified_discovered`, результаты `craft` по
+каталожным рецептам из `verified_crafted` и наличие всех предыдущих этапов той же
+кампании. Локальные `claims`, импортированные открытия, рецепты и счётчики не
+подтверждают право на печать. `catalog_revision` — SHA-256 UTF-8 канонического
+JSON всего `data.json`: сортировка ключей, разделители `,` и `:`, без ASCII escape.
+Revision выдаёт сервер; клиент не должен подставлять старый хэш отчёта сборки.
+
+Sync/craft/claim возвращают `catalog_revision`, `claims` (ID подтверждённых
+этапов), `expedition_points` и `claim_receipts`. Квитанция содержит `stage_id`,
+`campaign_id`, revision принятого каталога, snapshot `reward: {points, seal}` и
+`claimed_at`. Очки экспедиций — сумма сохранённых snapshot; они не меняют
+`User.global_score`, дневной лимит или исторический `points_total` Alchemy.
+Claim также возвращает `command_id`, `stage_id`, `reward` и
+`awarded_expedition_points`. Повтор того же ID и payload возвращает точный
+сохранённый ответ, даже после изменения каталога; новая команда уже полученного
+этапа возвращает нулевое начисление. Уникальность `(account_id, stage_id)` и
+блокировка прогресса защищают параллельные запросы. ID команды глобален в своей
+таблице; чужой аккаунт или иной payload с тем же ID получает конфликт.
+
+Sync/craft/claim содержат массивы `verified_discovered` и `verified_crafted`.
+Sync/craft также возвращают `crafted` и `attempts`, позволяя восстановить рецепты
+после очистки локального cache. Пустой sync монотонно читает сохранённую коллекцию.
+Гостевой GET `/api/guest/alchemy` возвращает ту же подробную проекцию. Исторический
+GET `/api/mini/alchemy` сохраняет числовые `discovered`/`verified_discovered` для
+карточки рейтинга; подробные поля проверки там — `verified_discovered_ids` и
+`verified_crafted`. Гостевой craft подтверждает цепочку для экспедиций, но
+`awarded=0`, без общего score и `AchievementGrant`; Telegram craft сохраняет
+прежние проверенные рейтинговые награды.
+
+Ошибки: 401 — сессия завершена/отозвана или профиль заблокирован; 403 — CSRF;
+400 — структура команды; 413 — тело слишком большое; 415 — не JSON; 422 —
+неизвестный рецепт/этап или отсутствие actor header. Конфликты 409 имеют `code`:
+`profile_changed` (вкладка принадлежит другому игроку), `catalog_changed`, `stage_ineligible` или
+`command_reused` (claim ID использован иначе). Не следует считать любой 409
+сменой аккаунта. Ошибки транзакции не сохраняют частичную печать или квитанцию.
+
+Миграция не повышает legacy/local claims до подтверждённых. Старый неподтверждённый
+craft остаётся неизменяемой квитанцией; после законного получения ингредиентов
+новый ID той же пары может подтвердить рецепт. Ограничение UNIQUE пары удалено;
+повторы наград предотвращают серверные verified-наборы. Гостевой аккаунт после
+утраты cookie всё ещё нельзя восстановить на другом устройстве без отдельного
+linking/recovery flow. Миграция не применена к dev/production автоматически.
+
 ## HTTP и эксплуатационные ограничения
 
 - Единственный явный origin; межсайтовые запросы запрещены, CORS не включён.
@@ -198,9 +411,13 @@ ID и баллы передаются строками без потери то�
 
 Для отдельной роли Mini App нужны CONNECT/USAGE соответствующей БД/схемы,
 SELECT на `users`, `chats`, `chat_members`, `quiz_sessions`, а также
-SELECT/INSERT/UPDATE/DELETE на `mini_app_sessions`. Гостевой вход и сохранение
+SELECT/INSERT/UPDATE/DELETE на `mini_app_sessions`. Первый Telegram-вход также требует
+INSERT и UPDATE `account_id` на `users`, SELECT/INSERT на `accounts` и
+`account_identities`, USAGE на sequence `account_identities.id`; row locks требуют
+соответствующие UPDATE-права. Гостевой вход и сохранение
 «Алхимии» дополнительно требуют SELECT/INSERT/UPDATE на `accounts`,
-`guest_sessions`, `alchemy_progress`, `alchemy_craft_commands`; выход отзывает строку
+`guest_sessions`, `alchemy_progress`, `alchemy_craft_commands`,
+`alchemy_stage_claims`, `alchemy_claim_commands`; выход отзывает строку
 в `guest_sessions`. Импортная Telegram-синхронизация «Алхимии» не меняет рейтинг.
 Только проверенная craft-команда обновляет `users.global_score` и пишет достижения,
 поэтому ей нужны соответствующие права на `users` и `achievement_grants`.

@@ -1,0 +1,880 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "night-city-case/1",
+  "title": "Ночной город — дело (формат night-city-case/1)",
+  "description": "Строгая схема дела. Все ссылки — по id внутри одного файла. Лишние поля запрещены. Смысловые проверки (непротиворечивость, достижимость, утечки) выполняет валидатор, а не схема: см. docs/tasks/NIGHT_CITY_CASE_AUTHORING.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "meta",
+    "setting",
+    "locations",
+    "characters",
+    "facts",
+    "evidence",
+    "dialogues",
+    "variants",
+    "endings"
+  ],
+  "properties": {
+    "schema": {
+      "const": "night-city-case/1"
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "title",
+        "genre",
+        "language",
+        "players",
+        "supernatural",
+        "content_flags",
+        "author",
+        "summary",
+        "npc_name_era"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "genre": {
+          "enum": [
+            "noir",
+            "classic",
+            "mystic"
+          ]
+        },
+        "language": {
+          "const": "ru"
+        },
+        "players": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 12
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 12
+            }
+          }
+        },
+        "supernatural": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "real",
+            "rules"
+          ],
+          "properties": {
+            "real": {
+              "type": "boolean"
+            },
+            "rules": {
+              "type": "string",
+              "maxLength": 1200
+            }
+          }
+        },
+        "content_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 8,
+          "items": {
+            "enum": [
+              "crime_violence_mild",
+              "death_offscreen",
+              "alcohol",
+              "mild_horror",
+              "none"
+            ]
+          }
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "human",
+                "model"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/text"
+        },
+        "npc_name_era": {
+          "enum": [
+            "ru_modern",
+            "ru_1900_1930",
+            "ru_1930_1960",
+            "neutral"
+          ],
+          "description": "Эпоха пула случайных имён NPC (пул ведёт сервер, не автор дела)."
+        }
+      }
+    },
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blurb",
+        "crime",
+        "days"
+      ],
+      "properties": {
+        "blurb": {
+          "$ref": "#/$defs/text"
+        },
+        "crime": {
+          "$ref": "#/$defs/text"
+        },
+        "days": {
+          "const": 7
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "text",
+          "connects"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "name": {
+            "$ref": "#/$defs/title"
+          },
+          "text": {
+            "$ref": "#/$defs/text"
+          },
+          "connects": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 9,
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      }
+    },
+    "characters": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "title_forms",
+          "gender",
+          "bio",
+          "tier",
+          "can_be_player",
+          "faction",
+          "personal_goal",
+          "secret",
+          "home",
+          "schedule_overrides",
+          "voice"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "title": {
+            "$ref": "#/$defs/title",
+            "description": "Название роли/должности героя, например «Экономка». Имени у героя нет: игрок играет под своим именем, NPC получает случайное имя от сервера при старте."
+          },
+          "title_forms": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gen",
+              "dat",
+              "acc",
+              "ins",
+              "prep"
+            ],
+            "properties": {
+              "gen": {
+                "$ref": "#/$defs/title"
+              },
+              "dat": {
+                "$ref": "#/$defs/title"
+              },
+              "acc": {
+                "$ref": "#/$defs/title"
+              },
+              "ins": {
+                "$ref": "#/$defs/title"
+              },
+              "prep": {
+                "$ref": "#/$defs/title"
+              }
+            },
+            "description": "Падежные формы title (родительный, дательный, винительный, творительный, предложный), строчными буквами. Имена не склоняются, склоняются только названия ролей."
+          },
+          "gender": {
+            "enum": [
+              "f",
+              "m"
+            ],
+            "description": "Грамматический род героя для согласования глаголов в текстах."
+          },
+          "bio": {
+            "$ref": "#/$defs/text"
+          },
+          "tier": {
+            "enum": [
+              "core",
+              "support",
+              "optional"
+            ]
+          },
+          "can_be_player": {
+            "type": "boolean"
+          },
+          "faction": {
+            "enum": [
+              "investigation",
+              "shadow",
+              "independent"
+            ],
+            "description": "Фракция по умолчанию. Виновный и сообщники варианта получают shadow независимо от этого поля."
+          },
+          "personal_goal": {
+            "$ref": "#/$defs/text"
+          },
+          "secret": {
+            "$ref": "#/$defs/text"
+          },
+          "home": {
+            "$ref": "#/$defs/id",
+            "description": "Место по умолчанию во всех окнах."
+          },
+          "schedule_overrides": {
+            "type": "array",
+            "maxItems": 14,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "windows",
+                "location"
+              ],
+              "properties": {
+                "windows": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 14,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 14
+                  }
+                },
+                "location": {
+                  "$ref": "#/$defs/id"
+                }
+              }
+            }
+          },
+          "voice": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Короткая подсказка о манере речи для оформителя реплик."
+          }
+        }
+      }
+    },
+    "facts": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 120,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text",
+          "kind",
+          "visibility",
+          "true_in"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "text": {
+            "$ref": "#/$defs/shorttext"
+          },
+          "kind": {
+            "enum": [
+              "event",
+              "alibi",
+              "motive",
+              "object",
+              "relation",
+              "secret"
+            ]
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "hidden"
+            ],
+            "description": "public — известен всем с начала; hidden — игроки узнают через улики."
+          },
+          "true_in": {
+            "$ref": "#/$defs/factTruth"
+          },
+          "at": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "character",
+              "location",
+              "window"
+            ],
+            "properties": {
+              "character": {
+                "$ref": "#/$defs/id"
+              },
+              "location": {
+                "$ref": "#/$defs/id"
+              },
+              "window": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 14,
+                "description": "0 — ночь перед началом дела."
+              }
+            },
+            "description": "Для фактов вида «персонаж X был в месте Y в окне N». Нужно для автоматической проверки алиби."
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 150,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "text",
+          "kind",
+          "fact",
+          "found",
+          "exists_in",
+          "requires",
+          "reliability",
+          "mentions"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "title": {
+            "$ref": "#/$defs/title"
+          },
+          "text": {
+            "$ref": "#/$defs/text"
+          },
+          "kind": {
+            "enum": [
+              "physical",
+              "document",
+              "trace",
+              "testimony"
+            ]
+          },
+          "fact": {
+            "$ref": "#/$defs/id",
+            "description": "Факт, который улика раскрывает. Для testimony — то, что утверждает свидетель; в вариантах, где факт ложен, свидетель лжёт или ошибается."
+          },
+          "found": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "via",
+                  "location",
+                  "windows"
+                ],
+                "properties": {
+                  "via": {
+                    "const": "examine"
+                  },
+                  "location": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "windows": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 14
+                    },
+                    "description": "[с какого окна, по какое включительно]"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "via"
+                ],
+                "properties": {
+                  "via": {
+                    "const": "dialogue"
+                  }
+                }
+              }
+            ]
+          },
+          "exists_in": {
+            "$ref": "#/$defs/variantSet",
+            "description": "В каких вариантах улика существует. Физические улики существуют только там, где их факт истинен."
+          },
+          "requires": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "description": "Улики, которые нужно получить раньше."
+          },
+          "reliability": {
+            "enum": [
+              "solid",
+              "doubtful"
+            ]
+          },
+          "key_for": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "description": "Варианты, для которых улика входит в ключевые доказательства."
+          },
+          "misleads_toward": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "description": "Персонажи, на которых улика ложно указывает (ложный след)."
+          },
+          "debunked_by": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "description": "Улики, которые опровергают ложный след."
+          },
+          "mentions": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 12,
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "description": "Все факты, которых касается текст улики."
+          }
+        }
+      }
+    },
+    "dialogues": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "character",
+          "text",
+          "valid_in",
+          "mentions",
+          "options"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "character": {
+            "$ref": "#/$defs/id"
+          },
+          "text": {
+            "$ref": "#/$defs/text"
+          },
+          "valid_in": {
+            "$ref": "#/$defs/variantSet"
+          },
+          "mentions": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 12,
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "options": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "label",
+                "goto",
+                "grants",
+                "requires"
+              ],
+              "properties": {
+                "label": {
+                  "$ref": "#/$defs/shorttext"
+                },
+                "goto": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "grants": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "maxItems": 3,
+                  "items": {
+                    "$ref": "#/$defs/id"
+                  }
+                },
+                "requires": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "maxItems": 3,
+                  "items": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "culprit",
+          "accomplices",
+          "motive",
+          "method",
+          "key_evidence",
+          "min_key",
+          "compositions",
+          "final_text"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "culprit": {
+            "$ref": "#/$defs/id"
+          },
+          "accomplices": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "motive": {
+            "$ref": "#/$defs/text"
+          },
+          "method": {
+            "$ref": "#/$defs/text"
+          },
+          "key_evidence": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "min_key": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "compositions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                4,
+                5,
+                8,
+                12
+              ]
+            },
+            "description": "Составы, на которых вариант допустим."
+          },
+          "final_text": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "window",
+          "text",
+          "effect"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "window": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 14
+          },
+          "text": {
+            "$ref": "#/$defs/text"
+          },
+          "effect": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "none"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "fact"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "reveal_fact"
+                  },
+                  "fact": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "location",
+                  "windows"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "lock_location"
+                  },
+                  "location": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "windows": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 14,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 14
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "endings": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "trigger",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "trigger": {
+            "enum": [
+              "accusation_proven",
+              "accusation_unproven",
+              "shadow_framed",
+              "evidence_destroyed",
+              "no_investigators",
+              "final_hearing",
+              "frozen"
+            ]
+          },
+          "variant": {
+            "$ref": "#/$defs/id"
+          },
+          "text": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^{}]*$"
+    },
+    "shorttext": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200,
+      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$",
+      "description": "Ссылки на героев: {c:id} — имя (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже. Иных фигурных скобок быть не должно."
+    },
+    "variantSet": {
+      "oneOf": [
+        {
+          "const": "all"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      ]
+    },
+    "factTruth": {
+      "description": "\"all\" — истинен во всех вариантах; \"none\" — ложен во всех вариантах (для заведомо ложных утверждений, например слов лгущего свидетеля); список id вариантов — истинен только в них.",
+      "oneOf": [
+        {
+          "const": "all"
+        },
+        {
+          "const": "none"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      ]
+    }
+  }
+}

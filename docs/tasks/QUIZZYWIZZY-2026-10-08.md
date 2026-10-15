@@ -4,9 +4,180 @@
 - **Scope:** dev repository only; production is explicitly out of scope.
 - **Source contract:** [audit specification](../audits/2026-10-08/QuizzyWizzy_AUDIT_SPEC_2026-10-08.md), [task pack](../audits/2026-10-08/QuizzyWizzy_CODEX_TASK_PACK_2026-10-08.md), [finding index](../audits/2026-10-08/QuizzyWizzy_AUDIT_INDEX_2026-10-08.json).
 - **Baseline:** `main` at `aeeab2b358014934521d401d7a113a4769b41e46`; working tree clean when adopted.
-- **Owner decisions:** unresolved decisions in the audit remain open; do not infer Mafia timing, Photo group policy, recovery/identity merges, historic points policy, or Farmer scope/balance.
+- **Owner decisions:** unresolved decisions in the audit remain open; Photo group direction, scoring and answer visibility were clarified on 2026-10-13. Do not infer Mafia timing, recovery/identity merges, historic points policy, or Farmer scope/balance.
+
+## Owner direction: shared game rooms and invitations — 2026-10-13
+
+Photo may be played in a Telegram group or in an application room with a room chat where every participant can write an answer. Every correct participant before the round deadline earns points; participants' answers remain hidden from other players until the round ends. During an open round, a private answer action is separate from public room chat; the answers can be shown to the room only after the round closes. A Telegram group shows the image, timer and results; its answer button opens the private Mini App form for the same room/game/round. Ordinary group messages are never treated as hidden answers. The owner wants both permanent Account-level friends and room invitations as separate actions; joining a room does not automatically add a friend, and Farm neighbor links do not automatically become Account friendships. Existing `RoomInvite` is a room-specific starting point. Implement shared invitation/room entry for Classic, Photo and future games, with authorization, revocation, expiry and anti-duplicate join semantics. Telegram group play and application-room play must use the same server-owned game transitions and scoring. Mirroring public chat between Telegram and application remains a separate transport design decision; a shared game does not depend on that mirror. The current personal Room Photo slice stays available as a separate mode until group semantics are implemented and accepted.
+
+QW-11 implementation order: (1) shared Account friend requests plus reusable Room invitations and deep links, preserving existing Farm neighbor relationships; (2) versioned `solo|group` Photo state and per-Account round attempts/ledger so one player's error or success cannot close or alter another's attempt; (3) persistent room chat with separate private answer command, deadline disclosure and Telegram group button to the same room/round; (4) both clients and worker using the same transitions. Replays and simultaneous deadline/answer must award each Account at most once; open-round projections, events and notifications must not expose another player's answer or success. Existing solo games keep their current rules and data. A Telegram-group text message is public by nature and cannot satisfy the hidden-answer rule.
 
 The attached task pack is adopted as the implementation order. Its statements are hypotheses/specification until independently confirmed against this checkout. Production deployment, data deletion, live Telegram use, and sending notifications are excluded.
+
+## Standalone personal Photo dev slice — 2026-10-09
+
+Implemented Room Photo as the room owner's personal creator-only series, using
+shared Photo domain transitions, verified catalog selection and scoring. State
+stores explicit room/account identity, per-series score, receipts and deadlines;
+no fake Telegram IDs, Telegram/global score linking or Room notification outbox.
+Only the owner starts/stops their series; other active members see neutral
+occupancy, and cannot see image, feedback or results. AUD-019 group Photo policy
+remains `OWNER_DECISION_REQUIRED`; this personal slice does not answer it.
+
+New starts are default-off with independent `MQB_ROOM_PHOTO_ENABLED=1` behind
+the guarded `MQB_DEV_GUEST_ENABLED=1` synthetic loopback guest gate. Existing
+series remain readable/playable with the start flag off. No new migration is
+needed. Persistent dev schema, feature flags and containers were not changed.
+Production, live Telegram, cloud CI, deleting programs/files, commit/push remain
+out of scope; all pre-existing dirty-tree changes were preserved.
+
+Start receipts are checked under room/command locks before random selection or
+replacement; answer/stop use exact actor/room/game scope and savepoints. Images
+require the creator's guest cookie and exact current game/round, use neutral
+headers and `no-store`, and reject stale/replaced/foreign media. Worker Room Photo
+candidates use game IDs; Telegram Photo due/delivery excludes null chat IDs.
+Guest application authorization now acquires the shared moderation fence before
+Session/Account reads/locks. Classic/Photo service access revalidates Account after
+the fence. Real PG tests exercise admin/guest in both lock orders, stale moderation
+revision/blocked accounts, 401 rejection before mutations and no deadlock.
+
+Fresh focused evidence: the existing mounted dev container ran
+`tests/test_room_photo.py tests/test_room_classic.py tests/test_photo_cross_ui.py
+tests/test_photo_quiz_scoring.py tests/test_game_deadlines.py
+tests/test_guest_accounts.py tests/test_game_worker_concurrency.py`: **38 passed,
+0 skipped, 5 warnings in 41.29s** against `morning_quiz_test`, including disposable
+schema Photo/Classic acceptance, concurrent answer/worker/receipts, privacy/media
+and the offline Telegram↔Mini App Photo journey. Three warnings are existing PTB
+ConversationHandler warnings; two are read-only container pytest-cache warnings.
+Host Python lacks `apscheduler`, so that Telegram journey ran in the existing
+container with its locked dependencies. All JS suites: **76 passed / 0 skipped**.
+Final focused rerun after the dev-flag and delivery assertions:
+`tests/test_room_photo.py tests/test_photo_cross_ui.py tests/test_game_deadlines.py
+tests/test_room_classic.py`: **23 passed / 0 skipped / 3 existing PTB warnings
+in 16.06s**. Project checks, `git diff --check` and **17** project gate unit tests passed.
+
+Five new DOM tests cover personal Photo start/answer/stop, disabled starts and
+occupancy privacy, retry-stable command IDs across navigation, catalogue/media
+retry, one poll in flight, and draft/focus preservation through hints. Five
+mount/navigate/close cycles return active timers and window listener count to
+baseline; five cancelled-read cycles return pending requests to zero, and repeated
+pagehide cleanup is idempotent. These are measured DOM/fetch counters, not a claim
+of complete native/browser leak freedom. The resource-lifecycle skill guided
+explicit ownership of timer/request cancellation and these repeat-cycle checks.
+
+Independent focused review closed two UI retry/polling issues and reported no
+remaining P0–P2. Final `pwsh -File scripts/Test-LocalMilestone.ps1` passed:
+the local image rebuilt, only `morning_quiz_test` was reset, migration from blank
+through `20261009_0024` passed, `alembic check` reported no new operations, full
+pytest/dump-restore **712 passed / 0 skipped / 35 warnings in 280.74s**, and all
+included JS syntax checks passed. JUnit: `.local/acceptance/tests.xml`. This full
+gate reused the guarded local Docker workflow, not cloud CI or live Telegram.
+Read-only persistent dev snapshots before/after matched: schema `0024`, accounts=2,
+games=14, users=2, guest_sessions=0, classic_account_answers=0. Existing persistent
+dev services were not restarted and no guest/Photo flag was switched on.
+Real browser/Telegram WebView, retained dev-backup restore and accepted release
+remain open. QW-04/QW-05/QW-06 remain `in_progress`.
+
+## Standalone Classic dev slice — 2026-10-09
+
+Implemented guest Room Classic through shared domain transitions/scoring arithmetic,
+account answer ledger (`20261009_0024`, additive only), owner/member authorization,
+immutable answers and transactional command receipts. Start receipts bind original
+parameters before random question selection and survive current-game replacement.
+Independent worker settles Room games by `game_id`; no fake Telegram identity or
+Room notification outbox. Scores are per-game; historical Telegram/global score
+linking is not claimed. Room UI uses direct guest commands, retains accepted-answer
+feedback after immediate advancement, watches rematches and cancels polling on exit.
+
+New starts are default-off. Guarded synthetic loopback dev requires separate
+`MQB_DEV_GUEST_ENABLED=1` and `MQB_ROOM_CLASSIC_ENABLED=1`; the Telegram whitelist
+is always retained, including when the synthetic token signs an arbitrary ID.
+Turning off new starts preserves existing guest gameplay when guest access remains on.
+The implementation/test run did not change persistent dev data. The subsequent
+additive dev migration is recorded below. No production write, live Telegram,
+program removal, commit/push or cloud CI was performed. Existing user data and
+source changes were preserved.
+
+Fresh final evidence: `pwsh -File scripts/Test-LocalMilestone.ps1` rebuilt the dev
+image, migrated only the disposable test DB from blank through `20261009_0024`,
+passed clean Alembic check, **701 passed / 35 warnings / 0 skipped in 263.73s**,
+dump/restore and JavaScript syntax checks. JUnit: `.local/acceptance/tests.xml`.
+All JavaScript suites (`node --test tests/js/*.test.cjs`) **71 passed / 0 skipped**.
+Focused worker/Room/domain tests **18 passed / 0 skipped in 6.97s**; project checks,
+diff whitespace and 17 Git gate unit tests passed. The earlier full attempt had one
+outdated worker mock failure; the mock now covers Room candidates, duplicates and
+failure isolation, and the final full rerun passed.
+
+Additive migration is exercised in a disposable schema against an existing
+populated game and refuses destructive downgrade. Savepoint tests prove receipt
+rollback when an adapter catches invalid answers. `accepted_answer` is scoped to
+the submitted round and actor, including B answering still-open Q1 after A/worker
+already opened Q2; the response keeps Q2 spoiler-safe. UI tests cover that race,
+the final question result, uncertain command replay, rematch and repeated timer
+cleanup. Independent review found no P0–P2 issues. Documentation at that Classic
+checkpoint distinguished gated guest Room Classic from the then-absent guest Photo;
+restoration of the retained dev backup and actual browser/WebView acceptance remain open.
+QW-04/QW-05/QW-06 remain `in_progress`; this is implemented dev code, not an
+accepted release or complete platform parity.
+
+## Persistent dev migration evidence — 2026-10-09
+
+The owner applied additive migration `20261009_0024` to the persistent dev
+database after creating backup
+`.local/acceptance/backups/qw-room-classic-pre0024-20261009.dump` (793,180 bytes,
+SHA-256 `6CB8BE37A41A0E8D982247AC93E972D4776CABC5CFFAE28AFB411F228E0C5CA8`).
+`pg_restore -l` exited 0 and listed 232 TOC entries; this archive was not restored
+in a rehearsal. Alembic was at `0023` before the change, upgraded to `0024` with
+exit 0, and `alembic check` is clean. Counts before and after remained accounts=2,
+games=14, farm_states=1, users=2, guest_sessions=0; the new
+`classic_account_answers` table has 0 rows. Feature flags remained off. The
+existing Mini App and game-worker containers were restarted in place to load
+the code; Mini App returned healthy, `/app` and `/app/farm` returned 200, and
+`/api/mini/config` still reported `private_test=true`, `guest_enabled=false`,
+`room_classic_enabled=false`. No production/live Telegram operation,
+program/file deletion, commit or push occurred. Persistent dev migration is now recorded, but
+backup restore rehearsal, browser/WebView acceptance and release criteria remain
+open; the QW packages remain `in_progress`.
+
+## Follow-up: Farm rate migration in persistent dev
+
+After the earlier `20261009_0024` update, the owner applied additive Farm
+migration `qw_farm_011` to persistent dev after creating
+`.local/acceptance/backups/qw-farm-rate-pre011-20261009.dump` (795,609 bytes,
+SHA-256 `8C105BF3D80836E43DD7D3354D25855F743256DBF44F046EB13867A6ECA89980`).
+`pg_restore -l` exited 0 and listed 237 TOC entries; the backup was not restored
+in a rehearsal. Before and after counts were unchanged: accounts=2, games=14,
+farm_states=1, users=2, classic_answers=0. The new `farm_rate_buckets` table has
+0 rows, and `alembic check` is clean.
+
+The Mini App container was restarted in place and is healthy. Its observed
+configuration remains `room_classic_enabled=false`, `room_photo_enabled=false`,
+`private_test=true`, `guest_enabled=false`; `QW_FARM_SHARED_RATE_ENABLED` is
+unset/off. Real WebView and HTTPS acceptance remain open. No production/live
+Telegram operation, installed program/file deletion, commit or push occurred.
+This is the current persistent dev migration record; the earlier `0024` section
+above describes the prior additive migration. Backup restore rehearsal and
+release criteria remain open.
+
+## Follow-up: standalone room self-leave in dev
+
+Invited non-owner members can now leave an idle or terminal standalone room
+through the shared room service, guest API and Mini App UI. Membership is marked
+inactive without deleting game history or scores; owner leave and leave during
+an active Classic/Photo game or Mafia lobby/phase are rejected. A membership
+version prevents an old leave request from removing access after rejoining via
+a valid invitation. Standalone Mafia rematches include only currently active
+members, while the finished game's roster remains unchanged. This is not yet a
+policy for abandoning an active game or transferring room ownership.
+
+Focused isolated PostgreSQL/ASGI checks: **56 passed / 0 skipped** (including
+real leave-vs-start and leave-vs-Mafia-restart races in both orders). Related
+JavaScript checks: **64 passed / 0 skipped**; project checks, diff check and
+17 gate unit tests passed. Independent final review found no P0–P2 issues.
+This is dev code in the dirty working tree: the persistent dev container was
+not replaced, no live browser or Telegram WebView acceptance was performed,
+and production, installed programs and user data were untouched. QW-05/QW-08
+remain `in_progress`.
 
 ## Environment evidence
 
@@ -16,11 +187,12 @@ The attached task pack is adopted as the implementation order. Its statements ar
 | Initial worktree | clean |
 | Alembic head | `20261008_0021`; clean blank-to-head PostgreSQL migration and `alembic check` passed in the disposable test DB; existing local dev DB upgraded in place |
 | Docker / PostgreSQL | Docker Engine 28.5.1; one dev PostgreSQL container at `127.0.0.1:55433`; `morning_quiz_dev` and persistent volume preserved |
-| PostgreSQL milestone | `scripts/Test-LocalMilestone.ps1`: migrations from blank through `20261008_0021`, `alembic check` clean, full pytest + regression + dump/restore passed; only disposable `morning_quiz_test` is reset |
-| Full pytest suite | **620 passed, 35 warnings, 0 skipped** in the latest containerized PostgreSQL milestone (309.69s) |
-| Local dev stack | Existing `morning_quiz_dev` upgraded in place to `20261008_0021`; 10 games, 1 game player, 2 users and 2 accounts retained. PostgreSQL, game-worker, healthy admin and Mini App running; Telegram intentionally not started |
+| PostgreSQL milestone | Last completed `scripts/Test-LocalMilestone.ps1`: migrations from blank through `20261008_0021`, `alembic check` clean, full pytest + regression + dump/restore passed; only disposable `morning_quiz_test` is reset. Latest rerun could not resolve Docker Hub for `python:3.13-slim` before tests/reset began |
+| Full pytest suite | Last full container milestone: **620 passed, 35 warnings, 0 skipped** (309.69s). After QW-02 body hardening, local full pytest: **618 passed, 3 skipped, 66 warnings** (432.31s); QW-06 callback changes are covered by the focused suite recorded below |
+| Latest changed-slice tests | Current mounted container ran `tests/test_mini_app.py`, `tests/test_admin_auth.py`, `tests/test_telegram_test_scope.py`, and `tests/test_dev_operations.py`: **129 passed, 8 warnings in 52.06s**. `project_checks.py --worktree` and `git diff --check` passed |
+| Local dev stack | Existing `morning_quiz_dev` remains at `20261008_0021`; 10 games, 1 game player, 2 users and 2 accounts retained. PostgreSQL, game-worker, admin and Mini App are healthy; Telegram intentionally not started. App services run the current checkout through read-only source mounts using the existing local Python 3.13 image; `.local` is the only writable host mount. Only static `data/questions`, `data/images`, and `data/global/categories.json` are mounted; legacy mutable `data/*.json` files are not mounted. |
 | Dev backup/restore | Pre-`0021` snapshot `d93a8691716c478a8a723085c166221c` and post-`0021` snapshot `fee42006d7ca46ceb6fc0c2487b5c99b` restored/verified (31 tables, 200 files each); `dev_database_changed=false`. Earlier snapshots retained |
-| Dev HTTP acceptance | After applying current image and migration `0021`, `scripts/check_dev_http.py` and `scripts/smoke_mini_app.py --base-url http://127.0.0.1:4185 --dev` passed; offline runtime start/command/stop covered, no Telegram calls. |
+| Dev HTTP acceptance | With the current checkout mounted and migration `0021`, `scripts/check_dev_http.py` and `scripts/smoke_mini_app.py --base-url http://127.0.0.1:4185 --dev` passed; offline runtime start/command/stop covered, no Telegram calls. |
 | Dependency check | `python-multipart==0.0.32` installed in project `.venv-local`; manifests and lock agree |
 | Project Context Hub | project inventory has no entry matching this repository root; Hub context/tools/questions/maintenance cannot be queried without a matching project ID |
 
@@ -30,15 +202,16 @@ The attached task pack is adopted as the implementation order. Its statements ar
 | --- | --- | --- | --- |
 | QW-00 | Rebaseline and evidence matrix for AUD-001…028; reproduce 001/002/007/008 | `baseline_recorded_runtime_gaps` | Clean baseline, static confirmations and isolated reproducers captured; PG schema/live reproduction remain unverified. |
 | QW-01 | Make Alchemy rewards server-authoritative; preserve imported progress and historic points | `in_progress` | Code and additive migration implemented; full containerized PostgreSQL milestone (including regression and backup/restore) passes. Production data migration/release is out of scope. |
-| QW-02 | PostgreSQL-only defaults, dependency/security/config and token handoff | `in_progress` | Multipart dependency fixed; browser auth uses HttpOnly same-origin cookie with Origin/CSRF checks; runtime defaults fail closed on JSON. Dev image and CI install hash-locked Python 3.13 test set and audit manifests/SBOMs. Full PG milestone passes; advisory query and GitHub CI execution remain. Preserve Telegram HMAC protections. |
+| QW-02 | PostgreSQL-only defaults, dependency/security/config and token handoff | `in_progress` | Multipart dependency fixed; browser auth uses HttpOnly same-origin cookie with Origin/CSRF checks; runtime defaults fail closed on JSON. Dev image and CI install hash-locked Python 3.13 test set and audit manifests/SBOMs. API/admin JSON bodies now reject oversized declared lengths before reading and enforce streaming caps across write routes. Local full pytest passes; advisory query and clean container rebuild remain. Cloud CI is intentionally not used. Preserve Telegram HMAC protections. |
 | QW-03 | Command idempotency and independent Mafia concurrency | `in_progress` | Mafia has a phase fence distinct from global revision, one immutable action/vote per player and phase; command replay identity includes game ID. Every application write now wraps receipt, transition, event and completed result in one savepoint so an adapter-caught domain error cannot commit a stuck receipt. Full PostgreSQL regression suite passes; production-like multi-worker stress/release rehearsal remains. |
-| QW-04 | Independent deadline/outbox worker | `in_progress` | Shared DB deadline processor and standalone dev worker; Telegram polling only drains notifications. Read-only outbox report cannot retry or resolve messages. Worker is running in unified dev Compose and isolates errors by game. Real-PG races cover Classic, Photo and Mafia. Independent OS workers prove one durable Classic transition and safe fresh-process restart. Tests distinguish explicit Telegram 429 retry from unknown outcome → `uncertain`; operator reconciliation and live delivery rehearsal remain. |
+| QW-04 | Independent deadline/outbox worker | `in_progress` | Shared DB deadline processor and standalone dev worker; Telegram polling only drains notifications. Read-only audit, atomic `uncertain → resolved` receipts and a protected local dev-admin reconciliation screen exist; no automatic resend. Claim-version fencing rejects late callbacks from an older send attempt, including with a reused worker ID. Worker is running in unified dev Compose and isolates errors by game. Real-PG races cover Classic, Photo and Mafia. Independent OS workers prove one durable Classic transition and safe fresh-process restart. Tests distinguish explicit Telegram 429 retry from unknown outcome → `uncertain`; live delivery rehearsal, orphan `sending` policy and full operational acceptance remain. |
 | QW-05 | Standalone account/room/identity and recovery | `in_progress` | `0017`–`0020` establish room/account storage; `0021` migrates persisted Mafia state to canonical room/account identity after all-game preflight. Telegram IDs remain only verified transport projections; domain no longer derives account IDs from Telegram IDs. Dev DB reached `0021` with legacy rows retained. Verified linking/recovery and owner decisions remain open. |
-| QW-06 | Remove MiniBridge and establish Classic/Photo parity | `in_progress` | Classic/Photo gameplay, resume, setup projection and launch use shared game services without synthetic PTB transcript. Photo deadline sync is POST; profile settings use shared revisioned SettingsService with fresh Telegram group-admin checks. Direct setup/start PG HTTP tests, JS navigation and local Mini App smoke pass. Legacy setup/callback compatibility paths, Telegram/WebView acceptance, group selection and Photo participant policy remain. |
+| QW-06 | Remove MiniBridge and establish Classic/Photo parity | `in_progress` | MiniBridge endpoints, PTB worker, fake Mini App Update dispatch, legacy runtime UI and fallback are removed. Direct Classic/Photo APIs remain backed by shared application services and PG; client retries preserve the same `command_id` after ambiguous network outcomes. Home-menu callbacks use original Telegram Updates, no-chat cards are disabled with connection guidance, and group settings use the revisioned SettingsService with fresh admin checks. Offline PostgreSQL Classic Bot↔Mini App lifecycle/receipt/score parity is covered in both orders by `tests/test_telegram_test_scope.py`; Photo cross-UI parity for answer/score/command and valid WebP is covered in both orders by `tests/test_photo_cross_ui.py` against one isolated PostgreSQL database. Photo final-answer replay after game completion preserves state and receipt invariants. Live Telegram/WebView rendering, group selection and Photo participant policy remain open. |
 | QW-07 | Question data QA, catalog and brand consistency | `in_progress` | Corrected known malformed rows and duplicate option; added canonical five-mode manifest and non-launchable Farmer card. Read-only audit compared all 63 categories / 6,706 rows in JSON with the disposable PG bank: 0 invalid rows, 0 seed mismatches, 20 duplicate groups (variants reported). Human editorial resolution, Farmer art/brand and responsive visual acceptance remain. |
-| QW-08 | Complete asynchronous Mafia lifecycle | `in_progress` | Shared domain transitions now power Telegram and room-only Mafia; standalone Mini App supports lobby, private role, night action, discussion, voting, deadlines and restart. Real-PG guest HTTP test covers invite→full game→restart; worker race is covered on Telegram-scoped games. Configurable phase timing, quiet hours, AFK, pause/leave/host transfer, room-only worker race and Telegram/WebView acceptance remain; policy decisions are needed. |
+| QW-08 | Complete asynchronous Mafia lifecycle | `in_progress` | Shared domain transitions now power Telegram and room-only Mafia; standalone Mini App supports lobby, private role, night action, discussion, voting, deadlines and restart. Real-PG guest HTTP test covers invite→full game→restart; standalone room terminal-vote deadline now has a two-OS-process PostgreSQL race and fresh-process replay test. Configurable phase timing, quiet hours, AFK, pause/leave/host transfer and Telegram/WebView acceptance remain; policy decisions are needed. |
 | QW-09 | Farmer MVP | `blocked_by_owner_decisions` | Balance and release-scope decisions are prerequisites. |
 | QW-10 | CI, backup/restore, end-to-end and release evidence | `in_progress` | Added pinned-action CI with disposable PostgreSQL 17, Alembic gates, full PG/backup-restore suite and JS/project checks; audits hash-locked deps and runtime manifest, verifies deterministic Alchemy artifacts, retains SBOM/JUnit. Local container milestone passes; GitHub CI has not run. Cross-mode E2E and release rehearsal remain. Production release needs separate explicit GO. |
+| QW-11 | Shared friends, invitations, room chat and group Photo | `proposed` | Owner direction: Telegram group and application room with participant answers; each correct participant scores, answers stay private until round end. Add separate Account friends and Room invitations; Telegram answer button opens a private Mini App form. Implement and accept across both clients. |
 
 ## Finding matrix
 
@@ -56,7 +229,7 @@ Statuses: `CONFIRMED_STATIC` means source code/config matches the finding; it do
 | AUD-008 | `FIX_IMPLEMENTED_PG_VERIFIED_TEST` | Replay identity now includes `game_id`; PostgreSQL-backed Mafia integration verifies the same command ID cannot replay a receipt across games. |
 | AUD-009 | `CONFIRMED_STATIC` | Guest recovery/linking flow absent/incomplete; QW-05. |
 | AUD-010 | `CONFIRMED_STATIC` | Guest capabilities are limited to Alchemy; QW-05. |
-| AUD-011 | `FIX_PARTIAL_STATIC_PG_NOT_VERIFIED` | Classic/Photo native play and resume no longer request the synthetic runtime transcript; group settings are editable in Mini App by Telegram admins through shared revisioned settings. Help and settings fallback are native screens; legacy quiz setup/callback/compatibility paths still use MiniBridge. Direct gameplay and Telegram duplicate-scoring remain to be verified against PostgreSQL. |
+| AUD-011 | `FIX_PARTIAL_OFFLINE_PG_VERIFIED` | Mini App Classic/Photo direct play, setup and resume no longer depend on MiniBridge; synthetic runtime/action/media routes and PTB worker are removed. `tests/test_telegram_test_scope.py::test_private_runner_real_handlers_menu_quiz_and_score` verifies a shared disposable-PG Classic game in Bot-first and Mini-first orders, including durable answer/receipt replay and no duplicate score or member-answer increments. Untracked `tests/test_photo_cross_ui.py` adds offline PTB plus Mini App ASGI Photo parity in both directions against the same isolated PostgreSQL database, with valid WebP and matching answer/score/command evidence (**1 passed**). Photo final-answer replay after completion is covered by three targeted `tests/test_mini_app.py` tests: replay leaves score/state/events/outbox/receipt unchanged; changed payload returns 409, a new ID returns 404, and the old ID after a new game returns 409. This is offline transport and database evidence only; live Telegram/WebView rendering and full Photo visual acceptance remain unverified. |
 | AUD-012 | `CONFIRMED_STATIC` | Mafia phase durations are hard-coded; policy decision needed before configurable defaults. |
 | AUD-013 | `CONFIRMED_STATIC` | Mafia lifecycle/discussion/AFK management incomplete; QW-08. |
 | AUD-014 | `CONFIRMED_STATIC` | Outbox uncertain-delivery reconciliation/operator procedure incomplete; QW-04. |
@@ -64,7 +237,7 @@ Statuses: `CONFIRMED_STATIC` means source code/config matches the finding; it do
 | AUD-016 | `NOT_VERIFIED` | Reported production drift is historical/context only; no production inspection authorized. |
 | AUD-017 | `CONFIRMED_STATIC` | In-memory rate limit keys by request client host; QW-02. |
 | AUD-018 | `FIX_IMPLEMENTED_SEED_PG_VERIFIED_TEST` | Corrected malformed seed entries and a control character in `Математика` #68. Read-only audit compared all 6,706 JSON rows against 63 test-PostgreSQL categories: 0 invalid rows and 0 seed hash mismatches; 20 duplicate groups remain in both sources for editorial review. |
-| AUD-019 | `OWNER_DECISION_REQUIRED` | Photo solo/group semantics cannot be selected from code evidence. |
+| AUD-019 | `OWNER_POLICY_RECORDED_IMPLEMENTATION_OPEN` | Group Photo is wanted in Telegram groups and application rooms. Every correct participant scores; answers are hidden until the round ends. Telegram answer button opens a private Mini App form. Permanent friends and room invites are separate. Implementation remains in QW-11. |
 | AUD-020 | `FIX_IMPLEMENTED_STATIC` | `application.game_catalog` is served in Mini App config; the home screen renders only catalog IDs, including Farmer as non-launchable `coming_soon`. Brand/accessibility review remains in QW-07. |
 | AUD-021 | `CONFIRMED_STATIC` | Farmer is a concept rather than a server-authoritative game; scope/balance decisions first. |
 | AUD-022 | `CONFIRMED_STATIC` | Runtime/dependency/setup manifests are inconsistent; QW-02/QW-10. |
@@ -76,6 +249,14 @@ Statuses: `CONFIRMED_STATIC` means source code/config matches the finding; it do
 | AUD-028 | `CONFIRMED_STATIC` | Account privacy/export/retention lifecycle incomplete; QW-05. |
 
 ## Adoption log
+
+- 2026-10-09 — Guest HTTP/PostgreSQL deadlock fix: `GuestAccounts.authorized(lock=True)` now requests `Account FOR NO KEY UPDATE`, compatible with roster/ledger FK `KEY SHARE`, while retaining `GuestSession FOR UPDATE` and the shared moderation fence; `resume` is unchanged. New real-ASGI/PG regressions pause Mafia restart before its roster insert and prove a concurrent repeated room join or Mafia ready request waits on its Room/game lock via `pg_blocking_pids`. Before the fix both races returned 503 and PostgreSQL logged two `deadlock detected` errors; after it both return 200, retain exact finished state/events/roster and correct new lobby/command receipts, with invite uses unchanged. Concurrent session commands and logout still wait, revoked-cookie writes return 401, and a waiting HTTP mutation observes the committed moderation block. Focused guest/auth/Alchemy/rooms/leave/Mafia/Mini App/Farm PG suites: **169 passed / 0 skipped in 83.43s**; after strengthening receipt/history assertions and adding concurrent logout, the final regression file passed **5 tests in 6.50s** (overlapping runs, not additive). Project checks, their **17** unittest cases and diff formatting passed. Independent final review found no P0–P2; the concurrent-logout and unchanged-invite-uses evidence follow-ups are covered. Canonical lock contract is in [STANDALONE_FOUNDATION](../engineering/STANDALONE_FOUNDATION.md). Tests ran with `docker exec` in the existing dev container against disposable `morning_quiz_test` schemas; no container removal/replacement, persistent dev/production write, live Telegram, file/program removal, commit/push or cloud CI was performed. No migration or release-ready claim.
+
+- 2026-10-09 — Telegram first-login integration gate: the fresh `Test-LocalMilestone.ps1` migrated disposable PostgreSQL from blank through `0023` and found no Alembic drift, but its full pytest exposed one admin regression: a moderation interruption attributed its event to the user it had just blocked. The event is now correctly system-authored (`actor_user_id`/`actor_account_id` null); focused real-PG moderation tests passed **2/2**. The full current tests service then passed **692 tests / 35 warnings / 0 skipped in 265.64s**, with clean Alembic check. Independent security review found no P0–P2. The dev `mini-app` container was restarted in place (not removed); `check_dev_http.py` passed with `telegram_calls=0`, all four dev services are running, and persistent dev remains at `0023`. No first-time live Telegram/WebView or public HTTPS acceptance is claimed; production, installed programs, cloud CI and Git remote were untouched.
+
+- 2026-10-09 — Telegram onboarding follow-up: the final isolated PostgreSQL onboarding file passes **22 tests / 0 skipped**, including preservation of an existing guest cookie/account when a distinct Telegram account is provisioned. This repeats overlapping scenarios from the focused runs below; counts are not additive.
+
+- 2026-10-09 — QW-05/QW-06 Telegram first-login slice: signed Mini App login now provisions only the missing User and one Account/verified Telegram AccountIdentity in one fenced transaction, retaining the existing login advisory lock. Existing profile, score, account ID and Alchemy progress are preserved; no guest merge, Chat or Room creation occurs. Shared storage mapping is used by Mini App, GameRepository and Farm; archived/blocked profiles or accounts, revoked-only/unverified/mismatched identities fail closed, and subsequent Mini/Farm requests and renew recheck the link. Invite acceptance no longer pre-seeds a Telegram User. Focused real PostgreSQL Mini/Farm/onboarding tests: **134 passed / 0 skipped**, extended onboarding/Mafia/invite tests: **34 passed / 0 skipped** (overlapping runs, not additive); concurrency covers separate and identical initData, Game-versus-login mapping, moderation fence and transactional rollback. JavaScript navigation/Alchemy/Farm tests: **60 passed / 0 skipped**; project checks, their **17** unittest cases and diff check passed. No migration is required. Independent review and live Telegram/WebView acceptance remain separate; no persistent dev/production data, installed programs, Telegram transport, cloud CI or Git publish was changed by this slice. QW-05/QW-06 remain `in_progress`.
 
 - 2026-10-08 — archive hash verified before extraction; source documents copied verbatim into `docs/audits/2026-10-08/`.
 - 2026-10-08 — adopted on the clean dev baseline above. Static inspection confirmed several audit findings; Docker/PG and Context Hub were unavailable, so no runtime or database claims are made.
@@ -135,4 +316,21 @@ Statuses: `CONFIRMED_STATIC` means source code/config matches the finding; it do
 - 2026-10-08 — QW-05 canonical Mafia identity slice: migration `20261008_0021` preflights every Mafia game and roster before changing state, then rewrites only `games.state` to version-2 room/account identity. Application/domain use resolved account IDs; Telegram identity remains in verified transport projections/receipts, not canonical state. Storage projection uses only active verified mappings; revocation clears only the transport projection, so account-based phase/deadline transitions continue. Regressions cover existing Telegram projection, read-only verified identity, and a deadline executing after one player's identity is revoked. Full container milestone: blank-to-`0021`, clean `alembic check`, **617 passed / 35 warnings / 0 skipped in 287.14s**, dump/restore and JS syntax passed. Pre-upgrade snapshot `d93a8691716c478a8a723085c166221c` restored/verified (31 tables, 200 files, source unchanged). Dev DB upgraded in place to `0021`; counts games=10, game_players=1, users=2, accounts=2; canonical active Mafia state verified. Rebuilt unified dev image; admin/Mini App/worker healthy; HTTP acceptance and Mini App smoke pass with `telegram_calls=0`. Production and Telegram remain untouched. Remaining: account linking/recovery policy, Mafia lifecycle owner decisions, room-only worker race and Telegram/WebView acceptance, GitHub CI and final release rehearsal.
 - 2026-10-08 — closeout rerun on final working tree: containerized milestone passed **617/617 in 293.91s** with 35 warnings and 0 skips; Alembic schema check clean; dump/restore and JS syntax checks passed. Rebuilt local dev image with `Start-LocalDevelopment.ps1` without resetting the persistent PostgreSQL volume; dev remains at `20261008_0021` with 10 games and 1 player. Admin/offline-runtime/Mini App HTTP acceptance and dev Mini App smoke passed (`telegram_calls=0`); a fresh post-migration snapshot `87738e654eb7411b83cb3ce7ab2e7ff7` restored/verified (31 tables, 200 files, source DB unchanged). Telegram and production remain untouched. Cloud CI was not run.
 - 2026-10-09 — independent final diff review caught Telegram identity reactivation after revocation and unbounded body buffering in three JSON write endpoints; both are fixed, with regression coverage. Alchemy craft test now uses a unique receipt ID to avoid cross-run contamination. Full local container milestone passed **620/620 in 309.69s** (35 warnings, 0 skipped), including blank-to-`0021`, `alembic check`, dump/restore and JS checks. Only disposable `morning_quiz_test` was reset; dev volume and production were not touched. Cloud CI was not run.
+- 2026-10-09 — QW-02 body-limit hardening: replaced buffered `request.body()` reads throughout Mini App JSON write routes with a shared Content-Length precheck plus bounded streaming; applied the same early length check and cumulative stream cap to admin login. Added oversized-declaration coverage across 29 legacy write routes. Independent review found no blocking gaps; focused tests passed **15/15**, project checks passed, and full local pytest passed **618 passed / 3 skipped / 66 warnings in 432.31s** using the existing local environment. `Test-LocalMilestone.ps1` could not rebuild its image because Docker Hub DNS was unavailable (`python:3.13-slim`); no cloud CI was run. Only `morning_quiz_test` was used; dev and production databases were not changed.
+- 2026-10-09 — QW-06 Telegram setup entry: the home-menu `nav:quiz`/`start_quiz` and `nav:photo` callbacks now enter the existing Classic/Photo setup conversations with their original Telegram Updates instead of synthetic command Updates. Setup edits the selected home card and button-cancel restores it; callback initiators are no longer misidentified as user command-message IDs. Offline dispatcher/runtime regressions forbid `as_command` for both game entries and verify cancel→home→re-enter→start plus Classic poll/score and Photo answer; **2 focused integration tests passed**. `tests/test_mini_app.py`, `tests/test_admin_auth.py`, and `tests/test_telegram_test_scope.py` passed **127 tests / 3 warnings** after the Classic change; project checks and diff formatting passed. Photo/Admin legacy adapters not related to home entry remain. Cloud CI was not used.
+- 2026-10-09 — QW-06 Mini App no-chat boundary: Classic and Photo cards require a selected Telegram chat; empty-chat home/chats screens explain `/start` or adding the bot to a group and provide the bot deep link. The play router independently stops missing-chat and unsupported-command routes before any game mount, preventing the normal app path from falling through to the transcript bridge. Corrected the JS DOM double to suppress activation on disabled buttons (matching browser behavior) and removed the impossible synthetic click from the regression. Combined Mini App JavaScript suites: **45 passed**. Independent review found the guard/UX coherent and no runtime blocker. The compatibility Bridge endpoint/client still exist; full removal and Bot↔Mini App PostgreSQL parity acceptance remain open. Cloud CI was not used.
+- 2026-10-09 — QW-06 direct-only gameplay slice: removed the MiniBridge routes, mailbox store/worker, synthetic Mini App-to-PTB dispatch, legacy `game-ui.js`, and play-screen fallback. Direct Classic/Photo application API remains the only supported app route; Bot transport allowlisting and outbox notifications are preserved. Dev preview now provisions only its guarded synthetic chat/member rather than starting a PTB app/bridge. Updated the HTTP smoke to exercise direct Classic/Photo APIs, configured Photo setup, image delivery, duplicate command, and cleanup. Added direct bridge-route 404 contract and preserved the same idempotency ID for UI retries after ambiguous network errors. Independent review approved the architecture boundary; JS/API/HTTP/full changed-slice checks still need to run. Cloud CI was not used.
 - 2026-10-09 — final local dev rebuild kept the PostgreSQL volume and data intact (`20261008_0021`, games=10, players=1, users=2, accounts=2). `alembic check`, admin/offline-runtime/Mini App acceptance, dev Mini App smoke and fresh backup restore passed; backup `fee42006d7ca46ceb6fc0c2487b5c99b` verified 31 tables/200 files with no source DB change. Telegram and production remain untouched.
+- 2026-10-09 — after Docker Hub DNS prevented a fresh base-image pull, `compose.dev.yml` was adjusted to run the working tree in the existing Python 3.13 image via read-only source mounts; `.local` remains the only writable app host mount, and legacy mutable JSON data is deliberately excluded. Added `tests/`/`pytest.ini` and read-only static quiz/media source mounts so tests and seeding use current checkout contents. Seed media output is isolated under `.local/preview/images`. Recreated only admin, Mini App and game-worker with `--no-build --no-deps`; persistent PostgreSQL was not recreated or reset and Telegram remains stopped. Admin/offline-runtime HTTP acceptance and complete dev Mini App smoke passed (`telegram_calls=0`); PostgreSQL/admin/Mini App are healthy and game-worker is running. The mounted container ran the current affected test suites: **129 passed / 8 warnings in 52.06s**. `project_checks.py --worktree` and Compose config validation passed. Cloud CI was not run; no commit or push was made.
+- 2026-10-09 — QW-06/AUD-011 Classic shared-PG parity evidence: `tests/test_telegram_test_scope.py::test_private_runner_real_handlers_menu_quiz_and_score` runs real PTB handlers through the scoped offline dispatcher and Mini App endpoints through ASGI against the same isolated PostgreSQL database. In Bot-first order, a Telegram poll answer is visible as answered with the same selected option in Mini App; a later conflicting Mini App command and its replay return the existing answer with `applied=false`, and replaying the Telegram update leaves score and the single `PollAnswer` unchanged. In Mini-first order, a new game is answered through Mini App first: global/member score and answered count advance once, replaying the same command ID returns the same completed result without another award, then the Telegram poll answer and its duplicate remain no-ops; the ledger contains one answer and two completed command receipts (Mini command result plus Telegram `applied=false`). Evidence is offline PTB/runtime plus ASGI only, not a live Telegram client or WebView; real Telegram WebView acceptance and Photo image/rendering parity remain open. The test uses the shared disposable-PG fixture; it does not validate production or live Telegram behavior.
+- 2026-10-09 — QW-06/AUD-011 Photo image URL evidence: Photo play now returns a round-specific protected image URL; after the round becomes stale, that URL returns 404. A focused check confirmed two distinct rounds return different images. Docker PostgreSQL Photo suite: **4 passed, 96 deselected, 2 warnings**; Mini App JavaScript: **43 passed**; project checks passed. Independent review found no blockers. This establishes the protected URL/stale-round contract and distinct-image behavior only; it is not full Bot↔Mini App Photo parity, and QW-06 remains `in_progress`.
+- 2026-10-09 — QW-06/AUD-011 Photo cross-UI and replay evidence: untracked `tests/test_photo_cross_ui.py` exercises offline PTB and Mini App ASGI in both Photo answer directions against one isolated PostgreSQL database, with valid WebP delivery and matching answer/score/command behavior; Docker PostgreSQL run: **1 passed**. Fixed completed-game Photo final-answer replay in `application/photo.py`; targeted `tests/test_mini_app.py` Photo cases: **3 passed**, confirming replay leaves score, state, events, outbox and receipt unchanged, changed payload returns 409, a new command ID returns 404, and an old ID after a new game returns 409. Independent review found no blockers. This does not establish live Telegram/WebView rendering or full Photo visual acceptance; QW-06 remains `in_progress`.
+- 2026-10-09 — Current dirty checkout at HEAD `c937c277`: full local container pytest **647 passed, 35 warnings, 0 skipped** (216.67s); `node --test tests/js/*.test.cjs` **60 passed**; `python scripts/project_checks.py --worktree` passed; Alembic upgrade to head and `alembic check` (no operations) passed on disposable `morning_quiz_test`. This is not a complete `Test-LocalMilestone` (no fresh rebuild/reset/restore rehearsal); CI was not used, and dev/production databases were not reset. No ready status implied.
+- 2026-10-09 — Updated local milestone on dirty checkout HEAD `c937c277`: `pwsh -File scripts/Test-LocalMilestone.ps1` built a fresh dev image and passed blank Alembic migration through `qw_farm_010`, clean `alembic check`, **647 passed / 35 warnings / 0 skipped in 213.92s**, dump/restore, and JavaScript syntax checks. JUnit report: `.local/acceptance/tests.xml`. Only disposable `morning_quiz_test` was reset; the dev DB volume and production were untouched. No cloud CI was used. Task remains `in_progress`.
+- 2026-10-09 — QW-04 notification reconciliation foundation: added additive `20261009_0022`, outbox row versions, and atomic operator receipts for `uncertain → resolved`. Decisions are `confirmed_delivered` (with chat/message evidence) or `closed_without_resend`; neither retries Telegram nor changes game state, Classic poll bindings or awards. Old `sending` is not operator-resolvable based on age alone. Receipts survive deletion of their outbox row; the test-DB audit recognizes `resolved` without exposing payload/evidence. Targeted isolated real-PostgreSQL tests: **15 passed**; independent diff review found no new P0–P2 issues. This is a storage/service foundation, **not** an operationally accepted reconciliation flow: authenticated operator entry, Classic binding recovery and live delivery rehearsal remain open. Production, real Telegram and cloud CI were untouched; QW-04 remains `in_progress`.
+- 2026-10-09 — Full local milestone after `0022`: the first run exposed a Farm test that assumed `qw_farm_010` would remain the final migration. The test now verifies Farm is in the Alembic chain and compares the database to the actual current head while retaining its populated-account and pre-Farm dump/restore assertions. Targeted Farm test passed; repeated `Test-LocalMilestone.ps1` passed blank migration through `20261009_0022`, clean `alembic check`, **653 passed / 35 warnings / 0 skipped in 226.50s**, dump/restore and JS syntax. Only disposable `morning_quiz_test` was reset. Before updating persistent dev, snapshot `5bf6ef899f1e4898a7dd914d85213b03` restored/verified (31 tables, 200 files, source unchanged); dev then upgraded `qw_farm_010 → 0022` in place. Dev now reports games=14, accounts=2, farm_states=1; admin/Mini App/PostgreSQL healthy, game-worker running, `check_dev_http.py` and dev Mini App smoke passed with `telegram_calls=0`. Production, Telegram and cloud CI were untouched.
+- 2026-10-09 — QW-04 local operator entry: added authenticated, CSRF-protected notification list/detail/resolve endpoints to the PostgreSQL admin router and an explicit decision flow in «Управление и обслуживание». API projections and validation errors omit payload, dedupe keys, raw transport errors and stored evidence; operator identity is honestly the shared role `local-admin`. `sending` and `resolved` are read-only. Ambiguous network retries within an open form retain the same action ID/body; conflicts require a fresh manual review. Isolated real-PG ASGI/storage tests **19 passed**; JS notification/navigation/Alchemy suites **54 passed**; independent review found no P0–P2 issues; project checks passed. The subsequent full `Test-LocalMilestone.ps1` passed **657 tests / 35 warnings / 0 skipped in 230.90s**, blank migration to `0022`, clean Alembic check, dump/restore and JS syntax. Recreated only the stateless dev-admin container; protected live dev API returned anonymous 401, login 200, authenticated list 200 (four uncertain records left untouched). Admin/Mini App HTTP smoke passed with `telegram_calls=0`; dev data remain games=14, accounts=2, farm_states=1 at `0022`. Canonical operator limits are in [NOTIFICATION_OUTBOX_AUDIT](../engineering/NOTIFICATION_OUTBOX_AUDIT.md). Full browser decision/WebView, live Telegram delivery, orphan `sending` policy and Classic poll-binding repair remain open. Production, installed programs and cloud CI were untouched.
+- 2026-10-09 — Native Chrome read-only dev-admin acceptance: login and «Управление и обслуживание» rendered the notification block and four `uncertain` cards (`photo.feedback` ×2, `photo.finished` ×2). Opening a card and switching to empty `sending`/`resolved` lists used GET requests only; the browser guard observed no mutation except login, and the four records were left untouched. At 390 px, document/body width matched the viewport without horizontal overflow; the mobile screenshot covered the empty resolved state, not a full uncertain decision form. No console page errors. This establishes a real desktop browser read-only flow and a narrow mobile layout check, not Telegram WebView or a live delivery/resolve rehearsal.
+- 2026-10-09 — QW-04 claim-version fencing: every outbox claim now returns its version, and all Mafia/Classic/Photo completion branches require it for atomic delivered/429/uncertain updates. A delayed callback from an earlier claim with the same static worker ID cannot change a later attempt after 429 and reclaim. Isolated PostgreSQL notification/resolution tests **11 passed** and admin notification tests **4 passed**; independent review found no new P0–P2 issue. Full `Test-LocalMilestone.ps1` passed **660 tests / 35 warnings / 0 skipped in 232.91s**, blank migration to `0022`, clean Alembic check, dump/restore and JS syntax. Only `morning_quiz_test` was reset; persistent dev and production data, live Telegram and installed programs were untouched. This fences DB callbacks, not external HTTP; orphan `sending` still requires a separately accepted stop-and-quarantine procedure.
+- 2026-10-09 — QW-04 offline orphan quarantine implementation: additive migration `20261009_0023` introduces separate durable `notification_quarantine_receipts`; terminal `NotificationResolution` remains separate. After the operator independently confirms that every Telegram sender and in-flight transport operation is stopped, `scripts/quarantine_notification_outbox.py` can move exactly one observed `sending → uncertain`. The transaction locks the row and compares version, claimed_by and claimed_at; action UUID replay is fingerprinted and serialized, with UUID reuse across quarantine/terminal resolution rejected. No resend, delivered claim, game/score/poll-binding change or attempt increment occurs. CLI requires an explicitly named URL environment variable, restricts target to local dev/test, does not load dotenv/default production URLs, requires exact stop attestation and recorded sender inventory/evidence, and commits only with `--apply`; default validation rolls back. Attestation is a manual assertion, not automated stop verification. Focused isolated real-PostgreSQL quarantine/resolution/notification/admin tests: **23 passed / 0 skipped in 18.52s**, covering races, stale claim tuple, rollback, durable replay, migration preservation and unchanged populated Classic state/binding/user scores. `project_checks.py --worktree` and `git diff --check` passed. Runbook: [NOTIFICATION_OUTBOX_AUDIT](../engineering/NOTIFICATION_OUTBOX_AUDIT.md). No actual sender stop/quarantine, persistent dev migration or data write, production operation, program removal, commit/push or cloud CI was performed. Full milestone and actual operational acceptance of this new procedure remain open; QW-04 stays `in_progress`.
+- 2026-10-09 — QW-04 verification and dev schema follow-up: `pwsh -File scripts/Test-LocalMilestone.ps1` built the current image, migrated the disposable test DB from blank through `20261009_0023`, found no Alembic drift, passed **668 tests / 35 warnings / 0 skipped in 244.14s**, and passed dump/restore plus JavaScript syntax. Before any persistent dev schema change, snapshot `2351b3e6f7a34b0bbe8bc555d7f5c143` restored and verified (32 tables, 200 files, `dev_database_changed=false`). The additive `0022 → 0023` migration then succeeded on `morning_quiz_dev`; read-only checks show games=14, accounts=2, farm_states=1, outbox=15, quarantine receipts=0. `check_dev_http.py` passed for admin/offline-runtime/Mini App with `telegram_calls=0`; `project_checks.py --worktree` and `git diff --check` passed. Existing notifications were not quarantined or resolved. Temporary test/restore databases were the only databases recreated for checks; production, installed programs, Telegram and cloud CI were untouched. Operational sender-stop acceptance and Classic poll-binding repair remain open, so QW-04 is still `in_progress`.

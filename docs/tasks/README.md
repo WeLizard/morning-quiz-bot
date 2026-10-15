@@ -19,6 +19,8 @@
 | QW-2026-10-08 | [QuizzyWizzy audit remediation](QUIZZYWIZZY-2026-10-08.md) | `in_progress` | critical | 2026-10-09 |
 | MQB-007 | [Приёмка и dev-интеграция Farm 0.2.0](MQB-007-farm-020-integration.md) | `in_progress` | high | 2026-10-09 |
 | MQB-009 | [Завершение платформы и новый «Ночной город»](MQB-009-platform-and-night-city.md) | `proposed` | critical | 2026-10-12 |
+| MQB-010 | [«Ночной город»: недельный режим, этапы](MQB-010-night-city-weekly-stages.md) (дизайн: [NIGHT_CITY_WEEKLY_DESIGN](NIGHT_CITY_WEEKLY_DESIGN.md)) | `proposed` | high | 2026-10-15 |
+| MQB-011 | [Форма обращения к игроку (он / она / не указывать)](MQB-011-address-form.md) | `in_progress` | medium | 2026-10-15 |
 
 ## Как добавить задачу
 

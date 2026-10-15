@@ -120,11 +120,16 @@ def test_farm_migration_preserves_accounts_and_dump_restores_pre_farm_state(tmp_
         db = Database(DatabaseSettings(url=restored_url))
         try:
             async with db.transaction() as session:
-                account = await session.get(Account, account_id)
-                user = await session.get(User, user_id)
-                assert account and account.display_name == "Farm migration fixture"
-                assert user and user.display_name == "Farm migration user"
-                assert user.account_id == account_id
+                # Plain column reads: the restored schema is pre-0030, so an ORM load of
+                # Account would select the missing accounts.address_form column.
+                account_name = await session.scalar(
+                    text("SELECT display_name FROM accounts WHERE id = :id"), {"id": account_id})
+                user_row = (await session.execute(
+                    text("SELECT display_name, account_id FROM users WHERE id = :id"),
+                    {"id": user_id})).one_or_none()
+                assert account_name == "Farm migration fixture"
+                assert user_row and user_row[0] == "Farm migration user"
+                assert user_row[1] == account_id
                 version = await session.scalar(text("SELECT version_num FROM alembic_version"))
                 assert version == "20261008_0021"
                 async with db.engine.connect() as connection:
@@ -169,13 +174,13 @@ def test_farm_migration_preserves_accounts_and_dump_restores_pre_farm_state(tmp_
         async def seed_baseline():
             db = Database(DatabaseSettings(url=migration_url))
             try:
+                # Core inserts name only the pre-farm columns: the ORM would also write
+                # columns added by later migrations (e.g. accounts.address_form).
                 async with db.transaction() as session:
-                    session.add(Account(id=account_id, display_name="Farm migration fixture"))
-                    session.add(User(
-                        id=user_id,
-                        account_id=account_id,
-                        display_name="Farm migration user",
-                    ))
+                    await session.execute(Account.__table__.insert().values(
+                        id=account_id, display_name="Farm migration fixture"))
+                    await session.execute(User.__table__.insert().values(
+                        id=user_id, account_id=account_id, display_name="Farm migration user"))
             finally:
                 await db.dispose()
 

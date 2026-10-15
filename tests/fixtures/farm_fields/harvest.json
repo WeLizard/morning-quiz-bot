@@ -1,0 +1,1639 @@
+{
+ "cases": [
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear reference",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear half",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear wander",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear doubled",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks reference",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDURUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUULUURX",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks half",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDURUUUUUUXR",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks wander",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDURUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUULUURXLRLRUDUD",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks doubled",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDURUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUULUURXDDDDDDDRUUUUUUUXRDDDDDDDURUUUUUUXRDDDDDDDRUUUUUUUXRDDDDDDDRUUUUULUURX",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     15,
+     59
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUXRDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUURUULUUUUUUUUUUUUUUUUXRDDDDRDDLDDDDDDDDDRDDDDLDRDDLDRRUUUUUUUUULUUUUUUURUUUULUUUXRDDRDDDDDDLDDDDDRDDDDDDDDDDRUUUUUUUUURUUULLDUUURURUUUUUUULLUXRDDDDDDRDDDDLUURUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 923
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUURUULUUUUUUUUUUUUUUUUXRDDDDRDDLDDDDDDDDDRDDDDLDRDDLDRRUUUUUUUUULUUUUUUURUUUULUUU",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUURUULUUUUUUUUUUUUUUUUXRDDDDRDDLDDDDDDDDDRDDDDLDRDDLDRRUUUUUUUUULUUUUUUURUUUULUUUXRDDRDDDDDDLDDDDDRDDDDDDDDDDRUUUUUUUUURUUULLDUUURURUUUUUUULLUXRDDDDDDRDDDDLUURUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 923
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUURUULUUUUUUUUUUUUUUUUXRDDDDRDDLDDDDDDDDDRDDDDLDRDDLDRRUUUUUUUUULUUUUUUURUUUULUUUXRDDRDDDDDDLDDDDDRDDDDDDDDDDRUUUUUUUUURUUULLDUUURURUUUUUUULLUXRDDDDDDRDDDDLUURUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDRUUUUURUULUUUUUUUUUUUUUUUUXRDDDDRDDLDDDDDDDDDRDDDDLDRDDLDRRUUUUUUUUULUUUUUUURUUUULUUUXRDDRDDDDDDLDDDDDRDDDDDDDDDDRUUUUUUUUURUUULLDUUURURUUUUUUULLUXRDDDDDDRDDDDLUURUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w1 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     42,
+     62,
+     102,
+     110,
+     137,
+     170
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear reference",
+   "path": "DDDDDDDRRUUUUUUUXRRDDDDDDDRRUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear half",
+   "path": "DDDDDDDRRUUUUUUUXR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear wander",
+   "path": "DDDDDDDRRUUUUUUUXRRDDDDDDDRRUUUUUUUXLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear doubled",
+   "path": "DDDDDDDRRUUUUUUUXRRDDDDDDDRRUUUUUUUXDDDDDDDRRUUUUUUUXRRDDDDDDDRRUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks reference",
+   "path": "DDDDDDDRRUUUULUURUXRRDDDDDDDRRUULUURUUUX",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks half",
+   "path": "DDDDDDDRRUUUULUURUXR",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks wander",
+   "path": "DDDDDDDRRUUUULUURUXRRDDDDDDDRRUULUURUUUXLRLRUDUD",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks doubled",
+   "path": "DDDDDDDRRUUUULUURUXRRDDDDDDDRRUULUURUUUXDDDDDDDRRUUUULUURUXRRDDDDDDDRRUULUURUUUX",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     19,
+     39
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUULUURUUUUUULUURUUUUXRRDDDDDDDDDDDDDRRDDLDLDDDDDDRRDUUUUUUUUUUUULLUURRUUUUUUUUUXLLLLLDDDDDDDDDDDDDDRRLDDRDDDDDDD",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 955
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUULUURUUUUUULUURUUUUXRRDDDDDDDDDDDDDRRDD",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 239
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUULUURUUUUUULUURUUUUXRRDDDDDDDDDDDDDRRDDLDLDDDDDDRRDUUUUUUUUUUUULLUURRUUUUUUUUUXLLLLLDDDDDDDDDDDDDDRRLDDRDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 936
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUULUURUUUUUULUURUUUUXRRDDDDDDDDDDDDDRRDDLDLDDDDDDRRDUUUUUUUUUUUULLUURRUUUUUUUUUXLLLLLDDDDDDDDDDDDDDRRLDDRDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUULUURUUUUUULUURUUUUXRRDDDDDDDDDDDDDRRDDLDLDDDDDDRRDUUUUUUUUUUUULLUURRUUUUUUUUUXLLLLLDDDDDDDDDDDDDDRRLDDRDDDDDDD",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w2 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     43,
+     86,
+     107,
+     117,
+     124,
+     189
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear reference",
+   "path": "DDDDDDDRRRUUUUUUUXRRDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear half",
+   "path": "DDDDDDDRRRUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear wander",
+   "path": "DDDDDDDRRRUUUUUUUXRRDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 968
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear doubled",
+   "path": "DDDDDDDRRRUUUUUUUXRRDDDDDDDDDDDDDDRRRUUUUUUUXRRDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks reference",
+   "path": "DDDRDDLDDRRRUUUUUUUXRRDDDDDLDDR",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks half",
+   "path": "DDDRDDLDDRRRUUU",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks wander",
+   "path": "DDDRDDLDDRRRUUUUUUUXRRDDDDDLDDRLRLRUDUD",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks doubled",
+   "path": "DDDRDDLDDRRRUUUUUUUXRRDDDDDLDDRDDDRDDLDDRRRUUUUUUUXRRDDDDDLDDR",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     32,
+     55
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUUXRRDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks reference",
+   "path": "DDRDDLDDDRDDLDDDRRRDDDLLLDDRRDDLLDDDDRRRUUUUUUURUUUUULUUUUUUUUUUUXRRDDDDDLDDRDDDDDDDDDDDDDDDDUUUUUUUUUULLL",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 937
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks half",
+   "path": "DDRDDLDDDRDDLDDDRRRDDDLLLDDRRDDLLDDDDRRRUUUUUUURUUUUU",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 39
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks wander",
+   "path": "DDRDDLDDDRDDLDDDRRRDDDLLLDDRRDDLLDDDDRRRUUUUUUURUUUUULUUUUUUUUUUUXRRDDDDDLDDRDDDDDDDDDDDDDDDDUUUUUUUUUULLLLRLRUDUD",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks doubled",
+   "path": "DDRDDLDDDRDDLDDDRRRDDDLLLDDRRDDLLDDDDRRRUUUUUUURUUUUULUUUUUUUUUUUXRRDDDDDLDDRDDDDDDDDDDDDDDDDUUUUUUUUUULLLDDRDDLDDDRDDLDDDRRRDDDLLLDDRRDDLLDDDDRRRUUUUUUURUUUUULUUUUUUUUUUUXRRDDDDDLDDRDDDDDDDDDDDDDDDDUUUUUUUUUULLL",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "harvest w3 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     24,
+     55,
+     64,
+     105,
+     114,
+     145
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest unload off the edge",
+   "path": "DX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest unload at the edge",
+   "path": "DUX",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest no unload",
+   "path": "DDDDDDDRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  }
+ ],
+ "constants": {
+  "hopper": 18,
+  "q_auto": 950,
+  "q_base": 850,
+  "q_span": 250,
+  "w": 8,
+  "weed_weight": 3
+ },
+ "op": "harvest"
+}

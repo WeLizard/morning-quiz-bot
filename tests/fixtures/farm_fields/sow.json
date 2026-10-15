@@ -1,0 +1,1597 @@
+{
+ "cases": [
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear reference",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear half",
+   "path": "DDDDDDDRRUUUUUUUR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear wander",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear doubled",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUUDDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks reference",
+   "path": "DDDDDDDRRUUUUUUURRDDDDLDDRDRRUUUUUUU",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks half",
+   "path": "DDDDDDDRRUUUUUUURR",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks wander",
+   "path": "DDDDDDDRRUUUUUUURRDDDDLDDRDRRUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks doubled",
+   "path": "DDDDDDDRRUUUUUUURRDDDDLDDRDRRUUUUUUUDDDDDDDRRUUUUUUURRDDDDLDDRDRRUUUUUUU",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     44,
+     55
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDRRDDDLLRUUUURUUUULUURUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks half",
+   "path": "DDDDDDDDDDDDDDDDDDDDRRDDDLLRUUUURUUUULUURUUUUUUUUUUU",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDRRDDDLLRUUUURUUUULUURUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDRRDDDLLRUUUURUUUULUURUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUDDDDDDDDDDDDDDDDDDDDRRDDDLLRUUUURUUUULUURUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w1 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     29,
+     45,
+     114,
+     123,
+     168,
+     176
+    ],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear reference",
+   "path": "DDDDDDDRRRUUUUUUURRRDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear half",
+   "path": "DDDDDDDRRRUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear wander",
+   "path": "DDDDDDDRRRUUUUUUURRRDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 560
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear doubled",
+   "path": "DDDDDDDRRRUUUUUUURRRDDDDDDDDDDDDDDRRRUUUUUUURRRDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks reference",
+   "path": "DDDDDDDRRRUUUUUUURRRDDLDDRDDD",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks half",
+   "path": "DDDDDDDRRRUUUU",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks wander",
+   "path": "DDDDDDDRRRUUUUUUURRRDDLDDRDDDLRLRUDUD",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 540
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks doubled",
+   "path": "DDDDDDDRRRUUUUUUURRRDDLDDRDDDDDDDDDDRRRUUUUUUURRRDDLDDRDDD",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     31,
+     45
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRRDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRRDDDDDDDDDDDDDDDDDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 894
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRRDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRRDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks reference",
+   "path": "DRDDLDDRDDLDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUURUULUUUUUUUUURRRDDDDDDDDDDLDDRDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks half",
+   "path": "DRDDLDDRDDLDDDDDDDDDDDDDDDDRRRUUUUUUUUUUU",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks wander",
+   "path": "DRDDLDDRDDLDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUURUULUUUUUUUUURRRDDDDDDDDDDLDDRDDDDDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 884
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks doubled",
+   "path": "DRDDLDDRDDLDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUURUULUUUUUUUUURRRDDDDDDDDDDLDDRDDDDDDDDDDDDRDDLDDRDDLDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUURUULUUUUUUUUURRRDDDDDDDDDDLDDRDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w2 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     16,
+     48,
+     83,
+     95,
+     130,
+     138
+    ],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear reference",
+   "path": "DDDDDDDRRRRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear half",
+   "path": "DDDDDDDRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear wander",
+   "path": "DDDDDDDRRRRUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear doubled",
+   "path": "DDDDDDDRRRRUUUUUUUDDDDDDDRRRRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks reference",
+   "path": "DDDDDRDDLRRRRUUUUULLUURR",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks half",
+   "path": "DDDDDRDDLRRR",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks wander",
+   "path": "DDDDDRDDLRRRRUUUUULLUURRLRLRUDUD",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks doubled",
+   "path": "DDDDDRDDLRRRRUUUUULLUURRDDDDDRDDLRRRRUUUUULLUURR",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     13,
+     48
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRRUUUUUUUUUUUUUUUUUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRRUUUUUUUUUUUUUUUUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDDRRRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks reference",
+   "path": "RRRDDLLLDDDDDDDDDDDDDDDDDDDDDRURRRUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks half",
+   "path": "RRRDDLLLDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks wander",
+   "path": "RRRDDLLLDDDDDDDDDDDDDDDDDDDDDRURRRUUUUUUUUUUUUUUUUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks doubled",
+   "path": "RRRDDLLLDDDDDDDDDDDDDDDDDDDDDRURRRUUUUUUUUUUUUUUUUUUUUUURRRDDLLLDDDDDDDDDDDDDDDDDDDDDRURRRUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "sow w3 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     10,
+     71,
+     83,
+     91,
+     127,
+     189
+    ],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  }
+ ],
+ "constants": {
+  "hopper": 18,
+  "q_auto": 950,
+  "q_base": 850,
+  "q_span": 250,
+  "w": 8,
+  "weed_weight": 3
+ },
+ "op": "sow"
+}

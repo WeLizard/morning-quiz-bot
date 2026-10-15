@@ -1,0 +1,2701 @@
+{
+ "cases": [
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear reference",
+   "path": "DDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear half",
+   "path": "DDDDDDDRUUUUUUURDDDDDDDRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear wander",
+   "path": "DDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear doubled",
+   "path": "DDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUUDDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUURDDDDDDDRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks reference",
+   "path": "DDDDDDDRUUUUURUULRRDDDLDDDDRUUUDRDDRUUUULUUURDDRUUDDDDDDDRUUUULUURU",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks half",
+   "path": "DDDDDDDRUUUUURUULRRDDDLDDDDRUUUDR",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks wander",
+   "path": "DDDDDDDRUUUUURUULRRDDDLDDDDRUUUDRDDRUUUULUUURDDRUUDDDDDDDRUUUULUURULRLRUDUD",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks doubled",
+   "path": "DDDDDDDRUUUUURUULRRDDDLDDDDRUUUDRDDRUUUULUUURDDRUUDDDDDDDRUUUULUURUDDDDDDDRUUUUURUULRRDDDLDDDDRUUUDRDDRUUUULUUURDDRUUDDDDDDDRUUUULUURU",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     9,
+     23,
+     36
+    ],
+    "weeds": [
+     2,
+     4,
+     5,
+     24,
+     35,
+     38,
+     40,
+     45,
+     57,
+     62
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUURDDDDDDDDDDDDDDDDDDDDDDDRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks reference",
+   "path": "RDDLDDDDDDRDDLDDDDDDDDDDDDDRUUUUUUUUUUUURUUUULUUURUUUURDDDDDLDDRRDDDDLDLDDDDDDDDDDDRUUUUUUUUUURURUUULLURRUUUUUUUULDDDDDDRRDDDDDDDLDLDDDDDDDDDRUUUUUUUURRDDDDDLDDDUURUUUULUUURUUUUUUUUULUUUUURDDDLLDDDDDDDDDDDDDDDDDRDDDR",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks half",
+   "path": "RDDLDDDDDDRDDLDDDDDDDDDDDDDRUUUUUUUUUUUURUUUULUUURUUUURDDDDDLDDRRDDDDLDLDDDDDDDDDDDRUUUUUUUUUURURUUULLURRUUU",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks wander",
+   "path": "RDDLDDDDDDRDDLDDDDDDDDDDDDDRUUUUUUUUUUUURUUUULUUURUUUURDDDDDLDDRRDDDDLDLDDDDDDDDDDDRUUUUUUUUUURURUUULLURRUUUUUUUULDDDDDDRRDDDDDDDLDLDDDDDDDDDRUUUUUUUURRDDDDDLDDDUURUUUULUUURUUUUUUUUULUUUUURDDDLLDDDDDDDDDDDDDDDDDRDDDRLRLRUDUD",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks doubled",
+   "path": "RDDLDDDDDDRDDLDDDDDDDDDDDDDRUUUUUUUUUUUURUUUULUUURUUUURDDDDDLDDRRDDDDLDLDDDDDDDDDDDRUUUUUUUUUURURUUULLURRUUUUUUUULDDDDDDRRDDDDDDDLDLDDDDDDDDDRUUUUUUUURRDDDDDLDDDUURUUUULUUURUUUUUUUUULUUUUURDDDLLDDDDDDDDDDDDDDDDDRDDDRRDDLDDDDDDRDDLDDDDDDDDDDDDDRUUUUUUUUUUUURUUUULUUURUUUURDDDDDLDDRRDDDDLDLDDDDDDDDDDDRUUUUUUUUUURURUUULLURRUUUUUUUULDDDDDDRRDDDDDDDLDLDDDDDDDDDRUUUUUUUURRDDDDDLDDDUURUUUULUUURUUUUUUUUULUUUUURDDDLLDDDDDDDDDDDDDDDDDRDDDR",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w1 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     8,
+     25,
+     39,
+     51,
+     72,
+     83,
+     150,
+     158,
+     183
+    ],
+    "weeds": [
+     4,
+     7,
+     13,
+     21,
+     23,
+     41,
+     43,
+     49,
+     57,
+     64,
+     71,
+     78,
+     80,
+     87,
+     88,
+     97,
+     105,
+     109,
+     120,
+     129,
+     135,
+     140,
+     144,
+     148,
+     157,
+     159,
+     172,
+     178,
+     185,
+     191
+    ],
+    "width": 1
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear reference",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear half",
+   "path": "DDDDDDDRRUUUUUUUR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear wander",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear doubled",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUUDDDDDDDRRUUUUUUURRDDDDDDDRRUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks reference",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDRRDULLUURRUULUURLLLDDDDDDD",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": 940
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks half",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDR",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": 426
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks wander",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDRRDULLUURRUULUURLLLDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": 880
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks doubled",
+   "path": "DDDDDDDRRUUUUUUURRDDDDDDRRDULLUURRUULUURLLLDDDDDDDDDDDDDDRRUUUUUUURRDDDDDDRRDULLUURRUULUURLLLDDDDDDD",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     15,
+     46,
+     61
+    ],
+    "weeds": [
+     1,
+     4,
+     16,
+     18,
+     22,
+     28,
+     31,
+     52,
+     53,
+     63
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUULRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUUDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDRRUUUUUUUUUUUUUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks reference",
+   "path": "DDDDDDDDDDDDDDDRRDDLLDDDDDDRRUUUUURUUUULUUUUURUULUURUULUUURRLDDRRRDDLLDDDDDLDDRDDDDDDDRDDDLDDRRUUUUUUUUUUUUUUUUULUURUUUU",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks half",
+   "path": "DDDDDDDDDDDDDDDRRDDLLDDDDDDRRUUUUURUUUULUUUUURUULUURUULUUURR",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks wander",
+   "path": "DDDDDDDDDDDDDDDRRDDLLDDDDDDRRUUUUURUUUULUUUUURUULUURUULUUURRLDDRRRDDLLDDDDDLDDRDDDDDDDRDDDLDDRRUUUUUUUUUUUUUUUUULUURUUUULRLRUDUD",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks doubled",
+   "path": "DDDDDDDDDDDDDDDRRDDLLDDDDDDRRUUUUURUUUULUUUUURUULUURUULUUURRLDDRRRDDLLDDDDDLDDRDDDDDDDRDDDLDDRRUUUUUUUUUUUUUUUUULUURUUUUDDDDDDDDDDDDDDDRRDDLLDDDDDDRRUUUUURUUUULUUUUURUULUURUULUUURRLDDRRRDDLLDDDDDLDDRDDDDDDDRDDDLDDRRUUUUUUUUUUUUUUUUULUURUUUU",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w2 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     13,
+     29,
+     34,
+     47,
+     66,
+     85,
+     129,
+     156,
+     164
+    ],
+    "weeds": [
+     1,
+     10,
+     22,
+     27,
+     28,
+     33,
+     38,
+     39,
+     51,
+     52,
+     70,
+     80,
+     82,
+     87,
+     93,
+     95,
+     110,
+     117,
+     122,
+     123,
+     130,
+     135,
+     136,
+     150,
+     171,
+     172,
+     174,
+     180,
+     186,
+     191
+    ],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear reference",
+   "path": "DDDDDDDRRRUUUUUUURRDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear half",
+   "path": "DDDDDDDRRRUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear wander",
+   "path": "DDDDDDDRRRUUUUUUURRDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 968
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear doubled",
+   "path": "DDDDDDDRRRUUUUUUURRDDDDDDDDDDDDDDRRRUUUUUUURRDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha clear dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks reference",
+   "path": "DRURRRRLLLD",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": 914
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks half",
+   "path": "DRURR",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": 676
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks wander",
+   "path": "DRURRRRLLLDLRLRUDUD",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": 545
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks doubled",
+   "path": "DRURRRRLLLDDRURRRRLLLD",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 1ha rocks dive",
+   "path": "DDDDDDDD",
+   "run": {
+    "rocks": [
+     13,
+     18,
+     54
+    ],
+    "weeds": [
+     4,
+     5,
+     9,
+     10,
+     15,
+     34,
+     52,
+     53,
+     55,
+     59
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear reference",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear half",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUU",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear empty",
+   "path": "",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear wander",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": 1000
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear wall",
+   "path": "U",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear doubled",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDRRRUUUUUUUUUUUUUUUUUUUUUUURRDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha clear dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [],
+    "weeds": [],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks reference",
+   "path": "RRDDLLDDDRDDLDDDDDURRRRDDLLLDLRRRDDLLLDDDDRDDLDRRURUUUUURUUURUUUULLLLUURURUUUUUUURRDDDDDDDLLLLDDDRRRRUDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": 929
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks half",
+   "path": "RRDDLLDDDRDDLDDDDDURRRRDDLLLDLRRRDDLLLDDDDRDDLDRRURUUUUUR",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": 165
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks empty",
+   "path": "",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks wander",
+   "path": "RRDDLLDDDRDDLDDDDDURRRRDDLLLDLRRRDDLLLDDDDRDDLDRRURUUUUURUUURUUUULLLLUURURUUUUUUURRDDDDDDDLLLLDDDRRRRUDDDDDDDDDDDDDLRLRUDUD",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": 902
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks wall",
+   "path": "U",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks edge",
+   "path": "RRRRRRRRR",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks doubled",
+   "path": "RRDDLLDDDRDDLDDDDDURRRRDDLLLDLRRRDDLLLDDDDRDDLDRRURUUUUURUUURUUUULLLLUURURUUUUUUURRDDDDDDDLLLLDDDRRRRUDDDDDDDDDDDDDRRDDLLDDDRDDLDDDDDURRRRDDLLLDLRRRDDLLLDDDDRDDLDRRURUUUUURUUURUUUULLLLUURURUUUUUUURRDDDDDDDLLLLDDDRRRRUDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 24,
+    "w": 8
+   },
+   "name": "cultivate w3 3ha rocks dive",
+   "path": "DDDDDDDDDDDDDDDDDDDDDDDD",
+   "run": {
+    "rocks": [
+     9,
+     48,
+     69,
+     76,
+     99,
+     104,
+     122,
+     168,
+     189
+    ],
+    "weeds": [
+     0,
+     8,
+     18,
+     24,
+     31,
+     36,
+     40,
+     42,
+     52,
+     53,
+     60,
+     65,
+     92,
+     94,
+     97,
+     98,
+     115,
+     118,
+     121,
+     125,
+     129,
+     133,
+     137,
+     140,
+     153,
+     155,
+     158,
+     174,
+     177,
+     179
+    ],
+    "width": 3
+   },
+   "score": null
+  }
+ ],
+ "constants": {
+  "hopper": 18,
+  "q_auto": 950,
+  "q_base": 850,
+  "q_span": 250,
+  "w": 8,
+  "weed_weight": 3
+ },
+ "op": "cultivate"
+}

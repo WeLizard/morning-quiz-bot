@@ -2,6 +2,7 @@
     'use strict';
     const tg = window.Telegram?.WebApp;
     const root = document.documentElement;
+    if (tg?.initData) root.classList.add('in-telegram');
     const prefs = {haptics: true, theme: 'system'};
     try { const saved = JSON.parse(localStorage.getItem('mqb-ui-preferences') || '{}'); if (typeof saved.haptics === 'boolean') prefs.haptics = saved.haptics; if (['system', 'dark', 'light'].includes(saved.theme)) prefs.theme = saved.theme; } catch {}
     const call = fn => { try { return fn?.(); } catch { return undefined; } };

@@ -4,23 +4,23 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-import random
 from typing import Any, Sequence
+from urllib.parse import quote
 
 from sqlalchemy import select
 
 from domain.photo import (
-    complete_round, normalize_photo, photo_deadlines, prepare_photo,
+    complete_round, normalize_photo, photo_deadlines, photo_points, prepare_photo,
     project_photo, record_attempt, reveal_hint, stop_photo,
 )
 from storage.admin_actions import operation_fence, require_access
 from storage.games import GameRepository
 from storage.members import MemberService
-from storage.models import Game, GameDeadline, PhotoQuizItem, PollAnswer
+from storage.models import Game, GameDeadline, PollAnswer
 from storage.notifications import NotificationQueue
 from storage.photo_media import images_root, verified_image_path
-from storage.photos import metadata
 from storage.repositories import OperationalRepository
+from application.photo_selection import available_photo_questions, select_photo_questions
 
 DEFAULT_PHOTO_QUESTION_COUNT = 3
 DEFAULT_PHOTO_OPEN_SECONDS = 60
@@ -41,6 +41,13 @@ def _moment(now=None) -> float:
     return datetime.now(timezone.utc).timestamp()
 
 
+def _image_url(chat_id: int, state: dict[str, Any]) -> str | None:
+    round_id = state["current_round_id"]
+    if not round_id:
+        return None
+    return f"/api/mini/photo/chats/{chat_id}/current/image?round_id={quote(round_id, safe='')}"
+
+
 class PhotoApplicationService:
     """Authoritative Photo commands inside an adapter-owned transaction."""
 
@@ -53,30 +60,7 @@ class PhotoApplicationService:
         return await self.games.current(chat_id=chat_id, mode="photo", lock=lock)
 
     async def _available_questions(self) -> list[dict[str, Any]]:
-        rows = (await self.session.scalars(
-            select(PhotoQuizItem).where(PhotoQuizItem.enabled.is_(True)).order_by(PhotoQuizItem.media_key)
-        )).all()
-        available = []
-        root = images_root()
-        for row in rows:
-            value = metadata(row)
-            if value.get("archived"):
-                continue
-            path = verified_image_path(root, row.media_key, value)
-            answer = str(value.get("display_answer") or value.get("correct_answer") or "").strip()
-            if path is None or not answer:
-                continue
-            available.append({
-                "display_answer": answer,
-                "media": {
-                    "media_key": row.media_key,
-                    "storage_name": value.get("storage_name"),
-                    "image_sha256": value.get("image_sha256"),
-                },
-            })
-        if not available:
-            raise LookupError("В каталоге нет доступных фото-загадок.")
-        return available
+        return await available_photo_questions(self.session)
 
     async def setup(self) -> dict[str, Any]:
         """Return the server-owned defaults and playable catalog size."""
@@ -93,11 +77,7 @@ class PhotoApplicationService:
         }
 
     async def _select_questions(self, count: int) -> list[dict[str, Any]]:
-        available = await self._available_questions()
-        random.SystemRandom().shuffle(available)
-        if count <= len(available):
-            return available[:count]
-        return [available[index % len(available)] for index in range(count)]
+        return await select_photo_questions(self.session, count)
 
     async def _enqueue(self, game: Game, kind: str, suffix: str, payload: dict) -> None:
         await NotificationQueue.enqueue_in(
@@ -119,8 +99,10 @@ class PhotoApplicationService:
             {"round_id": item["round_id"], "revision": state["revision"], "verdict": verdict},
         )
 
-    async def _enqueue_result(self, game: Game, state: dict[str, Any]) -> None:
+    async def _enqueue_result(self, game: Game, state: dict[str, Any], *, winner: dict | None = None) -> None:
         result = dict(state["last_result"])
+        if winner:
+            result.update(winner)
         await self._enqueue(game, "photo.result", f"result:{result['round_id']}",
                             {**result, "revision": state["revision"]})
 
@@ -132,14 +114,17 @@ class PhotoApplicationService:
              "score": state["total_score"]},
         )
 
-    async def current(self, *, chat_id: int, user_id: int, now=None) -> dict[str, Any] | None:
+    async def current(
+        self, *, chat_id: int, user_id: int, now=None, shared: bool = False,
+    ) -> dict[str, Any] | None:
+        """``shared`` is set by the Telegram adapter for group chats: every member
+        sees and answers the game.  Private chats and Mini App stay personal."""
         game = await self._current(chat_id)
         state = normalize_photo(game.state, chat_id=chat_id) if game else None
-        if game is None or state is None or state.get("creator_id") != user_id:
+        if game is None or state is None or (not shared and state.get("creator_id") != user_id):
             return None
         result = project_photo(
-            state, image_url=(f"/api/mini/photo/chats/{chat_id}/current/image"
-                              if state["current_round_id"] else None), now=now,
+            state, image_url=_image_url(chat_id, state), now=now,
         )
         result["game_id"] = game.id
         return result
@@ -185,7 +170,7 @@ class PhotoApplicationService:
         )
         if cached:
             return result
-        result = project_photo(state, image_url=f"/api/mini/photo/chats/{chat_id}/current/image", now=now)
+        result = project_photo(state, image_url=_image_url(chat_id, state), now=now)
         result["game_id"] = game.id
         await self.games.complete_command(command_id, result)
         return result
@@ -193,15 +178,23 @@ class PhotoApplicationService:
     async def answer(
         self, *, chat_id: int, user_id: int, display_name: str | None,
         round_id: str, answer: str, command_id: str | None = None, now=None,
+        shared: bool = False,
     ) -> dict[str, Any]:
+        """Points always go to ``user_id`` (the answerer).  With ``shared`` (a
+        Telegram group) any member may answer; otherwise only the creator."""
         await operation_fence(self.session)
         await require_access(self.session, chat_id, user_id)
         game = await self._current(chat_id, lock=True)
         state = normalize_photo(game.state, chat_id=chat_id) if game else None
-        if game is None or game.status != "active" or state is None:
+        if game is None or state is None:
             raise LookupError("Активная фото-викторина не найдена.")
-        if state["creator_id"] != user_id:
+        if not shared and state["creator_id"] != user_id:
             raise PermissionError("Эта фото-серия принадлежит другому игроку.")
+        if shared:
+            # A group member may answer without a profile yet (needed before the command ledger).
+            operational = OperationalRepository(self.session)
+            await operational.ensure_user({"id": user_id, "display_name": display_name or f"User {user_id}"})
+            await operational.ensure_member({"chat_id": chat_id, "user_id": user_id})
         payload = {"round_id": round_id, "answer": answer}
         cached, result = await self.games.reserve_command(
             command_id=command_id, game_id=game.id, actor_user_id=user_id,
@@ -209,6 +202,8 @@ class PhotoApplicationService:
         )
         if cached:
             return result
+        if game.status != "active":
+            raise LookupError("Активная фото-викторина не найдена.")
         state, verdict = record_attempt(state, round_id=round_id, answer=answer, now=now)
         if verdict != "correct":
             await self.games.sync_state(
@@ -216,15 +211,13 @@ class PhotoApplicationService:
                 status=state["status"], phase=state["phase"], deadlines=photo_deadlines(state),
             )
             await self._enqueue_feedback(game, state, verdict)
-            result = project_photo(state, image_url=f"/api/mini/photo/chats/{chat_id}/current/image", now=now)
+            result = project_photo(state, image_url=_image_url(chat_id, state), now=now)
             result.update(game_id=game.id, applied=True, verdict=verdict)
             await self.games.complete_command(command_id, result)
             return result
 
         item = next(item for item in state["rounds"] if item["round_id"] == round_id)
-        elapsed = _moment(now) - item["opened_at"]
-        fast = bool(item["hints_at"] and elapsed < item["hints_at"][0] - item["opened_at"])
-        points = max(1.0, 5.0 + int(fast) - item["attempts"] * 0.5)
+        points = photo_points(item, now=now)
 
         async def transition(profile):
             profile["score"] = float(Decimal(str(profile.get("score", 0))) + Decimal(str(points)))
@@ -248,14 +241,15 @@ class PhotoApplicationService:
             game, state, event_kind="photo_answered", actor_user_id=user_id,
             status=state["status"], phase=state["phase"], deadlines=photo_deadlines(state),
         )
-        await self._enqueue_result(game, state)
+        winner = ({"winner_id": user_id, "winner_name": display_name or f"User {user_id}"}
+                  if shared else None)
+        await self._enqueue_result(game, state, winner=winner)
         if state["status"] == "finished":
             await self._enqueue_finished(game, state)
         elif state["current_round_id"] != previous_round:
             await self._enqueue_question(game, state)
         result = project_photo(
-            state, image_url=(f"/api/mini/photo/chats/{chat_id}/current/image"
-                              if state["current_round_id"] else None), now=now,
+            state, image_url=_image_url(chat_id, state), now=now,
         )
         result.update(game_id=game.id, applied=score.applied, verdict="correct")
         await self.games.complete_command(command_id, result)
@@ -291,14 +285,16 @@ class PhotoApplicationService:
         await self.games.complete_command(command_id, result)
         return result
 
-    async def settle_due(self, *, chat_id: int, user_id: int | None = None, now=None) -> dict[str, Any] | None:
+    async def settle_due(
+        self, *, chat_id: int, user_id: int | None = None, now=None, shared: bool = False,
+    ) -> dict[str, Any] | None:
         await operation_fence(self.session)
         await require_access(self.session, chat_id, user_id)
         game = await self._current(chat_id, lock=True)
         state = normalize_photo(game.state, chat_id=chat_id) if game else None
         if game is None or game.status != "active" or state is None:
             return None
-        if user_id is not None and state.get("creator_id") != user_id:
+        if not shared and user_id is not None and state.get("creator_id") != user_id:
             return None
         timestamp = _moment(now)
         for _ in range(4):
@@ -336,16 +332,16 @@ class PhotoApplicationService:
         else:
             raise RuntimeError("Превышен предел переходов фото-викторины.")
         result = project_photo(
-            state, image_url=(f"/api/mini/photo/chats/{chat_id}/current/image"
-                              if state["current_round_id"] else None), now=timestamp,
+            state, image_url=_image_url(chat_id, state), now=timestamp,
         )
         result["game_id"] = game.id
         return result
 
-    async def image(self, *, chat_id: int, user_id: int):
+    async def image(self, *, chat_id: int, user_id: int, round_id: str | None):
         game = await self._current(chat_id)
         state = normalize_photo(game.state, chat_id=chat_id) if game else None
-        if game is None or state is None or state.get("creator_id") != user_id or not state["current_round_id"]:
+        if (game is None or state is None or state.get("creator_id") != user_id
+                or not state["current_round_id"] or round_id != state["current_round_id"]):
             raise LookupError("Активный фото-вопрос не найден.")
         item = next(item for item in state["rounds"] if item["round_id"] == state["current_round_id"])
         path = verified_image_path(images_root(), item["media"]["media_key"], item["media"])
@@ -356,7 +352,7 @@ class PhotoApplicationService:
     async def question_delivery(self, *, game_id: str, round_id: str) -> dict[str, Any] | None:
         game = await self.session.get(Game, game_id)
         state = normalize_photo(game.state, chat_id=game.chat_id) if game else None
-        if game is None or not game.is_current or state is None:
+        if game is None or game.chat_id is None or not game.is_current or state is None:
             return None
         item = next((item for item in state["rounds"] if item["round_id"] == round_id), None)
         if item is None or item["status"] != "open" or state["current_round_id"] != round_id:
@@ -377,7 +373,7 @@ class PhotoApplicationService:
             moment = datetime.fromtimestamp(moment, timezone.utc)
         return list((await self.session.scalars(
             select(Game.chat_id).join(GameDeadline, GameDeadline.game_id == Game.id).where(
-                Game.mode == "photo", Game.is_current.is_(True), Game.status == "active",
+                Game.mode == "photo", Game.chat_id.is_not(None), Game.is_current.is_(True), Game.status == "active",
                 GameDeadline.status == "pending", GameDeadline.due_at <= moment,
             ).distinct().order_by(Game.chat_id)
         )).all())

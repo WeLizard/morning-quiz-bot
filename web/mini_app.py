@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import ipaddress
 import json
+import logging
 import os
 import re
 import time
@@ -18,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from storage.database import Database, DatabaseSettings, normalize_database_url
 from storage.mini_app import MiniAppError, MiniAppStore
+from storage.account_passwords import PasswordAccounts
 from storage.guest_accounts import GuestAccounts, SESSION_SECONDS
 from storage.alchemy import AlchemyService
 from web.mini_auth import InvalidInitData, unique_object, validate_init_data
@@ -60,6 +62,39 @@ class MiniAppSettings:
         )
 
 
+class ChatUnavailable(MiniAppError):
+    """Telegram gave a permanent answer: the bot can no longer serve this chat."""
+    def __init__(self, reason, *, migrate_to=None, deactivate=True, status=410,
+                 detail='Чат больше недоступен боту'):
+        super().__init__(status, detail, code='chat_unavailable' if status == 410 else reason)
+        self.reason, self.migrate_to, self.deactivate = reason, migrate_to, deactivate
+
+
+# Bot API descriptions that mean "this chat is gone for the bot" (stable, permanent).
+_GONE_MARKERS = ('chat not found', 'peer_id_invalid', 'bot was kicked', 'bot is not a member',
+                 'bot was blocked', 'chat was deleted', 'chat was deactivated', 'not enough rights to get')
+
+
+def classify_telegram_error(status_code, body):
+    """Return ChatUnavailable for a permanent Bot API answer, None for a transient one.
+
+    Only 400/403 can be permanent. 429, 5xx, 401 (bad token), garbage and network
+    failures stay transient so a Telegram hiccup never retires a healthy chat.
+    """
+    if status_code not in {400, 403} or not isinstance(body, dict) or body.get('ok') is not False:
+        return None
+    parameters = body.get('parameters')
+    migrate_to = parameters.get('migrate_to_chat_id') if isinstance(parameters, dict) else None
+    if type(migrate_to) is int:
+        return ChatUnavailable('migrated', migrate_to=migrate_to)
+    description = str(body.get('description') or '').lower()
+    if 'upgraded to a supergroup' in description:
+        return ChatUnavailable('migrated')
+    if any(marker in description for marker in _GONE_MARKERS):
+        return ChatUnavailable('gone')
+    return None
+
+
 class TelegramMembership:
     def __init__(self, token, *, client=None, proxy=None):
         self._token = token
@@ -79,8 +114,14 @@ class TelegramMembership:
         async def member(uid):
             response = await self.client.post(f'https://api.telegram.org/bot{self._token}/getChatMember',
                                               json={'chat_id': chat_id, 'user_id': uid})
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            permanent = classify_telegram_error(response.status_code, body)
+            if permanent is not None:
+                raise permanent
             response.raise_for_status()
-            body = response.json()
             result = body.get('result', {})
             if body.get('ok') is not True or result.get('user', {}).get('id') != uid:
                 raise ValueError()
@@ -88,8 +129,13 @@ class TelegramMembership:
         try:
             async with asyncio.timeout(8):
                 # Telegram only guarantees querying other members for bot admins.
-                if (await member(self.bot_id)).get('status') not in {'creator', 'administrator'}:
-                    raise ValueError()
+                bot_status = (await member(self.bot_id)).get('status')
+                if bot_status in {'left', 'kicked'}:
+                    raise ChatUnavailable('gone')
+                if bot_status not in {'creator', 'administrator'}:
+                    # Bot is still in the chat but cannot verify members: not a reason to retire it.
+                    raise ChatUnavailable('bot_not_admin', deactivate=False, status=409,
+                                          detail='Боту нужны права администратора в этом чате')
                 return await member(user_id)
         except (httpx.HTTPError, ValueError, TypeError, AttributeError, TimeoutError):
             # Never log exception strings containing the secret-bearing Telegram URL.
@@ -105,14 +151,18 @@ class TelegramMembership:
 
 
 class RequestLimits:
-    """Bounded, single-process ingress limits; edge limits still required at deployment."""
-    def __init__(self, clock=time.monotonic):
-        self.clock, self.global_requests, self.frequent_reads, self.clients = clock, deque(), deque(), {}
+    """Bounded, single-process ingress limits; edge limits still required at deployment.
 
-    def allow(self, client, auth=False, frequent_read=False):
+    Farm traffic has its own buckets. One farm action is two requests (the command and the state refresh) and a quick
+    player taps several beds per second, so farm reads join the frequent-read bucket and farm commands get a wider
+    write bucket instead of sharing the general 120/min that is meant for the other games' writes."""
+    def __init__(self, clock=time.monotonic):
+        self.clock, self.global_requests, self.frequent_reads, self.farm_writes, self.clients = clock, deque(), deque(), deque(), {}
+
+    def allow(self, client, auth=False, frequent_read=False, farm_write=False):
         now = self.clock()
-        global_bucket = self.frequent_reads if frequent_read else self.global_requests
-        global_limit = 5000 if frequent_read else 600
+        global_bucket = self.farm_writes if farm_write else self.frequent_reads if frequent_read else self.global_requests
+        global_limit = 3000 if farm_write else 5000 if frequent_read else 600
         while global_bucket and global_bucket[0] <= now - 60:
             global_bucket.popleft()
         if len(global_bucket) >= global_limit:
@@ -121,16 +171,18 @@ class RequestLimits:
         self.clients = {key: values for key, values in self.clients.items() if values[-1] > now - 60}
         # A frequent, read-only game refresh must not consume the much smaller
         # bucket for login or write operations from the same Telegram client.
-        key = (client, auth, frequent_read)
+        key = (client, auth, frequent_read, farm_write)
         recent = [value for value in self.clients.get(key, ()) if value > now - 60]
-        per_client_limit = 10 if auth else 600 if frequent_read else 120
+        per_client_limit = 10 if auth else 300 if farm_write else 600 if frequent_read else 120
         if len(recent) >= per_client_limit:
             return False
         self.clients[key] = recent + [now]
         return True
 
 
-async def bounded_request_body(request: Request, *, max_bytes: int) -> bytes:
+async def bounded_request_body(
+    request: Request, *, max_bytes: int, too_large_message: str = 'Запрос слишком большой',
+) -> bytes:
     """Read a bounded body without making Starlette buffer an untrusted payload first."""
     content_length = request.headers.get('content-length')
     if content_length is not None:
@@ -141,19 +193,45 @@ async def bounded_request_body(request: Request, *, max_bytes: int) -> bytes:
         if declared_size < 0:
             raise MiniAppError(400, 'Некорректная длина запроса')
         if declared_size > max_bytes:
-            raise MiniAppError(413, 'Запрос слишком большой')
+            raise MiniAppError(413, too_large_message)
 
     body = bytearray()
     async for chunk in request.stream():
         if len(body) + len(chunk) > max_bytes:
-            raise MiniAppError(413, 'Запрос слишком большой')
+            raise MiniAppError(413, too_large_message)
         body.extend(chunk)
     return bytes(body)
 
 
+def static_cache_control(path):
+    if path in {'/app', '/app/alchemy'}:
+        return 'public, max-age=60, must-revalidate'
+    if path.endswith('.webp'):
+        return 'public, max-age=3600'
+    return 'public, max-age=300, must-revalidate'
+
+
+def _etag_matches(request, response):
+    etag = response.headers.get('etag')
+    sent = request.headers.get('if-none-match')
+    if not etag or not sent:
+        return False
+    candidates = {item.strip().removeprefix('W/') for item in sent.split(',')}
+    return '*' in candidates or etag.removeprefix('W/') in candidates
+
+
 def create_app(*, database=None, settings=None, membership=None, clock=time.time, allowed_user_ids=None,
-               runtime_enabled=False, scoring_rules=None):
+               runtime_enabled=None, scoring_rules=None, room_classic_enabled=None,
+               room_photo_enabled=None, dev_guest_access=False):
     settings = settings or MiniAppSettings.from_env()
+    # Production factory (uvicorn --factory) has no arguments: game switches come from env.
+    flag = lambda name: os.getenv(name, '').strip() == '1'
+    if runtime_enabled is None:
+        runtime_enabled = flag('MINI_APP_RUNTIME_ENABLED')
+    if room_classic_enabled is None:
+        room_classic_enabled = flag('MQB_ROOM_CLASSIC_ENABLED')
+    if room_photo_enabled is None:
+        room_photo_enabled = flag('MQB_ROOM_PHOTO_ENABLED')
     owned_db = database is None
     database = database or Database(DatabaseSettings(url=normalize_database_url(os.getenv('MINI_APP_DATABASE_URL', ''))))
     # Offline is fail-closed for groups; it never substitutes a permissive verifier.
@@ -194,6 +272,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                          chat_achievements=chat_achievements, streak_achievements=streak_achievements)
 
     guest_store = GuestAccounts(database, clock=clock)
+    password_store = PasswordAccounts(guest_store)
     guest_alchemy = AlchemyService(database)
 
     @asynccontextmanager
@@ -203,6 +282,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             if owned_db:
                 from storage.startup import require_current_schema
                 await require_current_schema(database)
+            if getattr(app.state, 'farm_shared_rate', None) is not None:
+                await app.state.farm_shared_rate.check_schema()
             yield
         finally:
             if membership is None and verifier is not None:
@@ -213,6 +294,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     app = FastAPI(title='Morning Quiz Mini App API', docs_url=None, redoc_url=None,
                   openapi_url=None, lifespan=lifespan, redirect_slashes=False)
     app.state.guest_store = guest_store
+    app.state.password_store = password_store
     app.state.mini_store = store
     app.state.mini_runtime_enabled = runtime_enabled
     mini_cookie = 'mqb_mini'
@@ -229,7 +311,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
 
     @app.exception_handler(MiniAppError)
     async def expected_error(request, error):
-        return JSONResponse({'detail': error.detail}, error.status,
+        return JSONResponse({'detail': error.detail, **({'code': error.code} if error.code else {})}, error.status,
                             headers={'Retry-After': '60'} if error.status == 429 else None)
 
     @app.exception_handler(SQLAlchemyError)
@@ -239,7 +321,15 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.middleware('http')
     async def boundary(request, call_next):
         static_game_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app/alchemy'}
-        public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/telegram-ui.js', '/app/game-ui.js', '/app/play-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp'}
+        public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/address.js', '/app/telegram-ui.js', '/app/play-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp', '/app/farm-card-v2.webp'}
+        public_page = public_page or (request.method in {'GET', 'HEAD'} and
+            (request.url.path == '/app/farm' or request.url.path.startswith('/app/farm/assets/')))
+        # Файлы интерфейса — не API: их качает каждый клиент при каждом открытии, и за общим
+        # NAT/VPN они съедали лимит API. Персональный /app/alchemy (с гостевым cookie) ходит в БД,
+        # его оставляем под лимитом и без кэша.
+        static_request = public_page and not (request.url.path == '/app/alchemy' and request.cookies.get('mqb_guest'))
+        farm_rate = getattr(app.state, 'farm_shared_rate', None)
+        shared_farm_api = farm_rate is not None and request.url.path.startswith('/api/farm/v1/')
         origin = f'{request.url.scheme}://{request.url.netloc}'
         allowed = origin == settings.origin
         if request.url.scheme != 'https':
@@ -255,28 +345,49 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         elif (request.headers.get('origin') not in (None, settings.origin)
               or (request.headers.get('sec-fetch-site') == 'cross-site' and not public_page)):
             response = JSONResponse({'detail': 'Межсайтовый запрос запрещён'}, 403)
-        elif (request.url.path.startswith('/api/guest/') and request.method not in {'GET', 'HEAD'}
+        elif (request.url.path.startswith(('/api/guest/', '/api/account/')) and request.method not in {'GET', 'HEAD'}
               and (request.headers.get('origin') != settings.origin
                    or request.headers.get('x-guest-csrf') != '1')):
             response = JSONResponse({'detail': 'Подтверждение origin обязательно'}, 403)
-        elif (request.url.path.startswith('/api/mini/') and request.url.path != '/api/mini/session'
+        elif (request.url.path.startswith('/api/mini/') and request.url.path not in {'/api/mini/session', '/api/mini/session/resume'}
               and request.method not in {'GET', 'HEAD'}
               and request.cookies.get(mini_cookie) and not request.headers.get('authorization')
               and (request.headers.get('origin') != settings.origin
                    or request.headers.get('x-mini-csrf') != '1')):
             response = JSONResponse({'detail': 'Подтверждение origin обязательно'}, 403)
-        # Login needs a deliberately tight bucket.  A game setup may legitimately
-        # contain several callbacks, and the read-only runtime endpoint is polled
-        # while a round is open; both still remain bounded per client and globally.
-        elif not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
-                request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/guest/start', '/api/guest/resume'},
-                request.url.path == '/api/mini/runtime'):
+        # Login needs a deliberately tight bucket. Every gameplay read/write is
+        # bounded normally; clients poll shared state at a modest interval.
+        elif not static_request and not shared_farm_api and not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
+                request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/mini/session/resume', '/api/guest/start', '/api/guest/resume', '/api/account/register', '/api/account/login'},
+                frequent_read=request.url.path.startswith('/api/farm/') and request.method in {'GET', 'HEAD'},
+                farm_write=request.url.path.startswith('/api/farm/') and request.method not in {'GET', 'HEAD'}):
             response = JSONResponse({'detail': 'Слишком много запросов'}, 429, headers={'Retry-After': '60'})
         else:
-            response = await call_next(request)
+            if shared_farm_api:
+                from qw_farm.domain import FarmError
+                try:
+                    await farm_rate.ingress(request)
+                except FarmError as error:
+                    response = JSONResponse({'code': error.code, 'message': error.message}, error.status,
+                        headers={'Retry-After': str(error.retry_after)} if hasattr(error, 'retry_after') else None)
+                else:
+                    response = await call_next(request)
+            else:
+                response = await call_next(request)
+        # Страницу фермы кэшировать нельзя: она сама отдаёт no-store (ссылки-приглашения).
+        cacheable = static_request and response.status_code == 200 and request.url.path != '/app/farm'
+        if cacheable and _etag_matches(request, response):
+            if hasattr(response, 'body_iterator'):
+                await response.body_iterator.aclose()
+            response = Response(status_code=304, headers={key: value for key, value in response.headers.items()
+                                                          if key.lower() in {'etag', 'last-modified'}})
         response.headers.update({'Cache-Control': 'no-store', 'Pragma': 'no-cache',
             'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
             'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'"})
+        if cacheable or (static_request and response.status_code == 304 and request.url.path != '/app/farm'):
+            # Имена файлов без версии, поэтому не immutable: короткий max-age + проверка по ETag (304).
+            del response.headers['Pragma']
+            response.headers['Cache-Control'] = static_cache_control(request.url.path)
         if public_page:
             response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
         if static_game_page:
@@ -297,6 +408,17 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(401, 'Требуется вход через Telegram')
         return token
 
+    async def retire_chat(chat_id, migrate_to=None):
+        """Best effort: a failed bookkeeping write must not hide the real answer."""
+        from storage.chat_availability import migrate_chat, set_chat_active
+        try:
+            if migrate_to:
+                await migrate_chat(database, chat_id, migrate_to)
+            else:
+                await set_chat_active(database, chat_id, False)
+        except Exception:
+            logging.getLogger(__name__).warning('Could not mark chat %s unavailable', chat_id, exc_info=True)
+
     async def chat_access(request, chat_id, *, include_role=False):
         token = credential(request)
         uid = await store.chat_identity(token, chat_id)
@@ -304,14 +426,19 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         if chat_id != uid:
             if verifier is None:
                 raise MiniAppError(503, 'Проверка Telegram отключена в локальном offline-режиме')
-            if include_role and hasattr(verifier, 'status'):
-                identity = await verifier.status(chat_id, uid)
-                role = identity.get('status')
-                member = role in {'creator', 'administrator', 'member'}
-                # Telegram's restricted status is still a member when is_member=true.
-                member = member or (role == 'restricted' and identity.get('is_member') is True)
-            else:
-                member = await verifier.allowed(chat_id, uid)
+            try:
+                if include_role and hasattr(verifier, 'status'):
+                    identity = await verifier.status(chat_id, uid)
+                    role = identity.get('status')
+                    member = role in {'creator', 'administrator', 'member'}
+                    # Telegram's restricted status is still a member when is_member=true.
+                    member = member or (role == 'restricted' and identity.get('is_member') is True)
+                else:
+                    member = await verifier.allowed(chat_id, uid)
+            except ChatUnavailable as gone:
+                if gone.deactivate:
+                    await retire_chat(chat_id, gone.migrate_to)
+                raise
             if not member:
                 raise MiniAppError(403, 'Членство в чате не подтверждено')
         # Projection rechecks session/chat after the external await.
@@ -333,7 +460,10 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         from application.game_catalog import game_modes
         return {'bot_username': settings.bot_username, 'game_location': 'shared-bot-and-app' if runtime_enabled else 'telegram-chat', 'offline': settings.offline,
                 'runtime_enabled': runtime_enabled,
+                'room_classic_enabled': room_classic_enabled,
+                'room_photo_enabled': room_photo_enabled,
                 'private_test': allowed_user_ids is not None,
+                'guest_enabled': allowed_user_ids is None or dev_guest_access,
                 'game_modes': game_modes()}
 
     @app.get('/app')
@@ -367,7 +497,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-mafia.webp')
         if asset == 'alchemy.webp':
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-atlas.webp')
-        if asset not in {'app.js', 'telegram-ui.js', 'game-ui.js', 'play-ui.js', 'styles.css', 'host-card.webp', 'mafia-card.webp'}:
+        if asset not in {'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js', 'styles.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'}:
             raise MiniAppError(404, 'Файл не найден')
         return FileResponse(Path(__file__).parent / 'mini_client' / asset)
 
@@ -377,7 +507,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     guest_cookie_secure = urlsplit(settings.origin).scheme == 'https'
 
     def guest_access():
-        if allowed_user_ids is not None:
+        if allowed_user_ids is not None and not dev_guest_access:
             raise MiniAppError(403, 'Гостевой вход закрыт в Telegram private test')
 
     def guest_response(profile, raw=None):
@@ -411,6 +541,126 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         response.delete_cookie(guest_cookie, path='/', httponly=True,
             secure=guest_cookie_secure, samesite='strict')
         return response
+
+    async def account_json(request, keys, required):
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await bounded_request_body(request, max_bytes=2000)
+        try:
+            value = json.loads(raw, object_pairs_hook=unique_object)
+            if not isinstance(value, dict) or not required <= set(value) <= keys:
+                raise ValueError()
+        except (ValueError, UnicodeError, RecursionError):
+            raise MiniAppError(400, 'Некорректные параметры') from None
+        return value
+
+    @app.post('/api/guest/profile')
+    async def guest_update_profile(request: Request):
+        guest_access()
+        value = await account_json(request, {'display_name'}, {'display_name'})
+        return await guest_store.update_display_name(
+            request.cookies.get(guest_cookie), value['display_name'])
+
+    @app.post('/api/guest/telegram-name')
+    async def guest_telegram_name(request: Request):
+        guest_access()
+        if not settings.bot_token:
+            raise MiniAppError(503, 'Вход через Telegram не настроен')
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await bounded_request_body(request, max_bytes=20000)
+        try:
+            value = json.loads(raw, object_pairs_hook=unique_object)
+            if not isinstance(value, dict) or set(value) != {'init_data'}:
+                raise ValueError()
+            identity = validate_init_data(value['init_data'], settings.bot_token, now=clock())
+        except (ValueError, TypeError, UnicodeError, RecursionError):
+            raise MiniAppError(401, 'Недействительные или просроченные данные Telegram') from None
+        return await guest_store.update_display_name(request.cookies.get(guest_cookie),
+            f'{identity.first_name} {identity.last_name}', only_placeholder=True)
+
+    async def telegram_link_json(request, *, confirm=False):
+        guest_access()
+        if not settings.bot_token:
+            raise MiniAppError(503, 'Вход через Telegram не настроен')
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await bounded_request_body(request, max_bytes=20000)
+        required = ({'init_data', 'confirm', 'account_id', 'telegram_user_id'}
+                    if confirm else {'init_data'})
+        try:
+            value = json.loads(raw, object_pairs_hook=unique_object)
+            if not isinstance(value, dict) or set(value) != required:
+                raise ValueError()
+            if confirm and (value['confirm'] is not True
+                            or not isinstance(value['account_id'], str)
+                            or not isinstance(value['telegram_user_id'], str)):
+                raise ValueError()
+        except (ValueError, TypeError, UnicodeError, RecursionError):
+            raise MiniAppError(400, 'Некорректные параметры подтверждения') from None
+        try:
+            identity = validate_init_data(value['init_data'], settings.bot_token, now=clock())
+        except InvalidInitData:
+            raise MiniAppError(401, 'Недействительные или просроченные данные Telegram') from None
+        from application.account_linking import AccountLinkingService
+        service = AccountLinkingService(database, guest_store, allowed_user_ids=allowed_user_ids)
+        return await service.telegram(request.cookies.get(guest_cookie), identity, confirm=confirm,
+            expected_account_id=value.get('account_id'),
+            expected_telegram_user_id=value.get('telegram_user_id'))
+
+    @app.post('/api/account/telegram-link/preview')
+    async def telegram_link_preview(request: Request):
+        return await telegram_link_json(request)
+
+    @app.post('/api/account/telegram-link/confirm')
+    async def telegram_link_confirm(request: Request):
+        return await telegram_link_json(request, confirm=True)
+
+    @app.post('/api/account/register')
+    async def account_register(request: Request):
+        guest_access()
+        value = await account_json(request, {'login', 'password', 'display_name', 'address_form'}, {'login', 'password'})
+        profile, raw = await password_store.register(
+            value['login'], value['password'], value.get('display_name'), request.cookies.get(guest_cookie),
+            address_form=value.get('address_form'))
+        return guest_response(profile, raw)
+
+    @app.post('/api/account/login')
+    async def account_login(request: Request):
+        guest_access()
+        value = await account_json(request, {'login', 'password'}, {'login', 'password'})
+        profile, raw = await password_store.login(
+            value['login'], value['password'], request.client.host if request.client else '')
+        return guest_response(profile, raw)
+
+    @app.post('/api/account/logout')
+    async def account_logout(request: Request):
+        return await guest_logout(request)
+
+    @app.post('/api/account/address-form')
+    async def account_address_form(request: Request, identity: str | None = Query(None)):
+        """One setting on the Account for every channel (guest cookie or Telegram session)."""
+        from uuid import UUID
+        from domain.address import effective_address_form, parse_address_form
+        from storage.models import Account
+        from web.principal import PrincipalError, resolve_principal
+        value = await account_json(request, {'address_form'}, {'address_form'})
+        try:
+            form = parse_address_form(value['address_form'])
+        except ValueError:
+            raise MiniAppError(400, 'Некорректная форма обращения') from None
+        if identity == 'guest':
+            guest_access()
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                # The principal boundary already holds the Account row lock (lock=True).
+                account = await session.get(Account, UUID(who.account_id))
+                account.address_form = form
+                return {'account_id': who.account_id, 'address_form': effective_address_form(form),
+                        'address_form_chosen': True}
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
 
     @app.post('/api/guest/rooms')
     async def guest_create_room(request: Request):
@@ -509,6 +759,28 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
             return {'items': await RoomApplicationService(session).list_mine(account_id=account.id)}
 
+    @app.post('/api/guest/rooms/{room_id}/leave')
+    async def guest_leave_room(request: Request, room_id: str):
+        from application.rooms import RoomApplicationService
+        guest_access()
+        value = await guest_mafia_json(request, keys={'membership_version'},
+                                      error_message='Некорректная команда выхода')
+        # Shared moderation fence is acquired by authorized. Avoid an Account
+        # FOR UPDATE before game locks (game writes may need Account FK locks).
+        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=False) as (session, account, _):
+            try:
+                return await RoomApplicationService(session).leave(
+                    account_id=account.id, room_id=room_id,
+                    membership_version=value['membership_version'])
+            except LookupError as error:
+                raise MiniAppError(404, str(error)) from None
+            except PermissionError as error:
+                raise MiniAppError(403, str(error)) from None
+            except ValueError as error:
+                raise MiniAppError(400, str(error)) from None
+            except RuntimeError as error:
+                raise MiniAppError(409, str(error)) from None
+
     @app.get('/api/guest/rooms/{room_id}')
     async def guest_get_room(request: Request, room_id: str):
         from application.rooms import RoomApplicationService
@@ -526,17 +798,144 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(400, 'Не указан корректный идентификатор команды')
         return 'guest:' + value if len(value) <= 58 else value
 
-    async def guest_mafia_json(request: Request, *, keys: set[str], max_bytes: int = 500):
+    async def guest_mafia_json(request: Request, *, keys: set[str], max_bytes: int = 500,
+                               error_message: str = 'Некорректная команда Mafia', optional: frozenset = frozenset()):
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
         raw = await bounded_request_body(request, max_bytes=max_bytes)
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
-            if not isinstance(value, dict) or set(value) != keys:
+            if not isinstance(value, dict) or not keys <= set(value) <= keys | optional:
                 raise ValueError()
             return value
         except (ValueError, UnicodeError, RecursionError):
-            raise MiniAppError(400, 'Некорректная команда Mafia') from None
+            raise MiniAppError(400, error_message) from None
+
+    async def guest_classic_call(request, room_id, action):
+        from application.room_classic import RoomClassicApplicationService
+        guest_access()
+        values = {}
+        command_id = None
+        if action not in {'current', 'setup'}:
+            keys = {'count', 'open_seconds', 'interval_seconds'} if action == 'start' else {'game_id', 'round_id', 'selected_option'} if action == 'answer' else {'game_id', 'expected_revision'}
+            values = await guest_mafia_json(request, keys=keys, **(
+                {'optional': frozenset({'category_mode', 'categories', 'random_categories'}), 'max_bytes': 4000}
+                if action == 'start' else {}))
+            command_id = guest_mafia_command_id(request)
+            if action != 'start' and (not isinstance(values.get('game_id'), str) or not 1 <= len(values['game_id']) <= 64):
+                raise MiniAppError(400, 'Некорректная викторина')
+            if action == 'answer' and (not isinstance(values['round_id'], str) or not 1 <= len(values['round_id']) <= 64 or type(values['selected_option']) is not int):
+                raise MiniAppError(400, 'Некорректный ответ')
+        try:
+            # Translate failures outside the transaction so receipts, scores and
+            # random selection are rolled back together on rejected commands.
+            async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+                service = RoomClassicApplicationService(session, rules=scoring_rules)
+                if action == 'current':
+                    return {'current': await service.current(room_id=room_id, account_id=account.id)}
+                if action == 'setup':
+                    return await service.setup(room_id=room_id, account_id=account.id)
+                if action == 'start':
+                    return await service.start(room_id=room_id, account_id=account.id, command_id=command_id,
+                        enabled=room_classic_enabled, **values)
+                return await service.command(room_id=room_id, account_id=account.id, command_id=command_id,
+                                             kind=action, **values)
+        except LookupError as error:
+            raise MiniAppError(404, str(error)) from None
+        except PermissionError as error:
+            raise MiniAppError(403, str(error)) from None
+        except RuntimeError as error:
+            raise MiniAppError(409, str(error)) from None
+        except ValueError as error:
+            raise MiniAppError(400, str(error)) from None
+
+    @app.get('/api/guest/rooms/{room_id}/classic/current')
+    async def guest_classic_current(request: Request, room_id: str):
+        return await guest_classic_call(request, room_id, 'current')
+
+    @app.get('/api/guest/rooms/{room_id}/classic/setup')
+    async def guest_classic_setup(request: Request, room_id: str):
+        return await guest_classic_call(request, room_id, 'setup')
+
+    @app.post('/api/guest/rooms/{room_id}/classic/start')
+    async def guest_classic_start(request: Request, room_id: str):
+        return await guest_classic_call(request, room_id, 'start')
+
+    @app.post('/api/guest/rooms/{room_id}/classic/answer')
+    async def guest_classic_answer(request: Request, room_id: str):
+        return await guest_classic_call(request, room_id, 'answer')
+
+    @app.post('/api/guest/rooms/{room_id}/classic/stop')
+    async def guest_classic_stop(request: Request, room_id: str):
+        return await guest_classic_call(request, room_id, 'stop')
+
+    async def guest_photo_call(request, room_id, action):
+        from application.room_photo import RoomPhotoApplicationService
+        guest_access()
+        values = {}
+        command_id = None
+        if action not in {'current', 'setup', 'image'}:
+            keys = ({'question_count', 'open_seconds', 'hints_enabled'} if action == 'start'
+                    else {'game_id', 'round_id', 'answer'} if action == 'answer'
+                    else {'game_id', 'expected_revision'})
+            values = await guest_mafia_json(request, keys=keys)
+            command_id = guest_mafia_command_id(request)
+            if action != 'start' and (not isinstance(values.get('game_id'), str) or not 1 <= len(values['game_id']) <= 64):
+                raise MiniAppError(400, 'Некорректная фото-серия')
+            if action == 'answer' and (not isinstance(values['round_id'], str)
+                    or not 1 <= len(values['round_id']) <= 64 or not isinstance(values['answer'], str)):
+                raise MiniAppError(400, 'Некорректный ответ')
+        try:
+            async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+                service = RoomPhotoApplicationService(session)
+                scope = {'room_id': room_id, 'account_id': account.id}
+                if action == 'current':
+                    result = await service.current(**scope)
+                    occupied = bool(result and result.get('occupied'))
+                    return {'current': None if result and 'occupied' in result else result, 'occupied': occupied}
+                if action == 'setup':
+                    return await service.setup(**scope)
+                if action == 'image':
+                    path = await service.image(**scope, game_id=request.query_params.get('game_id'),
+                                               round_id=request.query_params.get('round_id'))
+                    return FileResponse(path, media_type='image/webp', headers={
+                        'Cache-Control': 'no-store', 'Content-Disposition': 'inline; filename="photo.webp"'})
+                if action == 'start':
+                    return await service.start(**scope, command_id=command_id,
+                                               enabled=room_photo_enabled, **values)
+                return await service.command(**scope, command_id=command_id, kind=action, **values)
+        except LookupError as error:
+            raise MiniAppError(404, str(error)) from None
+        except PermissionError as error:
+            raise MiniAppError(403, str(error)) from None
+        except RuntimeError as error:
+            raise MiniAppError(409, str(error)) from None
+        except ValueError as error:
+            raise MiniAppError(400, str(error)) from None
+
+    @app.get('/api/guest/rooms/{room_id}/photo/setup')
+    async def guest_photo_setup(request: Request, room_id: str):
+        return await guest_photo_call(request, room_id, 'setup')
+
+    @app.get('/api/guest/rooms/{room_id}/photo/current')
+    async def guest_photo_current(request: Request, room_id: str):
+        return await guest_photo_call(request, room_id, 'current')
+
+    @app.get('/api/guest/rooms/{room_id}/photo/current/image')
+    async def guest_photo_image(request: Request, room_id: str):
+        return await guest_photo_call(request, room_id, 'image')
+
+    @app.post('/api/guest/rooms/{room_id}/photo/start')
+    async def guest_photo_start(request: Request, room_id: str):
+        return await guest_photo_call(request, room_id, 'start')
+
+    @app.post('/api/guest/rooms/{room_id}/photo/answer')
+    async def guest_photo_answer(request: Request, room_id: str):
+        return await guest_photo_call(request, room_id, 'answer')
+
+    @app.post('/api/guest/rooms/{room_id}/photo/stop')
+    async def guest_photo_stop(request: Request, room_id: str):
+        return await guest_photo_call(request, room_id, 'stop')
 
     @app.get('/api/guest/rooms/{room_id}/mafia/lobby')
     async def guest_mafia_lobby(request: Request, room_id: str):
@@ -733,17 +1132,12 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def guest_mafia_restart(request: Request, room_id: str):
         return await guest_mafia_command(request, room_id, 'room_restart')
 
-    @app.post('/api/mini/session')
-    async def login(request: Request):
+    async def login(request: Request, *, provision=True):
         if not settings.bot_token:
             raise MiniAppError(503, 'Вход через Telegram не настроен')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > 20000:
-                raise MiniAppError(413, 'Запрос слишком большой')
+        body = await bounded_request_body(request, max_bytes=20000)
         try:
             value = json.loads(body, object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) != {'init_data'}:
@@ -751,7 +1145,15 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             identity = validate_init_data(value['init_data'], settings.bot_token, now=clock())
         except (ValueError, TypeError, UnicodeError, InvalidInitData, RecursionError):
             raise MiniAppError(401, 'Недействительные или просроченные данные Telegram') from None
-        return mini_session_response(await store.create_session(identity))
+        return mini_session_response(await store.create_session(identity, provision=provision))
+
+    @app.post('/api/mini/session')
+    async def create_login(request: Request):
+        return await login(request)
+
+    @app.post('/api/mini/session/resume')
+    async def resume_login(request: Request):
+        return await login(request, provision=False)
 
     @app.post('/api/mini/session/renew')
     async def renew(request: Request):
@@ -791,7 +1193,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.get('/api/mini/alchemy')
     async def alchemy_progress(request: Request):
         # Сводка игрока в «Алхимии»: открытия, очки и место.
-        return await store.alchemy_progress(credential(request))
+        return await store.alchemy_progress(credential(request),
+            expected_user_id=alchemy_mini_user(request, required=False))
 
     @app.get('/api/mini/alchemy/leaderboard')
     async def alchemy_leaderboard(request: Request, limit: int = Query(20, ge=1, le=100),
@@ -816,7 +1219,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                     or not all(isinstance(item, str) and len(item) <= 128 for item in crafted)
                     or type(attempts) is not int or not 0 <= attempts <= 100000):
                 raise ValueError()
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, UnicodeError, RecursionError):
             raise MiniAppError(422, 'Некорректная сводка прогресса') from None
         return discovered, crafted, attempts
 
@@ -841,10 +1244,18 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         # Локальный save сохраняем для удобства, но он не подтверждает награды.
         discovered, crafted, attempts = await alchemy_body(request)
         return await store.alchemy_sync(credential(request), discovered=discovered,
-                                        crafted=crafted, attempts=attempts)
+            crafted=crafted, attempts=attempts, expected_user_id=alchemy_mini_user(request))
 
-    @app.post('/api/mini/alchemy/craft')
-    async def alchemy_craft(request: Request):
+    def alchemy_mini_user(request, *, required=True):
+        value = request.headers.get('x-mini-user')
+        if value is None and not required:
+            return None
+        if (not isinstance(value, str) or not re.fullmatch(r'[1-9][0-9]{0,15}', value)
+                or int(value) >= 2**52):
+            raise MiniAppError(422, 'Не указан профиль игры')
+        return value
+
+    async def alchemy_craft_body(request: Request):
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
         raw = await bounded_request_body(request, max_bytes=512)
@@ -860,9 +1271,60 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректная команда опыта') from None
+        return value
+
+    def alchemy_guest_account(request):
+        value = request.headers.get('x-guest-account', '')
+        if not re.fullmatch(r'[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}', value):
+            raise MiniAppError(422, 'Не указан гостевой профиль игры')
+        return value
+
+    @app.post('/api/mini/alchemy/craft')
+    async def alchemy_craft(request: Request):
+        value = await alchemy_craft_body(request)
         return await store.alchemy_craft(
             credential(request), command_id=value['command_id'],
+            expected_user_id=alchemy_mini_user(request),
             ingredient_a=value['ingredient_a'], ingredient_b=value['ingredient_b'])
+
+    @app.post('/api/guest/alchemy/craft')
+    async def guest_alchemy_craft(request: Request):
+        guest_access()
+        value = await alchemy_craft_body(request)
+        return await guest_alchemy.guest_craft(request.cookies.get(guest_cookie),
+            expected_account_id=alchemy_guest_account(request), **value)
+
+    async def alchemy_claim_body(request):
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await bounded_request_body(request, max_bytes=512)
+        try:
+            value = json.loads(raw, object_pairs_hook=unique_object)
+            if (not isinstance(value, dict)
+                    or set(value) != {'command_id', 'stage_id', 'catalog_revision'}
+                    or not isinstance(value['command_id'], str)
+                    or not re.fullmatch(r'[A-Za-z0-9_-]{8,64}', value['command_id'])
+                    or not isinstance(value['stage_id'], str)
+                    or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', value['stage_id'])
+                    or not isinstance(value['catalog_revision'], str)
+                    or not re.fullmatch(r'[a-f0-9]{64}', value['catalog_revision'])):
+                raise ValueError()
+        except (ValueError, TypeError, UnicodeError, RecursionError):
+            raise MiniAppError(400, 'Некорректная команда этапа') from None
+        return value
+
+    @app.post('/api/mini/alchemy/claim-stage')
+    async def alchemy_claim_stage(request: Request):
+        return await store.alchemy_claim_stage(credential(request),
+            expected_user_id=alchemy_mini_user(request),
+            **await alchemy_claim_body(request))
+
+    @app.post('/api/guest/alchemy/claim-stage')
+    async def guest_alchemy_claim_stage(request: Request):
+        guest_access()
+        return await guest_alchemy.guest_claim_stage(request.cookies.get(guest_cookie),
+            expected_account_id=alchemy_guest_account(request),
+            **await alchemy_claim_body(request))
 
     @app.get('/api/mini/history')
     async def history(request: Request, limit: int = Query(20, ge=1, le=50)):
@@ -901,9 +1363,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Редактирование настроек сейчас отключено')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 1000:
-            raise MiniAppError(413, 'Настройки слишком большие')
+        raw = await bounded_request_body(
+            request, max_bytes=1000, too_large_message='Настройки слишком большие')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             expected = {'questions', 'seconds', 'interval', 'announce', 'announce_delay', 'expected_revision'}
@@ -961,9 +1422,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Изменение настроек сейчас отключено')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 12000:
-            raise MiniAppError(413, 'Настройки слишком большие')
+        raw = await bounded_request_body(
+            request, max_bytes=12000, too_large_message='Настройки слишком большие')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) != {'classic', 'daily', 'wisdom', 'auto_delete', 'expected_revision'}:
@@ -1078,9 +1538,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Запуск игр в Mini App сейчас отключён')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 300:
-            raise MiniAppError(413, 'Команда слишком большая')
+        raw = await bounded_request_body(
+            request, max_bytes=300, too_large_message='Команда слишком большая')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if (not isinstance(value, dict) or set(value) != {'command_id'}
@@ -1141,9 +1600,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Игры в Mini App сейчас отключены')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 300:
-            raise MiniAppError(413, 'Команда слишком большая')
+        raw = await bounded_request_body(
+            request, max_bytes=300, too_large_message='Команда слишком большая')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if (not isinstance(value, dict)
@@ -1182,9 +1640,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Ответы в Mini App сейчас отключены')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 500:
-            raise MiniAppError(413, 'Ответ слишком большой')
+        raw = await bounded_request_body(
+            request, max_bytes=500, too_large_message='Ответ слишком большой')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             keys = set(value) if isinstance(value, dict) else set()
@@ -1240,9 +1697,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Запуск игр в Mini App сейчас отключён')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 500:
-            raise MiniAppError(413, 'Команда слишком большая')
+        raw = await bounded_request_body(
+            request, max_bytes=500, too_large_message='Команда слишком большая')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if (not isinstance(value, dict) or set(value) - {
@@ -1313,9 +1769,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Ответы в Mini App сейчас отключены')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 1000:
-            raise MiniAppError(413, 'Ответ слишком большой')
+        raw = await bounded_request_body(
+            request, max_bytes=1000, too_large_message='Ответ слишком большой')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if (not isinstance(value, dict)
@@ -1356,9 +1811,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Игры в Mini App сейчас отключены')
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 300:
-            raise MiniAppError(413, 'Команда слишком большая')
+        raw = await bounded_request_body(
+            request, max_bytes=300, too_large_message='Команда слишком большая')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if (not isinstance(value, dict) or set(value) != {'command_id', 'expected_revision'}
@@ -1395,7 +1849,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         async with store.authorized(token) as (session, user):
             await store.require_chat(session, user.id, chat_id)
             try:
-                path = await PhotoApplicationService(database, session).image(chat_id=chat_id, user_id=user.id)
+                path = await PhotoApplicationService(database, session).image(
+                    chat_id=chat_id, user_id=user.id, round_id=request.query_params.get('round_id'))
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
         return FileResponse(path, media_type='image/webp')
@@ -1424,9 +1879,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         from storage.models import SystemState
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 1000:
-            raise MiniAppError(413, 'Черновик слишком большой')
+        raw = await bounded_request_body(
+            request, max_bytes=1000, too_large_message='Черновик слишком большой')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) != {'players', 'expected_revision'}:
@@ -1522,9 +1976,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         from application.mafia import MafiaApplicationService
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 200:
-            raise MiniAppError(413, 'Действие слишком большое')
+        raw = await bounded_request_body(
+            request, max_bytes=200, too_large_message='Действие слишком большое')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) != {'ready', 'expected_revision'}:
@@ -1553,9 +2006,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         from application.mafia import MafiaApplicationService
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 160:
-            raise MiniAppError(413, 'Действие слишком большое')
+        raw = await bounded_request_body(
+            request, max_bytes=160, too_large_message='Действие слишком большое')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) != {'expected_revision'}:
@@ -1596,9 +2048,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def mafia_game_body(request, *, target=False):
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
-        raw = await request.body()
-        if len(raw) > 240:
-            raise MiniAppError(413, 'Действие слишком большое')
+        raw = await bounded_request_body(
+            request, max_bytes=240, too_large_message='Действие слишком большое')
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             keys = {'expected_revision', 'target'} if target else {'expected_revision'}
@@ -1648,44 +2099,6 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def mafia_restart(request: Request, chat_id: int):
         return await mafia_game_command(request, chat_id, 'restart')
 
-    if runtime_enabled:
-        from storage.mini_bridge import MiniBridge
-
-        @app.get('/api/mini/runtime')
-        async def runtime_view(request: Request):
-            async with store.authorized(credential(request)) as (session, user):
-                return await MiniBridge(database, store.bot_key_id, user.id, clock=clock).snapshot(session)
-
-        @app.post('/api/mini/runtime/actions')
-        async def runtime_action(request: Request):
-            if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
-                raise MiniAppError(415, 'Ожидается JSON')
-            raw = bytearray()
-            async for chunk in request.stream():
-                raw.extend(chunk)
-                if len(raw) > 4000:
-                    raise MiniAppError(413, 'Действие слишком большое')
-            try:
-                action = json.loads(raw, object_pairs_hook=unique_object)
-                if not isinstance(action, dict):
-                    raise ValueError()
-            except (ValueError, UnicodeError, RecursionError):
-                raise MiniAppError(400, 'Некорректное действие') from None
-            async with store.authorized(credential(request), write=True) as (session, user):
-                from storage.admin_actions import access_allowed_in
-                if not await access_allowed_in(session, user.id, user.id):
-                    raise MiniAppError(403, 'Игры сейчас недоступны')
-                return await MiniBridge(database, store.bot_key_id, user.id, clock=clock).enqueue(session, action)
-
-        @app.get('/api/mini/runtime/media/{message_id}')
-        async def runtime_media(request: Request, message_id: int):
-            from storage.photo_media import images_root
-            async with store.authorized(credential(request)) as (session, user):
-                name = await MiniBridge(database, store.bot_key_id, user.id, clock=clock).media_name(session, message_id)
-                root = images_root()
-                path = (root / name).resolve()
-                if path.parent != root or path.suffix.lower() not in {'.webp', '.jpg', '.jpeg', '.png'} or not path.is_file():
-                    raise MiniAppError(404, 'Изображение недоступно')
-                return FileResponse(path)
-
+    from qw_farm.integration import install_farm
+    install_farm(app, database, settings, allowed_user_ids=allowed_user_ids, clock=clock)
     return app

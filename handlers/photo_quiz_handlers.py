@@ -63,25 +63,31 @@ class PhotoQuizHandlers:
     def _command_id(kind, update_id):
         return f'tg:photo:{kind}:' + sha256(str(update_id).encode()).hexdigest()[:32]
 
-    async def _current(self, chat_id, user_id):
+    @staticmethod
+    def _is_group(update) -> bool:
+        chat = getattr(update, 'effective_chat', None)
+        return getattr(chat, 'type', None) in ('group', 'supergroup')
+
+    async def _current(self, chat_id, user_id, shared=False):
         from application.photo import PhotoApplicationService
         async with self.database.transaction() as session:
             return await PhotoApplicationService(self.database, session).current(
-                chat_id=chat_id, user_id=user_id,
+                chat_id=chat_id, user_id=user_id, shared=shared,
             )
 
     async def photo_quiz_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Точка входа команды /photo_quiz -> показывает меню настроек"""
-        if not update.message or not update.effective_chat or not update.effective_user:
+        message = update.effective_message
+        if not message or not update.effective_chat or not update.effective_user:
             return ConversationHandler.END
 
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
 
         # Проверяем, не идет ли уже фото-викторина
-        active_quiz = await self._current(chat_id, user_id)
+        active_quiz = await self._current(chat_id, user_id, shared=self._is_group(update))
         if active_quiz and active_quiz.get('status') == 'active':
-            await update.message.reply_text(
+            await message.reply_text(
                 escape_markdown_v2("🖼️ Фото-викторина уже идет. Остановите текущую: `/stop_photo_quiz`."),
                 parse_mode="MarkdownV2",
             )
@@ -99,13 +105,31 @@ class PhotoQuizHandlers:
             {
                 "chat_id": chat_id,
                 "user_id": user_id,
-                "original_command_message_id": update.message.message_id,
+                "shared": self._is_group(update),
+                "original_command_message_id": update.message.message_id if update.message else None,
+                "menu_entry_message_id": context.chat_data.get('_menu_entry_message_id'),
             }
         )
         context.chat_data[PHOTO_CFG_STORE_KEY] = cfg
 
         await self._send_photo_quiz_cfg_message(update, context)
         return PHOTO_CFG_OPTIONS
+
+    async def photo_menu_entry(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Enter photo setup from the real home-card callback Update."""
+        from modules.telegram_menu import acknowledge
+
+        query = update.callback_query
+        if not query:
+            return ConversationHandler.END
+        await acknowledge(query)
+        context.args = []
+        if query.message:
+            context.chat_data['_menu_entry_message_id'] = query.message.message_id
+        try:
+            return await self.photo_quiz_command(update, context)
+        finally:
+            context.chat_data.pop('_menu_entry_message_id', None)
 
     async def stop_photo_quiz_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /stop_photo_quiz"""
@@ -188,19 +212,27 @@ class PhotoQuizHandlers:
             chat_id = update.effective_chat.id
             if not update.effective_user or not update.message or not update.message.text:
                 return False
+            if update.effective_user.is_bot:
+                return False
+            # Group: any member answers and is credited; private chat: only the player.
+            shared = self._is_group(update)
             from application.photo import PhotoApplicationService
+            from storage.admin_actions import BotAccessBlocked
             async with self.database.transaction() as session:
                 service = PhotoApplicationService(self.database, session)
-                current = await service.settle_due(chat_id=chat_id, user_id=update.effective_user.id)
+                current = await service.settle_due(
+                    chat_id=chat_id, user_id=update.effective_user.id, shared=shared)
                 if current is None or not current.get('question'):
                     return False
                 result = await service.answer(
                     chat_id=chat_id, user_id=update.effective_user.id,
                     display_name=update.effective_user.full_name,
                     round_id=current['question']['round_id'], answer=update.message.text,
-                    command_id=self._command_id('answer', update.update_id),
+                    command_id=self._command_id('answer', update.update_id), shared=shared,
                 )
 
+        except BotAccessBlocked:
+            return False
         except Exception as e:
             logger.error(f"Ошибка обработки сообщения в фото-викторине: {e}")
             return False
@@ -213,9 +245,14 @@ class PhotoQuizHandlers:
         if not query:
             return ConversationHandler.END
 
-        await query.answer()
         data = query.data or ""
         cfg: Dict[str, Optional[int]] = context.chat_data.get(PHOTO_CFG_STORE_KEY, {})
+        restore_menu = (
+            data == CB_PQCFG_CANCEL and bool(cfg)
+            and cfg.get('menu_entry_message_id') == getattr(query.message, 'message_id', None)
+        )
+        if not restore_menu:
+            await query.answer()
 
         if not cfg:
             await query.answer("Настройка устарела. Попробуйте снова.", show_alert=True)
@@ -289,7 +326,7 @@ class PhotoQuizHandlers:
                 await query.answer("Не удалось определить параметры запуска.", show_alert=True)
                 return PHOTO_CFG_OPTIONS
 
-            active_quiz = await self._current(chat_id, user_id)
+            active_quiz = await self._current(chat_id, user_id, shared=bool(cfg.get("shared")))
             if active_quiz and active_quiz.get('status') == 'active':
                 await query.answer("Фото-викторина уже идет в этом чате.", show_alert=True)
                 await self._send_photo_quiz_cfg_message(query, context)
@@ -314,6 +351,12 @@ class PhotoQuizHandlers:
             return ConversationHandler.END
 
         if data == CB_PQCFG_CANCEL:
+            if restore_menu:
+                from modules.telegram_menu import home
+                context.chat_data.pop(PHOTO_CFG_MENU_MSG_KEY, None)
+                context.chat_data.pop(PHOTO_CFG_STORE_KEY, None)
+                await home(update, context)
+                return ConversationHandler.END
             await self._cleanup_cfg_message(context, query.message)
             context.chat_data.pop(PHOTO_CFG_STORE_KEY, None)
             return ConversationHandler.END
@@ -544,11 +587,11 @@ class PhotoQuizHandlers:
         return False
 
     def get_handlers(self) -> list:
-        from modules.telegram_menu import conversation_entry, home_fallbacks
+        from modules.telegram_menu import home_fallbacks
         cancel_handler = CommandHandler("cancel", self.cancel_photo_quiz_command)
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("photo_quiz", self.photo_quiz_command),
-                CallbackQueryHandler(conversation_entry(self.photo_quiz_command, 'photo_quiz'), pattern=r'^nav:photo$'),
+                CallbackQueryHandler(self.photo_menu_entry, pattern=r'^nav:photo$'),
                 CommandHandler('start', self.photo_quiz_command, filters=filters.Regex(r'^/start(?:@\w+)? photo$'))],
             states={
                 PHOTO_CFG_OPTIONS: [

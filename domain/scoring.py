@@ -68,6 +68,17 @@ def _matching_milestone(score: Decimal, milestones: tuple[int, ...]) -> int | No
     return None
 
 
+def classic_points(*, streak: int, is_correct: bool, rules: ClassicScoringRules) -> tuple[int, Decimal]:
+    """Shared arithmetic independent of the actor's transport or score ledger."""
+    if not is_correct:
+        return 0, Decimal('-0.5')
+    streak += 1
+    multiplier = Decimal('0')
+    if rules.streak_enabled and streak >= rules.min_streak_for_bonus:
+        multiplier = min(Decimal(streak) * rules.base_multiplier, rules.max_multiplier)
+    return streak, Decimal('1') + multiplier
+
+
 def apply_classic_score(
     data: dict[str, Any],
     *,
@@ -109,16 +120,9 @@ def apply_classic_score(
     elif milestone_code:
         data["milestones_achieved"].add(milestone_code)
 
+    streak, points = classic_points(streak=streak, is_correct=is_correct, rules=rules)
     if is_correct:
-        streak += 1
-        multiplier = Decimal("0")
-        if rules.streak_enabled and streak >= rules.min_streak_for_bonus:
-            multiplier = min(Decimal(streak) * rules.base_multiplier, rules.max_multiplier)
-        points = Decimal("1") + multiplier
         data["correct_answers_count"] = int(data.get("correct_answers_count") or 0) + 1
-    else:
-        streak = 0
-        points = Decimal("-0.5")
     data["consecutive_correct"] = streak
     data["max_consecutive_correct"] = max(best, streak)
     data["score"] = float(old_score + points)

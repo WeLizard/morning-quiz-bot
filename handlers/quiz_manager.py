@@ -1133,8 +1133,9 @@ class QuizManager(ClassicPersistenceMixin):
 
     async def quiz_command_entry(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
         logger.debug(f"quiz_command_entry: ПОЛУЧЕНА КОМАНДА /quiz. Update ID: {update.update_id}")
-        if not update.message or not update.effective_chat or not update.effective_user:
-            logger.debug("quiz_command_entry: update.message, effective_chat или effective_user отсутствуют.")
+        message = update.effective_message
+        if not message or not update.effective_chat or not update.effective_user:
+            logger.debug("quiz_command_entry: effective_message, effective_chat или effective_user отсутствуют.")
             return ConversationHandler.END
 
         chat_id = update.effective_chat.id
@@ -1147,7 +1148,7 @@ class QuizManager(ClassicPersistenceMixin):
         active_quiz = self.state.get_active_quiz(chat_id)
         if active_quiz and not active_quiz.is_stopping:
             logger.info(f"quiz_command_entry: Викторина уже активна в чате {chat_id}. Отправка сообщения.")
-            await update.message.reply_text(escape_markdown_v2(f"Викторина уже идет. Остановите ее: `/{self.app_config.commands.stop_quiz}`."), parse_mode=ParseMode.MARKDOWN_V2)
+            await message.reply_text(escape_markdown_v2(f"Викторина уже идет. Остановите ее: `/{self.app_config.commands.stop_quiz}`."), parse_mode=ParseMode.MARKDOWN_V2)
             return ConversationHandler.END
 
         args = context.args if context.args else []
@@ -1170,7 +1171,7 @@ class QuizManager(ClassicPersistenceMixin):
                     logger.debug(f"quiz_command_entry: Количество вопросов из аргументов: {parsed_num_q}")
                 else:
                     logger.info(f"quiz_command_entry: Некорректное количество вопросов в аргументах: {num_val}. Чат: {chat_id}")
-                    await update.message.reply_text(f"Количество вопросов должно быть от 1 до {escape_markdown_v2(str(self.app_config.max_questions_per_session))}\\.", parse_mode=ParseMode.MARKDOWN_V2)
+                    await message.reply_text(f"Количество вопросов должно быть от 1 до {escape_markdown_v2(str(self.app_config.max_questions_per_session))}\\.", parse_mode=ParseMode.MARKDOWN_V2)
                     return ConversationHandler.END
             except ValueError:
                 logger.debug(f"quiz_command_entry: Первый аргумент '{temp_args_for_parsing[0]}' не является числом (если остался после announce).")
@@ -1199,7 +1200,7 @@ class QuizManager(ClassicPersistenceMixin):
                 category_names_for_quiz=parsed_categories_names if parsed_categories_names else None,
                 is_random_categories_mode=final_is_random_cats_for_quick,
                 interval_seconds=params_for_quick_launch.get("interval_seconds") if "interval_seconds" in params_for_quick_launch else None,
-                original_command_message_id=update.message.message_id,
+                original_command_message_id=update.message.message_id if update.message else None,
                 interactive_start_message_id=None
             )
             return ConversationHandler.END
@@ -1213,7 +1214,7 @@ class QuizManager(ClassicPersistenceMixin):
                 True, params_for_announce_only["announce_delay_seconds"],
                 is_random_categories_mode=True,
                 interval_seconds=params_for_announce_only.get("interval_seconds") if "interval_seconds" in params_for_announce_only else None,
-                original_command_message_id=update.message.message_id,
+                original_command_message_id=update.message.message_id if update.message else None,
                 interactive_start_message_id=None
             )
             return ConversationHandler.END
@@ -1243,7 +1244,8 @@ class QuizManager(ClassicPersistenceMixin):
                 'categories_mode': saved_categories_mode,
                 'num_random_categories': saved_num_random_categories,
                 'specific_categories': saved_specific_categories,
-                'original_command_message_id': update.message.message_id, 
+                'original_command_message_id': update.message.message_id if update.message else None,
+                'menu_entry_message_id': context.chat_data.get('_menu_entry_message_id'),
                 'chat_id': chat_id, 
                 'user_id': user.id
             }
@@ -1255,8 +1257,24 @@ class QuizManager(ClassicPersistenceMixin):
                 logger.debug(f"quiz_command_entry: _send_quiz_cfg_message успешно выполнен для чата {chat_id}")
             except Exception as e:
                 logger.error(f"quiz_command_entry: Ошибка в _send_quiz_cfg_message для чата {chat_id}: {e}", exc_info=True)
-                await update.message.reply_text("Произошла ошибка при настройке викторины. Пожалуйста, попробуйте еще раз.")
+                await message.reply_text("Произошла ошибка при настройке викторины. Пожалуйста, попробуйте еще раз.")
             return CFG_QUIZ_OPTIONS
+
+    async def quiz_menu_entry(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
+        """Enter the existing setup conversation from its real callback Update."""
+        from modules.telegram_menu import acknowledge
+
+        query = update.callback_query
+        if not query:
+            return ConversationHandler.END
+        await acknowledge(query)
+        context.args = []
+        if query.message:
+            context.chat_data['_menu_entry_message_id'] = query.message.message_id
+        try:
+            return await self.quiz_command_entry(update, context)
+        finally:
+            context.chat_data.pop('_menu_entry_message_id', None)
 
     async def _send_quiz_cfg_message(self, update_or_query: Union[Update, CallbackQuery], context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.debug(f"_send_quiz_cfg_message: Начало выполнения. Тип: {type(update_or_query).__name__}")
@@ -2007,6 +2025,12 @@ class QuizManager(ClassicPersistenceMixin):
         original_cmd_msg_id = context.chat_data.get('_quiz_cmd_msg_id')
         cfg_progress_data = context.chat_data.pop('quiz_cfg_progress', None)
 
+        if (query and query.message and cfg_progress_data
+                and cfg_progress_data.get('menu_entry_message_id') == query.message.message_id):
+            from modules.telegram_menu import home
+            await home(update, context)
+            return ConversationHandler.END
+
         chat_id_for_ops: Optional[int] = None
         if cfg_progress_data and 'chat_id' in cfg_progress_data: chat_id_for_ops = cfg_progress_data['chat_id']
         elif query and query.message: chat_id_for_ops = query.message.chat_id
@@ -2135,7 +2159,7 @@ class QuizManager(ClassicPersistenceMixin):
         cancel_handler_for_conv = CommandHandler(self.app_config.commands.cancel, self.cancel_quiz_cfg_command)
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler(self.app_config.commands.quiz, self.quiz_command_entry),
-                CallbackQueryHandler(conversation_entry(self.quiz_command_entry, self.app_config.commands.quiz), pattern=r'^(nav:quiz|start_quiz)$'),
+                CallbackQueryHandler(self.quiz_menu_entry, pattern=r'^(nav:quiz|start_quiz)$'),
                 CommandHandler('start', conversation_entry(self.quiz_command_entry, self.app_config.commands.quiz), filters=filters.Regex(r'^/start(?:@\w+)? (?:quiz|play)$'))],
             states={
                 CFG_QUIZ_OPTIONS: [CallbackQueryHandler(self.handle_quiz_cfg_callback, pattern=f"^{CB_QCFG_}")],

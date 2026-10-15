@@ -74,10 +74,20 @@ def _round(state: dict[str, Any], round_id: str) -> dict[str, Any]:
     return item
 
 
-def normalize_photo(value: object, *, chat_id: int | None = None) -> dict[str, Any] | None:
+def normalize_photo(value: object, *, chat_id: int | None = None, room_id: str | None = None) -> dict[str, Any] | None:
     if not isinstance(value, dict) or value.get("mode") != "photo":
         return None
-    if type(value.get("chat_id")) is not int or (chat_id is not None and value["chat_id"] != chat_id):
+    standalone = value.get('chat_id') is None
+    if standalone:
+        if (not isinstance(value.get('room_id'), str) or not value['room_id']
+                or not isinstance(value.get('creator_account_id'), str) or not value['creator_account_id']
+                or value.get('creator_id') is not None or chat_id is not None):
+            return None
+    elif (type(value.get("chat_id")) is not int or type(value.get('creator_id')) is not int
+          or value.get('room_id') is not None or value.get('creator_account_id') is not None):
+        return None
+    if ((chat_id is not None and value["chat_id"] != chat_id)
+            or (room_id is not None and (not standalone or value['room_id'] != room_id))):
         return None
     if value.get("status") not in PHOTO_STATUSES or value.get("phase") not in PHOTO_PHASES:
         return None
@@ -147,11 +157,18 @@ def _open(state: dict[str, Any], item: dict[str, Any], now: float) -> None:
 
 
 def prepare_photo(
-    *, chat_id: int, creator_id: int, questions: Sequence[dict[str, Any]],
+    *, chat_id: int | None = None, creator_id: int | None = None,
+    room_id: str | None = None, creator_account_id: str | None = None,
+    questions: Sequence[dict[str, Any]],
     open_seconds: int = 60, hints_enabled: bool = True, now=None,
     round_id_factory=None,
 ) -> dict[str, Any]:
-    if type(chat_id) is not int or chat_id == 0 or type(creator_id) is not int:
+    standalone = chat_id is None and creator_id is None
+    if standalone:
+        if not isinstance(room_id, str) or not room_id or not isinstance(creator_account_id, str) or not creator_account_id:
+            raise ValueError("Некорректный участник фото-загадки.")
+    elif (type(chat_id) is not int or chat_id == 0 or type(creator_id) is not int
+          or room_id is not None or creator_account_id is not None):
         raise ValueError("Некорректный участник фото-загадки.")
     if type(open_seconds) is not int or not 5 <= open_seconds <= 600:
         raise ValueError("Время ответа должно быть от 5 до 600 секунд.")
@@ -192,9 +209,18 @@ def prepare_photo(
         "finished_at": None, "finish_reason": None,
         "total_correct": 0, "total_score": 0.0, "last_result": None,
     }
+    if standalone:
+        state.update(room_id=room_id, creator_account_id=creator_account_id)
     _open(state, rounds[0], timestamp)
     state["revision"] = 1
     return state
+
+
+def photo_points(item: dict[str, Any], *, now=None) -> float:
+    """Shared Photo award: speed bonus and the same failed-attempt penalty."""
+    elapsed = _timestamp(now) - item['opened_at']
+    fast = bool(item['hints_at'] and elapsed < item['hints_at'][0] - item['opened_at'])
+    return max(1.0, 5.0 + int(fast) - item['attempts'] * 0.5)
 
 
 def classify_answer(user_answer: str, correct_answer: str) -> str:

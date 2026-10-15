@@ -746,7 +746,7 @@ _Спасибо за ожидание\\!_"""
             CommandHandler(self.app_config.commands.cancel, self.cancel_command),
             CommandHandler("maintenance", self.maintenance_command),  # Команда для управления обслуживанием
             # Обработчик callback-запросов от inline кнопок
-            CallbackQueryHandler(self.start_menu_callback, pattern=r"^(nav:(home|profile|rating|chat_rating|categories|help)|start_(mystats|global_top|help|categories))$"),
+            CallbackQueryHandler(self.start_menu_callback, pattern=r"^(nav:(home|profile|rating|chat_rating|categories|help|address)|addr:[mfn]|start_(mystats|global_top|help|categories))$"),
         ]
         return handlers_list
 

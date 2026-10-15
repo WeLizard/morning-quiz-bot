@@ -12,12 +12,23 @@ def test_game_catalog_has_unique_ids_and_explicit_capabilities():
                and isinstance(mode['capabilities'], list) for mode in modes)
 
 
-def test_farmer_is_visible_as_coming_soon_not_as_playable():
+def test_farmer_is_hidden_when_dev_feature_flag_is_off(monkeypatch):
+    monkeypatch.delenv('QW_FARM_ENABLED', raising=False)
     farm = game_mode('farm')
     assert farm == {
         'id': 'farm', 'title': 'Весёлый фермер', 'status': 'coming_soon',
         'interfaces': [], 'capabilities': [],
     }
+
+
+def test_farmer_is_dev_playable_only_in_browser_and_mini_app(monkeypatch):
+    monkeypatch.setenv('QW_FARM_ENABLED', '1')
+    farm = game_mode('farm')
+    assert farm['status'] == 'development'
+    assert farm['interfaces'] == ['browser', 'mini_app']
+    assert {'account_farm', 'production', 'neighbors', 'equipment', 'helpers',
+            'forest_trips', 'telegram_invites', 'server_owned_economy'} <= set(farm['capabilities'])
+    assert 'telegram' not in farm['interfaces']
 
 
 def test_catalog_results_are_detached_from_the_canonical_manifest():

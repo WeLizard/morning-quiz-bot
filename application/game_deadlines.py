@@ -7,6 +7,8 @@ import logging
 from .classic import ClassicApplicationService
 from .mafia import MafiaApplicationService
 from .photo import PhotoApplicationService
+from .room_classic import RoomClassicApplicationService
+from .room_photo import RoomPhotoApplicationService
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,9 @@ class GameDeadlineProcessor:
         async with self.database.transaction() as session:
             mafia_due = await MafiaApplicationService(session).due_game_ids(now=now)
             classic_due = await ClassicApplicationService(self.database, session).due(now=now)
+            room_classic_due = await RoomClassicApplicationService(session).due_game_ids(now=now)
             photo_due = await PhotoApplicationService(self.database, session).due(now=now)
+            room_photo_due = await RoomPhotoApplicationService(session).due_game_ids(now=now)
 
         candidates = {
             'mafia': sorted(set(mafia_due)),
@@ -53,6 +57,16 @@ class GameDeadlineProcessor:
                     self.database, session,
                 ).settle_due(chat_id=chat_id, now=now),
             )
+            settled['photo'] += result is not None
+
+        for game_id in sorted(set(room_classic_due)):
+            result = await self._apply_one('classic', game_id, lambda session:
+                RoomClassicApplicationService(session).settle_due_game(game_id=game_id, now=now))
+            settled['classic'] += result is not None
+
+        for game_id in sorted(set(room_photo_due)):
+            result = await self._apply_one('photo', game_id, lambda session:
+                RoomPhotoApplicationService(session).settle_due_game(game_id=game_id, now=now))
             settled['photo'] += result is not None
 
         if any(settled.values()):

@@ -343,7 +343,7 @@ def own_role(value: object, *, chat_id: int | None = None,
     actor_field = _identity_field(lobby)
     role = lobby['assignments'].get(str(actor_id))
     if role is None:
-        raise PermissionError('Вы не участник этой партии.')
+        raise PermissionError('Вы не участвуете в этой партии.')
     titles = {'mafia': 'Мафия', 'citizen': 'Мирный', 'detective': 'Детектив', 'doctor': 'Доктор'}
     player = next(item for item in lobby['players'] if _actor(item, lobby) == actor_id)
     alive = actor_id in lobby.get('alive', [])

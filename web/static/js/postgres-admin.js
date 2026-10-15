@@ -453,6 +453,82 @@
                     await systemSettings();
                 };
             }, systemSettings)));
+            const notifications = card(body, 'Уведомления · проверка доставки');
+            notice(notifications, 'Общий ключ админки обозначает оператора local-admin. Решение закрывает неопределённость и не отправляет сообщение повторно.');
+            const notificationStatus = selectField(notifications, 'Статус уведомлений', 'uncertain', [
+                ['uncertain', 'Требуют проверки'], ['sending', 'Отправляются · только чтение'], ['resolved', 'Закрыты · только чтение'],
+            ]);
+            const notificationItems = element('div'); notifications.append(notificationItems);
+            let notificationOffset = 0, notificationLoad = 0;
+            async function openNotification(item) {
+                try {
+                    const {data: record} = await api(`/api/notifications/${encodeURIComponent(item.id)}`);
+                    modal('Проверка уведомления', form => {
+                        notice(form, `ID ${record.id} · ${record.kind} · ${record.status} · версия ${record.version}`);
+                        notice(form, `Чат: ${record.chat_id ?? '—'} · пользователь: ${record.user_id ?? '—'} · попыток: ${record.attempts} · ошибка: ${record.has_error ? 'есть' : 'нет'}`);
+                        if (record.status !== 'uncertain') {
+                            if (record.resolution) notice(form, `Решение: ${record.resolution.decision} · оператор ${record.resolution.operator_id}`);
+                            notice(form, 'Эта запись доступна только для чтения.');
+                            return async () => {};
+                        }
+                        const decision = selectField(form, 'Решение после проверки', '', [
+                            ['', 'Выберите решение'], ['confirmed_delivered', 'Подтвердить доставку'],
+                            ['closed_without_resend', 'Закрыть без повторной отправки'],
+                        ]); decision.required = true;
+                        const reason = field(form, 'Причина решения', '', 'textarea', {required: true, maxLength: 2000});
+                        const method = field(form, 'Способ проверки', '', 'text', {required: true, maxLength: 200});
+                        // IDs remain strings in the projection so BigInt recipients never lose precision.
+                        const chat = field(form, 'Chat ID проверенного сообщения', '', 'text', {maxLength: 20});
+                        const message = field(form, 'Message ID проверенного сообщения', '', 'text', {maxLength: 19});
+                        const confirmation = field(form, 'Подтверждаю выбранное решение без повторной отправки', false, 'checkbox', {required: true});
+                        let pending = null;
+                        const changed = () => { pending = null; };
+                        [decision, reason, method, chat, message, confirmation].forEach(input => input.addEventListener('input', changed));
+                        decision.addEventListener('change', () => {
+                            changed(); const confirmed = decision.value === 'confirmed_delivered';
+                            chat.required = confirmed; message.required = confirmed;
+                            const submit = form.querySelector('button[type="submit"]');
+                            if (submit) submit.textContent = confirmed ? 'Подтвердить доставку' : decision.value === 'closed_without_resend' ? 'Закрыть без повторной отправки' : 'Выберите решение';
+                        });
+                        return async () => {
+                            if (!decision.value || !confirmation.checked || !reason.value.trim() || !method.value.trim()) throw new Error('Выберите решение, заполните причину и способ проверки, подтвердите действие.');
+                            const args = {expected_version: record.version, decision: decision.value, reason: reason.value, verification_method: method.value};
+                            if (decision.value === 'confirmed_delivered') {
+                                for (const [name, input] of [['chat_id', chat], ['message_id', message]]) {
+                                    const value = Number(input.value);
+                                    if (!/^-?\d+$/.test(input.value) || !Number.isSafeInteger(value) || !value || (name === 'message_id' && value < 1)) throw new Error('Укажите целые Chat ID и положительный Message ID без потери точности.');
+                                    args[name] = value;
+                                }
+                            }
+                            if (!pending) pending = {...args, action_id: crypto.randomUUID()};
+                            // Network retries submit the same body/action_id. Edits create a new action.
+                            await post(`/api/notifications/${encodeURIComponent(record.id)}/resolve`, pending);
+                            await loadNotifications();
+                        };
+                    }, () => openNotification(item), record.status === 'uncertain' ? 'Выберите решение' : 'Закрыть');
+                } catch (error) { alert(error.message); }
+            }
+            async function loadNotifications() {
+                const generation = ++notificationLoad;
+                try {
+                    const query = new URLSearchParams({status: notificationStatus.value, limit: '25', offset: String(notificationOffset)});
+                    const {data: page} = await api(`/api/notifications?${query}`);
+                    if (generation !== notificationLoad || !notifications.isConnected) return;
+                    notificationItems.replaceChildren();
+                    if (!page.items.length) notice(notificationItems, 'Нет уведомлений с этим статусом.');
+                    for (const item of page.items) {
+                        const row = card(notificationItems, `${item.kind} · ${item.status}`);
+                        notice(row, `ID ${item.id} · версия ${item.version} · попыток: ${item.attempts} · ошибка: ${item.has_error ? 'есть' : 'нет'}`);
+                        row.append(button(item.status === 'uncertain' ? 'Проверить и закрыть' : 'Просмотреть', () => openNotification(item), true));
+                    }
+                    const paging = element('div', undefined, 'pg-actions'); notificationItems.append(paging);
+                    if (notificationOffset) paging.append(button('Предыдущие уведомления', () => { notificationOffset = Math.max(0, notificationOffset - 25); return loadNotifications(); }, true));
+                    if (page.has_more) paging.append(button('Следующие уведомления', () => { notificationOffset += 25; return loadNotifications(); }, true));
+                } catch (error) { if (generation === notificationLoad) fail(notificationItems, error); }
+            }
+            notificationStatus.addEventListener('change', () => { notificationOffset = 0; return loadNotifications(); });
+            notifications.append(button('Обновить уведомления', loadNotifications, true));
+            await loadNotifications();
             const backups = card(body, 'Резервные копии dev');
             notice(backups, 'PostgreSQL, вопросы, изображения и история файлов — на этом компьютере. Проверка восстанавливает снимок в отдельную временную БД и сравнивает все таблицы; рабочие данные не меняются.');
             const result = element('p', '', 'pg-note'); result.setAttribute('role', 'status');

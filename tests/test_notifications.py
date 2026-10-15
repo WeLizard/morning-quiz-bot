@@ -2,6 +2,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import pytest
 from sqlalchemy import select
 from telegram.error import RetryAfter, TelegramError
 
@@ -52,7 +53,7 @@ def test_notification_outbox_deduplicates_claims_and_completes(pg_env):
             item = claimed[0]
             worker = 'worker:a' if claims[0] else 'worker:b'
             assert item['attempts'] == 1 and item['kind'] == 'mafia.phase'
-            assert await queue.delivered(item['id'], worker) is True
+            assert await queue.delivered(item['id'], worker, claim_version=item['claim_version']) is True
             assert await queue.claim('worker:c', kinds={'mafia.phase'}) is None
 
             async with database.transaction() as session:
@@ -63,6 +64,52 @@ def test_notification_outbox_deduplicates_claims_and_completes(pg_env):
                     ('future.mode', 'pending'), ('mafia.phase', 'delivered')
                 ]
 
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('completion', ['delivered', 'retry_after', 'uncertain'])
+def test_old_claim_cannot_complete_new_attempt_with_same_worker_id(pg_env, completion):
+    async def run():
+        async with isolated_database(pg_env) as (database, _):
+            async with database.transaction() as session:
+                await NotificationQueue.enqueue_in(
+                    session, kind='test', dedupe_key='fenced-claim', payload={},
+                )
+            queue = NotificationQueue(database)
+            old = await queue.claim('constant-worker')
+            assert old['claim_version'] == 1
+            assert await queue.retry_after(
+                old['id'], 'constant-worker', 0, claim_version=old['claim_version'],
+            )
+            current = await queue.claim('constant-worker')
+            assert current['id'] == old['id']
+            assert current['claim_version'] == 3 and current['attempts'] == 2
+            async with database.transaction() as session:
+                row = await session.get(NotificationOutbox, current['id'])
+                before = (row.status, row.version, row.attempts, row.claimed_by,
+                          row.claimed_at, row.available_at, row.delivered_at, row.last_error)
+            args = {'delivered': (), 'retry_after': (3600,), 'uncertain': ('LateError',)}
+            assert not await getattr(queue, completion)(
+                old['id'], 'constant-worker', *args[completion],
+                claim_version=old['claim_version'],
+            )
+            async with database.transaction() as session:
+                row = await session.get(NotificationOutbox, current['id'])
+                assert (row.status, row.version, row.attempts, row.claimed_by,
+                        row.claimed_at, row.available_at, row.delivered_at, row.last_error) == before
+            assert await getattr(queue, completion)(
+                current['id'], 'constant-worker', *args[completion],
+                claim_version=current['claim_version'],
+            )
+            assert not await getattr(queue, completion)(
+                current['id'], 'constant-worker', *args[completion],
+                claim_version=current['claim_version'],
+            )
+            async with database.transaction() as session:
+                row = await session.get(NotificationOutbox, current['id'])
+                assert row.version == 4
+                assert row.status == {'delivered': 'delivered', 'retry_after': 'pending',
+                                      'uncertain': 'uncertain'}[completion]
     asyncio.run(run())
 
 

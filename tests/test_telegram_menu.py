@@ -45,7 +45,8 @@ def test_stale_setup_button_stops_before_game_mutation(callback, key):
     asyncio.run(run())
 
 
-def test_private_mini_app_signed_owner_only_and_client_contract(pg_env):
+def test_private_mini_app_signed_owner_only_and_client_contract(pg_env, monkeypatch):
+    monkeypatch.setenv('QW_FARM_ENABLED', '1')
     async def run():
         async with environment(pg_env) as env:
             origin = 'https://test-quiz.example.com'
@@ -56,7 +57,12 @@ def test_private_mini_app_signed_owner_only_and_client_contract(pg_env):
                 assert config['bot_username'] == 'TestQuizBot' and config['private_test'] is True
                 assert TOKEN not in str(config)
                 assert [item['id'] for item in config['game_modes']] == ['classic', 'photo', 'night', 'atlas', 'farm']
-                assert next(item for item in config['game_modes'] if item['id'] == 'farm')['status'] == 'coming_soon'
+                farm = next(item for item in config['game_modes'] if item['id'] == 'farm')
+                assert farm['status'] == 'development'
+                assert farm['interfaces'] == ['browser', 'mini_app']
+                assert 'telegram' not in farm['interfaces']
+                assert {'account_farm', 'production', 'neighbors', 'equipment', 'helpers',
+                        'forest_trips', 'telegram_invites', 'server_owned_economy'} <= set(farm['capabilities'])
                 assert (await client.get('/app/telegram-ui.js')).status_code == 200
                 assert (await client.post('/api/dev/session')).status_code == 404
                 assert (await client.get('/api/mini/me')).status_code == 401

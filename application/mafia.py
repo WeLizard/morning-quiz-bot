@@ -709,6 +709,15 @@ class MafiaApplicationService:
             row.state, room_id=room_id, account_id=account_id,
             expected_revision=expected_revision,
         )
+        # The finished roster is history. Only current room members return to
+        # the new lobby; Room is locked by _room_lock, also used by leave/join.
+        active_accounts = set(str(value) for value in (await self.session.scalars(
+            select(RoomMembership.account_id).where(
+                RoomMembership.room_id == room_id, RoomMembership.status == 'active',
+            )
+        )).all())
+        lobby['players'] = [player for player in lobby['players']
+                            if player['account_id'] in active_accounts]
         await self.games.replace_current(row, state=lobby)
         projection = public_lobby(
             lobby, room_id=room_id, viewer_account_id=account_id,

@@ -45,6 +45,7 @@ from handlers.cleanup_handler import schedule_cleanup_job
 from handlers.backup_handlers import BackupHandlers
 from handlers.photo_quiz_handlers import PhotoQuizHandlers
 from handlers.mafia_handlers import MafiaHandlers
+from handlers.chat_availability_handlers import ChatAvailabilityHandlers
 from datetime import timedelta
 
 # Настройка логирования
@@ -528,6 +529,10 @@ async def main() -> None:
         application_instance.add_handlers(photo_quiz_handlers.get_handlers())
         if mafia_handlers:
             application_instance.add_handlers(mafia_handlers.get_handlers())
+        if data_manager.postgres_storage:
+            # Group -1: служебные события чата не должны зависеть от остальных обработчиков.
+            availability_handlers = ChatAvailabilityHandlers(data_manager.postgres_storage.database)
+            application_instance.add_handlers(availability_handlers.get_handlers(), group=-1)
 
         # ===== ВОССТАНОВЛЕНИЕ АКТИВНЫХ ВИКТОРИН =====
         logger.info("🔄 Восстановление активных викторин после перезапуска...")

@@ -12,6 +12,7 @@ from .models import (
     Account, AccountIdentity, Chat, Game, GameCommand, GameDeadline, GameEvent,
     GamePlayer, Room, RoomTransport, User,
 )
+from .telegram_accounts import telegram_account, TelegramAccountUnavailable
 
 
 def telegram_room_id(chat_id: int) -> str:
@@ -44,47 +45,17 @@ class GameRepository:
         )
         if user is None:
             raise LookupError('Игрок не найден.')
-        subject = str(user_id)
-        historical_identity = await self.session.scalar(select(AccountIdentity).where(
-            AccountIdentity.provider == 'telegram',
-            AccountIdentity.provider_subject == subject,
-        ).order_by(AccountIdentity.revoked_at.is_(None).desc()).limit(1).with_for_update())
-        if historical_identity is not None and historical_identity.revoked_at is not None:
-            raise RuntimeError('Telegram identity was revoked; explicit recovery is required.')
-        if user.account_id is None:
-            account = Account(display_name=(user.display_name or 'Игрок')[:255])
-            self.session.add(account)
-            await self.session.flush()
-            user.account_id = account.id
-            await self.session.flush()
-
-        identity = historical_identity
-        if identity is not None and identity.account_id != user.account_id:
-            raise RuntimeError('Telegram identity points to a different platform account.')
-        if identity is None:
-            now = datetime.now(timezone.utc)
-            self.session.add(AccountIdentity(
-                account_id=user.account_id, provider='telegram', provider_subject=subject,
-                verified_at=now, linked_at=now,
-            ))
-            await self.session.flush()
-        return user.account_id
+        return (await telegram_account(self.session, user, provision=True)).id
 
     async def existing_account_for_telegram_user(self, user_id: int):
         """Read an already-provisioned Telegram account without creating identity rows."""
         user = await self.session.scalar(select(User).where(User.id == user_id))
         if user is None or user.account_id is None:
             return None
-        identity = await self.session.scalar(select(AccountIdentity).where(
-            AccountIdentity.provider == 'telegram',
-            AccountIdentity.provider_subject == str(user_id),
-            AccountIdentity.revoked_at.is_(None),
-        ))
-        if identity is not None and identity.account_id != user.account_id:
-            raise RuntimeError('Telegram identity points to a different platform account.')
-        if identity is None or identity.verified_at is None:
+        try:
+            return (await telegram_account(self.session, user)).id
+        except TelegramAccountUnavailable:
             return None
-        return identity.account_id
 
     async def _resolve_actor_account(
         self, *, actor_user_id: int | None, actor_account_id=None,

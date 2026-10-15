@@ -511,6 +511,8 @@ def install_postgres_admin(app: FastAPI) -> None:
     router.include_router(make_dev_runtime_router())
     from web.admin_ai import make_ai_router
     router.include_router(make_ai_router())
+    from web.admin_notifications import make_notifications_router
+    router.include_router(make_notifications_router())
     app.include_router(router)
     pg_endpoints = {route.endpoint for route in router.routes}
 

@@ -71,6 +71,12 @@ def test_offline_runtime_real_start_quiz_buttons_and_stop(pg_env, monkeypatch, t
                 assert any(j['name'] == 'postgres_cleanup' for j in status['jobs'])
                 result = await runtime.input(message='/start')
                 assert result['messages']
+                home_menu = next(
+                    message for message in result['messages']
+                    if any(button.get('callback_data') == 'nav:photo'
+                           for row in message.get('reply_markup', {}).get('inline_keyboard', [])
+                           for button in row)
+                )
                 result = await runtime.input(message='/quiz')
                 assert not any(e['event'] == 'handler_error' for e in result['events']), result['events']
                 buttons = [(m['message_id'], b) for m in result['messages'] for row in m.get('reply_markup', {}).get('inline_keyboard', []) for b in row]
@@ -96,7 +102,26 @@ def test_offline_runtime_real_start_quiz_buttons_and_stop(pg_env, monkeypatch, t
                 picture = BytesIO()
                 Image.new('RGB', (20, 20), 'blue').save(picture, format='PNG')
                 await create_photo(db, uuid4().hex, picture.getvalue(), 'сова', True, root=tmp_path / 'images')
-                result = await runtime.input(message='/photo_quiz')
+                from modules import telegram_menu
+                monkeypatch.setattr(
+                    telegram_menu, 'as_command',
+                    lambda *_args, **_kwargs: pytest.fail('Photo menu entry must keep the real callback Update'),
+                )
+                result = await runtime.input(message_id=home_menu['message_id'], callback='nav:photo')
+                photo_menu = next(m for m in result['messages'] if m['message_id'] == home_menu['message_id'])
+                cancel_data = next(
+                    button['callback_data']
+                    for row in photo_menu['reply_markup']['inline_keyboard']
+                    for button in row if button.get('text') == '❌ Отмена'
+                )
+                await runtime.input(message_id=home_menu['message_id'], callback=cancel_data)
+                restored = next(m for m in runtime.messages.values() if m['message_id'] == home_menu['message_id'])
+                assert any(
+                    button.get('callback_data') == 'nav:photo'
+                    for row in restored.get('reply_markup', {}).get('inline_keyboard', [])
+                    for button in row
+                )
+                result = await runtime.input(message_id=home_menu['message_id'], callback='nav:photo')
                 start = next((m['message_id'], b) for m in result['messages'] for row in m.get('reply_markup', {}).get('inline_keyboard', []) for b in row if b.get('callback_data') == 'pqcfg_start')
                 result = await runtime.input(message_id=start[0], callback=start[1]['callback_data'])
                 assert any(m.get('photo') for m in result['messages']), result['messages']

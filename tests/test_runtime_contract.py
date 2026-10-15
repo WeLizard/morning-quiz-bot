@@ -31,7 +31,7 @@ def test_mini_app_session_does_not_change_operational_files(pg_env):
         async with environment(pg_env, runtime_enabled=True) as env:
             headers = await login(env)
             for path in ('/api/mini/me', '/api/mini/progress', '/api/mini/achievements', '/api/mini/history',
-                         '/api/mini/config', '/api/mini/runtime', '/api/mini/categories',
+                         '/api/mini/config', '/api/mini/categories',
                          '/api/mini/leaderboard', '/api/mini/chats?limit=50',
                          f'/api/mini/chats/{USER}/details', f'/api/mini/chats/{USER}/leaderboard'):
                 assert (await env.client.get(path, headers=headers)).status_code == 200, path

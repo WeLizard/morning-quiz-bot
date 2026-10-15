@@ -128,11 +128,21 @@ def install_admin_auth(app, *, auth=None):
             return JSONResponse({"detail": "Слишком много попыток. Подождите минуту."}, status_code=429, headers={"Retry-After": "60"})
         if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
             return JSONResponse({"detail": "Ожидается JSON"}, status_code=415)
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                declared_size = int(content_length)
+            except ValueError:
+                return JSONResponse({"detail": "Некорректная длина запроса"}, status_code=400)
+            if declared_size < 0:
+                return JSONResponse({"detail": "Некорректная длина запроса"}, status_code=400)
+            if declared_size > 2048:
+                return JSONResponse({"detail": "Запрос слишком большой"}, status_code=413)
         body = bytearray()
         async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > 2048:
+            if len(body) + len(chunk) > 2048:
                 return JSONResponse({"detail": "Запрос слишком большой"}, status_code=413)
+            body.extend(chunk)
         import json
         try:
             data = json.loads(body)

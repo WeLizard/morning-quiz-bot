@@ -156,14 +156,15 @@ def _round(state: dict[str, Any], round_id: str) -> dict[str, Any]:
     return value
 
 
-def normalize_classic(value: object, *, chat_id: int | None = None) -> dict[str, Any] | None:
+def normalize_classic(value: object, *, chat_id: int | None = None, room_id: str | None = None) -> dict[str, Any] | None:
     """Validate the durable v2 envelope without repairing ambiguous state."""
 
     if not isinstance(value, dict) or value.get("mode") != "classic":
         return None
-    if type(value.get("chat_id")) is not int or (
-        chat_id is not None and value["chat_id"] != chat_id
-    ):
+    standalone = value.get('chat_id') is None and isinstance(value.get('room_id'), str) and bool(value['room_id'])
+    if not standalone and type(value.get('chat_id')) is not int:
+        return None
+    if (chat_id is not None and value.get('chat_id') != chat_id) or (room_id is not None and value.get('room_id') != room_id):
         return None
     if value.get("status") not in CLASSIC_STATUSES or value.get("phase") not in CLASSIC_PHASES:
         return None
@@ -226,8 +227,10 @@ def normalize_classic(value: object, *, chat_id: int | None = None) -> dict[str,
 
 def prepare_classic(
     *,
-    chat_id: int,
-    creator_id: int | None,
+    chat_id: int | None = None,
+    creator_id: int | None = None,
+    room_id: str | None = None,
+    creator_account_id: str | None = None,
     questions: Sequence[dict[str, Any]],
     quiz_type: str = "session",
     open_seconds: int = 30,
@@ -237,7 +240,10 @@ def prepare_classic(
 ) -> dict[str, Any]:
     """Validate and freeze every round before any client delivery occurs."""
 
-    if type(chat_id) is not int or chat_id == 0:
+    if chat_id is None:
+        if not isinstance(room_id, str) or not 1 <= len(room_id) <= 64 or not isinstance(creator_account_id, str):
+            raise ValueError('Некорректная комната или аккаунт.')
+    elif type(chat_id) is not int or chat_id == 0:
         raise ValueError("Некорректный чат.")
     if creator_id is not None and type(creator_id) is not int:
         raise ValueError("Некорректный создатель викторины.")
@@ -282,6 +288,7 @@ def prepare_classic(
         "revision": 0,
         "chat_id": chat_id,
         "creator_id": creator_id,
+        **({'room_id': room_id, 'creator_account_id': creator_account_id} if chat_id is None else {}),
         "quiz_type": quiz_type,
         "config": {
             "question_count": len(rounds),
@@ -466,10 +473,34 @@ def classic_deadlines(value: object) -> dict[str, float]:
     return result
 
 
+def settle_classic(value: object, *, now=None) -> dict[str, Any]:
+    """Apply the same due transitions for transport and account games."""
+    state = normalize_classic(value)
+    if state is None:
+        raise ValueError('Состояние викторины повреждено.')
+    timestamp = _timestamp(now)
+    for _ in range(len(state['rounds']) * 3):
+        due = sorted((deadline, kind) for kind, deadline in classic_deadlines(state).items() if deadline <= timestamp)
+        if not due:
+            return state
+        _, kind = due[0]
+        if kind == 'start':
+            state = start_classic(state, expected_revision=state['revision'], now=timestamp)
+            continue
+        action, round_id = kind.split(':', 1)
+        item = _round(state, round_id)
+        if action == 'advance' or (state['current_round_id'] == round_id and item['index'] + 1 < len(state['rounds'])):
+            state = advance_classic(state, round_id=round_id, cause='answer' if action == 'advance' else 'deadline', expected_revision=state['revision'], now=timestamp)
+        else:
+            state = close_round(state, round_id=round_id, now=timestamp)
+    raise RuntimeError('Превышен предел переходов викторины.')
+
+
 def project_classic(
     value: object,
     *,
     selected_options: dict[str, int] | None = None,
+    answered_round_id: str | None = None,
     now=None,
 ) -> dict[str, Any]:
     """Spoiler-safe game projection shared by Telegram-facing and HTTP clients."""
@@ -492,7 +523,7 @@ def project_classic(
             now=datetime.fromtimestamp(_timestamp(now), timezone.utc),
         )
         question["round_id"] = question.pop("poll_id")
-    return {
+    result = {
         "game_id": None,
         "revision": state["revision"],
         "status": state["status"],
@@ -503,3 +534,14 @@ def project_classic(
             "total": len(state["rounds"]),
         },
     }
+    if answered_round_id is not None:
+        selected = selected_options.get(answered_round_id)
+        if type(selected) is not int:
+            raise ValueError('Принятый ответ не найден.')
+        answered = _round(state, answered_round_id)
+        accepted = public_question(answered_round_id, {
+            **answered, 'question_session_index': answered['index'], 'end_timestamp': answered['closes_at'],
+        }, selected_option=selected, now=datetime.fromtimestamp(_timestamp(now), timezone.utc))
+        accepted['round_id'] = accepted.pop('poll_id')
+        result['accepted_answer'] = accepted
+    return result

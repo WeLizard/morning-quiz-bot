@@ -44,10 +44,17 @@ def _pick_categories(
     return chosen
 
 
+async def list_classic_categories(session) -> list[str]:
+    """Names of active categories that hold at least one playable question."""
+    rows = (await session.scalars(select(QuestionCategory).where(
+        QuestionCategory.archived.is_(False)).order_by(QuestionCategory.name))).all()
+    return [row.name for row in rows if any(QuestionBank.is_valid(source) for source in row.questions or [])]
+
+
 async def select_classic_questions(
     session,
     *,
-    chat_id: int,
+    chat_id: int | None,
     count: int,
     defaults: dict | None = None,
     category_names: list[str] | None = None,
@@ -63,7 +70,7 @@ async def select_classic_questions(
     if type(count) is not int or not 1 <= count <= 1000:
         raise ValueError('Количество вопросов должно быть от 1 до 1000.')
     randomize = shuffle or random.SystemRandom().shuffle
-    chat = await session.get(Chat, chat_id)
+    chat = await session.get(Chat, chat_id) if chat_id is not None else None
     settings = deepcopy(defaults or {})
     settings.update(deepcopy(chat.settings or {}) if chat else {})
     rows = (await session.scalars(select(QuestionCategory).where(

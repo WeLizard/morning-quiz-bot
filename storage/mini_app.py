@@ -9,14 +9,17 @@ import time
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
+from domain.address import effective_address_form
 from .admin_actions import operation_fence
-from .models import (AchievementGrant, Chat, ChatMember, Game, GamePlayer, MiniAppSession,
+from .models import (Account, AchievementGrant, Chat, ChatMember, Game, GamePlayer, MiniAppSession,
                      PollAnswer, QuizSession, User)
+from .telegram_accounts import telegram_account, TelegramAccountUnavailable
 
 
 class MiniAppError(Exception):
-    def __init__(self, status, detail):
+    def __init__(self, status, detail, *, code=None):
         self.status, self.detail = status, detail
+        self.code = code
         super().__init__(detail)
 
 
@@ -39,7 +42,7 @@ class MiniAppStore:
     def now(self):
         return datetime.fromtimestamp(self.clock(), timezone.utc)
 
-    async def create_session(self, identity, *, session_limit=5):
+    async def create_session(self, identity, *, session_limit=5, provision=True):
         if self.allowed_user_ids is not None and identity.user_id not in self.allowed_user_ids:
             raise MiniAppError(403, 'Этот тестовый Mini App доступен только приглашённому игроку')
         now = self.now()
@@ -47,12 +50,28 @@ class MiniAppStore:
         expires = now + timedelta(minutes=15)
         async with self.database.transaction() as session:
             await operation_fence(session)
-            # Serialize login quotas without needing UPDATE permission on users.
+            # Serialize first provisioning, replay and per-user login quotas.
             login_lock = -1 - int(sha256(f'mini-login:{identity.user_id}'.encode()).hexdigest()[:15], 16)
             await session.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': login_lock})
-            user = await session.get(User, identity.user_id)
-            if user is None or user.bot_blocked:
-                raise MiniAppError(403, 'Профиль недоступен. Сначала откройте бота.')
+            user = await session.get(User, identity.user_id, with_for_update=True)
+            if user is None:
+                if not provision:
+                    raise MiniAppError(404, 'Профиль Telegram ещё не создан.')
+                await session.execute(insert(User).values(
+                    id=identity.user_id, display_name='Игрок').on_conflict_do_nothing())
+                user = await session.get(User, identity.user_id, with_for_update=True)
+            try:
+                await telegram_account(session, user, provision=provision, now=now)
+            except TelegramAccountUnavailable as exc:
+                if not provision and str(exc) in {'Аккаунт не зарегистрирован.', 'Telegram identity не зарегистрирована.'}:
+                    raise MiniAppError(404, 'Профиль Telegram ещё не создан.') from None
+                raise MiniAppError(403, str(exc)) from None
+            if provision:
+                # A newly provisioned player needs a personal chat before messaging the bot.
+                await session.execute(insert(Chat).values(
+                    id=user.id, type='private', title=user.display_name).on_conflict_do_nothing())
+                await session.execute(insert(ChatMember).values(
+                    chat_id=user.id, user_id=user.id).on_conflict_do_nothing())
             # Expired sessions cannot validate initData again: its TTL is only 5 min.
             await session.execute(delete(MiniAppSession).where(MiniAppSession.expires_at < now - timedelta(minutes=1)))
             replay = await session.scalar(select(MiniAppSession.token_hash).where(
@@ -95,8 +114,12 @@ class MiniAppStore:
             if row is None or row.revoked or row.expires_at <= now - timedelta(minutes=1):
                 raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.')
             user = await session.get(User, row.user_id)
-            if user is None or user.bot_blocked or user.moderation_revision != row.user_revision:
+            if user is None or user.bot_blocked or user.archived or user.moderation_revision != row.user_revision:
                 raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.')
+            try:
+                await telegram_account(session, user)
+            except TelegramAccountUnavailable:
+                raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.') from None
             if self.allowed_user_ids is not None and user.id not in self.allowed_user_ids:
                 raise MiniAppError(403, 'Доступ к тестовому Mini App закрыт')
             row.expires_at = now + timedelta(minutes=minutes)
@@ -114,9 +137,14 @@ class MiniAppStore:
             user = await session.scalar(select(User).join(MiniAppSession, MiniAppSession.user_id == User.id).where(
                 MiniAppSession.token_hash == digest, MiniAppSession.bot_key_id == self.bot_key_id,
                 MiniAppSession.expires_at > self.now(), MiniAppSession.revoked.is_(False),
-                User.bot_blocked.is_(False), User.moderation_revision == MiniAppSession.user_revision))
+                User.bot_blocked.is_(False), User.archived.is_(False),
+                User.moderation_revision == MiniAppSession.user_revision))
             if user is None:
                 raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.')
+            try:
+                await telegram_account(session, user)
+            except TelegramAccountUnavailable:
+                raise MiniAppError(401, 'Сессия завершена. Откройте Mini App заново.') from None
             if self.allowed_user_ids is not None and user.id not in self.allowed_user_ids:
                 raise MiniAppError(403, 'Доступ к тестовому Mini App закрыт')
             yield session, user
@@ -129,9 +157,12 @@ class MiniAppStore:
                 row.revoked = True  # Keep replay tombstone until expiry.
 
     async def profile(self, token):
-        async with self.authorized(token) as (_, user):
-            return {'user_id': str(user.id), 'display_name': user.display_name,
-                    'score': str(user.global_score), 'answered_count': user.total_answered}
+        async with self.authorized(token) as (session, user):
+            account = await session.get(Account, user.account_id)
+            return {'user_id': str(user.id), 'account_id': str(user.account_id), 'display_name': user.display_name,
+                    'score': str(user.global_score), 'answered_count': user.total_answered,
+                    'address_form': effective_address_form(account.address_form if account else None),
+                    'address_form_chosen': bool(account and account.address_form is not None)}
 
     @staticmethod
     def own_stats(member):
@@ -418,22 +449,42 @@ class MiniAppStore:
         async with self.authorized(token) as (session, user):
             return user.id
 
-    async def alchemy_sync(self, token, *, discovered, crafted, attempts):
+    @staticmethod
+    def require_alchemy_actor(user, expected_user_id):
+        if expected_user_id is not None and str(user.id) != expected_user_id:
+            raise MiniAppError(409, 'Профиль игры изменился. Открой игру заново.', code='profile_changed')
+
+    async def alchemy_sync(self, token, *, discovered, crafted, attempts, expected_user_id=None):
         """Импортировать локальную сводку без рейтинговых наград."""
         from .alchemy import AlchemyService
-        return await AlchemyService(self.database).sync(
-            await self._alchemy_identity(token), discovered=discovered, crafted=crafted, attempts=attempts)
+        async with self.authorized(token, write=True) as (session, user):
+            self.require_alchemy_actor(user, expected_user_id)
+            return await AlchemyService(self.database).sync(
+                user.id, discovered=discovered, crafted=crafted, attempts=attempts, _session=session)
 
-    async def alchemy_craft(self, token, *, command_id, ingredient_a, ingredient_b):
+    async def alchemy_craft(self, token, *, command_id, ingredient_a, ingredient_b, expected_user_id=None):
         """Run one authenticated, server-validated Alchemy recipe command."""
         from .alchemy import AlchemyService
-        return await AlchemyService(self.database).craft(
-            await self._alchemy_identity(token), command_id=command_id,
-            ingredient_a=ingredient_a, ingredient_b=ingredient_b)
+        async with self.authorized(token, write=True) as (session, user):
+            self.require_alchemy_actor(user, expected_user_id)
+            return await AlchemyService(self.database).craft(
+                user.id, command_id=command_id, ingredient_a=ingredient_a,
+                ingredient_b=ingredient_b, _session=session)
 
-    async def alchemy_progress(self, token):
+    async def alchemy_claim_stage(self, token, *, expected_user_id=None, **command):
         from .alchemy import AlchemyService
-        return await AlchemyService(self.database).progress(await self._alchemy_identity(token))
+        from application.alchemy_journey import AlchemyJourneyService
+        async with self.authorized(token, write=True) as (session, user):
+            self.require_alchemy_actor(user, expected_user_id)
+            row = await AlchemyService(self.database)._locked_progress(session, user.id)
+            return await AlchemyJourneyService(self.database, session).claim_stage(
+                account_id=row.account_id, user_id=user.id, **command)
+
+    async def alchemy_progress(self, token, *, expected_user_id=None):
+        from .alchemy import AlchemyService
+        async with self.authorized(token) as (session, user):
+            self.require_alchemy_actor(user, expected_user_id)
+            return await AlchemyService(self.database).progress(user.id, _session=session)
 
     async def alchemy_leaderboard(self, token, *, limit=20, offset=0):
         from .alchemy import AlchemyService

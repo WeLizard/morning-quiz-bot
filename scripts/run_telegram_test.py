@@ -138,10 +138,6 @@ async def build_application(database, scope, token, proxy, *, request_factory=No
     app.add_handler(CustomPollAnswerHandler(config, state, scores, dm, quiz).get_handler())
     async def error(update, context):
         scope.event('handler_error', exception=type(context.error).__name__)
-        from modules.mini_bridge_worker import active_mini_action
-        intent = active_mini_action.get()
-        if intent is not None:
-            intent['error'] = 'Бот не смог выполнить действие. Проверьте состояние и попробуйте снова.'
     app.add_error_handler(error)
     return app, config, quiz, photos, dm
 
@@ -211,12 +207,7 @@ async def run(args):
     server = await asyncio.start_server(health, '0.0.0.0' if IN_DEV_CONTAINER else '127.0.0.1', PORT, limit=8192)
     if stop_path.exists():
         stop_path.unlink()
-    app = photos = dm = mini_worker = None
-    from hashlib import sha256
-    from storage.mini_bridge import MiniBridge
-    from modules.mini_bridge_worker import run_worker
-    scope.mini_bridge = MiniBridge(database, sha256(token.encode()).hexdigest(), scope.chat_id)
-    dispatch_lock = asyncio.Lock()
+    app = photos = dm = None
     try:
         app, config, quiz, photos, dm = await build_application(database, scope, token, proxy)
         await app.initialize()
@@ -272,15 +263,13 @@ async def run(args):
             await home(refresh, CallbackContext.from_update(refresh, app))
             scope.event('operator_menu_refresh')
         scope.event('polling_started')
-        mini_worker = asyncio.create_task(run_worker(scope.mini_bridge, app, photos, scope, dispatch_lock))
         offset = None
         while not stop_path.exists():
             try:
                 updates = await app.bot.get_updates(offset=offset, timeout=15, limit=100,
                     allowed_updates=['message', 'callback_query', 'poll_answer'])
                 for update in updates:
-                    async with dispatch_lock:
-                        await dispatch(app, config, scope, update)
+                    await dispatch(app, config, scope, update)
                     offset = update.update_id + 1
                 await dm.flush_postgres_writes()
             except Conflict:
@@ -298,9 +287,6 @@ async def run(args):
                 await asyncio.sleep(3)
     finally:
         status['running'] = False
-        if mini_worker:
-            mini_worker.cancel()
-            await asyncio.gather(mini_worker, return_exceptions=True)
         if photos:
             await photos.shutdown()
         if app:

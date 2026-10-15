@@ -23,26 +23,7 @@ class PrivateTestScope:
         self.chat_id, self.bot_id = chat_id, bot_id
         self.poll_ids = set()
         self.callback_ids = deque(maxlen=1000)
-        self.local_message_ids = deque(maxlen=1000)
         self.events = deque(maxlen=200)
-        self.local_delivery = False
-        self.local_runtime = None
-
-    def enable_local_delivery(self):
-        """Use a local Telegram-shaped result only for the opted-in private Mini App game.
-
-        The production bot and every group keep the normal Telegram transport.
-        """
-        if self.local_runtime is None:
-            from modules.dev_runtime import DevRuntime
-            self.local_runtime = DevRuntime(None)
-            self.local_runtime.chat_id = self.chat_id
-            self.local_runtime.room = {'id': self.chat_id, 'type': 'private', 'first_name': 'Игрок'}
-            self.local_runtime.player = {'id': self.chat_id, 'is_bot': False, 'first_name': 'Игрок'}
-        self.local_delivery = True
-
-    def disable_local_delivery(self):
-        self.local_delivery = False
 
     def event(self, name, **data):
         self.events.append({'at': datetime.now(timezone.utc).isoformat(), 'event': name, **data})
@@ -102,54 +83,14 @@ class ScopedRequest(BaseRequest):
         if not self.scope.permits(name, params):
             self.scope.event('blocked_outbound')
             raise Forbidden('Test transport blocked a method or recipient outside the authorized private chat')
-        from modules.mini_bridge_worker import active_mini_action
-        intent = active_mini_action.get()
-        if intent and name == 'answerCallbackQuery' and params.get('callback_query_id') == 'mini-' + intent['id']:
-            self.scope.event('mini_app_callback_ack')
-            if params.get('text'):
-                intent['error' if params.get('show_alert') else 'notice'] = str(params['text'])[:200]
-            return 200, b'{"ok":true,"result":true}'
-        if name == 'deleteMessage' and params.get('message_id') in self.scope.local_message_ids:
-            return 200, b'{"ok":true,"result":true}'
-        reply_id = (params.get('reply_parameters') or {}).get('message_id', params.get('reply_to_message_id'))
-        if reply_id in self.scope.local_message_ids:
-            # An app input has no native Telegram message to quote. Preserve the
-            # response and uploads, but do not send a made-up reply target to Telegram.
-            from telegram.request import RequestData
-            request_data = RequestData([p for p in request_data._parameters
-                                        if p.name not in {'reply_parameters', 'reply_to_message_id'}])
-            params = request_data.parameters
-        local_methods = {'getChat', 'getChatMember', 'getChatAdministrators', 'getChatMemberCount',
-                         'sendMessage', 'sendPhoto', 'sendPoll', 'editMessageText',
-                         'editMessageCaption', 'editMessageReplyMarkup', 'stopPoll',
-                         'deleteMessage', 'deleteMessages'}
-        if self.scope.local_delivery and name in local_methods:
-            # The same bot handlers still form the game. For a one-player Mini App,
-            # however, their output is an app event, not an outbound Telegram call.
-            from modules.dev_runtime import OfflineRequest
-            status, raw = await OfflineRequest(self.scope.local_runtime).do_request(
-                'http://mini.local/' + name, method, request_data=request_data, **kwargs)
-            self.scope.event('mini_local_delivery', method=name)
-        else:
-            status, raw = await self.inner.do_request(url, method, request_data=request_data, **kwargs)
-        if name != 'getUpdates' and not (self.scope.local_delivery and name in local_methods):
+        status, raw = await self.inner.do_request(url, method, request_data=request_data, **kwargs)
+        if name != 'getUpdates':
             self.scope.event('telegram_call', method=name, status=status)
         if status == 200 and name == 'sendPoll':
             result = json.loads(raw).get('result') or {}
             poll_id = (result.get('poll') or {}).get('id')
             if poll_id:
                 self.scope.poll_ids.add(poll_id)
-        bridge = getattr(self.scope, 'mini_bridge', None)
-        if bridge and status == 200 and name != 'getUpdates':
-            from pathlib import Path
-            media = None
-            if name == 'sendPhoto':
-                for upload in (request_data.multipart_data or {}).values():
-                    candidate = Path(str(upload[0])).name
-                    if Path(candidate).suffix.lower() in {'.webp', '.jpg', '.jpeg', '.png'}:
-                        media = candidate
-                        break
-            await bridge.publish(name, params, json.loads(raw).get('result'), media)
         return status, raw
 
 

@@ -97,6 +97,17 @@ async def login(env, uid=USER, **extras):
     return {'Authorization': 'Bearer ' + token}
 
 
+def test_farm_main_menu_art_is_served_by_the_public_asset_route(pg_env):
+    async def run():
+        async with environment(pg_env) as env:
+            response = await env.client.get('/app/farm-card-v2.webp')
+            assert response.status_code == 200
+            assert response.headers['content-type'].startswith('image/webp')
+            assert response.content[:4] == b'RIFF' and response.content[8:12] == b'WEBP'
+            assert "default-src 'none'" in response.headers['content-security-policy']
+    asyncio.run(run())
+
+
 def test_login_uses_http_only_cookie_and_cookie_writes_require_csrf(pg_env):
     async def run():
         async with environment(pg_env) as env:
@@ -112,8 +123,20 @@ def test_login_uses_http_only_cookie_and_cookie_writes_require_csrf(pg_env):
             denied = await env.client.post('/api/mini/alchemy/sync', json=payload)
             assert denied.status_code == 403
             accepted = await env.client.post('/api/mini/alchemy/sync', json=payload,
-                headers={'Origin': ORIGIN, 'X-Mini-CSRF': '1'})
+                headers={'Origin': ORIGIN, 'X-Mini-CSRF': '1', 'X-Mini-User': str(USER)})
             assert accepted.status_code == 200
+    asyncio.run(run())
+
+
+def test_legacy_telegram_transcript_bridge_routes_are_removed(pg_env):
+    async def run():
+        async with environment(pg_env, runtime_enabled=True) as env:
+            headers = await login(env)
+            assert (await env.client.get('/api/mini/runtime', headers=headers)).status_code == 404
+            assert (await env.client.post('/api/mini/runtime/actions', headers=headers, json={
+                'request_id': uuid4().hex, 'type': 'command', 'value': '/quiz',
+            })).status_code == 404
+            assert (await env.client.get('/api/mini/runtime/media/1', headers=headers)).status_code == 404
     asyncio.run(run())
 
 
@@ -185,6 +208,61 @@ def test_write_routes_reject_oversized_declared_body_before_parsing(pg_env, path
     asyncio.run(run())
 
 
+def test_legacy_write_routes_reject_declared_oversize_before_reading(pg_env):
+    routes = [
+        ('post', '/api/mini/session', 20000),
+        ('post', '/api/guest/rooms', 2000),
+        ('post', '/api/guest/rooms/test-room/invites', 2000),
+        ('post', '/api/guest/alchemy/sync', 128 * 1024),
+        ('post', '/api/guest/rooms/test-room/mafia/lobby', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/lobby/join', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/lobby/ready', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/lobby/start', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/discussion', 5000),
+        ('post', '/api/guest/rooms/test-room/mafia/action', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/vote', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/advance', 500),
+        ('post', '/api/guest/rooms/test-room/mafia/restart', 500),
+        ('put', f'/api/mini/chats/{USER}/classic-settings', 1000),
+        ('put', f'/api/mini/chats/{USER}/preferences', 12000),
+        ('post', f'/api/mini/classic/chats/{USER}/start', 300),
+        ('post', f'/api/mini/classic/chats/{USER}/stop', 300),
+        ('post', f'/api/mini/classic/chats/{USER}/answer', 500),
+        ('post', f'/api/mini/photo/chats/{USER}/start', 500),
+        ('post', f'/api/mini/photo/chats/{USER}/answer', 1000),
+        ('post', f'/api/mini/photo/chats/{USER}/stop', 300),
+        ('put', '/api/mini/mafia/draft', 1000),
+        ('post', f'/api/mini/mafia/chats/{USER}/discussion', 5000),
+        ('post', f'/api/mini/mafia/chats/{USER}/lobby/ready', 200),
+        ('post', f'/api/mini/mafia/chats/{USER}/lobby/start', 160),
+        ('post', f'/api/mini/mafia/chats/{USER}/action', 240),
+        ('post', f'/api/mini/mafia/chats/{USER}/vote', 240),
+        ('post', f'/api/mini/mafia/chats/{USER}/advance', 240),
+        ('post', f'/api/mini/mafia/chats/{USER}/restart', 240),
+    ]
+
+    async def run():
+        async with environment(pg_env, runtime_enabled=True) as env:
+            for method, path, limit in routes:
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Origin': ORIGIN,
+                    'X-Mini-CSRF': '1',
+                    'X-Guest-CSRF': '1',
+                }
+                if path == '/api/guest/alchemy/sync':
+                    started = await env.client.post(
+                        '/api/guest/start', headers=headers, json={},
+                    )
+                    headers['X-Guest-Account'] = started.json()['account_id']
+                response = await env.client.request(
+                    method, path, content=b'x' * (limit + 1),
+                    headers=headers,
+                )
+                assert response.status_code == 413, f'{method.upper()} {path}: {response.text}'
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize('origin,offline', [('http://public.example', False), ('http://public.example', True),
     ('https://example.com/', False), ('https://user@example.com', False), ('https://example.com?x=1', False),
     ('https://*', False), ('', False)])
@@ -198,8 +276,9 @@ def test_profile_uses_stored_values_and_session_survives_app_restart(pg_env):
         async with environment(pg_env) as env:
             headers = await login(env)
             profile = await env.client.get('/api/mini/me', headers=headers)
-            assert profile.json() == {'user_id': str(USER), 'display_name': f'Player {USER}',
-                                      'score': '12.250', 'answered_count': 0}
+            assert profile.json() == {'user_id': str(USER), 'account_id': profile.json()['account_id'],
+                                      'display_name': f'Player {USER}', 'score': '12.250', 'answered_count': 0,
+                                      'address_form': 'n', 'address_form_chosen': False}
             assert 'PRIVATE_METADATA' not in profile.text
             assert profile.headers['cache-control'] == 'no-store'
             assert not profile.cookies and 'set-cookie' not in profile.headers
@@ -585,16 +664,17 @@ def test_mafia_start_and_private_role_api_share_application_state(pg_env):
     asyncio.run(run())
 
 
-def test_unknown_profile_and_session_limit_do_not_create_users_or_scores(pg_env):
+def test_first_login_creates_profile_and_session_limit_preserves_scores(pg_env):
     async def run():
         async with environment(pg_env) as env:
-            missing = await env.client.post('/api/mini/session', json={'init_data': signed(USER + 999)})
-            assert missing.status_code == 403
+            missing = await env.client.post('/api/mini/session', json={'init_data': signed(USER + 2)})
+            assert missing.status_code == 200
             for index in range(5):
                 await login(env, query_id=str(index))
             assert (await env.client.post('/api/mini/session', json={'init_data': signed(query_id='six')})).status_code == 429
             async with env.db.transaction() as session:
-                assert await session.get(User, USER + 999) is None
+                newcomer = await session.get(User, USER + 2)
+                assert newcomer.account_id is not None and newcomer.global_score == Decimal('0')
                 assert (await session.get(User, USER)).global_score == Decimal('12.250')
     asyncio.run(run())
 
@@ -773,19 +853,73 @@ def test_photo_projection_serves_current_image_without_answer_or_path(pg_env, tm
             current = await env.client.get(path, headers=headers)
             assert current.status_code == 200
             assert current.json()['question']['mask'] and 'СЕКРЕТНЫЙ' not in current.json()['question']['mask']
-            assert current.json()['question']['image_url'] == path + '/image'
+            image_url = current.json()['question']['image_url']
+            assert image_url == path + '/image?round_id=' + state['current_round_id']
             assert 'СЕКРЕТНЫЙ' not in current.text and str(image) not in current.text
-            loaded = await env.client.get(path + '/image', headers=headers)
+            loaded = await env.client.get(image_url, headers=headers)
             assert loaded.status_code == 200 and loaded.content == image.read_bytes()
             other = await login(env, USER + 1)
             assert (await env.client.get(path, headers=other)).status_code == 404
-            assert (await env.client.get(path + '/image', headers=other)).status_code == 404
+            assert (await env.client.get(image_url, headers=other)).status_code == 404
+    asyncio.run(run())
+
+
+def test_photo_image_url_changes_with_round_and_rejects_stale_round(pg_env, tmp_path, monkeypatch):
+    async def run():
+        from domain.photo import prepare_photo
+
+        root = tmp_path.resolve()
+        (root / 'owl.webp').write_bytes(b'RIFF-first-round-WEBP')
+        (root / 'cat.webp').write_bytes(b'RIFF-second-round-WEBP')
+        monkeypatch.setenv('PHOTO_IMAGES_DIR', str(root))
+        async with environment(pg_env, runtime_enabled=True) as env:
+            started = datetime.now(timezone.utc)
+            state = prepare_photo(
+                chat_id=CHAT, creator_id=USER, open_seconds=60, hints_enabled=True,
+                questions=[
+                    {'display_answer': 'СОВА', 'media': {'media_key': 'owl', 'storage_name': 'owl'}},
+                    {'display_answer': 'КОТ', 'media': {'media_key': 'cat', 'storage_name': 'cat'}},
+                ], now=started,
+            )
+            async with env.db.transaction() as session:
+                await GameRepository(session).ensure_telegram_room(CHAT)
+                session.add(Game(id=str(uuid4()), chat_id=CHAT, room_id=f'telegram:{CHAT}',
+                                 mode='photo', status='active', phase='question_open',
+                                 revision=state['revision'], state=state, is_current=True,
+                                 started_at=started))
+            headers = await login(env)
+            base = f'/api/mini/photo/chats/{CHAT}'
+            first = await env.client.get(base + '/current', headers=headers)
+            assert first.status_code == 200, first.text
+            first_question = first.json()['question']
+            first_url = first_question['image_url']
+            assert first_url.endswith('?round_id=' + first_question['round_id'])
+            assert (await env.client.get(first_url, headers=headers)).content == (root / 'owl.webp').read_bytes()
+            assert (await env.client.get(base + '/current/image', headers=headers)).status_code == 404
+
+            answered = await env.client.post(base + '/answer', headers=headers, json={
+                'command_id': str(uuid4()), 'round_id': first_question['round_id'], 'answer': 'сова',
+            })
+            assert answered.status_code == 200, answered.text
+            second_question = answered.json()['question']
+            second_url = second_question['image_url']
+            assert second_question['round_id'] != first_question['round_id']
+            assert second_url != first_url
+            assert second_url.endswith('?round_id=' + second_question['round_id'])
+            current = await env.client.get(base + '/current', headers=headers)
+            assert current.json()['question']['image_url'] == second_url
+            assert (await env.client.get(second_url, headers=headers)).content == (root / 'cat.webp').read_bytes()
+            assert (await env.client.get(first_url, headers=headers)).status_code == 404
+            other = await login(env, USER + 1)
+            assert (await env.client.get(second_url, headers=other)).status_code == 404
+
     asyncio.run(run())
 
 
 def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_path, monkeypatch):
     async def run():
         from storage.photos import PhotoCatalog
+        from storage.models import GameCommand, GameEvent, NotificationOutbox
 
         root = tmp_path.resolve()
         (root / 'Сова.webp').write_bytes(b'RIFF-direct-photo-WEBP')
@@ -810,7 +944,7 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
             assert synced.status_code == 200 and synced.json()['question']['round_id'] == question['round_id']
             current = await env.client.get(base + '/current', headers=headers)
             assert current.status_code == 200 and current.json()['question']['round_id'] == question['round_id']
-            assert (await env.client.get(base + '/current/image', headers=headers)).content == (root / 'Сова.webp').read_bytes()
+            assert (await env.client.get(question['image_url'], headers=headers)).content == (root / 'Сова.webp').read_bytes()
             wrong_id = str(uuid4())
             wrong = await env.client.post(base + '/answer', headers=headers,
                 json={'command_id': wrong_id, 'round_id': question['round_id'], 'answer': 'ворона'})
@@ -818,12 +952,50 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
             duplicate = await env.client.post(base + '/answer', headers=headers,
                 json={'command_id': wrong_id, 'round_id': question['round_id'], 'answer': 'ворона'})
             assert duplicate.json() == wrong.json()
-            won = await env.client.post(base + '/answer', headers=headers,
-                json={'command_id': str(uuid4()), 'round_id': question['round_id'], 'answer': 'сова'})
+            final_payload = {'command_id': str(uuid4()), 'round_id': question['round_id'], 'answer': 'сова'}
+            won = await env.client.post(base + '/answer', headers=headers, json=final_payload)
             assert won.status_code == 200 and won.json()['status'] == 'finished'
+            game_id = won.json()['game_id']
+
+            async def snapshot():
+                async with env.db.transaction() as session:
+                    game = await session.get(Game, game_id)
+                    return (
+                        game.revision, json.loads(json.dumps(game.state)),
+                        (await session.get(User, USER)).global_score,
+                        (await session.get(ChatMember, (CHAT, USER))).score,
+                        await session.scalar(select(func.count()).select_from(PollAnswer).where(
+                            PollAnswer.game_id == game_id)),
+                        await session.scalar(select(func.count()).select_from(GameEvent).where(
+                            GameEvent.game_id == game_id)),
+                        await session.scalar(select(func.count()).select_from(NotificationOutbox).where(
+                            NotificationOutbox.game_id == game_id)),
+                        await session.scalar(select(func.count()).select_from(GameCommand).where(
+                            GameCommand.game_id == game_id)),
+                    )
+
+            finished_snapshot = await snapshot()
+            replay = await env.client.post(base + '/answer', headers=headers, json=final_payload)
+            assert replay.status_code == 200 and replay.json() == won.json()
+            assert await snapshot() == finished_snapshot
+
+            changed = await env.client.post(base + '/answer', headers=headers,
+                json={**final_payload, 'answer': 'ворона'})
+            assert changed.status_code == 409
+            fresh_id = str(uuid4())
+            fresh = await env.client.post(base + '/answer', headers=headers,
+                json={**final_payload, 'command_id': fresh_id})
+            assert fresh.status_code == 404
+            assert await snapshot() == finished_snapshot
+            async with env.db.transaction() as session:
+                assert await session.get(GameCommand, fresh_id) is None
+
             restarted = await env.client.post(base + '/start', headers=headers,
                 json={'command_id': str(uuid4()), 'question_count': 1,
                       'open_seconds': 60, 'hints_enabled': False})
+            assert restarted.status_code == 200, restarted.text
+            reused = await env.client.post(base + '/answer', headers=headers, json=final_payload)
+            assert reused.status_code == 409
             stopped = await env.client.post(base + '/stop', headers=headers,
                 json={'command_id': str(uuid4()),
                       'expected_revision': restarted.json()['revision']})
@@ -995,8 +1167,9 @@ def test_alchemia_atlas_is_served_as_self_contained_mini_app_page(pg_env):
             assert 'атлас маленьких чудес' in html and 'alchemia.atlas.v1' in html
             # Ресурсы автономны; обе сетевые команды ведут только в наш API.
             assert 'src="http' not in html and 'href="http' not in html
-            assert '/api/mini/alchemy/sync' in html
-            assert '/api/mini/alchemy/craft' in html
+            # sync.js builds endpoints from one per-identity base.
+            assert "'/api/mini/alchemy/'" in html and "'/api/guest/alchemy/'" in html
+            assert "API + 'sync'" in html and "API + 'craft'" in html
             assert '#t=' not in html and 'mqb-mini-token' not in html
             assert 'Authorization: `Bearer' not in html
             # Инлайн-стили и скрипты обязаны быть разрешены: со строгой политикой
@@ -1016,6 +1189,7 @@ def test_alchemy_sync_imports_without_reward_and_craft_is_server_authoritative(p
     async def run():
         async with environment(pg_env) as env:
             headers = await login(env)
+            headers['X-Mini-User'] = str(USER)
             imported = await env.client.post(
                 '/api/mini/alchemy/sync', headers=headers,
                 json={'discovered': ['water', 'earth', 'fire', 'air', 'steam'],
@@ -1128,8 +1302,8 @@ def test_membership_verifier_distinguishes_chat_admins(status, extra, expected):
     asyncio.run(run())
 
 
+# Бот-не-админ теперь даёт 409 (см. test_bot_status_in_chat_decides_between_gone_and_missing_rights).
 @pytest.mark.parametrize('response', [httpx.Response(429), httpx.Response(500),
-    httpx.Response(200, json={'ok': True, 'result': {'user': {'id': 123456}, 'status': 'member'}}),
     httpx.Response(200, json={'ok': False}), httpx.Response(200, text='broken')])
 def test_membership_failure_is_closed_without_leaking_bot_token(response):
     async def run():
@@ -1164,4 +1338,199 @@ def test_mini_bearer_is_not_an_admin_session():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://127.0.0.1:4184') as client:
             response = await client.get('/api/users', headers={'Authorization': 'Bearer ' + 'x' * 43})
             assert response.status_code == 401
+    asyncio.run(run())
+
+
+# --- Устаревшие Telegram-чаты: постоянные ответы против временных -----------------------
+
+def _telegram_gone(status, description, **parameters):
+    body = {'ok': False, 'error_code': status, 'description': description}
+    if parameters:
+        body['parameters'] = parameters
+    return httpx.Response(status, json=body)
+
+
+@pytest.mark.parametrize('response,reason,migrate_to', [
+    (_telegram_gone(400, 'Bad Request: chat not found'), 'gone', None),
+    (_telegram_gone(403, 'Forbidden: bot was kicked from the supergroup chat'), 'gone', None),
+    (_telegram_gone(403, 'Forbidden: bot is not a member of the channel chat'), 'gone', None),
+    (_telegram_gone(400, 'Bad Request: group chat was upgraded to a supergroup chat',
+                    migrate_to_chat_id=-1002345678901), 'migrated', -1002345678901),
+])
+def test_permanent_telegram_answers_are_chat_unavailable_not_503(response, reason, migrate_to):
+    from web.mini_app import ChatUnavailable
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _: response)) as client:
+            with pytest.raises(ChatUnavailable) as error:
+                await TelegramMembership(TOKEN, client=client).allowed(CHAT, USER)
+            assert (error.value.status, error.value.reason, error.value.migrate_to) == (410, reason, migrate_to)
+            assert error.value.deactivate is True and TOKEN not in str(error.value)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('response', [
+    httpx.Response(429, json={'ok': False, 'error_code': 429, 'description': 'Too Many Requests: retry after 5',
+                              'parameters': {'retry_after': 5}}),
+    httpx.Response(500, json={'ok': False, 'description': 'Internal Server Error'}),
+    httpx.Response(502, text='<html>bad gateway</html>'),
+    httpx.Response(401, json={'ok': False, 'description': 'Unauthorized'}),
+    _telegram_gone(400, 'Bad Request: user not found'),
+])
+def test_transient_telegram_answers_stay_503_and_never_retire_a_chat(response):
+    from web.mini_app import ChatUnavailable
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _: response)) as client:
+            with pytest.raises(MiniAppError) as error:
+                await TelegramMembership(TOKEN, client=client).allowed(CHAT, USER)
+            assert not isinstance(error.value, ChatUnavailable) and error.value.status == 503
+    asyncio.run(run())
+
+
+def test_network_failure_and_timeout_are_transient():
+    async def run():
+        def broken(_):
+            raise httpx.ConnectTimeout('timeout')
+        async with httpx.AsyncClient(transport=httpx.MockTransport(broken)) as client:
+            with pytest.raises(MiniAppError) as error:
+                await TelegramMembership(TOKEN, client=client).allowed(CHAT, USER)
+            assert error.value.status == 503
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('bot_status,expected,deactivate', [('left', 410, True), ('kicked', 410, True),
+                                                            ('member', 409, False)])
+def test_bot_status_in_chat_decides_between_gone_and_missing_rights(bot_status, expected, deactivate):
+    from web.mini_app import ChatUnavailable
+    async def run():
+        def handler(request):
+            uid = json.loads(request.content)['user_id']
+            return httpx.Response(200, json={'ok': True, 'result': {'user': {'id': uid}, 'status': bot_status}})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ChatUnavailable) as error:
+                await TelegramMembership(TOKEN, client=client).allowed(CHAT, USER)
+            assert (error.value.status, error.value.deactivate) == (expected, deactivate)
+    asyncio.run(run())
+
+
+def _reactivate(chat_id):
+    from sqlalchemy import update
+    return update(Chat).where(Chat.id == chat_id).values(is_active=True)
+
+
+def test_permanent_error_retires_chat_and_hides_it_while_transient_does_not(pg_env):
+    from web.mini_app import ChatUnavailable
+    async def run():
+        async with environment(pg_env) as env:
+            headers = await login(env)
+            try:
+                env.verifier.allowed.side_effect = MiniAppError(503, 'Не удалось подтвердить членство в Telegram')
+                assert (await env.client.get(f'/api/mini/chats/{CHAT}/games', headers=headers)).status_code == 503
+                listed = (await env.client.get('/api/mini/chats', headers=headers)).json()['items']
+                assert str(CHAT) in {item['chat_id'] for item in listed}
+                async with env.db.transaction() as session:
+                    assert (await session.get(Chat, CHAT)).is_active is True
+
+                env.verifier.allowed.side_effect = ChatUnavailable('gone')
+                gone = await env.client.get(f'/api/mini/chats/{CHAT}/games', headers=headers)
+                assert gone.status_code == 410 and gone.json()['code'] == 'chat_unavailable'
+                async with env.db.transaction() as session:
+                    assert (await session.get(Chat, CHAT)).is_active is False
+                listed = (await env.client.get('/api/mini/chats', headers=headers)).json()['items']
+                assert str(CHAT) not in {item['chat_id'] for item in listed}
+                # Telegram больше не дёргаем: чат уже скрыт.
+                env.verifier.allowed.reset_mock()
+                assert (await env.client.get(f'/api/mini/chats/{CHAT}/games', headers=headers)).status_code == 404
+                env.verifier.allowed.assert_not_called()
+            finally:
+                async with env.db.transaction() as session:
+                    await session.execute(_reactivate(CHAT))
+    asyncio.run(run())
+
+
+def test_migrated_chat_moves_settings_and_members_to_the_new_id(pg_env):
+    from web.mini_app import ChatUnavailable
+    new_id = -1009876543210
+    async def run():
+        async with environment(pg_env) as env:
+            headers = await login(env)
+            try:
+                env.verifier.allowed.side_effect = ChatUnavailable('migrated', migrate_to=new_id)
+                assert (await env.client.get(f'/api/mini/chats/{CHAT}/games', headers=headers)).status_code == 410
+                async with env.db.transaction() as session:
+                    assert (await session.get(Chat, CHAT)).is_active is False
+                    moved = await session.get(Chat, new_id)
+                    assert moved is not None and moved.is_active and moved.type == 'supergroup'
+                    members = set((await session.scalars(select(ChatMember.user_id).where(
+                        ChatMember.chat_id == new_id))).all())
+                    assert members == {USER, USER + 1}
+                from storage.chat_availability import migrate_chat
+                assert await migrate_chat(env.db, CHAT, new_id) is True      # повтор безопасен
+                listed = (await env.client.get('/api/mini/chats', headers=headers)).json()['items']
+                assert str(new_id) in {item['chat_id'] for item in listed}
+            finally:
+                async with env.db.transaction() as session:
+                    await session.execute(delete(Chat).where(Chat.id == new_id))
+                    await session.execute(_reactivate(CHAT))
+    asyncio.run(run())
+
+
+def test_bot_membership_updates_toggle_chat_availability(pg_env):
+    from handlers.chat_availability_handlers import ChatAvailabilityHandlers
+    from telegram.constants import ChatMemberStatus
+    async def run():
+        async with environment(pg_env) as env:
+            handlers = ChatAvailabilityHandlers(env.db)
+            def event(status, kind='supergroup'):
+                return SimpleNamespace(my_chat_member=SimpleNamespace(
+                    chat=SimpleNamespace(id=CHAT, type=kind), new_chat_member=SimpleNamespace(status=status)))
+            async def active():
+                async with env.db.transaction() as session:
+                    return (await session.get(Chat, CHAT)).is_active
+            await handlers.my_chat_member(event(ChatMemberStatus.BANNED), None)
+            assert await active() is False
+            await handlers.my_chat_member(event(ChatMemberStatus.RESTRICTED), None)
+            assert await active() is False
+            await handlers.my_chat_member(event(ChatMemberStatus.ADMINISTRATOR), None)
+            assert await active() is True
+            await handlers.my_chat_member(event(ChatMemberStatus.LEFT, 'private'), None)
+            assert await active() is True
+    asyncio.run(run())
+
+
+# --- Статика не лимитируется, API — по-прежнему --------------------------------------------
+
+def test_static_assets_are_exempt_from_rate_limits_but_api_is_not():
+    async def run():
+        app = create_app(database=SimpleNamespace(), settings=MiniAppSettings(TOKEN, ORIGIN, offline=True))
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+            paths = ['/app', '/app/app.js', '/app/styles.css', '/app/host-card.webp', '/app/photo.webp',
+                     '/app/mafia-card.webp', '/app/farm-card-v2.webp']
+            for number in range(700):          # больше глобального лимита 600/мин
+                response = await client.get(paths[number % len(paths)])
+                assert response.status_code == 200, (number, response.status_code)
+            assert (await client.get('/app/app.js')).status_code == 200
+            codes = [(await client.get('/api/mini/me')).status_code for _ in range(130)]
+            assert codes[:120] == [401] * 120 and set(codes[120:]) == {429}
+            # Неизвестные файлы статикой не считаются.
+            assert (await client.get('/app/secret.txt')).status_code == 429
+    asyncio.run(run())
+
+
+def test_static_assets_have_cache_headers_and_answer_conditional_requests():
+    async def run():
+        app = create_app(database=SimpleNamespace(), settings=MiniAppSettings(TOKEN, ORIGIN, offline=True))
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+            script = await client.get('/app/app.js')
+            assert script.headers['cache-control'].startswith('public, max-age=')
+            assert 'immutable' not in script.headers['cache-control']      # имена без версии
+            assert 'pragma' not in script.headers and script.headers['etag']
+            assert (await client.get('/app/host-card.webp')).headers['cache-control'] == 'public, max-age=3600'
+            assert (await client.get('/app')).headers['cache-control'] == 'public, max-age=60, must-revalidate'
+            again = await client.get('/app/app.js', headers={'If-None-Match': script.headers['etag']})
+            assert again.status_code == 304 and again.content == b''
+            assert again.headers['cache-control'] == script.headers['cache-control']
+            assert "script-src 'self'" in again.headers['content-security-policy']
+            changed = await client.get('/app/app.js', headers={'If-None-Match': '"other"'})
+            assert changed.status_code == 200 and changed.content
+            assert (await client.get('/api/mini/config')).headers['cache-control'] == 'no-store'
     asyncio.run(run())

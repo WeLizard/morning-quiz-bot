@@ -11,13 +11,17 @@ from application.classic import ClassicApplicationService
 from application.game_deadlines import GameDeadlineProcessor
 from application.mafia import MafiaApplicationService
 from application.photo import PhotoApplicationService
+from application.rooms import RoomApplicationService
 from tests.local_database import isolated_database
 from tests.test_postgres_members import CHAT, USER, pg_env
-from storage.models import Account, Game, GameEvent, Room
+from storage.models import (
+    Account, Chat, Game, GameCommand, GameDeadline, GameEvent,
+    NotificationOutbox, Room, User,
+)
 from storage.repositories import OperationalRepository
 
 
-def _process_worker_once(database_url, schema, barrier, results):
+def _process_worker_once(database_url, schema, barrier, results, now=None):
     """Run one real worker pass in a separate OS process and isolated schema."""
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -43,7 +47,7 @@ def _process_worker_once(database_url, schema, barrier, results):
 
         try:
             await database.check_connection()
-            return await SynchronizedWorker(database).run_once()
+            return await SynchronizedWorker(database).run_once(now=now)
         finally:
             await database.dispose()
 
@@ -53,7 +57,7 @@ def _process_worker_once(database_url, schema, barrier, results):
         results.put(('error', f'{type(error).__name__}: {error}'))
 
 
-def _process_worker_once_without_barrier(database_url, schema, results):
+def _process_worker_once_without_barrier(database_url, schema, results, now=None):
     """A fresh process must observe durable state without replaying it."""
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -73,7 +77,7 @@ def _process_worker_once_without_barrier(database_url, schema, results):
         )
         try:
             await database.check_connection()
-            return await GameDeadlineProcessor(database).run_once()
+            return await GameDeadlineProcessor(database).run_once(now=now)
         finally:
             await database.dispose()
 
@@ -205,11 +209,11 @@ def test_independent_worker_processes_apply_one_deadline_and_restart(pg_env):
     asyncio.run(run())
 
 
-def _run_fresh_process_worker(database_url, schema, context):
+def _run_fresh_process_worker(database_url, schema, context, now=None):
     results = context.Queue()
     process = context.Process(
         target=_process_worker_once_without_barrier,
-        args=(database_url, schema, results),
+        args=(database_url, schema, results, now),
     )
     process.start()
     result = _finish_process(process, results)
@@ -354,5 +358,186 @@ def test_two_deadline_workers_apply_one_standalone_mafia_phase_transition(pg_env
             assert await GameDeadlineProcessor(database).run_once(now=deadline + timedelta(minutes=1)) == {
                 'mafia': 0, 'classic': 0, 'photo': 0,
             }
+
+    asyncio.run(run())
+
+
+def test_independent_processes_finish_standalone_mafia_vote_once(pg_env):
+    """Two OS workers settle a service-created room once, including after restart."""
+    from uuid import uuid4
+
+    async def run():
+        async with isolated_database(pg_env) as (database, schema):
+            accounts = [uuid4() for _ in range(4)]
+            room_id = str(uuid4())
+            async with database.transaction() as session:
+                session.add_all([
+                    Account(id=account_id, display_name=f'Player {index}')
+                    for index, account_id in enumerate(accounts, 1)
+                ])
+                await session.flush()
+                rooms = RoomApplicationService(session)
+                await rooms.create(
+                    account_id=accounts[0], request_id=room_id, title='Worker vote race',
+                )
+                invite = await rooms.create_invite(
+                    account_id=accounts[0], room_id=room_id,
+                    expires_in_seconds=300, max_uses=3,
+                )
+                for account_id in accounts[1:]:
+                    await rooms.join_by_invite(
+                        account_id=account_id, invite_code=invite['invite_code'],
+                    )
+
+            async with database.transaction() as session:
+                service = MafiaApplicationService(session)
+                lobby = await service.create_room_lobby(
+                    room_id=room_id, account_id=accounts[0], name='Player 1',
+                    command_id=f'mafia-create-{room_id}',
+                )
+                for index, account_id in enumerate(accounts[1:], 2):
+                    lobby = await service.room_join(
+                        room_id=room_id, account_id=account_id,
+                        name=f'Player {index}', command_id=f'mafia-join-{index}-{room_id}',
+                    )
+                for index, account_id in enumerate(accounts, 1):
+                    lobby = await service.room_ready(
+                        room_id=room_id, account_id=account_id, ready=True,
+                        expected_revision=lobby['revision'],
+                        command_id=f'mafia-ready-{index}-{room_id}',
+                    )
+                await service.room_start(
+                    room_id=room_id, account_id=accounts[0],
+                    expected_revision=lobby['revision'],
+                    command_id=f'mafia-start-{room_id}',
+                )
+                game = await service.games.current_in_room(room_id=room_id, mode='mafia')
+                game_id = game.id
+                state = game.state
+                mafia_id = next(actor_id for actor_id, role in state['assignments'].items()
+                                if role == 'mafia')
+                citizens = [actor_id for actor_id, role in state['assignments'].items()
+                            if role == 'citizen']
+                victim_id = citizens[0]
+                seats = {player['account_id']: f'p{index}'
+                         for index, player in enumerate(state['players'], 1)}
+                action = await service.room_action(
+                    room_id=room_id, account_id=mafia_id,
+                    target_seat=seats[victim_id],
+                    expected_revision=state['phase_revision'],
+                    command_id=f'mafia-action-{room_id}',
+                )
+                day = await service.room_advance(
+                    room_id=room_id, account_id=accounts[0],
+                    expected_revision=action['lobby']['revision'],
+                    command_id=f'mafia-day-{room_id}',
+                )
+                assert day['lobby']['status'] == 'day'
+                voting = await service.room_advance(
+                    room_id=room_id, account_id=accounts[0],
+                    expected_revision=day['lobby']['revision'],
+                    command_id=f'mafia-voting-{room_id}',
+                )
+                assert voting['lobby']['status'] == 'voting'
+                for index, voter_id in enumerate(citizens[1:], 1):
+                    await service.room_vote(
+                        room_id=room_id, account_id=voter_id,
+                        target_seat=seats[mafia_id],
+                        expected_revision=voting['lobby']['phase_revision'],
+                        command_id=f'mafia-vote-{index}-{room_id}',
+                    )
+                vote_deadline = datetime.fromtimestamp(
+                    voting['lobby']['ends_at'] + 1, tz=timezone.utc,
+                )
+                game = await session.get(Game, game_id)
+                voting_revision = game.revision
+                voting_phase_revision = game.state['phase_revision']
+                command_count = await session.scalar(select(func.count()).select_from(GameCommand).where(
+                    GameCommand.game_id == game_id,
+                ))
+                assert command_count == 14
+                assert await session.scalar(select(func.count()).select_from(GameCommand).where(
+                    GameCommand.game_id == game_id, GameCommand.status != 'completed',
+                )) == 0
+                deadline = await session.scalar(select(GameDeadline).where(
+                    GameDeadline.game_id == game_id, GameDeadline.kind == 'phase',
+                ))
+                assert deadline.status == 'pending' and deadline.revision == voting_revision
+                assert await session.scalar(select(func.count()).select_from(Chat)) == 0
+                assert await session.scalar(select(func.count()).select_from(User)) == 0
+                assert await session.scalar(select(func.count()).select_from(NotificationOutbox)) == 0
+
+            context = multiprocessing.get_context('spawn')
+            barrier = context.Barrier(2)
+            results = context.Queue()
+            workers = [context.Process(
+                target=_process_worker_once,
+                args=(pg_env, schema, barrier, results, vote_deadline),
+            ) for _ in range(2)]
+            try:
+                for worker in workers:
+                    worker.start()
+                worker_results = [_finish_process(worker, results) for worker in workers]
+            finally:
+                for worker in workers:
+                    if worker.is_alive():
+                        worker.terminate()
+                        worker.join(5)
+                results.close()
+                results.join_thread()
+
+            async with database.transaction() as session:
+                game = await session.get(Game, game_id)
+                transitions = await session.scalar(select(func.count()).select_from(GameEvent).where(
+                    GameEvent.game_id == game_id, GameEvent.kind == 'deadline_advanced',
+                ))
+                vote_results = [entry for entry in game.state['history']
+                                if entry['type'] == 'vote_result']
+                assert game.room_id == room_id and game.chat_id is None
+                assert game.status == 'finished' and game.phase == 'finished'
+                assert game.state['winner'] == 'citizens'
+                assert game.ended_at is not None
+                assert game.revision == voting_revision + 1
+                assert game.state['phase_revision'] == voting_phase_revision + 1
+                assert transitions == 1
+                assert len(vote_results) == 1
+                assert vote_results[0]['eliminated'] == seats[mafia_id]
+                revision = game.revision
+                deadline = await session.scalar(select(GameDeadline).where(
+                    GameDeadline.game_id == game_id, GameDeadline.kind == 'phase',
+                ))
+                assert deadline.status == 'completed' and deadline.completed_at is not None
+                assert await session.scalar(select(func.count()).select_from(GameCommand).where(
+                    GameCommand.game_id == game_id,
+                )) == command_count
+                assert await session.scalar(select(func.count()).select_from(NotificationOutbox)) == 0
+                assert await session.scalar(select(func.count()).select_from(Chat)) == 0
+                assert await session.scalar(select(func.count()).select_from(User)) == 0
+
+            restarted = await asyncio.to_thread(
+                _run_fresh_process_worker, pg_env, schema, context,
+                vote_deadline + timedelta(minutes=5),
+            )
+            assert sum(result['mafia'] for result in worker_results) == 1
+            assert restarted == {'mafia': 0, 'classic': 0, 'photo': 0}
+            async with database.transaction() as session:
+                game = await session.get(Game, game_id)
+                assert game.chat_id is None
+                assert game.status == 'finished' and game.revision == revision
+                assert game.state['phase_revision'] == voting_phase_revision + 1
+                assert len([entry for entry in game.state['history']
+                            if entry['type'] == 'vote_result']) == 1
+                assert await session.scalar(select(func.count()).select_from(GameEvent).where(
+                    GameEvent.game_id == game_id, GameEvent.kind == 'deadline_advanced',
+                )) == 1
+                assert await session.scalar(select(func.count()).select_from(GameDeadline).where(
+                    GameDeadline.game_id == game_id, GameDeadline.status == 'pending',
+                )) == 0
+                assert await session.scalar(select(func.count()).select_from(GameCommand).where(
+                    GameCommand.game_id == game_id,
+                )) == command_count
+                assert await session.scalar(select(func.count()).select_from(NotificationOutbox)) == 0
+                assert await session.scalar(select(func.count()).select_from(Chat)) == 0
+                assert await session.scalar(select(func.count()).select_from(User)) == 0
 
     asyncio.run(run())

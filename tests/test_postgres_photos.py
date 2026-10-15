@@ -374,3 +374,78 @@ def test_shared_photo_application_is_idempotent_and_uses_games_only(pg_env, tmp_
                     PollAnswer.game_id == game.id))
                 assert answers == 2
     asyncio.run(run())
+
+
+def _telegram_update(chat_id, chat_type, user_id, text, update_id, name='Player'):
+    return SimpleNamespace(
+        update_id=update_id,
+        effective_chat=SimpleNamespace(id=chat_id, type=chat_type),
+        effective_user=SimpleNamespace(id=user_id, full_name=name, is_bot=False),
+        message=SimpleNamespace(text=text),
+    )
+
+
+def test_telegram_photo_group_any_member_answers_private_only_player(pg_env, tmp_path, monkeypatch):
+    """Owner rule (AUD-019): group answers by anyone, points to the answerer;
+    private chat is personal; a blocked answerer is ignored."""
+    from handlers.photo_quiz_handlers import PhotoQuizHandlers
+    from application.photo import PhotoApplicationService
+    from storage.repositories import OperationalRepository
+    from uuid import uuid4
+
+    async def run():
+        async with scenario(pg_env) as db:
+            monkeypatch.setenv('PHOTO_IMAGES_DIR', str(tmp_path))
+            (tmp_path / 'owl.webp').write_bytes(b'RIFF-photo-test-WEBP')
+            questions = [{'display_answer': 'Сова', 'media': {'media_key': 'owl', 'storage_name': 'owl'}}]
+            handlers = PhotoQuizHandlers(SimpleNamespace(postgres_storage=PostgresRuntimeStorage(db)))
+            starter, answerer, banned = USER, USER + 1, USER + 2
+
+            async def start(chat_id):
+                async with db.transaction() as session:
+                    await PhotoApplicationService(db, session).start(
+                        chat_id=chat_id, user_id=starter, display_name='Starter', question_count=1,
+                        open_seconds=600, hints_enabled=False, questions=questions,
+                        command_id=str(uuid4()))
+
+            async def score(chat_id, user_id):
+                async with db.transaction() as session:
+                    row = await session.get(ChatMember, (chat_id, user_id))
+                    return row.score if row else None
+
+            async def state(chat_id):
+                async with db.transaction() as session:
+                    return (await session.scalar(select(Game).where(
+                        Game.chat_id == chat_id, Game.mode == 'photo', Game.is_current.is_(True)))).state
+
+            # Group: the blocked member is ignored, a non-starter member wins and is credited.
+            await start(CHAT)
+            async with db.transaction() as session:
+                repo = OperationalRepository(session)
+                await repo.ensure_user({'id': banned, 'display_name': 'Banned'})
+                await session.execute(update(User).where(User.id == banned).values(bot_blocked=True))
+            assert not await handlers.handle_photo_quiz_message(
+                _telegram_update(CHAT, 'supergroup', banned, 'сова', 1001), None)
+            assert (await state(CHAT))['total_correct'] == 0
+            assert await score(CHAT, banned) is None
+            assert await handlers.handle_photo_quiz_message(
+                _telegram_update(CHAT, 'supergroup', answerer, 'сова', 1002), None)
+            finished = await state(CHAT)
+            assert finished['status'] == 'finished' and finished['total_correct'] == 1
+            assert await score(CHAT, answerer) == Decimal('5')
+            assert await score(CHAT, starter) in (None, Decimal('0'))
+            # The finished game accepts no further answers from anyone.
+            assert not await handlers.handle_photo_quiz_message(
+                _telegram_update(CHAT, 'supergroup', starter, 'сова', 1003), None)
+
+            # Private chat: only the player answers; other users are ignored.
+            await start(starter)
+            assert not await handlers.handle_photo_quiz_message(
+                _telegram_update(starter, 'private', answerer, 'сова', 1004), None)
+            assert (await state(starter))['total_correct'] == 0
+            assert await score(starter, answerer) is None
+            assert await handlers.handle_photo_quiz_message(
+                _telegram_update(starter, 'private', starter, 'сова', 1005), None)
+            assert (await state(starter))['status'] == 'finished'
+            assert await score(starter, starter) == Decimal('5')
+    asyncio.run(run())

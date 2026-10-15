@@ -32,7 +32,8 @@ def summarize(rows, *, now=None, stale_after=timedelta(minutes=5)):
     oldest = {}
     for row in rows:
         stamp = (row.available_at if row.status == 'pending' else
-                 row.claimed_at if row.status in {'sending', 'uncertain'} else row.delivered_at)
+                 row.claimed_at if row.status in {'sending', 'uncertain'} else
+                 getattr(row, 'resolved_at', None) if row.status == 'resolved' else row.delivered_at)
         if stamp is not None and (row.status not in oldest or stamp < oldest[row.status]):
             oldest[row.status] = stamp
     errors = Counter(
@@ -42,9 +43,12 @@ def summarize(rows, *, now=None, stale_after=timedelta(minutes=5)):
     return {
         'generated_at': now.isoformat(),
         'total': len(rows),
-        'counts': {key: counts.get(key, 0) for key in ('pending', 'sending', 'uncertain', 'delivered')},
+        'counts': {key: counts.get(key, 0) for key in (
+            'pending', 'sending', 'uncertain', 'delivered',
+            *(['resolved'] if counts.get('resolved') else []),
+        )},
         'other_statuses': {key: count for key, count in sorted(counts.items())
-                           if key not in {'pending', 'sending', 'uncertain', 'delivered'}},
+                           if key not in {'pending', 'sending', 'uncertain', 'delivered', 'resolved'}},
         'stale_sending_after_seconds': int(stale_after.total_seconds()),
         'stale_sending': len(stale),
         'oldest_at': {key: value.isoformat() for key, value in sorted(oldest.items())},
@@ -60,7 +64,8 @@ def summarize(rows, *, now=None, stale_after=timedelta(minutes=5)):
         'uncertain_items': [
             {'id': row.id, 'kind': row.kind, 'game_id': row.game_id,
              'chat_id': row.chat_id, 'user_id': row.user_id,
-             'attempts': row.attempts, 'last_error': row.last_error}
+             'attempts': row.attempts, 'last_error': row.last_error,
+             'version': getattr(row, 'version', 0)}
             for row in sorted((item for item in rows if item.status == 'uncertain'),
                               key=lambda item: item.id)[:100]
         ],

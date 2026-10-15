@@ -1,4 +1,5 @@
 """Explicit loopback synthetic preview. Never used by the public Mini App factory."""
+import asyncio
 from hashlib import sha256
 import os
 from pathlib import Path
@@ -31,17 +32,31 @@ def create_dev_app():
     player_id = int(os.getenv('MINI_APP_DEV_USER_ID') or DEMO_USER)
     if player_id <= 0:
         raise RuntimeError('A positive dev player ID is required')
-    app = create_app(settings=settings, membership=DemoMembership(), allowed_user_ids={player_id}, runtime_enabled=player_id == DEMO_USER)
+    # Separate opt-ins: disabling new Classic starts must never revoke guests'
+    # access to their already-running rooms. Real Telegram private tests remain closed.
+    guests_enabled = player_id == DEMO_USER and os.getenv('MQB_DEV_GUEST_ENABLED', '') == '1'
+    room_classic_enabled = guests_enabled and os.getenv('MQB_ROOM_CLASSIC_ENABLED', '') == '1'
+    room_photo_enabled = guests_enabled and os.getenv('MQB_ROOM_PHOTO_ENABLED', '') == '1'
+    app = create_app(settings=settings, membership=DemoMembership(),
+                     allowed_user_ids={player_id}, dev_guest_access=guests_enabled,
+                     runtime_enabled=player_id == DEMO_USER, room_classic_enabled=room_classic_enabled,
+                     room_photo_enabled=room_photo_enabled)
     if player_id == DEMO_USER:
         from contextlib import asynccontextmanager
-        from modules.mini_offline_runtime import offline_game
         original_lifespan = app.router.lifespan_context
         @asynccontextmanager
-        async def with_game(application):
+        async def with_synthetic_chat(application):
             async with original_lifespan(application):
-                async with offline_game(app.state.mini_store.database, player_id, SYNTHETIC_TOKEN):
-                    yield
-        app.router.lifespan_context = with_game
+                database = app.state.mini_store.database
+                from storage.dev_backups import guard
+                from storage.repositories import OperationalRepository
+                await asyncio.to_thread(guard, database)
+                async with database.transaction() as session:
+                    repo = OperationalRepository(session)
+                    await repo.ensure_chat({'id': player_id, 'type': 'private', 'title': 'Моя тестовая игра'})
+                    await repo.ensure_member({'chat_id': player_id, 'user_id': player_id})
+                yield
+        app.router.lifespan_context = with_synthetic_chat
 
     @app.get('/api/dev/info')
     async def info():

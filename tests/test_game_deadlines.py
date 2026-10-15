@@ -57,19 +57,51 @@ def test_deadline_processor_isolates_failures_and_runs_each_mode(monkeypatch, ca
             calls.append(('photo', chat_id, now))
             return None
 
+    class RoomClassic:
+        def __init__(self, session):
+            self.session = session
+
+        async def due_game_ids(self, *, now):
+            return ['room-game-2', 'room-game-1', 'room-game-2']
+
+        async def settle_due_game(self, *, game_id, now):
+            calls.append(('room-classic', game_id, now))
+            if game_id == 'room-game-2':
+                raise RuntimeError('isolated room candidate failure')
+            return {'status': 'finished'}
+
+    class RoomPhoto:
+        def __init__(self, session):
+            self.session = session
+
+        async def due_game_ids(self, *, now):
+            return ['photo-room-2', 'photo-room-1', 'photo-room-2']
+
+        async def settle_due_game(self, *, game_id, now):
+            calls.append(('room-photo', game_id, now))
+            if game_id == 'photo-room-2':
+                raise RuntimeError('isolated room Photo candidate failure')
+            return {'status': 'finished'}
+
     monkeypatch.setattr(game_deadlines, 'MafiaApplicationService', Mafia)
     monkeypatch.setattr(game_deadlines, 'ClassicApplicationService', Classic)
     monkeypatch.setattr(game_deadlines, 'PhotoApplicationService', Photo)
+    monkeypatch.setattr(game_deadlines, 'RoomClassicApplicationService', RoomClassic)
+    monkeypatch.setattr(game_deadlines, 'RoomPhotoApplicationService', RoomPhoto)
 
     result = asyncio.run(game_deadlines.GameDeadlineProcessor(database).run_once(now=now))
 
-    assert result == {'mafia': 1, 'classic': 1, 'photo': 0}
+    assert result == {'mafia': 1, 'classic': 2, 'photo': 1}
     assert calls == [
         ('mafia', 'game-1', now), ('mafia', 'game-2', now),
         ('classic', -3, now), ('photo', -4, now),
+        ('room-classic', 'room-game-1', now), ('room-classic', 'room-game-2', now),
+        ('room-photo', 'photo-room-1', now), ('room-photo', 'photo-room-2', now),
     ]
-    assert database.transactions == 5  # one candidate snapshot + one per target
+    assert database.transactions == 9  # one candidate snapshot + one per target
     assert 'mode=mafia candidate=game-2' in caplog.text
+    assert 'mode=classic candidate=room-game-2' in caplog.text
+    assert 'mode=photo candidate=photo-room-2' in caplog.text
 
 
 def test_worker_interval_has_a_bounded_polling_range(monkeypatch):

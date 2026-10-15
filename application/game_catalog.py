@@ -1,6 +1,7 @@
 """Canonical public catalog of Morning Quiz game modes and their current capabilities."""
 
 from copy import deepcopy
+import os
 
 
 _MODES = (
@@ -44,8 +45,14 @@ _MODES = (
 
 def game_modes():
     """Return detached data so API consumers cannot mutate the canonical catalog."""
-    return deepcopy(_MODES)
+    modes = deepcopy(_MODES)
+    if os.getenv('QW_FARM_ENABLED') == '1':
+        farm = next(item for item in modes if item['id'] == 'farm')
+        farm.update(status='development', interfaces=['browser', 'mini_app'],
+                    capabilities=['account_farm', 'production', 'neighbors', 'equipment',
+                                  'helpers', 'forest_trips', 'telegram_invites', 'server_owned_economy'])
+    return modes
 
 
 def game_mode(mode_id):
-    return next((item for item in _MODES if item['id'] == mode_id), None)
+    return next((item for item in game_modes() if item['id'] == mode_id), None)

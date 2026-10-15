@@ -20,6 +20,7 @@ from domain.classic import (
     project_classic,
     public_question,
     schedule_classic,
+    settle_classic,
     start_classic,
     validate_classic_answer,
 )
@@ -488,50 +489,11 @@ class ClassicApplicationService:
             else float(now) if type(now) in {int, float}
             else datetime.now(timezone.utc).timestamp()
         )
-        changed = False
         was_finished = state['status'] == 'finished'
         previous_round_id = state['current_round_id']
-        for _ in range(len(state['rounds']) * 3):
-            due = sorted(
-                (deadline, kind)
-                for kind, deadline in classic_deadlines(state).items()
-                if deadline <= timestamp
-            )
-            if not due:
-                break
-            _, kind = due[0]
-            if kind == 'start':
-                state = start_classic(
-                    state, expected_revision=state['revision'], now=timestamp
-                )
-                changed = True
-                continue
-            action, internal_id = kind.split(':', 1)
-            if action == 'advance':
-                state = advance_classic(
-                    state, round_id=internal_id, cause='answer',
-                    expected_revision=state['revision'], now=timestamp,
-                )
-            else:
-                item = next(
-                    item for item in state['rounds']
-                    if item['round_id'] == internal_id
-                )
-                if (
-                    state['current_round_id'] == internal_id
-                    and item['index'] + 1 < len(state['rounds'])
-                ):
-                    state = advance_classic(
-                        state, round_id=internal_id, cause='deadline',
-                        expected_revision=state['revision'], now=timestamp,
-                    )
-                else:
-                    state = close_round(
-                        state, round_id=internal_id, now=timestamp
-                    )
-            changed = True
-        else:
-            raise RuntimeError('Превышен предел переходов викторины.')
+        next_state = settle_classic(state, now=timestamp)
+        changed = next_state != state
+        state = next_state
         if changed:
             if not was_finished and state['status'] == 'finished':
                 await record_completed_in(self.session, state)
@@ -623,6 +585,7 @@ class ClassicApplicationService:
             .join(GameDeadline, GameDeadline.game_id == Game.id)
             .where(
                 Game.mode == 'classic', Game.is_current.is_(True),
+                Game.chat_id.is_not(None),
                 Game.status == 'active', GameDeadline.status == 'pending',
                 GameDeadline.due_at <= moment,
                 (GameDeadline.kind == 'start')

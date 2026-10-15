@@ -16,6 +16,8 @@ class TelegramIdentity:
     user_id: int
     auth_date: int
     fingerprint: str
+    first_name: str = ''
+    last_name: str = ''
 
 
 def unique_object(pairs):
@@ -58,6 +60,9 @@ def validate_init_data(raw, bot_token, *, now, max_age=300, future_skew=30):
         uid = user['id']
         if type(uid) is not int or not 0 < uid < 2**52 or user.get('is_bot', False) is not False:
             raise ValueError()
-        return TelegramIdentity(uid, timestamp, expected)
+        first_name, last_name = user.get('first_name', ''), user.get('last_name', '')
+        if not isinstance(first_name, str) or not isinstance(last_name, str):
+            raise ValueError()
+        return TelegramIdentity(uid, timestamp, expected, first_name, last_name)
     except (ValueError, KeyError, TypeError, UnicodeError, AttributeError, RecursionError):
         raise InvalidInitData('Недействительные или просроченные данные Telegram') from None

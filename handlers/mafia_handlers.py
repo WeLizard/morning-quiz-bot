@@ -387,7 +387,7 @@ class MafiaHandlers:
             if item is None:
                 return
             if not item['chat_id']:
-                await queue.uncertain(item['id'], worker_id, 'MissingChatId')
+                await queue.uncertain(item['id'], worker_id, 'MissingChatId', claim_version=item['claim_version'])
                 continue
             try:
                 if item['kind'] == 'classic.question':
@@ -413,15 +413,15 @@ class MafiaHandlers:
                 seconds = error.retry_after
                 if hasattr(seconds, 'total_seconds'):
                     seconds = seconds.total_seconds()
-                await queue.retry_after(item['id'], worker_id, float(seconds))
+                await queue.retry_after(item['id'], worker_id, float(seconds), claim_version=item['claim_version'])
             except TelegramError as error:
                 # Telegram has no idempotency key for sendMessage. A lost HTTP
                 # response is an unknown outcome, so automatic resend could duplicate.
-                await queue.uncertain(item['id'], worker_id, type(error).__name__)
+                await queue.uncertain(item['id'], worker_id, type(error).__name__, claim_version=item['claim_version'])
             except Exception as error:
-                await queue.uncertain(item['id'], worker_id, type(error).__name__)
+                await queue.uncertain(item['id'], worker_id, type(error).__name__, claim_version=item['claim_version'])
             else:
-                await queue.delivered(item['id'], worker_id)
+                await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
 
     async def _deliver_photo_question(self, context, item):
         from application.photo import PhotoApplicationService
@@ -455,7 +455,9 @@ class MafiaHandlers:
                     else '❌ Пока мимо. Попробуйте ещё раз.')
         elif item['kind'] == 'photo.result':
             if payload.get('correct'):
-                text = (f'🎉 <b>Правильно!</b> {escape(str(payload.get("answer") or ""))}\n'
+                winner = (f' Отгадал(а): {escape(str(payload["winner_name"]))}.'
+                          if payload.get('winner_name') else '')
+                text = (f'🎉 <b>Правильно!</b> {escape(str(payload.get("answer") or ""))}{winner}\n'
                         f'+{escape(str(payload.get("points") or 0))} баллов')
             else:
                 text = (f'⏰ Время вышло. Ответ: '
@@ -491,13 +493,13 @@ class MafiaHandlers:
                 )
                 delivery = {'id': row.id, 'status': row.status}
         if effect is None:
-            await queue.delivered(item['id'], worker_id)
+            await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
             return
         if not created:
             if delivery['status'] in {'sent', 'skipped'}:
-                await queue.delivered(item['id'], worker_id)
+                await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
             else:
-                await queue.uncertain(item['id'], worker_id, 'DeliveryAlreadyReserved')
+                await queue.uncertain(item['id'], worker_id, 'DeliveryAlreadyReserved', claim_version=item['claim_version'])
             return
         remaining = math.ceil(effect['closes_at'] - time.time())
         if remaining < 5:
@@ -505,7 +507,7 @@ class MafiaHandlers:
                 await GameDeliveries(session).skipped(
                     delivery_id=delivery['id'], reason='deadline_too_close'
                 )
-            await queue.delivered(item['id'], worker_id)
+            await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
             return
         try:
             sent = await context.bot.send_poll(
@@ -540,15 +542,15 @@ class MafiaHandlers:
             seconds = error.retry_after
             if hasattr(seconds, 'total_seconds'):
                 seconds = seconds.total_seconds()
-            await queue.retry_after(item['id'], worker_id, float(seconds))
+            await queue.retry_after(item['id'], worker_id, float(seconds), claim_version=item['claim_version'])
         except Exception as error:
             async with self.database.transaction() as session:
                 await GameDeliveries(session).uncertain(
                     delivery_id=delivery['id'], error=type(error).__name__
                 )
-            await queue.uncertain(item['id'], worker_id, type(error).__name__)
+            await queue.uncertain(item['id'], worker_id, type(error).__name__, claim_version=item['claim_version'])
         else:
-            await queue.delivered(item['id'], worker_id)
+            await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
 
     async def _deliver_classic_result(self, context, queue, worker_id, item):
         """Publish one durable Classic summary without risking a blind resend."""
@@ -569,13 +571,13 @@ class MafiaHandlers:
                 )
                 delivery = {'id': row.id, 'status': row.status}
         if result is None:
-            await queue.delivered(item['id'], worker_id)
+            await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
             return
         if not created:
             if delivery['status'] in {'sent', 'skipped'}:
-                await queue.delivered(item['id'], worker_id)
+                await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
             else:
-                await queue.uncertain(item['id'], worker_id, 'DeliveryAlreadyReserved')
+                await queue.uncertain(item['id'], worker_id, 'DeliveryAlreadyReserved', claim_version=item['claim_version'])
             return
         try:
             sent = await context.bot.send_message(
@@ -596,15 +598,15 @@ class MafiaHandlers:
             seconds = error.retry_after
             if hasattr(seconds, 'total_seconds'):
                 seconds = seconds.total_seconds()
-            await queue.retry_after(item['id'], worker_id, float(seconds))
+            await queue.retry_after(item['id'], worker_id, float(seconds), claim_version=item['claim_version'])
         except Exception as error:
             async with self.database.transaction() as session:
                 await GameDeliveries(session).uncertain(
                     delivery_id=delivery['id'], error=type(error).__name__
                 )
-            await queue.uncertain(item['id'], worker_id, type(error).__name__)
+            await queue.uncertain(item['id'], worker_id, type(error).__name__, claim_version=item['claim_version'])
         else:
-            await queue.delivered(item['id'], worker_id)
+            await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
 
     def install_notification_delivery(self, job_queue):
         if job_queue is None:

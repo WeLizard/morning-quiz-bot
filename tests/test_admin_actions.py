@@ -16,7 +16,7 @@ from tests.test_postgres_members import CHAT, OTHER_CHAT, USER, pg_env, scenario
 from handlers.moderation import moderation_handler
 from storage.admin_actions import AdminActions, AdminConflict, BotAccessBlocked
 from storage.members import MemberService
-from storage.models import AdminAction, Chat, ChatMember, Game, PollAnswer, QuizSession, User, MessageCleanupItem
+from storage.models import AdminAction, Chat, ChatMember, Game, GameEvent, PollAnswer, QuizSession, User, MessageCleanupItem
 from storage.photos import PhotoSessions, PhotoSessionConflict
 from storage.repositories import OperationalRepository
 from storage.schedule_source import ScheduleSource
@@ -200,6 +200,13 @@ def test_user_ban_cancels_photo_without_awarding_or_resuming(pg_env, tmp_path):
             live._accept_record(photo, saved)
             live.active_photo_quizzes[CHAT] = photo
             await block(service)
+            async with db.transaction() as session:
+                event = await session.scalar(select(GameEvent).where(
+                    GameEvent.kind == 'moderation_interrupted',
+                ))
+                assert event is not None
+                assert event.actor_user_id is None
+                assert event.actor_account_id is None
             with pytest.raises(PhotoSessionConflict):
                 await PhotoSessions(db).complete_question(saved, correct=True, points=6)
             context = photo_context()

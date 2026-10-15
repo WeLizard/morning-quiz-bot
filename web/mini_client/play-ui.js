@@ -1,36 +1,87 @@
 (() => {
     'use strict';
-    const clean = text => String(text || '').replace(/\\([_\[\]()~`>#+\-=|{}.!*])/g, '$1').replace(/<\/?(?:b|i|code|pre|u|s)>/g, '').replace(/[*`]/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    const label = text => clean(text).replace(/^[^\p{L}\p{N}]+/u, '').trim();
     const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
     const number = value => new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 1}).format(Number(value) || 0);
-    const at = m => m.updated_at || m.at || 0;
-    // Presentation only. Commands still enter the existing engine and scores come from its ledger.
-    function model(data, preferred) {
-        const games = data.games || [], messages = data.messages || [];
-        const game = preferred ? games.find(g => g.kind === preferred) : games.find(g => g.status === 'active') || [...games].sort((a, b) => b.started_at - a.started_at)[0];
-        const kind = preferred || game?.kind || (data.photo_round ? 'photo' : 'classic');
-        const prefix = kind === 'photo' ? 'pqcfg_' : 'qcfg_';
-        const menu = [...messages].filter(m => m.buttons?.some(row => row.some(b => b.data.startsWith(prefix)))).sort((a, b) => at(b) - at(a))[0];
-        if (menu && game?.status !== 'active' && (!game || at(menu) >= game.started_at)) return {phase: 'setup', kind, menu};
-        if (!game) return {phase: 'idle', kind};
-        const related = messages.filter(m => m.at >= game.started_at - 1);
-        const question = kind === 'classic' ? [...messages].reverse().find(m => m.poll && (game.poll_ids.includes(m.poll.id) || m.at >= game.started_at)) : [...related].reverse().find(m => m.media);
-        if (game.status !== 'active') return {phase: 'result', kind, game, question};
-        return {phase: kind === 'photo' ? 'photo' : question ? 'question' : 'waiting', kind, game, question,
-            previous: [...related].reverse().find(m => m.feedback && m.id !== question?.id),
-            hints: related.filter(m => m.at >= (question?.at || 0) && !m.media && /подсказка|попробуйте ещё|неверно/i.test(clean(m.text))).slice(-2)};
-    }
     let dispose = () => {};
+    const seconds = value => typeof value === 'number' ? value : Date.parse(value) / 1000;
+    // Transport adapters. play-ui only talks to an `api` object, so the same screen plays a
+    // Telegram chat game (chatApi) or a standalone room game (roomApi). Command methods take
+    // the idempotency id chosen by play-ui: it is reused unchanged when a command is retried.
+    function chatApi(chatId, request) {
+        if (!chatId) throw new Error('Выбери чат и игровой режим перед запуском.');
+        const base = kind => `/api/mini/${kind}/chats/${chatId}`;
+        const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        return {
+            kind: 'chat',
+            async setup(kind) {
+                if (kind === 'classic') return (await request(`/api/mini/chats/${chatId}/details`))?.classic || null;
+                return request(`${base('photo')}/setup`);
+            },
+            async current(kind) {
+                try { return await request(`${base(kind)}/sync`, {method: 'POST'}); }
+                catch (error) { if (error.status === 404) return null; throw error; }
+            },
+            start(kind, params, id) {
+                return post(`${base(kind)}/start`, kind === 'classic' ? {command_id: id} : {...params, command_id: id});
+            },
+            answer(kind, params, id) {
+                if (kind === 'classic') {
+                    const body = {selected_option: params.selectedOption};
+                    body[params.internal ? 'round_id' : 'poll_id'] = params.questionId;
+                    return post(`${base('classic')}/answer`, {...body, command_id: id});
+                }
+                return post(`${base('photo')}/answer`, {round_id: params.questionId, answer: params.answer, command_id: id});
+            },
+            stop(kind, params, id) { return post(`${base(kind)}/stop`, {expected_revision: params.revision, command_id: id}); },
+            imageUrl: question => question.image_url,
+        };
+    }
+    function roomApi(roomId, request, {accountId = null} = {}) {
+        if (!roomId) throw new Error('Выбери комнату перед запуском.');
+        const base = kind => `/api/guest/rooms/${encodeURIComponent(roomId)}/${kind}`;
+        const post = (path, body, id) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': id}, body: JSON.stringify(body)});
+        return {
+            kind: 'room', accountId,
+            async setup(kind) {
+                return request(`${base(kind)}/setup`);
+            },
+            async current(kind) {
+                try {
+                    const data = await request(`${base(kind)}/current`);
+                    if (kind === 'photo' && data?.occupied) return {occupied: true};
+                    const view = data?.current || null;
+                    // A finished room game stays "current" with its last question: show the result, not the question.
+                    if (view && ['finished', 'stopped', 'interrupted'].includes(view.status)) return {...view, question: null, finished_view: true};
+                    return view;
+                } catch (error) { if (error.status === 404) return null; throw error; }
+            },
+            start(kind, params, id) {
+                return post(`${base(kind)}/start`, kind === 'classic'
+                    ? {count: params.count, open_seconds: params.open_seconds, interval_seconds: params.interval_seconds,
+                        ...(params.category_mode ? {category_mode: params.category_mode, categories: params.categories || [], random_categories: params.random_categories} : {})}
+                    : {question_count: params.question_count, open_seconds: params.open_seconds, hints_enabled: params.hints_enabled}, id);
+            },
+            answer(kind, params, id) {
+                return post(`${base(kind)}/answer`, kind === 'classic'
+                    ? {game_id: params.gameId, round_id: params.questionId, selected_option: params.selectedOption}
+                    : {game_id: params.gameId, round_id: params.questionId, answer: params.answer}, id);
+            },
+            stop(kind, params, id) { return post(`${base(kind)}/stop`, {game_id: params.gameId, expected_revision: params.revision}, id); },
+            imageUrl: question => question.image_url,
+        };
+    }
     window.QuizPlay = {
-        model,
+        chatApi, roomApi,
         stop() { dispose(); dispose = () => {}; },
-        async mount({host, request, media, command, chatId, selection, onHome, onReplay, onProfile, onSettings}) {
+        async mount({host, request, media, command, chatId, api: adapter, selection, onHome, onReplay, onProfile, onSettings}) {
             window.QuizPlay.stop();
+            if (!(adapter || chatId) || ![null, undefined, '/quiz', '/photo_quiz'].includes(command)) {
+                throw new Error('Выбери чат и игровой режим перед запуском.');
+            }
+            const api = adapter || chatApi(chatId, request), room = api.kind === 'room';
             document.body?.classList.add('is-playing');
-            let active = true, timer, ticker, snapshot, direct, directPhoto, current, setupDetails = null, photoSetup = null, setupError = null, busy = false, pending = null, lastHash = '', chosen = null, questionKey = '', draft = '', offset = 0, starting = false;
+            let active = true, timer, ticker, direct, directPhoto, classicSetup = null, classicChoice = null, photoSetup = null, photoOccupied = false, lastAccepted = null, skipGame = null, setupError = null, busy = false, pendingCommand = null, lastHash = '', chosen = null, questionKey = '', draft = '', starting = false;
             let preferred = command === '/photo_quiz' ? 'photo' : command === '/quiz' ? 'classic' : null;
-            const directPlay = !!chatId && (command === null || command === undefined || ['/quiz', '/photo_quiz'].includes(command));
             const images = new Map();
             const page = el('section', undefined, 'play-screen'), top = el('div', undefined, 'play-topline');
             const button = (text, fn, cls = '') => { const b = el('button', text, cls); b.type = 'button'; b.onclick = fn; return b; };
@@ -39,7 +90,6 @@
             const stage = el('div', undefined, 'play-stage'), notice = el('div', '', 'play-notice'); notice.setAttribute('role', 'status');
             page.append(top, status, stage, notice); host.append(page);
             dispose = () => { active = false; clearTimeout(timer); clearInterval(ticker); images.forEach(url => URL.revokeObjectURL(url)); document.body?.classList.toggle('is-playing', false); };
-            const callback = (item, data) => send({type: 'callback', value: data, message_id: item.id, revision: item.revision});
             function hostLine(text, cls = '') {
                 const row = el('div', undefined, `host-line ${cls}`), image = el('img'); image.src = '/app/host.webp'; image.alt = ''; row.append(image, el('p', text)); return row;
             }
@@ -49,7 +99,8 @@
                 const meter = el('progress'); meter.max = Math.max(1, game.total); meter.value = game.current; meter.setAttribute('aria-label', `Вопрос ${game.current} из ${game.total}`);
                 stage.append(bar, meter);
             }
-            function picture(path) {
+            function picture(question) {
+                const path = api.imageUrl(question);
                 const image = el('img'); image.alt = 'Что изображено на фото?'; image.className = 'play-photo';
                 if (images.has(path)) image.src = images.get(path);
                 else media(path).then(blob => { if (!active) return; const url = URL.createObjectURL(blob); images.set(path, url); image.src = url; }).catch(() => { if (active) image.alt = 'Фото не загрузилось. Проверь подключение.'; });
@@ -57,31 +108,6 @@
             }
             function countdown(end, closed = false) {
                 const clock = el('span', '', 'play-clock'); clock.dataset.deadline = end; clock.dataset.closed = String(closed); clock.setAttribute('aria-label', 'Оставшееся время'); clock.setAttribute('aria-live', 'off'); return clock;
-            }
-            function setup(view) {
-                const menu = view.menu, buttons = menu.buttons.flat(), prefix = view.kind === 'photo' ? 'pqcfg_' : 'qcfg_';
-                const start = buttons.find(b => b.data === prefix + 'start');
-                if (start) {
-                    stage.append(el('span', 'ПЕРЕД ПЕРВЫМ ВОПРОСОМ', 'eyebrow'), el('h1', view.kind === 'photo' ? 'Присмотримся?' : 'Проверим интуицию?'));
-                    stage.append(hostLine(view.kind === 'photo' ? 'Покажу картинку. Ты — напиши, что узнал. Подсказки можно включить в параметрах раунда.' : 'Не нужно знать всё. Выбирай ответ и собирай серию. А если сомневаешься — доверься интуиции.'));
-                    const facts = el('div', undefined, 'preparation-facts');
-                    for (const b of buttons.filter(b => ['qcfg_num_menu', 'qcfg_open_period', 'pqcfg_qcount', 'pqcfg_time'].includes(b.data))) facts.append(el('span', label(b.text))); stage.append(facts);
-                    const fields = el('div', undefined, 'round-summary');
-                    for (const b of buttons.filter(b => !/start|cancel|noop/.test(b.data) && b.data.startsWith(prefix))) {
-                        const name = label(b.text); fields.append(button(name, () => callback(menu, b.data), 'round-field'));
-                    }
-                    const details = el('details', undefined, 'round-options'); details.append(el('summary', 'Параметры этого раунда'), fields); stage.append(details);
-                    stage.append(button('Начать игру', () => callback(menu, start.data), 'primary play-primary'));
-                    stage.append(el('p', 'Общие настройки — в профиле. Этот раунд можно пройти здесь или в чате.', 'play-footnote'));
-                } else {
-                    const text = clean(menu.text).trim();
-                    stage.append(el('span', 'ПАРАМЕТРЫ РАУНДА', 'eyebrow'), el('h1', text.split('\n')[0] || 'Выбери вариант'));
-                    if (text.includes('\n')) stage.append(el('p', text.split('\n').slice(1).join('\n'), 'muted'));
-                    const grid = el('div', undefined, 'setup-options');
-                    for (const b of buttons.filter(b => b.data.startsWith(prefix))) grid.append(button(label(b.text), () => callback(menu, b.data), b.style === 'success' ? 'primary' : ''));
-                    stage.append(grid);
-                    if (/введите|напишите|отправьте/i.test(text)) inputForm('Твоё значение', null);
-                }
             }
             function directSetup() {
                 stage.append(el('span', 'ПЕРЕД ПЕРВЫМ ВОПРОСОМ', 'eyebrow'));
@@ -94,24 +120,30 @@
                     return;
                 }
                 if (preferred === 'classic') {
-                    const config = setupDetails?.classic;
+                    const config = classicSetup;
                     if (!config) { stage.append(hostLine('Загружаю параметры квиза…')); return; }
                     stage.append(el('h1', 'Проверим интуицию?'));
-                    stage.append(hostLine('Вопросы и правила берутся из настроек выбранного чата. Ответы и очки будут общими с игрой в чате.'));
+                    if (room && classicChoice) {
+                        stage.append(hostLine('Настрой партию: сколько вопросов, сколько времени на ответ и какие темы.'));
+                        roomClassicForm(config);
+                        stage.append(button('Начать игру', startDirect, 'primary play-primary'));
+                        return;
+                    }
+                    stage.append(hostLine(room ? 'Вопросы подбираются из общего каталога. Это твоя личная партия.' : 'Вопросы и правила берутся из настроек выбранного чата. Ответы и очки будут общими с игрой в чате.'));
                     const facts = el('div', undefined, 'preparation-facts');
                     facts.append(el('span', `${number(config.questions)} вопросов`), el('span', `${number(config.seconds)} секунд на ответ`));
                     if (Number(config.interval) > 0) facts.append(el('span', `Пауза ${number(config.interval)} секунд`));
                     const categoryText = config.category_mode === 'specific' && config.categories?.length
                         ? `Темы: ${config.categories.join(', ')}`
                         : config.category_mode === 'exclude' && config.categories?.length
-                            ? `Без тем: ${config.categories.join(', ')}` : 'Темы — по настройкам чата';
+                            ? `Без тем: ${config.categories.join(', ')}` : (room ? 'Темы — любые' : 'Темы — по настройкам чата');
                     facts.append(el('span', categoryText)); stage.append(facts);
                     if (typeof onSettings === 'function') stage.append(button('Настройки квиза', onSettings, 'quiet play-secondary'));
                     stage.append(button('Начать игру', startDirect, 'primary play-primary'));
                 } else if (preferred === 'photo') {
                     if (!photoSetup) { stage.append(hostLine('Проверяю фото-каталог…')); return; }
                     stage.append(el('h1', 'Присмотримся?'));
-                    stage.append(hostLine('Каждая загадка соединяет образы в слово. Ответы через Mini App сохраняются в ту же игровую систему.'));
+                    stage.append(hostLine(room ? 'Каждая загадка соединяет образы в слово. Ответы сохраняются в твоём аккаунте.' : 'Каждая загадка соединяет образы в слово. Ответы через Mini App сохраняются в ту же игровую систему.'));
                     const facts = el('div', undefined, 'preparation-facts');
                     facts.append(el('span', `${photoSetup.question_count} картинки`),
                         el('span', `${photoSetup.open_seconds} секунд на картинку`),
@@ -122,7 +154,10 @@
                     if (photoSetup.available_questions < photoSetup.question_count) {
                         stage.append(el('p', 'В каталоге пока меньше картинок, чем вопросов в серии — некоторые загадки могут повториться.', 'play-footnote'));
                     }
-                    if (!photoSetup.can_start) {
+                    if (photoOccupied) {
+                        stage.querySelector('button')?.setAttribute('disabled', '');
+                        stage.append(el('p', 'Фото-серия занята другим игроком.', 'play-notice'));
+                    } else if (!photoSetup.can_start) {
                         stage.querySelector('button')?.setAttribute('disabled', '');
                         stage.append(el('p', 'Сейчас в каталоге нет доступных изображений.', 'play-notice'));
                     }
@@ -132,17 +167,65 @@
                     stage.append(button('Классический квиз', () => chooseDirectMode('classic'), 'primary play-primary'));
                     stage.append(button('Фото-загадки', () => chooseDirectMode('photo'), 'primary play-secondary'));
                 }
-                stage.append(el('p', 'Глобальные настройки доступны в Профиль → Настройки. Этот раунд использует состояние выбранного чата.', 'play-footnote'));
+                if (!room) stage.append(el('p', 'Глобальные настройки доступны в Профиль → Настройки. Этот раунд использует состояние выбранного чата.', 'play-footnote'));
+            }
+            // Room Classic setup: the same options as the Telegram settings (count, time, pause, theme mode and themes).
+            function roomClassicForm(config) {
+                const limits = config.limits || {}, choice = classicChoice;
+                const form = el('form', undefined, 'native-settings room-classic-setup');
+                form.onsubmit = event => { event.preventDefault(); startDirect(); };
+                const numeric = (title, key, range, fallback) => {
+                    const field = el('label', title, 'field'), input = el('input');
+                    input.type = 'number'; input.name = key; input.min = String((limits[range] || fallback)[0]); input.max = String((limits[range] || fallback)[1]);
+                    input.value = String(choice[key]);
+                    input.addEventListener('input', () => { choice[key] = input.value === '' ? NaN : Number(input.value); });
+                    field.append(input); form.append(field); return input;
+                };
+                numeric('Вопросов в раунде', 'questions', 'questions', [1, 50]);
+                numeric('Секунд на ответ', 'seconds', 'seconds', [5, 600]);
+                numeric('Пауза между вопросами, секунд', 'interval', 'interval', [0, 600]);
+                const picker = el('details', undefined, 'category-picker'); picker.open = true;
+                picker.append(el('summary', 'Темы квиза'));
+                const modeField = el('label', 'Как выбирать темы', 'field'), mode = el('select'); mode.name = 'category_mode';
+                for (const [value, label] of [['all', 'Все темы'], ['random', 'Случайные темы'], ['specific', 'Только выбранные'], ['exclude', 'Все, кроме выбранных']]) {
+                    const option = el('option', label); option.value = value; mode.append(option);
+                }
+                mode.value = choice.category_mode; modeField.append(mode);
+                const randomField = el('label', 'Сколько случайных тем', 'field'), random = el('input');
+                random.type = 'number'; random.name = 'random_categories'; random.min = String((limits.random_categories || [1, 10])[0]); random.max = String((limits.random_categories || [1, 10])[1]);
+                random.value = String(choice.random_categories);
+                random.addEventListener('input', () => { choice.random_categories = random.value === '' ? NaN : Number(random.value); });
+                randomField.append(random);
+                const checks = el('div', undefined, 'category-checks');
+                for (const name of config.available_categories || []) {
+                    const label = el('label', undefined, 'category-choice'), input = el('input');
+                    input.type = 'checkbox'; input.checked = choice.categories.has(name);
+                    input.addEventListener('change', () => { if (input.checked) choice.categories.add(name); else choice.categories.delete(name); });
+                    label.append(input, el('span', name)); checks.append(label);
+                }
+                const sync = () => {
+                    choice.category_mode = mode.value;
+                    randomField.hidden = !['random', 'all', 'exclude'].includes(mode.value) ? true : mode.value === 'all';
+                    checks.hidden = !['specific', 'exclude'].includes(mode.value);
+                };
+                mode.addEventListener('change', sync); sync();
+                picker.append(modeField, randomField, checks); form.append(picker);
+                stage.append(form);
             }
             async function loadDirectSetup(kind) {
                 setupError = null;
                 try {
                     if (kind === 'classic') {
-                        setupDetails = await request(`/api/mini/chats/${chatId}/details`);
+                        classicSetup = await api.setup('classic');
+                        classicChoice = room && classicSetup && Array.isArray(classicSetup.available_categories) ? {
+                            questions: classicSetup.questions, seconds: classicSetup.seconds, interval: classicSetup.interval,
+                            category_mode: classicSetup.category_mode || 'all', categories: new Set(classicSetup.categories || []),
+                            random_categories: classicSetup.random_categories || 3,
+                        } : null;
                         photoSetup = null;
                     } else {
-                        photoSetup = await request(`/api/mini/photo/chats/${chatId}/setup`);
-                        setupDetails = null;
+                        photoSetup = await api.setup('photo');
+                        classicSetup = null;
                     }
                 } catch (error) { setupError = error.message; throw error; }
             }
@@ -153,52 +236,49 @@
                 try { await loadDirectSetup(kind); await refresh(); }
                 catch (error) { notice.textContent = error.message; stage.replaceChildren(button('Повторить', () => chooseDirectMode(kind), 'quiet')); }
             }
-            function inputForm(title, round, disabled = false, directPhotoAnswer = false) {
+            function inputForm(title, round, disabled = false) {
                 const form = el('form', undefined, 'play-answer-form'), field = el('label', title), input = el('input');
                 input.value = draft; input.autocomplete = 'off'; input.maxLength = 300; input.placeholder = round ? 'Кажется, это…' : 'Введи значение'; input.disabled = disabled;
                 input.addEventListener('input', () => { draft = input.value; }); field.append(input);
                 const submit = button(round ? 'Проверить ответ' : 'Применить', () => {}, 'primary play-primary'); submit.type = 'submit'; submit.disabled = disabled || busy;
                 form.append(field, submit); form.onsubmit = event => {
                     event.preventDefault();
-                    if (!disabled && !busy && input.value.trim()) {
-                        if (directPhotoAnswer) sendPhotoDirect(round, input.value.trim());
-                        else send({type: 'text', value: input.value.trim(), round});
-                    }
+                    if (!disabled && !busy && input.value.trim()) sendPhotoDirect(round, input.value.trim());
                 }; stage.append(form);
             }
-            function question(view) {
-                const item = view.question, poll = item.poll, result = item.feedback;
-                if (view.previous?.feedback) { const answer = view.previous.feedback; stage.append(el('p', `Предыдущий ответ: ${answer.correct ? 'верно ✓' : 'мимо'} · ${Number(answer.points) > 0 ? '+' : ''}${number(answer.points)} баллов`, 'previous-answer')); }
-                // Separate only the engine's optional headers, preserving literal question text.
-                const lines = poll.question.split('\n');
-                if (lines.length > 1 && /^(?:Ежедневный )?[Вв]опрос(?: \d+\/\d+)?$/.test(lines[0].trim())) lines.shift();
-                const category = lines.length > 1 && lines[0].startsWith('Категория: ') ? lines.shift().slice(11) : 'ОДИН ВОПРОС. ТВОЁ РЕШЕНИЕ.';
-                const head = el('div', undefined, 'question-top'); head.append(el('span', category, 'eyebrow'), countdown(poll.ends_at, poll.closed || !!result)); stage.append(head);
-                const title = lines.join('\n');
-                stage.append(el('h1', title, 'play-question'));
-                const answers = el('div', undefined, 'play-answers');
-                poll.options.forEach((option, index) => {
-                    const b = button(undefined, () => { if (!busy && snapshot.connected && !poll.closed && !result && Date.now() + offset < poll.ends_at * 1000) { chosen = index; send({type: 'vote', value: index, message_id: item.id}); } }, 'play-option');
-                    b.append(el('span', String.fromCharCode(65 + index), 'option-letter'), el('span', option));
-                    b.setAttribute('aria-pressed', String(chosen === index));
-                    if (chosen === index) b.classList.add('selected');
-                    if (result && index === result.answer) { b.classList.add('correct'); b.append(el('span', '✓', 'option-mark')); }
-                    if (result && index === result.selected && !result.correct) { b.classList.add('incorrect'); b.append(el('span', '×', 'option-mark')); }
-                    b.disabled = busy || !snapshot.connected || poll.closed || !!result; answers.append(b);
-                }); stage.append(answers);
-                if (result) {
-                    const feedback = el('section', undefined, `play-verdict ${result.correct ? 'is-correct' : ''}`);
-                    feedback.append(el('strong', result.correct ? 'Есть! Именно так.' : 'Не в этот раз. Зато теперь знаешь.'), el('span', `${Number(result.points) > 0 ? '+' : ''}${number(result.points)} баллов`));
-                    if (result.explanation) feedback.append(el('p', clean(result.explanation))); stage.append(feedback);
-                    stage.append(el('p', 'Следующий вопрос появится автоматически — в темпе общей игры.', 'play-footnote'));
-                } else if (poll.closed) stage.append(hostLine('Время вышло. Не страшно — продолжим со следующим вопросом.'));
-                else {
-                    stage.append(el('p', busy ? 'Ответ отправляется…' : 'Нажми на вариант — это и будет твой ответ.', 'play-footnote'));
-                }
+            function myScore(view) {
+                const list = view.scores || [];
+                const mine = list.find(item => api.accountId && item.account_id === api.accountId) || (list.length === 1 ? list[0] : null);
+                return mine ? Number(mine.score) || 0 : 0;
+            }
+            function acceptedVerdict(view) {
+                const accepted = lastAccepted;
+                if (!accepted || accepted.round_id === view.question?.round_id) return;
+                const verdict = el('section', undefined, `play-verdict ${accepted.is_correct ? 'is-correct' : ''}`);
+                verdict.append(el('strong', accepted.is_correct ? 'Верно! Ответ принят.' : 'Не в этот раз.'),
+                    el('span', `${Number(accepted.points) > 0 ? '+' : ''}${number(accepted.points)} баллов`));
+                if (Number.isInteger(accepted.correct_option) && accepted.options) verdict.append(el('p', `Правильный ответ: ${accepted.options[accepted.correct_option]}`));
+                if (accepted.explanation) verdict.append(el('p', accepted.explanation));
+                stage.append(verdict);
+            }
+            function scoreList(view) {
+                if (!view.scores?.length) return;
+                const box = el('section', undefined, 'play-scores');
+                box.append(el('span', 'ОЧКИ ПАРТИИ', 'eyebrow'));
+                view.scores.forEach(item => box.append(el('p', `${item.name}: ${number(item.score)}`)));
+                stage.append(box);
+            }
+            function classicResult(view) {
+                const complete = view.status === 'finished';
+                stage.append(el('span', complete ? 'ПАРТИЯ ЗАВЕРШЕНА' : 'ПАРТИЯ ОСТАНОВЛЕНА', 'eyebrow'),
+                    el('h1', complete ? 'Квиз пройден.' : 'Продолжим в другой раз.', 'result-title'));
+                const score = el('div', undefined, 'result-score'); score.append(el('strong', number(myScore(view))), el('span', 'баллов за партию')); stage.append(score);
+                acceptedVerdict(view); scoreList(view);
+                stage.append(button('Сыграть ещё', () => replay('classic'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
             }
             function sharedQuestion(view) {
                 const poll = view.question, game = view.game || {current: poll.question_number, total: poll.question_number};
-                stats({...game, points: 0});
+                stats({...game, points: myScore(view)});
                 const lines = poll.question.split('\n');
                 if (lines.length > 1 && /^(?:Ежедневный )?[Вв]опрос(?: \d+\/\d+)?$/.test(lines[0].trim())) lines.shift();
                 const category = lines.length > 1 && lines[0].startsWith('Категория: ') ? lines.shift().slice(11) : 'ОДИН ВОПРОС. ТВОЁ РЕШЕНИЕ.';
@@ -218,14 +298,16 @@
                     b.disabled = busy || poll.closed || poll.answered; answers.append(b);
                 });
                 stage.append(answers);
+                acceptedVerdict(view);
                 if (poll.answered) {
                     const verdict = el('section', undefined, `play-verdict ${poll.is_correct ? 'is-correct' : ''}`);
                     verdict.append(el('strong', poll.is_correct ? 'Есть! Именно так.' : 'Не в этот раз. Зато теперь знаешь.'),
                         el('span', `${Number(poll.points) > 0 ? '+' : ''}${number(poll.points)} баллов`));
                     if (poll.explanation) verdict.append(el('p', poll.explanation)); stage.append(verdict);
-                    stage.append(el('p', 'Ответ сохранён в общей игре. Следующий вопрос появится здесь и в чате.', 'play-footnote'));
-                } else if (poll.closed) stage.append(hostLine('Время вышло. Ждём следующий вопрос общей игры.'));
-                else stage.append(el('p', busy ? 'Ответ сохраняется…' : 'Нажми на вариант — ответ сразу попадёт в общую игру.', 'play-footnote'));
+                    stage.append(el('p', room ? 'Ответ сохранён. Следующий вопрос появится здесь.' : 'Ответ сохранён в общей игре. Следующий вопрос появится здесь и в чате.', 'play-footnote'));
+                } else if (poll.closed) stage.append(hostLine(room ? 'Время вышло. Ждём следующий вопрос.' : 'Время вышло. Ждём следующий вопрос общей игры.'));
+                else stage.append(el('p', busy ? 'Ответ сохраняется…' : room ? 'Нажми на вариант — ответ сразу сохранится.' : 'Нажми на вариант — ответ сразу попадёт в общую игру.', 'play-footnote'));
+                scoreList(view);
                 if (view.revision !== undefined && !['finished', 'stopped', 'interrupted'].includes(view.status)) {
                     const exit = el('details', undefined, 'round-exit');
                     exit.append(el('summary', 'Завершить раунд'), el('p', 'Уже полученные баллы сохранятся.'));
@@ -236,19 +318,19 @@
                 const question = view.question;
                 stats({current: question.question_number, total: question.question_count, points: view.score});
                 const head = el('div', undefined, 'question-top');
-                head.append(el('span', 'УЗНАЁШЬ?', 'eyebrow'), countdown(Date.parse(question.ends_at) / 1000, question.closed)); stage.append(head);
-                stage.append(el('h1', 'Что скрывается\nна картинке?', 'play-question'), picture(question.image_url));
+                head.append(el('span', 'УЗНАЁШЬ?', 'eyebrow'), countdown(seconds(question.ends_at), question.closed)); stage.append(head);
+                stage.append(el('h1', 'Что скрывается\nна картинке?', 'play-question'), picture(question));
                 if (question.mask) stage.append(el('p', question.mask, 'photo-mask'));
                 if (view.last_result) {
                     const result = view.last_result, verdict = el('section', undefined, `play-verdict ${result.correct ? 'is-correct' : ''}`);
-                    verdict.append(el('strong', result.correct ? 'Угадал! Следующая картинка уже здесь.' : 'Время вышло. Идём дальше.'),
+                    verdict.append(el('strong', result.correct ? 'Верно! Следующая картинка уже здесь.' : 'Время вышло. Идём дальше.'),
                         el('span', result.correct ? `+${number(result.points)} баллов` : `Ответ: ${result.answer}`)); stage.append(verdict);
                 }
                 if (question.feedback === 'almost') stage.append(el('p', 'Очень близко — образ верный, собери точное слово.', 'photo-hint'));
                 else if (question.feedback === 'wrong') stage.append(el('p', 'Пока мимо. Посмотри, какие два образа соединяются.', 'photo-hint'));
                 if (!question.closed) inputForm('Твой ответ', question.round_id, false, true);
                 else stage.append(hostLine('Этот фото-вопрос уже закрыт. Готовим следующий.'));
-                stage.append(el('p', 'Картинка загружена из общей игровой сессии, без копии сообщения Telegram.', 'play-footnote'));
+                stage.append(el('p', room ? 'Картинка загружена из текущей серии.' : 'Картинка загружена из общей игровой сессии, без копии сообщения Telegram.', 'play-footnote'));
                 const exit = el('details', undefined, 'round-exit'); exit.append(el('summary', 'Завершить раунд'), el('p', 'Уже полученные баллы сохранятся.'));
                 exit.append(button('Да, завершить', stopPhotoDirect, 'quiet')); stage.append(exit);
             }
@@ -259,22 +341,13 @@
                 const score = el('div', undefined, 'result-score'); score.append(el('strong', number(view.score)), el('span', 'баллов за серию')); stage.append(score);
                 stage.append(el('p', `${view.correct} правильных из ${view.game.total}`, 'previous-answer'));
                 if (view.last_result?.answer) stage.append(hostLine(`Последний ответ: ${view.last_result.answer}`));
-                stage.append(button('Сыграть ещё', () => onReplay('/photo_quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
-            }
-            function result(view) {
-                const game = view.game, complete = game.status === 'completed';
-                stage.append(el('span', complete ? 'РАУНД ЗАВЕРШЁН' : 'РАУНД ОСТАНОВЛЕН', 'eyebrow'), el('h1', complete ? 'Ещё одна история\nв копилку.' : 'Продолжим в другой раз.', 'result-title'));
-                const score = el('div', undefined, 'result-score'); score.append(el('strong', `${Number(game.points) > 0 ? '+' : ''}${number(game.points)}`), el('span', 'баллов за этот раунд')); stage.append(score);
-                const total = el('div', undefined, 'result-facts'); total.append(el('span', `${game.correct} правильных из ${game.total}`), el('span', `${game.total ? Math.round(game.correct / game.total * 100) : 0}% точность`)); stage.append(total);
-                stage.append(hostLine(game.correct ? 'Хорошая игра. Пара неожиданных фактов — и день уже интереснее.' : 'Любопытство важнее идеального счёта. Сыграем ещё?'));
-                if (view.question?.feedback) { const review = el('details', undefined, 'round-options'); review.append(el('summary', 'Последний вопрос и объяснение'), el('p', view.question.poll.question)); const answer = view.question.feedback.answer; if (Number.isInteger(answer)) review.append(el('strong', view.question.poll.options[answer])); if (view.question.feedback.explanation) review.append(el('p', clean(view.question.feedback.explanation))); stage.append(review); }
-                stage.append(button('Сыграть ещё', () => onReplay(view.kind === 'photo' ? '/photo_quiz' : '/quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
+                stage.append(button('Сыграть ещё', () => room ? replay('photo') : onReplay('/photo_quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
             }
             function render() {
-                if (!snapshot || !active) return;
+                if (!active) return;
                 if (starting) { stage.replaceChildren(hostLine('Готовлю твою игру. Сейчас начнём.')); return; }
                 if (directPhoto?.question) {
-                    const hash = JSON.stringify([directPhoto, snapshot.connected, busy]); if (hash === lastHash) return;
+                    const hash = JSON.stringify([directPhoto, busy]); if (hash === lastHash) return;
                     lastHash = hash; stage.replaceChildren(); mode.textContent = 'Фото-загадки'; sharedPhoto(directPhoto); tick(); return;
                 }
                 if (directPhoto) {
@@ -282,161 +355,133 @@
                     lastHash = hash; stage.replaceChildren(); mode.textContent = 'Фото-загадки'; sharedPhotoResult(directPhoto); return;
                 }
                 if (direct?.question) {
-                    const hash = JSON.stringify([direct, busy, chosen]); if (hash === lastHash) return;
+                    const hash = JSON.stringify([direct, busy, chosen, lastAccepted]); if (hash === lastHash) return;
                     const directKey = direct.question.round_id || direct.question.poll_id;
                     if (directKey !== questionKey) { chosen = null; questionKey = directKey; }
                     lastHash = hash; stage.replaceChildren(); mode.textContent = 'Классический квиз'; sharedQuestion(direct); tick(); return;
                 }
-                if (directPlay) {
-                    const hash = JSON.stringify([preferred, setupDetails, photoSetup, busy]);
-                    if (hash === lastHash) return;
-                    lastHash = hash; stage.replaceChildren();
-                    mode.textContent = preferred === 'photo' ? 'Фото-загадки' : preferred === 'classic' ? 'Классический квиз' : 'Выбор игры';
-                    directSetup();
-                    return;
+                if (direct && !direct.question && ['finished', 'stopped', 'interrupted'].includes(direct.status)) {
+                    const hash = JSON.stringify([direct, busy, lastAccepted]); if (hash === lastHash) return;
+                    lastHash = hash; stage.replaceChildren(); mode.textContent = 'Классический квиз'; classicResult(direct); return;
                 }
-                current = model(snapshot, preferred);
-                const hash = JSON.stringify([current, snapshot.photo_round, snapshot.connected, busy, chosen]); if (hash === lastHash) return;
-                const key = current.question?.poll?.id || snapshot.photo_round || current.menu?.id || current.game?.key;
-                const input = stage.querySelector('input'), focus = input && input === document.activeElement;
-                const optionsOpen = stage.querySelector('.round-options')?.open;
-                if (key !== questionKey) { chosen = null; draft = ''; questionKey = key; } else if (input) draft = input.value;
-                lastHash = hash; stage.replaceChildren(); mode.textContent = current.kind === 'photo' ? 'Фото-загадки' : 'Классический квиз';
-                if (current.phase === 'setup') setup(current);
-                else if (current.phase === 'result') result(current);
-                else if (['question', 'photo', 'waiting'].includes(current.phase)) {
-                    stats(current.game);
-                    if (current.phase === 'question') question(current);
-                    else if (current.phase === 'photo' && current.question) {
-                        const roundActive = current.game.phase === 'active' && !!snapshot.photo_round;
-                        const head = el('div', undefined, 'question-top'); head.append(el('span', 'УЗНАЁШЬ?', 'eyebrow'), countdown(Date.parse(current.game.question_started_at) / 1000 + current.game.time_limit, !roundActive)); stage.append(head);
-                        stage.append(el('h1', 'Что скрывается\nна картинке?', 'play-question'), picture(current.question.media));
-                        const mask = clean(current.question.text).match(/Слово:\s*([^\n]+)/); if (mask) stage.append(el('p', mask[1], 'photo-mask'));
-                        for (const hint of current.hints) stage.append(el('p', clean(hint.text), 'photo-hint'));
-                        if (roundActive) inputForm('Твой ответ', snapshot.photo_round, !snapshot.connected);
-                        else stage.append(hostLine(current.game.outcome?.correct ? 'Узнал! Готовлю следующую картинку.' : 'Готовлю следующую картинку.'));
-                    } else stage.append(hostLine('Выбираю следующий вопрос. Сейчас начнём.'));
-                    const exit = el('details', undefined, 'round-exit'); exit.append(el('summary', 'Завершить раунд'), el('p', 'Уже полученные баллы сохранятся.'));
-                    exit.append(button('Да, завершить', () => send({type: 'command', value: current.kind === 'photo' ? '/stop_photo_quiz' : '/stopquiz'}), 'quiet')); stage.append(exit);
-                } else { stage.append(hostLine('Готов, когда готов ты. Выбирай игру — начнём.')); stage.append(button('Выбрать игру', onHome, 'primary play-primary')); }
-                if (busy || !snapshot.connected) stage.querySelectorAll('button').forEach(b => { b.disabled = true; });
-                if (optionsOpen && current.phase === 'setup' && stage.querySelector('.round-options')) stage.querySelector('.round-options').open = true;
-                if (focus) stage.querySelector('input')?.focus({preventScroll: true});
+                const hash = JSON.stringify([preferred, classicSetup, photoSetup, photoOccupied, busy]);
+                if (hash === lastHash) return;
+                lastHash = hash; stage.replaceChildren();
+                mode.textContent = preferred === 'photo' ? 'Фото-загадки' : preferred === 'classic' ? 'Классический квиз' : 'Выбор игры';
+                directSetup();
                 tick();
             }
             function tick() {
                 stage.querySelectorAll('[data-deadline]').forEach(clock => {
-                    const remaining = Math.max(0, Math.ceil(Number(clock.dataset.deadline) - (Date.now() + offset) / 1000));
+                    const remaining = Math.max(0, Math.ceil(Number(clock.dataset.deadline) - Date.now() / 1000));
                     clock.textContent = clock.dataset.closed === 'true' ? '✓' : Number.isFinite(remaining) ? `${remaining} с` : '…';
                     clock.classList.toggle('urgent', remaining <= 5 && clock.dataset.closed !== 'true');
                     if (!remaining && clock.dataset.closed !== 'true') { stage.querySelectorAll('.play-option, .confirm-answer, .play-answer-form button').forEach(b => { b.disabled = true; }); }
                 });
             }
+            // A finished room game stays "current" on the server; after "play again" it is hidden locally.
+            const hidden = view => (view && skipGame && view.game_id === skipGame) ? null : view;
+            // Opening a game must not land on a game that had already ended before this screen opened.
+            let firstLoad = true; const staleGames = new Set();
+            const fresh = view => (view && view.finished_view && staleGames.has(view.game_id)) ? null : view;
             async function refresh(renderPage = true) {
                 if (!active) return; clearTimeout(timer);
                 try {
-                    if (directPlay) {
-                        const [shared, sharedPhotoView] = await Promise.all([
-                            preferred === 'photo' ? Promise.resolve(null) : request(`/api/mini/classic/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (direct?.status && direct.status !== 'active' ? direct : null) : Promise.reject(error)),
-                            preferred === 'classic' ? Promise.resolve(null) : request(`/api/mini/photo/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (directPhoto?.status && directPhoto.status !== 'active' ? directPhoto : null) : Promise.reject(error)),
-                        ]);
-                        if (!active) return;
-                        direct = shared; directPhoto = sharedPhotoView;
-                        snapshot = {connected: true, server_time: Date.now() / 1000, games: [], messages: [], requests: []};
-                        offset = 0; status.textContent = '';
-                    } else {
-                        const [data, shared, sharedPhotoView] = await Promise.all([
-                            request('/api/mini/runtime'),
-                            preferred === 'photo' || !chatId ? Promise.resolve(null) : request(`/api/mini/classic/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? (direct?.status && direct.status !== 'active' ? direct : null) : Promise.reject(error)),
-                            preferred === 'classic' || !chatId ? Promise.resolve(null) : request(`/api/mini/photo/chats/${chatId}/sync`, {method: 'POST'}).catch(error => error.status === 404 ? null : Promise.reject(error)),
-                        ]);
-                        if (!active) return; snapshot = data; direct = shared; directPhoto = sharedPhotoView; offset = data.server_time * 1000 - Date.now();
-                        status.textContent = direct || directPhoto ? '' : data.connected ? '' : 'Связь с ведущим прервалась. Попробуем подключиться снова.';
-                        if (pending) { const receipt = data.requests.find(r => r.id === pending.request_id); if (receipt && !['pending', 'running'].includes(receipt.status)) { busy = false; starting = false; pending = null; notice.textContent = receipt.error || receipt.notice || ''; } }
-                    }
+                    const [shared, sharedPhotoView] = await Promise.all([
+                        preferred === 'photo' ? Promise.resolve(null) : api.current('classic').then(view => view ?? (direct?.status && direct.status !== 'active' ? direct : null)),
+                        preferred === 'classic' ? Promise.resolve(null) : api.current('photo').then(view => view ?? (directPhoto?.status && directPhoto.status !== 'active' ? directPhoto : null)),
+                    ]);
+                    if (!active) return;
+                    if (firstLoad) { firstLoad = false; [shared, sharedPhotoView].forEach(view => { if (view?.finished_view && view.game_id) staleGames.add(view.game_id); }); }
+                    photoOccupied = !!sharedPhotoView?.occupied;
+                    direct = fresh(hidden(shared)); directPhoto = photoOccupied ? null : fresh(hidden(sharedPhotoView)); status.textContent = '';
                     if (renderPage) render();
                 } catch (error) { if (active) { status.textContent = error.message; stage.querySelectorAll('button').forEach(b => { b.disabled = true; }); lastHash = ''; } }
                 finally { if (active) timer = setTimeout(refresh, document.hidden ? 10000 : busy ? 1000 : 2000); }
             }
+            function replay(kind) {
+                skipGame = (kind === 'photo' ? directPhoto : direct)?.game_id || null;
+                direct = null; directPhoto = null; lastAccepted = null; chosen = null; draft = ''; lastHash = '';
+                notice.textContent = ''; render();
+            }
+            // The idempotency id lives with the pending command: an uncertain retry sends the same id.
+            async function runCommand(action, params, call, progress, retry) {
+                if (!active || busy) return null;
+                const key = action + JSON.stringify(params);
+                const pending = pendingCommand?.key === key ? pendingCommand : {key, id: crypto.randomUUID()};
+                pendingCommand = pending;
+                busy = true; notice.textContent = progress; render();
+                try {
+                    const result = await call(pending.id);
+                    pendingCommand = null;
+                    notice.textContent = '';
+                    return result;
+                } catch (error) {
+                    const uncertain = !error.status || error.status >= 500;
+                    if (!uncertain) pendingCommand = null;
+                    notice.replaceChildren(el('p', error.message));
+                    if (uncertain) notice.append(button('Проверить отправку', retry || (() => runCommand(action, params, call, 'Проверяю сохранённую команду…')), 'quiet'));
+                    return null;
+                } finally { busy = false; lastHash = ''; if (active) render(); }
+            }
             async function sendDirect(questionId, selectedOption, internalRound) {
                 if (!active || busy) return;
-                busy = true; chosen = selectedOption; selection(); notice.textContent = 'Сохраняю ответ…'; render();
-                try {
-                    const payload = {selected_option: selectedOption, command_id: crypto.randomUUID()};
-                    payload[internalRound ? 'round_id' : 'poll_id'] = questionId;
-                    direct = await request(`/api/mini/classic/chats/${chatId}/answer`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
-                    notice.textContent = '';
-                } catch (error) { notice.textContent = error.message; }
-                finally { busy = false; lastHash = ''; await refresh(); }
+                chosen = selectedOption; selection();
+                const params = {gameId: direct?.game_id || null, questionId, internal: internalRound, selectedOption};
+                const result = await runCommand('classic.answer', params, id => api.answer('classic', params, id), 'Сохраняю ответ…', () => sendDirect(questionId, selectedOption, internalRound));
+                if (result) { lastAccepted = result.accepted_answer || null; direct = result; await refresh(); }
             }
             async function startDirect() {
                 if (!active || busy) return;
-                busy = true; starting = true; notice.textContent = 'Готовлю вопросы…'; render();
-                try {
-                    direct = await request(`/api/mini/classic/chats/${chatId}/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({command_id: crypto.randomUUID()})});
-                    starting = false; notice.textContent = '';
-                } catch (error) { starting = false; notice.textContent = error.message; }
-                finally { busy = false; lastHash = ''; await refresh(); }
+                starting = true; render();
+                const params = classicChoice ? {
+                    count: classicChoice.questions, open_seconds: classicChoice.seconds, interval_seconds: classicChoice.interval,
+                    category_mode: classicChoice.category_mode, categories: [...classicChoice.categories].filter(name => ['specific', 'exclude'].includes(classicChoice.category_mode)),
+                    random_categories: classicChoice.random_categories,
+                } : {count: classicSetup?.questions, open_seconds: classicSetup?.seconds, interval_seconds: classicSetup?.interval};
+                if (classicChoice && classicChoice.category_mode === 'specific' && !params.categories.length || classicChoice && classicChoice.category_mode === 'exclude' && !params.categories.length) {
+                    starting = false; notice.textContent = 'Выбери хотя бы одну тему.'; return render();
+                }
+                const result = await runCommand('classic.start', params, id => api.start('classic', params, id), 'Готовлю вопросы…', () => startDirect());
+                starting = false;
+                if (result) { lastAccepted = null; skipGame = null; direct = result; await refresh(); }
+                else render();
             }
             async function stopDirect() {
                 if (!active || busy || direct?.revision === undefined) return;
-                busy = true; notice.textContent = 'Завершаю раунд…'; render();
-                try {
-                    direct = await request(`/api/mini/classic/chats/${chatId}/stop`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({command_id: crypto.randomUUID(), expected_revision: direct.revision})});
-                    notice.textContent = 'Раунд завершён. Все баллы сохранены.';
-                } catch (error) { notice.textContent = error.message; }
-                finally { busy = false; lastHash = ''; render(); }
+                const params = {gameId: direct.game_id || null, revision: direct.revision};
+                const result = await runCommand('classic.stop', params, id => api.stop('classic', params, id), 'Завершаю раунд…', () => stopDirect());
+                if (result) { direct = result; notice.textContent = 'Раунд завершён. Все баллы сохранены.'; render(); }
             }
             async function sendPhotoDirect(roundId, answer) {
                 if (!active || busy) return;
-                busy = true; selection(); notice.textContent = 'Проверяю ответ…'; render();
-                try {
-                    directPhoto = await request(`/api/mini/photo/chats/${chatId}/answer`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({round_id: roundId, answer, command_id: crypto.randomUUID()})});
-                    draft = ''; notice.textContent = directPhoto.verdict === 'correct' ? 'Есть! Ответ сохранён.' : '';
-                } catch (error) { notice.textContent = error.message; }
-                finally { busy = false; lastHash = ''; await refresh(); }
+                selection();
+                const params = {gameId: directPhoto?.game_id || null, questionId: roundId, answer};
+                const result = await runCommand('photo.answer', params, id => api.answer('photo', params, id), 'Проверяю ответ…', () => sendPhotoDirect(roundId, answer));
+                if (result) { directPhoto = result; draft = ''; notice.textContent = result.verdict === 'correct' ? 'Есть! Ответ сохранён.' : ''; await refresh(); }
             }
             async function startPhotoDirect() {
                 if (!active || busy) return;
-                busy = true; starting = true; notice.textContent = 'Раскладываю фото-загадки…'; render();
-                try {
-                    directPhoto = await request(`/api/mini/photo/chats/${chatId}/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
-                        command_id: crypto.randomUUID(), question_count: photoSetup.question_count,
-                        open_seconds: photoSetup.open_seconds, hints_enabled: photoSetup.hints_enabled,
-                    })});
-                    starting = false; notice.textContent = '';
-                } catch (error) { starting = false; notice.textContent = error.message; }
-                finally { busy = false; lastHash = ''; await refresh(); }
+                starting = true; render();
+                const params = {question_count: photoSetup.question_count, open_seconds: photoSetup.open_seconds, hints_enabled: photoSetup.hints_enabled};
+                const result = await runCommand('photo.start', params, id => api.start('photo', params, id), 'Раскладываю фото-загадки…', () => startPhotoDirect());
+                starting = false;
+                if (result) { skipGame = null; directPhoto = result; await refresh(); }
+                else render();
             }
             async function stopPhotoDirect() {
                 if (!active || busy || directPhoto?.revision === undefined) return;
-                busy = true; notice.textContent = 'Завершаю фото-серию…'; render();
-                try {
-                    directPhoto = await request(`/api/mini/photo/chats/${chatId}/stop`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({command_id: crypto.randomUUID(), expected_revision: directPhoto.revision})});
-                    notice.textContent = 'Серия завершена. Баллы сохранены.';
-                } catch (error) { notice.textContent = error.message; }
-                finally { busy = false; lastHash = ''; render(); }
-            }
-            async function send(action) {
-                if (!active || busy) return;
-                busy = true; pending = {...action, request_id: crypto.randomUUID()}; selection(); notice.textContent = 'Секунду…'; render();
-                const transmit = async () => {
-                    try { await request('/api/mini/runtime/actions', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(pending)}); await refresh(); }
-                    catch (error) {
-                        if (!active) return;
-                        if (error.status) { busy = false; starting = false; pending = null; notice.textContent = error.message; await refresh(); }
-                        else { notice.replaceChildren(el('p', error.message), button('Проверить отправку', () => { if (pending) transmit(); }, 'quiet')); }
-                    }
-                }; await transmit();
+                const params = {gameId: directPhoto.game_id || null, revision: directPhoto.revision};
+                const result = await runCommand('photo.stop', params, id => api.stop('photo', params, id), 'Завершаю фото-серию…', () => stopPhotoDirect());
+                if (result) { directPhoto = result; notice.textContent = 'Серия завершена. Баллы сохранены.'; render(); }
             }
             stage.append(hostLine('Филиныч раскладывает карточки…'));
-            if (directPlay && preferred) {
+            if (preferred) {
                 try { await loadDirectSetup(preferred); }
                 catch (error) { notice.textContent = error.message; }
             }
             await refresh(false);
-            if (command && active && snapshot && !directPlay) await send({type: 'command', value: command});
-            else render();
+            render();
             if (active) ticker = setInterval(tick, 500);
         },
     };

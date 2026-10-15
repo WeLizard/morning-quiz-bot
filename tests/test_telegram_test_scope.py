@@ -1,6 +1,11 @@
 import asyncio
+from hashlib import sha256
+import hmac
+import json
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from urllib.parse import urlencode
 
 import pytest
 from telegram import Update
@@ -77,21 +82,6 @@ def test_unexpected_url_blocked_and_own_poll_registered():
     asyncio.run(run())
 
 
-def test_opted_in_mini_game_delivery_never_calls_telegram():
-    async def run():
-        scope = PrivateTestScope(CHAT, BOT)
-        scope.enable_local_delivery()
-        inner = SimpleNamespace(do_request=AsyncMock())
-        request = ScopedRequest(inner, scope, TOKEN)
-        payload = SimpleNamespace(parameters={'chat_id': CHAT, 'question': 'Local?', 'options': ['Yes', 'No']}, multipart_data={})
-        status, raw = await request.do_request('https://api.telegram.org/bot' + TOKEN + '/sendPoll', 'POST', payload)
-        assert status == 200 and b'"ok": true' in raw
-        inner.do_request.assert_not_called()
-        assert any(event['event'] == 'mini_local_delivery' and event['method'] == 'sendPoll' for event in scope.events)
-        assert not any(event['event'] == 'telegram_call' for event in scope.events)
-    asyncio.run(run())
-
-
 def test_start_settings_routes_to_real_settings_command():
     scope = PrivateTestScope(CHAT, BOT)
     commands = SimpleNamespace(quiz='quiz', mystats='mystats', global_top='globaltop',
@@ -117,6 +107,11 @@ def test_private_runner_real_handlers_menu_quiz_and_score(pg_env, monkeypatch, t
     from storage.settings import SettingsService
     from storage.question_bank import QuestionBank
     from storage.models import User
+    from storage.models import ChatMember, Game, GameCommand, PollAnswer
+    from sqlalchemy import select
+    import httpx
+    from telegram.ext import CallbackContext
+    from web.mini_app import MiniAppSettings, create_app
     from uuid import uuid4
     import telegram.request
     monkeypatch.setenv('BOT_TOKEN', TOKEN)
@@ -155,7 +150,30 @@ def test_private_runner_real_handlers_menu_quiz_and_score(pg_env, monkeypatch, t
                 await click(menu, 'start_settings')
                 assert any('admin_' in str(m.get('reply_markup', '')) or 'cfg_' in str(m.get('reply_markup', '')) for m in dummy.messages.values())
                 await runner.dispatch(app, config, scope, message_update(command='/cancel', bot=app.bot))
-                await click(menu, 'start_quiz')
+                from modules import telegram_menu
+                monkeypatch.setattr(
+                    telegram_menu, 'as_command',
+                    lambda *_args, **_kwargs: pytest.fail('Classic menu entry must keep the real callback Update'),
+                )
+                await click(menu, 'nav:quiz')
+                assert menu['message_id'] in dummy.messages
+                assert any(
+                    button.get('callback_data', '').startswith('qcfg_')
+                    for row in dummy.messages[menu['message_id']]['reply_markup']['inline_keyboard']
+                    for button in row
+                )
+                cancel_data = next(
+                    button['callback_data']
+                    for row in dummy.messages[menu['message_id']]['reply_markup']['inline_keyboard']
+                    for button in row if button.get('text') == 'Отмена'
+                )
+                await click(dummy.messages[menu['message_id']], cancel_data)
+                assert any(
+                    button.get('callback_data') == 'nav:quiz'
+                    for row in dummy.messages[menu['message_id']]['reply_markup']['inline_keyboard']
+                    for button in row
+                )
+                await click(dummy.messages[menu['message_id']], 'nav:quiz')
                 choices = [(m, b['callback_data']) for m in dummy.messages.values()
                            for row in m.get('reply_markup', {}).get('inline_keyboard', []) for b in row
                            if b.get('callback_data', '').endswith('start')]
@@ -171,9 +189,172 @@ def test_private_runner_real_handlers_menu_quiz_and_score(pg_env, monkeypatch, t
                 async with db.transaction() as session:
                     score = (await session.get(User, CHAT)).global_score
                     assert score > 0
-                await runner.dispatch(app, config, scope, answer)
-                async with db.transaction() as session:
-                    assert (await session.get(User, CHAT)).global_score == score
+                    game = await session.scalar(select(Game).where(
+                        Game.chat_id == CHAT, Game.mode == 'classic', Game.is_current.is_(True),
+                    ))
+                    assert game is not None
+                    rows = (await session.scalars(select(PollAnswer).where(
+                        PollAnswer.game_id == game.id, PollAnswer.user_id == CHAT,
+                    ))).all()
+                    assert len(rows) == 1 and rows[0].is_correct
+                    round_id = rows[0].round_id
+
+                # A Telegram vote and a Mini App answer use the same durable game
+                # and answer ledger. Only the Telegram boundary receives an Update.
+                origin = 'http://127.0.0.1:4185'
+                mini = create_app(
+                    database=db, settings=MiniAppSettings(TOKEN, origin, offline=True),
+                    membership=SimpleNamespace(allowed=AsyncMock(return_value=True)),
+                    clock=lambda: int(time.time()), runtime_enabled=True,
+                )
+                fields = {
+                    'auth_date': str(int(time.time())),
+                    'user': json.dumps({'id': CHAT, 'first_name': 'Tester'}),
+                }
+                check = '\n'.join(f'{key}={value}' for key, value in sorted(fields.items()))
+                key = hmac.new(b'WebAppData', TOKEN.encode(), sha256).digest()
+                fields['hash'] = hmac.new(key, check.encode(), sha256).hexdigest()
+                async with httpx.AsyncClient(
+                    transport=httpx.ASGITransport(app=mini), base_url=origin,
+                ) as client:
+                    login = await client.post('/api/mini/session', json={'init_data': urlencode(fields)})
+                    assert login.status_code == 200, login.text
+                    current = await client.get(f'/api/mini/classic/chats/{CHAT}/current')
+                    assert current.status_code == 200, current.text
+                    question = current.json()['question']
+                    assert question['round_id'] == round_id
+                    assert question['answered'] is True
+                    assert question['selected_option'] == correct
+                    first_duplicate_payload = {
+                        'round_id': round_id, 'selected_option': 1 - correct,
+                        'command_id': uuid4().hex,
+                    }
+                    duplicate = await client.post(
+                        f'/api/mini/classic/chats/{CHAT}/answer',
+                        json=first_duplicate_payload,
+                        headers={'Origin': origin, 'X-Mini-CSRF': '1'},
+                    )
+                    assert duplicate.status_code == 200, duplicate.text
+                    assert duplicate.json()['applied'] is False
+                    assert duplicate.json()['question']['selected_option'] == correct
+                    replay = await client.post(
+                        f'/api/mini/classic/chats/{CHAT}/answer',
+                        json=first_duplicate_payload,
+                        headers={'Origin': origin, 'X-Mini-CSRF': '1'},
+                    )
+                    assert replay.status_code == 200 and replay.json() == duplicate.json()
+                    await runner.dispatch(app, config, scope, answer)
+                    async with db.transaction() as session:
+                        assert (await session.get(User, CHAT)).global_score == score
+                        rows = (await session.scalars(select(PollAnswer).where(
+                            PollAnswer.game_id == game.id, PollAnswer.user_id == CHAT,
+                        ))).all()
+                        assert len(rows) == 1
+
+                    stopped = await client.post(
+                        f'/api/mini/classic/chats/{CHAT}/stop',
+                        json={'command_id': uuid4().hex,
+                              'expected_revision': duplicate.json()['revision']},
+                        headers={'Origin': origin, 'X-Mini-CSRF': '1'},
+                    )
+                    assert stopped.status_code == 200, stopped.text
+                    started = await client.post(
+                        f'/api/mini/classic/chats/{CHAT}/start',
+                        json={'command_id': uuid4().hex},
+                        headers={'Origin': origin, 'X-Mini-CSRF': '1'},
+                    )
+                    assert started.status_code == 200, started.text
+                    new_game = started.json()
+                    assert new_game['question']['round_id'] != round_id
+                    old_poll_ids = {m['poll']['id'] for m in dummy.messages.values() if m.get('poll')}
+                    await app.bot_data['game_runtime'].notification_job(CallbackContext(app))
+                    delivered = [m['poll'] for m in dummy.messages.values()
+                                 if m.get('poll') and m['poll']['id'] not in old_poll_ids]
+                    assert len(delivered) == 1
+                    new_poll = delivered[0]
+                    assert new_poll['id'] in scope.poll_ids
+                    new_correct = next(i for i, option in enumerate(new_poll['options'])
+                                       if option['text'] == 'Two')
+                    async with db.transaction() as session:
+                        before_member = await session.get(ChatMember, (CHAT, CHAT))
+                        before_member_score = before_member.score
+                        before_member_answers = before_member.answered_count
+                    http_command_id = uuid4().hex
+                    new_payload = {
+                        'round_id': new_game['question']['round_id'],
+                        'selected_option': new_correct,
+                        'command_id': http_command_id,
+                    }
+                    mini_answer = await client.post(
+                        f'/api/mini/classic/chats/{CHAT}/answer', json=new_payload,
+                        headers={'Origin': origin, 'X-Mini-CSRF': '1'},
+                    )
+                    assert mini_answer.status_code == 200, mini_answer.text
+                    assert mini_answer.json()['applied'] is True
+                    async with db.transaction() as session:
+                        awarded_score = (await session.get(User, CHAT)).global_score
+                        awarded_member = await session.get(ChatMember, (CHAT, CHAT))
+                        awarded_member_score = awarded_member.score
+                        awarded_member_answers = awarded_member.answered_count
+                        assert awarded_score > score
+                        assert awarded_member_score > before_member_score
+                        assert awarded_member_answers == before_member_answers + 1
+                    mini_replay = await client.post(
+                        f'/api/mini/classic/chats/{CHAT}/answer', json=new_payload,
+                        headers={'Origin': origin, 'X-Mini-CSRF': '1'},
+                    )
+                    assert mini_replay.status_code == 200
+                    assert mini_replay.json() == mini_answer.json()
+                    async with db.transaction() as session:
+                        assert (await session.get(User, CHAT)).global_score == awarded_score
+                        member = await session.get(ChatMember, (CHAT, CHAT))
+                        assert member.score == awarded_member_score
+                        assert member.answered_count == awarded_member_answers
+                    new_answer = Update.de_json({'update_id': dummy.next_id(), 'poll_answer': {
+                        'poll_id': new_poll['id'], 'user': offline.PLAYER,
+                        'option_ids': [new_correct],
+                        'option_persistent_ids': [new_poll['options'][new_correct]['persistent_id']],
+                    }}, app.bot)
+                    await runner.dispatch(app, config, scope, new_answer)
+                    after = await client.get(f'/api/mini/classic/chats/{CHAT}/current')
+                    assert after.status_code == 200, after.text
+                    assert after.json()['question']['answered'] is True
+                    assert after.json()['question']['selected_option'] == new_correct
+                    async with db.transaction() as session:
+                        assert (await session.get(User, CHAT)).global_score == awarded_score
+                        member = await session.get(ChatMember, (CHAT, CHAT))
+                        assert member.score == awarded_member_score
+                        assert member.answered_count == awarded_member_answers
+                        second = (await session.scalars(select(PollAnswer).where(
+                            PollAnswer.game_id == new_game['game_id'], PollAnswer.user_id == CHAT,
+                        ))).all()
+                        assert len(second) == 1 and second[0].selected_option == new_correct
+                        tg_command_id = 'tg-answer:' + sha256(
+                            f"{new_poll['id']}:{CHAT}".encode(),
+                        ).hexdigest()[:48]
+                        commands = (await session.scalars(select(GameCommand).where(
+                            GameCommand.game_id == new_game['game_id'],
+                            GameCommand.kind == 'classic.answer',
+                        ))).all()
+                        assert {item.id for item in commands} == {http_command_id, tg_command_id}
+                        assert all(item.status == 'completed' for item in commands)
+                        assert (await session.get(GameCommand, http_command_id)).result == mini_answer.json()
+                        assert (await session.get(GameCommand, tg_command_id)).result['applied'] is False
+                    await runner.dispatch(app, config, scope, new_answer)
+                    async with db.transaction() as session:
+                        assert (await session.get(User, CHAT)).global_score == awarded_score
+                        member = await session.get(ChatMember, (CHAT, CHAT))
+                        assert member.score == awarded_member_score
+                        assert member.answered_count == awarded_member_answers
+                        second = (await session.scalars(select(PollAnswer).where(
+                            PollAnswer.game_id == new_game['game_id'], PollAnswer.user_id == CHAT,
+                        ))).all()
+                        assert len(second) == 1
+                        commands = (await session.scalars(select(GameCommand).where(
+                            GameCommand.game_id == new_game['game_id'],
+                            GameCommand.kind == 'classic.answer',
+                        ))).all()
+                        assert {item.id for item in commands} == {http_command_id, tg_command_id}
                 assert not any(e['event'] in {'handler_error', 'blocked_outbound'} for e in scope.events), scope.events
             finally:
                 await photos.shutdown()

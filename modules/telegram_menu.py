@@ -89,6 +89,8 @@ async def home(update, context):
             [Button('🌒 Ночной город', callback_data='mafia:open')],
             [Button('📊 Мой прогресс', callback_data='nav:profile'), Button('🏆 Рейтинг', callback_data='nav:rating')],
             [Button('📚 Категории', callback_data='nav:categories'), Button('❔ Как играть', callback_data='nav:help')]]
+    if dm and dm.postgres_storage:
+        rows.append([Button('🗣 Как к тебе обращаться', callback_data='nav:address')])
     try:
         mini = launch_button(update.effective_chat.type)
         if mini:
@@ -103,6 +105,35 @@ async def home(update, context):
         text += '\n\n<code>DEV · личный тест · расписания выключены</code>'
     await card(update, context, text, rows)
     return ConversationHandler.END
+
+
+ADDRESS_ACTIONS = {'addr:m', 'addr:f', 'addr:n'}
+
+
+async def address_card(update, context, action):
+    """Pick how games address the player (он / она / не указывать); stored on the Account."""
+    from domain.address import ADDRESS_FORM_LABELS, ADDRESS_FORMS
+    from storage.address_form import set_telegram_address_form, telegram_address_form
+    back = [Button('‹ Главное меню', callback_data='nav:home')]
+    dm = context.bot_data.get('data_manager')
+    if not (dm and dm.postgres_storage):
+        return await card(update, context, '🗣 Выбор обращения пока недоступен.', [back])
+    database, uid = dm.postgres_storage.database, update.effective_user.id
+    try:
+        if action in ADDRESS_ACTIONS:
+            await set_telegram_address_form(database, uid, action[-1])
+        form, chosen = await telegram_address_form(database, uid)
+    except Exception:
+        logger.exception('Address form unavailable')
+        return await card(update, context, '🗣 <b>Не удалось сохранить выбор</b>\n\nПопробуй ещё раз чуть позже.', [back])
+    current = ADDRESS_FORM_LABELS[form] if chosen else 'пока не выбрано'
+    text = ('🗣 <b>Как к тебе обращаться</b>\n\n'
+            'Игры будут говорить о тебе в нужной форме: «собрал» или «собрала». '
+            'Telegram пол не сообщает, поэтому я не угадываю.\n\n'
+            f'Сейчас: <b>{current}</b>\n\n<i>Выбор общий для бота, Mini App и фермы.</i>')
+    rows = [[Button(('✅ ' if chosen and form == code else '') + ADDRESS_FORM_LABELS[code], callback_data=f'addr:{code}')
+             for code in ADDRESS_FORMS], back]
+    await card(update, context, text, rows)
 
 
 async def navigate(update, context):
@@ -125,6 +156,8 @@ async def navigate(update, context):
                 '<b>Управление</b>\n/start — главное меню\n/cancel — выйти из настройки\n'
                 '/stopquiz — остановить классический квиз\n/stop_photo_quiz — остановить фото-квиз\n\n'
                 '<i>Очки и правила классики не изменены. Mini App не заменяет игру в чате.</i>')
+    elif action == 'nav:address' or (isinstance(action, str) and action in ADDRESS_ACTIONS):
+        return await address_card(update, context, action)
     elif action == 'nav:categories':
         categories = dm.category_manager.get_all_category_names(chat_id=update.effective_chat.id) if dm else []
         names = sorted(str(name) for name in categories)

@@ -19,7 +19,35 @@ x-app-service: &app-service
   working_dir: /app
   environment: *app-environment
   volumes:
+    # Run the current checkout with the already-built Python 3.13 image.
+    # Keep source read-only and .local writable; never mount .env into containers.
     - ./.local:/app/.local
+    - ./alembic:/app/alembic:ro
+    - ./application:/app/application:ro
+    - ./config:/app/config:ro
+    # Mount only static quiz/media source data; never mount legacy mutable data/ JSON.
+    - ./data/global/categories.json:/app/data/global/categories.json:ro
+    - ./data/images:/app/data/images:ro
+    - ./data/questions:/app/data/questions:ro
+    - ./domain:/app/domain:ro
+    - ./handlers:/app/handlers:ro
+    - ./modules:/app/modules:ro
+    - ./scripts:/app/scripts:ro
+    - ./storage:/app/storage:ro
+    - ./qw_farm:/app/qw_farm:ro
+    - ./web:/app/web:ro
+    - ./alembic.ini:/app/alembic.ini:ro
+    - ./app_config.py:/app/app_config.py:ro
+    - ./backup_manager.py:/app/backup_manager.py:ro
+    - ./bot.py:/app/bot.py:ro
+    - ./data_manager.py:/app/data_manager.py:ro
+    - ./main.py:/app/main.py:ro
+    - ./maintenance_fallback.py:/app/maintenance_fallback.py:ro
+    - ./migrate_category_stats.py:/app/migrate_category_stats.py:ro
+    - ./pytest.ini:/app/pytest.ini:ro
+    - ./state.py:/app/state.py:ro
+    - ./tests:/app/tests:ro
+    - ./utils.py:/app/utils.py:ro
 
 services:
   postgres:
@@ -52,6 +80,9 @@ services:
 
   seed:
     <<: *app-service
+    environment:
+      <<: *app-environment
+      PHOTO_IMAGES_DIR: /app/.local/preview/images
     command:
       - python
       - -c
@@ -105,6 +136,10 @@ services:
       MINI_APP_BOT_TOKEN: 123456:LOCAL_TEST_ONLY_012345678901234567890
       MINI_APP_ORIGIN: http://127.0.0.1:4185
       MINI_APP_OFFLINE: "1"
+      QW_FARM_ENABLED: "1"
+      MQB_DEV_GUEST_ENABLED: ${MQB_DEV_GUEST_ENABLED:-0}
+      MQB_ROOM_CLASSIC_ENABLED: ${MQB_ROOM_CLASSIC_ENABLED:-0}
+      MQB_ROOM_PHOTO_ENABLED: ${MQB_ROOM_PHOTO_ENABLED:-0}
       MINI_APP_DEV_USER_ID: ${MQB_DEV_PLAYER_ID:-900000000091}
       PHOTO_IMAGES_DIR: /app/.local/preview/images
     ports:

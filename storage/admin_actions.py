@@ -234,7 +234,6 @@ class AdminActions:
                             )
                     await repository.interrupt(
                         game, event_kind='moderation_interrupted',
-                        actor_user_id=target_id if scope == 'users' else None,
                     )
                     interrupted.append(
                         f'classic:{game.chat_id}' if game.mode == 'classic' else game.id

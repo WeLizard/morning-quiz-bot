@@ -68,6 +68,9 @@ class Account(ModerationMixin, TimestampMixin, Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     display_name: Mapped[str] = mapped_column(String(255), default="Гость", nullable=False)
+    # Form of address for game texts: 'm' | 'f' | 'n'. NULL = not asked yet (reads as neutral);
+    # Telegram does not report gender, so it is never inferred.
+    address_form: Mapped[Optional[str]] = mapped_column(String(1))
 
 
 class AccountIdentity(Base):
@@ -92,6 +95,20 @@ class AccountIdentity(Base):
             unique=True, postgresql_where=text("revoked_at IS NULL"),
         ),
         Index("ix_account_identities_account_provider", "account_id", "provider"),
+    )
+
+
+class AccountCredential(Base):
+    """Password verifier for the ``password`` identity. No email is required;
+    a future ``email`` identity can sit next to it on the same account."""
+    __tablename__ = "account_credentials"
+
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
 
@@ -319,6 +336,21 @@ class GamePlayer(Base):
     )
 
 
+class ClassicAccountAnswer(Base):
+    """One immutable answer per platform actor and Classic round."""
+    __tablename__ = 'classic_account_answers'
+
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='CASCADE'), primary_key=True)
+    round_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), primary_key=True)
+    selected_option: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    points_delta: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    answered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (CheckConstraint('selected_option BETWEEN 0 AND 9', name='ck_classic_account_answer_option'),)
+
+
 class GameCommand(Base):
     """Idempotency receipt for commands submitted by any client adapter."""
     __tablename__ = 'game_commands'
@@ -445,8 +477,54 @@ class NotificationOutbox(Base):
     claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[Optional[str]] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (Index('ix_notification_outbox_ready', 'status', 'available_at'),)
+
+
+class NotificationResolution(Base):
+    """Atomic operator receipt; independent of game/poll delivery bindings."""
+    __tablename__ = 'notification_resolutions'
+
+    action_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    item_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True,
+    )
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    operator_id: Mapped[str] = mapped_column(String(96), nullable=False)
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    previous_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    resulting_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("decision IN ('confirmed_delivered', 'closed_without_resend')",
+                        name='ck_notification_resolution_decision'),
+    )
+
+
+class NotificationQuarantineReceipt(Base):
+    """Nonterminal offline quarantine audit, independent of terminal resolutions."""
+    __tablename__ = 'notification_quarantine_receipts'
+
+    action_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    item_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    operator_id: Mapped[str] = mapped_column(String(96), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    previous_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    resulting_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    claimed_by: Mapped[Optional[str]] = mapped_column(String(96))
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
 
 
 class PollAnswer(Base):
@@ -659,7 +737,26 @@ class AlchemyCraftCommand(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (
-        UniqueConstraint('account_id', 'ingredient_a', 'ingredient_b',
-                         name='uq_alchemy_craft_account_recipe'),
-    )
+    # A failed verification can later be retried after a legitimate craft chain.
+    # Command id, rather than ingredient pair, identifies the immutable receipt.
+
+
+class AlchemyStageClaim(Base):
+    __tablename__ = 'alchemy_stage_claims'
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True)
+    stage_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    campaign_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    catalog_revision: Mapped[str] = mapped_column(String(64), nullable=False)
+    reward: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AlchemyClaimCommand(Base):
+    __tablename__ = 'alchemy_claim_commands'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey('accounts.id', ondelete='CASCADE'), nullable=False, index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

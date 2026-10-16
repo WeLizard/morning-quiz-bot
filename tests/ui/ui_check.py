@@ -346,13 +346,23 @@ def run_startup(pw_browser, base):
             shown = False
         c.ok(shown, f'{path}: rendered within 2.5 s with every other host blocked')
         c.ok(page.evaluate('window.QW?.sdkState') in ('not-needed', None), f"{path}: browser does not request the SDK (state {page.evaluate('window.QW?.sdkState')})")
-        c.ok(not page.evaluate("document.body.innerText.includes('Открываем QuizzyWizzy')"), f'{path}: not stuck on the splash text')
+        # The splash must give way within 2.5 s (polling via evaluate: the production CSP forbids string evaluation).
+        left = False
+        for _ in range(25):
+            if page.evaluate("() => !document.body.innerText.includes('Открываем QuizzyWizzy')"):
+                left = True
+                break
+            page.wait_for_timeout(100)
+        c.ok(left, f'{path}: not stuck on the splash text')
     c.ok(not external, f'no request leaves the origin: {external[:5]}')
     tg_hash = ('#tgWebAppData=query_id%3Dx%26user%3D%257B%2522id%2522%253A1%257D%26auth_date%3D1%26hash%3Dx'
                '&tgWebAppVersion=8.0&tgWebAppPlatform=android&tgWebAppThemeParams=%7B%7D')
     page.goto(base + '/app/alchemy' + tg_hash, wait_until='load')
     page.reload(wait_until='load')
-    page.wait_for_function('window.QW && QW.sdkState !== "loading"', timeout=4000)
+    for _ in range(40):
+        if page.evaluate("() => Boolean(window.QW) && QW.sdkState !== 'loading'"):
+            break
+        page.wait_for_timeout(100)
     c.ok(page.evaluate('QW.sdkState') == 'loaded' and page.evaluate('QW.isTelegram()'), f"Telegram launch: pinned SDK loaded from our origin ({page.evaluate('QW.sdkState')})")
     page.evaluate("""() => { Telegram.WebView.receiveEvent('safe_area_changed', {top: 28, bottom: 0, left: 0, right: 0});
         Telegram.WebView.receiveEvent('fullscreen_changed', {is_fullscreen: true}); }""")

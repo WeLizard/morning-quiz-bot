@@ -59,7 +59,7 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         nav: {setRoot(handler, options) { qw.rootBack = handler; qw.rootOptions = options; }},
         header: {mountBack() {}, mountGear() {}}, configure(options) { qw.configs.push(options); if (options.mode) qw.mode = options.mode; qw.onHome = options.onHome; }};
     qw.menu = {register(items, title) { qw.items = items; qw.menuTitle = title; }, setAccount(value) { qw.account = value; }};
-    const brand = new Element('a'), mounts = [], timers = [], ui = {prefs: {theme: 'system', haptics: true}, canFullscreen: true,
+    const brand = new Element('a'), mounts = [], ratingCalls = [], timers = [], ui = {prefs: {theme: 'system', haptics: true}, canFullscreen: true,
         configure(back, settings) { this.settings = settings; }, back: () => qw.rootBack ? qw.rootBack() : qw.mode === 'game' ? qw.onHome?.() : undefined, selection() {},
         openBot(username, action) { this.openedBot = [username, action]; return Boolean(username); },
         setTheme(value) { this.prefs.theme = value; }, toggleHaptics() { return this.prefs.haptics = !this.prefs.haptics; }, fullscreen() {}};
@@ -112,7 +112,7 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
     }};
     if (replaceAvailable) navigationLocation.replace = path => replacedNavigation.push(path);
     runInNewContext(source('app.js'), {
-        window: {addEventListener: (event, handler) => windowEvents.set(event, handler), QWAddress: addressModule, QW: qw, QuizTelegram: ui, QuizPlay: {stop() {}, async mount(options) { mounts.push(options); }, roomApi: (roomId, request, extra) => ({kind: 'room', roomId, request, extra})}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}, initData, initDataUnsafe: {start_param: startParam}}}, location: navigationLocation},
+        window: {addEventListener: (event, handler) => windowEvents.set(event, handler), QWAddress: addressModule, QW: qw, QuizTelegram: ui, QuizRating: {async render(context) { ratingCalls.push(context); }}, QuizPlay: {stop() {}, async mount(options) { mounts.push(options); }, roomApi: (roomId, request, extra) => ({kind: 'room', roomId, request, extra})}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}, initData, initDataUnsafe: {start_param: startParam}}}, location: navigationLocation},
         location: currentLocation, URL, URLSearchParams,
         history: {state: null, replaceState(state, title, path) {
             if (historyThrows) throw new Error('WebView history blocked');
@@ -147,7 +147,7 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         await findButton(ids.content, 'Войти как dev-игрок').click(); await flush();
     }
     const tab = page => ids.navigation.children.find(n => n.dataset.page === page);
-    return {...ids, ui, qw, mounts, tab, timers, requests, assigned, replaced, replacedNavigation, storage, currentLocation, document, windowEvents};
+    return {...ids, ui, qw, mounts, ratingCalls, tab, timers, requests, assigned, replaced, replacedNavigation, storage, currentLocation, document, windowEvents};
 }
 
 const guestPhotoBase = '/api/guest/rooms/room-test/photo';
@@ -618,22 +618,36 @@ test('guest gets the same four-tab bar: games and profile are separate, no dupli
     assert.equal(app.qw.rootBack, null);
 });
 
-test('guest Chats and Rating show a Telegram stub whose button opens the linking flow', async () => {
+test('guest Chats show a Telegram stub whose button opens the linking flow', async () => {
     const app = await application(true, '', {savedGuest: true, initData: 'signed-link', offline: false, autoLogin: false});
-    for (const page of ['chats', 'rating']) {
-        await app.tab(page).click(); await flush();
-        assert.equal(app.content.dataset.page, 'guest-stub');
-        assert.equal(app.tab(page).attrs['aria-current'], 'page');
-        assert.equal(app.qw.rootOptions.onScreen, false);
-        assert.match(app.content.textContent, /Чаты и рейтинг чатов появятся, когда ты свяжешь Telegram с профилем/);
-        assert.equal(app.navigation.hidden, false);
-    }
+    await app.tab('chats').click(); await flush();
+    assert.equal(app.content.dataset.page, 'guest-stub');
+    assert.equal(app.tab('chats').attrs['aria-current'], 'page');
+    assert.equal(app.qw.rootOptions.onScreen, false);
+    assert.match(app.content.textContent, /Чаты и рейтинг чатов появятся, когда ты свяжешь Telegram с профилем/);
+    assert.equal(app.navigation.hidden, false);
     await findButton(app.content, 'Связать Telegram').click(); await flush();
-    // Account linking lives in «Профиль → Настройки» (UI_RULES §11), also for guests.
     assert.equal(app.content.dataset.page, 'guest-settings');
     assert.equal(app.tab('profile').attrs['aria-current'], 'page');
     assert.ok(findButton(app.content, 'Связать с Telegram'));
     assert.equal(app.requests.filter(r => r.path.startsWith('/api/mini/chats') || r.path.includes('leaderboard')).length, 0);
+});
+
+test('guest Rating is the real account rating, not a Telegram stub', async () => {
+    const app = await application(true, '', {savedGuest: true, initData: 'signed-link', offline: false, autoLogin: false});
+    await app.tab('rating').click(); await flush();
+    assert.equal(app.content.dataset.page, 'rating');
+    assert.equal(app.tab('rating').attrs['aria-current'], 'page');
+    assert.equal(app.qw.rootOptions.onScreen, false);
+    assert.equal(app.ratingCalls.length, 1);
+    const call = app.ratingCalls[0];
+    assert.equal(call.identity, 'guest');
+    assert.equal(call.content, app.content);
+    assert.equal(call.isCurrent(), true);
+    // The "choose a nickname" step leads to the guest profile.
+    await call.onProfile(); await flush(); await flush();
+    assert.equal(app.content.dataset.page, 'guest-profile');
+    assert.equal(app.ratingCalls.length, 1);
 });
 
 test('guest already linked to Telegram is offered Telegram sign-in instead of linking', async () => {

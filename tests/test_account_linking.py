@@ -302,7 +302,11 @@ def test_linked_alchemy_channels_keep_offline_claims_unverified_and_awards_once(
                 user = await session.get(User, UID)
                 assert row.user_id == UID
                 assert set(row.verified_discovered) == BASE_ELEMENTS | {'stone', 'steam'}
-                assert float(row.points_total) == craft['awarded'] == float(user.global_score)
+                assert float(row.points_total) == craft['awarded']
+                assert user.global_score == 0, 'Alchemy points live in their own journal slice'
+                from storage.models import ScoreTotal
+                assert float(await session.scalar(select(ScoreTotal.total).where(
+                    ScoreTotal.account_id == user.account_id, ScoreTotal.source == 'alchemy'))) == craft['awarded']
                 assert await session.scalar(select(func.count()).select_from(AlchemyProgress)) == 1
                 assert await session.scalar(select(func.count()).select_from(AlchemyCraftCommand)) == 3
                 codes = (await session.scalars(select(AchievementGrant.code))).all()

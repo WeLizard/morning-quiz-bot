@@ -195,7 +195,14 @@ class PostgresRuntimeStorage:
                     "last_answer_at": parse_datetime(data.get("last_answer_time")),
                 }
             )
-            await repository.upsert_member(member_values(chat_id, user_id, data))
+            values = member_values(chat_id, user_id, data)
+            await repository.upsert_member(values)
+            if values["score"]:
+                from .score_ledger import RewardLedger, ensure_account_for_user
+                seeded = await session.scalar(select(User).where(User.id == user_id))
+                await RewardLedger.award(
+                    session, account_id=await ensure_account_for_user(session, seeded),
+                    source="legacy_import", amount=values["score"], key=f"seed:{chat_id}", chat_id=chat_id)
             await repository.add_achievement_codes(
                 user_id, string_list(data.get("milestones_achieved"))
             )

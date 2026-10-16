@@ -30,6 +30,7 @@ from .models import Account, AlchemyCraftCommand, AlchemyProgress, User
 from .guest_accounts import GuestAccounts
 from .mini_app import MiniAppError
 from .repositories import OperationalRepository
+from .score_ledger import RewardLedger
 
 logger = logging.getLogger(__name__)
 
@@ -375,10 +376,10 @@ class AlchemyService:
                     | earned
                 )
                 if awarded:
-                    await session.execute(
-                        update(User).where(User.id == user_id)
-                        .values(global_score=User.global_score + awarded)
-                    )
+                    # Own slice of the journal; the common rating and users.global_score are not touched.
+                    await RewardLedger.award(
+                        session, account_id=row.account_id, source='alchemy', amount=awarded,
+                        key=f'craft:{command_id}')
 
             points_today = row.points_today if row.points_day == day else Decimal('0')
             response = {

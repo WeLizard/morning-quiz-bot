@@ -14,6 +14,7 @@ from sqlalchemy import and_, select, text, or_
 
 from .models import AdminAction, Chat, ChatMember, Game, QuizSession, User, SystemState
 from .games import GameRepository
+from .score_ledger import RewardLedger, ensure_account_for_user
 
 FENCE = 7319480024
 COUNTERS = ('score', 'answered_count', 'correct_answers_count', 'consecutive_correct')
@@ -311,13 +312,24 @@ class AdminActions:
                 user = by_id[member.user_id]
                 if scope == 'chats' and user.total_answered < member.answered_count:
                     raise AdminConflict('Глобальный счётчик ответов меньше вклада чата. Сначала нужна сверка данных; ничего не сброшено.')
-                user.global_score -= member.score
+                if member.score:
+                    await RewardLedger.award(
+                        session, account_id=await ensure_account_for_user(session, user), source='admin',
+                        amount=-member.score, key=f'admin:reset:{action_id}:{member.chat_id}:{member.user_id}',
+                        chat_id=member.chat_id)
                 user.total_answered -= member.answered_count
                 for key in COUNTERS:
                     setattr(member, key, Decimal('0.000') if key == 'score' else 0)
             if scope == 'users':
-                by_id[target_id].global_score = Decimal('0.000')
-                by_id[target_id].total_answered = 0
+                target = by_id[target_id]
+                account_id = await ensure_account_for_user(session, target)
+                # Whatever the chat rows do not explain (room points, imports, edits) goes too;
+                # Alchemy keeps its own slice.
+                rest = await RewardLedger.common_total(session, account_id)
+                if rest:
+                    await RewardLedger.award(session, account_id=account_id, source='admin', amount=-rest,
+                                             key=f'admin:reset:{action_id}:{target_id}:rest')
+                target.total_answered = 0
             await session.flush()
             after, _, _ = await self._reset_snapshot(session, scope, target_id)
             return await self._record(session, action_id, scope, target_id, 'reset', request, before, after)

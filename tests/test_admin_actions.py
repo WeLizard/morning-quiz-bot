@@ -20,6 +20,7 @@ from storage.models import AdminAction, Chat, ChatMember, Game, GameEvent, PollA
 from storage.photos import PhotoSessions, PhotoSessionConflict
 from storage.repositories import OperationalRepository
 from storage.schedule_source import ScheduleSource
+from storage.score_backfill import backfill
 from tests.test_admin_auth import TOKEN, login
 from tests.test_classic_recovery import game
 from tests.test_postgres_photos import payload, manager as photo_manager, context as photo_context
@@ -43,6 +44,9 @@ async def setup(url):
                     'milestone_codes': ['award-1'], 'streak_achievement_codes': ['streak-4']})
                 await repo.ensure_member({'chat_id': OTHER_CHAT, 'user_id': USER, 'score': Decimal('2'), 'answered_count': 2})
                 session.add(PollAnswer(poll_id='old', user_id=USER, chat_id=CHAT, points_delta=Decimal('1')))
+                # The pre-journal state above is what migration 0034 imports; tests start from the migrated state.
+                await session.flush()
+                await backfill(session)
             yield db, AdminActions(db)
         finally:
             async with db.transaction() as session:

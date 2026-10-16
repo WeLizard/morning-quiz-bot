@@ -1239,7 +1239,10 @@ def test_alchemy_sync_imports_without_reward_and_craft_is_server_authoritative(p
                 user = await session.get(User, USER)
                 row = await session.scalar(select(AlchemyProgress).where(
                     AlchemyProgress.user_id == USER))
-                assert user.global_score == Decimal('12.250') + Decimal(str(crafted.json()['awarded']))
+                assert user.global_score == Decimal('12.250'), 'Alchemy points are a separate journal slice'
+                from storage.models import ScoreTotal
+                assert await session.scalar(select(ScoreTotal.total).where(
+                    ScoreTotal.account_id == user.account_id, ScoreTotal.source == 'alchemy')) == Decimal(str(crafted.json()['awarded']))
                 assert 'steam' in row.verified_discovered
     asyncio.run(run())
 

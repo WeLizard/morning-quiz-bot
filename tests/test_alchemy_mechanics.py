@@ -60,6 +60,16 @@ async def global_score(db, user_id):
         return (await session.get(User, user_id)).global_score
 
 
+async def alchemy_points(db, user_id):
+    """Alchemy's own slice of the score journal (never part of users.global_score)."""
+    from storage.models import ScoreTotal
+    async with db.transaction() as session:
+        user = await session.get(User, user_id)
+        total = await session.scalar(select(ScoreTotal.total).where(
+            ScoreTotal.account_id == user.account_id, ScoreTotal.source == 'alchemy'))
+        return total or Decimal('0.000')
+
+
 async def grant_codes(db, user_id):
     async with db.transaction() as session:
         return sorted((await session.scalars(select(AchievementGrant.code).where(

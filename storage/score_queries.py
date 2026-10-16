@@ -14,23 +14,17 @@ class ScoreQueries:
         self.database = database
 
     async def rating(self, chat_id: int | None = None, limit: int = 10):
+        """/top and /globaltop: the same ranking core as the app (rows carry names only)."""
         if limit <= 0:
             return []
-        if chat_id is None:
-            statement = select(User.id, User.display_name, User.global_score).where(User.archived.is_(False)).order_by(
-                User.global_score.desc(), User.display_name, User.id,
-            )
-        else:
-            statement = select(User.id, User.display_name, ChatMember.score).join(
-                ChatMember, ChatMember.user_id == User.id,
-            ).where(ChatMember.chat_id == chat_id, User.archived.is_(False)).order_by(
-                ChatMember.score.desc(), User.display_name, User.id,
-            )
+        from application.rating import rank
         async with self.database.transaction() as session:
-            rows = (await session.execute(statement.limit(limit))).all()
-        return [{"user_id": uid, "name": name, "score": round(float(score), 1)} for uid, name, score in rows]
+            result = await rank(session, viewer=None, scope='global' if chat_id is None else 'chat',
+                                chat_id=chat_id, limit=limit)
+        return [{"name": item["display_name"], "score": round(float(item["score"]), 1)}
+                for item in result["items"]]
 
-    async def profiles(self, chat_id: int | None, user_ids):
+    async def profiles(self, chat_id: int | None, user_ids, *, with_place: bool = False):
         ids = list({int(uid) for uid in user_ids})
         if not ids:
             return {}
@@ -38,12 +32,18 @@ class ScoreQueries:
         statement = select(User, ChatMember).outerjoin(ChatMember, and_(
             ChatMember.user_id == User.id, ChatMember.chat_id == chat_id,
         )).where(User.id.in_(ids))
+        from application.rating import rank
         async with self.database.transaction() as session:
             rows = (await session.execute(statement)).all()
+            places = {}
+            for user, _ in rows:
+                if with_place and user.account_id is not None:
+                    places[user.id] = (await rank(session, viewer=user.account_id, limit=1))["me"]["rank"]
         result = {}
         for user, member in rows:
             total = round(float(user.global_score), 1)
             global_stats = {
+                "place": places.get(user.id),
                 "name": user.display_name, "total_score": total,
                 "answered_polls": user.total_answered,
                 "average_score_per_poll": round(total / user.total_answered, 2) if user.total_answered else 0.0,

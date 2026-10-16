@@ -12,7 +12,7 @@ from storage.mini_app import MiniAppError
 from storage.repositories import OperationalRepository
 from tests.local_database import isolated_database
 from tests.test_alchemy_mechanics import (DAY1, DAY2, USER, OTHER_USER, grant_codes,
-                                         global_score, prepare, stored)
+                                         global_score, alchemy_points, prepare, stored)
 from tests.test_postgres_members import pg_env
 
 CATALOG = load_catalog()
@@ -68,7 +68,8 @@ def test_verified_server_recipe_awards_once_and_replays_idempotently(pg_env):
             assert result['recipe'] == key and result['result'] == result_element
             assert result['awarded'] >= 2
             assert result_element in result['verified_discovered']
-            assert await global_score(db, USER) == Decimal(str(result['awarded']))
+            assert await alchemy_points(db, USER) == Decimal(str(result['awarded']))
+            assert await global_score(db, USER) == Decimal('0.000')
 
             replay = await service.craft(
                 USER, command_id='verified-command-0001',
@@ -80,7 +81,8 @@ def test_verified_server_recipe_awards_once_and_replays_idempotently(pg_env):
                 ingredient_a=ingredient_a, ingredient_b=ingredient_b, now=DAY1,
             )
             assert second_command['awarded'] == 0
-            assert await global_score(db, USER) == Decimal(str(result['awarded']))
+            assert await alchemy_points(db, USER) == Decimal(str(result['awarded']))
+            assert await global_score(db, USER) == Decimal('0.000')
             async with db.transaction() as session:
                 commands = (await session.scalars(select(AlchemyCraftCommand))).all()
                 assert len(commands) == 2
@@ -172,7 +174,7 @@ def test_verified_progress_survives_later_untrusted_sync(pg_env):
             assert imported['awarded'] == 0
             assert result_element in imported['verified_discovered']
             assert set(imported['verified_crafted']) == {craft['recipe']}
-            assert await global_score(db, USER) == Decimal(str(craft['awarded']))
+            assert await alchemy_points(db, USER) == Decimal(str(craft['awarded']))
     asyncio.run(run())
 
 
@@ -286,6 +288,6 @@ def test_parallel_duplicate_recipe_commands_award_once(pg_env):
             assert sum(result['awarded'] > 0 for result in results) == 1
             async with db.transaction() as session:
                 assert len((await session.scalars(select(AlchemyCraftCommand))).all()) == 10
-                assert (await session.get(User, USER)).global_score == Decimal(
-                    str(results[0]['awarded']))
+                assert (await session.get(User, USER)).global_score == 0
+            assert await alchemy_points(db, USER) == Decimal(str(results[0]['awarded']))
     asyncio.run(run())

@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .score_ledger import RewardLedger, ensure_account_for_user
 from .models import (
     AchievementGrant,
     Chat,
@@ -217,17 +218,21 @@ class OperationalRepository:
         if result.rowcount != 1:
             raise LookupError(f"Chat member {chat_id}/{user_id} does not exist")
 
-        user_result = await self.session.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(
-                global_score=User.global_score + points_delta,
-                total_answered=User.total_answered + 1,
-                last_answer_at=func.now(),
-            )
-        )
-        if user_result.rowcount != 1:
+        user = await self.session.scalar(select(User).where(User.id == user_id))
+        if user is None:
             raise LookupError(f"User {user_id} does not exist")
+        if points_delta:
+            kind = (payload or {}).get("quiz_type") or "classic"
+            if not await RewardLedger.award(
+                self.session, account_id=await ensure_account_for_user(self.session, user),
+                source=kind if kind in ("classic", "photo") else "classic",
+                amount=points_delta, key=f"poll:{poll_id}", chat_id=chat_id,
+            ):
+                raise RuntimeError(f"Score event poll:{poll_id} already recorded for an unreserved answer")
+        await self.session.execute(
+            update(User).where(User.id == user_id)
+            .values(total_answered=User.total_answered + 1, last_answer_at=func.now())
+        )
         return True
 
     async def get_chat_leaderboard(self, chat_id: int, limit: int = 20) -> list[ChatMember]:
@@ -255,16 +260,17 @@ class OperationalRepository:
         )
 
     async def recompute_user_totals(self, user_id: int) -> None:
-        aggregate = (
+        """Recount answers and rebuild the ``global_score`` cache from the score journal.
+
+        Points are never re-derived from chat rows: that erased Alchemy and room points."""
+        answered = (
             await self.session.execute(
-                select(
-                    func.coalesce(func.sum(ChatMember.score), 0),
-                    func.coalesce(func.sum(ChatMember.answered_count), 0),
-                ).where(ChatMember.user_id == user_id)
+                select(func.coalesce(func.sum(ChatMember.answered_count), 0)).where(ChatMember.user_id == user_id)
             )
-        ).one()
+        ).scalar_one()
         await self.session.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(global_score=aggregate[0], total_answered=aggregate[1])
+            update(User).where(User.id == user_id).values(total_answered=answered)
         )
+        account_id = await self.session.scalar(select(User.account_id).where(User.id == user_id))
+        if account_id is not None:
+            await RewardLedger.recompute(self.session, account_id)

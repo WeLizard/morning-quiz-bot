@@ -805,10 +805,11 @@ class ScoreManager:
             "average_score_per_poll": average_score_per_poll,
         }
 
-    async def get_session_profiles(self, chat_id: int, user_ids) -> Dict[str, Any]:
+    async def get_session_profiles(self, chat_id: int, user_ids, *, with_place: bool = False) -> Dict[str, Any]:
         if self.postgres_storage:
             from storage.score_queries import ScoreQueries
-            return await ScoreQueries(self.postgres_storage.database).profiles(chat_id, user_ids)
+            return await ScoreQueries(self.postgres_storage.database).profiles(
+                chat_id, user_ids, with_place=with_place)
         result = {}
         for uid in user_ids:
             chat = await self.get_current_chat_user_stats(str(uid), chat_id)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from contextlib import nullcontext
 from decimal import Decimal
+from uuid import uuid4
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
@@ -15,6 +16,7 @@ from .models import ChatMember, Game, PollAnswer, User, QuizSession
 from .repositories import OperationalRepository
 from .runtime import member_data, member_values
 from .admin_actions import operation_fence, require_access
+from .score_ledger import RewardLedger, ensure_account_for_user
 
 
 class MemberNotFound(LookupError):
@@ -141,9 +143,15 @@ class MemberService:
             await repo.upsert_member(values)
             await repo.add_achievement_codes(user_id, values["milestone_codes"])
             await repo.add_achievement_codes(user_id, values["streak_achievement_codes"])
+            if delta:
+                account_id = await ensure_account_for_user(session, user)
+                if not await RewardLedger.award(
+                    session, account_id=account_id, source=kind, amount=delta,
+                    key=f"{kind}:{answer_id}", chat_id=chat_id, game_id=game_id or classic_game_id,
+                ):
+                    raise RuntimeError(f"Score event {kind}:{answer_id} already recorded for an unreserved answer")
             await session.execute(update(User).where(User.id == user_id).values(
                 display_name=effective_name,
-                global_score=User.global_score + delta,
                 total_answered=User.total_answered + int(kind == "classic"),
                 first_answer_at=user.first_answer_at or values["first_answer_at"],
                 last_answer_at=values["last_answer_at"] or user.last_answer_at,
@@ -174,6 +182,10 @@ class MemberService:
             if expected_score is not None and old_score != expected_score:
                 raise ScoreConflict("Баллы уже изменились. Обновите данные и повторите действие.")
             member.score = score
-            user.global_score += score - old_score
+            delta = score - old_score
+            if delta:
+                await RewardLedger.award(
+                    session, account_id=await ensure_account_for_user(session, user), source='admin',
+                    amount=delta, key=f"admin:set:{uuid4().hex}", chat_id=chat_id)
             await session.flush()
         return old_score

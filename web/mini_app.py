@@ -327,7 +327,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.middleware('http')
     async def boundary(request, call_next):
         static_game_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app/alchemy'}
-        public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/address.js', '/app/telegram-ui.js', '/app/play-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp', '/app/farm-card-v2.webp'}
+        public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/address.js', '/app/telegram-ui.js', '/app/play-ui.js', '/app/rating-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp', '/app/farm-card-v2.webp'}
         public_page = public_page or (request.method in {'GET', 'HEAD'} and
             (request.url.path == '/app/farm' or request.url.path.startswith('/app/farm/assets/')
              or request.url.path in SHELL_ASSET_PATHS))
@@ -512,7 +512,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-mafia.webp')
         if asset == 'alchemy.webp':
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-atlas.webp')
-        if asset not in {'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js', 'styles.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'}:
+        if asset not in {'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js', 'rating-ui.js', 'styles.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'}:
             raise MiniAppError(404, 'Файл не найден')
         return FileResponse(Path(__file__).parent / 'mini_client' / asset)
 
@@ -680,6 +680,26 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 account.address_form = form
                 return {'account_id': who.account_id, 'address_form': effective_address_form(form),
                         'address_form_chosen': True}
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
+
+    @app.post('/api/account/rating-visibility')
+    async def account_rating_visibility(request: Request, identity: str | None = Query(None)):
+        """Hide or show the account in every rating (the owner still sees their own place)."""
+        from uuid import UUID
+        from storage.models import Account
+        from web.principal import PrincipalError, resolve_principal
+        value = await account_json(request, {'hidden'}, {'hidden'})
+        if not isinstance(value['hidden'], bool):
+            raise MiniAppError(400, 'Некорректные параметры')
+        if identity == 'guest':
+            guest_access()
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                account = await session.get(Account, UUID(who.account_id))
+                account.rating_hidden = value['hidden']
+                return {'hidden': account.rating_hidden}
         except PrincipalError as error:
             raise MiniAppError(error.status, error.message, code=error.code) from None
 
@@ -1384,6 +1404,59 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.get('/api/mini/leaderboard')
     async def global_leaderboard(request: Request, limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0, le=10000)):
         return await store.global_leaderboard(credential(request), limit=limit, offset=offset)
+
+    @app.get('/api/rating')
+    async def account_rating(
+        request: Request, scope: str = Query('global'), period: str = Query('all'), game: str = Query('all'),
+        room_id: str | None = Query(None, max_length=64), chat_id: int | None = Query(None),
+        limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0, le=10000),
+        identity: str | None = Query(None),
+    ):
+        """Account rating for every channel (guest, password or Telegram session); rows carry no identifiers."""
+        from uuid import UUID
+        from sqlalchemy import select
+        from application.rating import RatingError, rank
+        from storage.models import Chat, ChatMember, Room, RoomMembership
+        from web.principal import PrincipalError, resolve_principal
+        if identity == 'guest':
+            guest_access()
+        if scope == 'chat':
+            if chat_id is None or not -(2**52) < chat_id < 2**52 or chat_id == 0:
+                raise MiniAppError(404, 'Чат недоступен')
+            await chat_access(request, chat_id)
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, identity=identity) as (session, who):
+                viewer = UUID(who.account_id)
+                if scope == 'room':
+                    member = await session.scalar(select(RoomMembership.account_id).where(
+                        RoomMembership.room_id == room_id, RoomMembership.account_id == viewer,
+                        RoomMembership.status == 'active')) if room_id else None
+                    if member is None:
+                        raise MiniAppError(404, 'Комната недоступна')
+                try:
+                    result = await rank(session, viewer=viewer, scope=scope, period=period, game=game,
+                                        room_id=room_id, chat_id=chat_id, limit=limit, offset=offset)
+                except RatingError as error:
+                    raise MiniAppError(422, str(error)) from None
+                if offset == 0:
+                    rooms = (await session.execute(
+                        select(Room.id, Room.title).join(RoomMembership, RoomMembership.room_id == Room.id)
+                        .where(RoomMembership.account_id == viewer, RoomMembership.status == 'active')
+                        .order_by(Room.title, Room.id).limit(50))).all()
+                    chats = []
+                    if who.telegram_user_id is not None:
+                        chats = (await session.execute(
+                            select(Chat.id, Chat.title).join(ChatMember, ChatMember.chat_id == Chat.id)
+                            .where(ChatMember.user_id == who.telegram_user_id, Chat.id < 0, Chat.archived.is_(False))
+                            .order_by(Chat.title, Chat.id).limit(50))).all()
+                    result['options'] = {
+                        'rooms': [{'room_id': rid, 'title': title or 'Комната'} for rid, title in rooms],
+                        'chats': [{'chat_id': cid, 'title': title or 'Чат'} for cid, title in chats],
+                        'telegram': who.telegram_user_id is not None}
+                return result
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
 
     @app.get('/api/mini/chats/{chat_id}/details')
     async def chat_details(request: Request, chat_id: int):

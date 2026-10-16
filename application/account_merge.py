@@ -31,8 +31,9 @@ from storage.mini_app import MiniAppError
 from storage.models import (
     Account, AccountCredential, AccountIdentity, AccountMerge, AlchemyClaimCommand,
     AlchemyCraftCommand, AlchemyProgress, AlchemyStageClaim, Base, ClassicAccountAnswer,
-    GamePlayer, GuestSession, Room, RoomInvite, RoomMembership, User,
+    GamePlayer, GuestSession, Room, RoomInvite, RoomMembership, ScoreEvent, User,
 )
+from storage.score_ledger import RewardLedger
 
 MAX_QTY = 10 ** 9
 MAX_COINS = 10 ** 12
@@ -56,6 +57,8 @@ MERGE_POLICY = {
     ('users', 'account_id'): 'move',
     ('game_players', 'account_id'): 'move_no_conflict',
     ('classic_account_answers', 'account_id'): 'move_no_conflict',
+    ('score_events', 'account_id'): 'move_no_conflict',
+    ('score_totals', 'account_id'): 'special',
     ('game_commands', 'actor_account_id'): 'history',
     ('game_events', 'actor_account_id'): 'history',
     ('alchemy_progress', 'account_id'): 'union',
@@ -229,7 +232,7 @@ class AccountMergeService:
         # ``lost_login`` follows the actual main when it is known, else the default (current).
         lost = lost_if_telegram_main if main is not None and main.id != current.id else lost_if_current_main
         rules = ['Открытия и предметы объединяются.',
-                 'Очки и рейтинг остаются от основного профиля.',
+                 'Очки обоих профилей суммируются в основном.',
                  'Ферма основного профиля сохраняется; склад и заработанные монеты второй фермы добавляются к ней.']
         if both:
             rules.append(f'Вход по логину «{lost}» перестанет работать: останется логин основного профиля.'
@@ -309,6 +312,7 @@ class AccountMergeService:
         await self._merge_alchemy(session, main, secondary, summary)
         await self._merge_rooms(session, main, secondary, summary)
         await self._merge_games(session, main, secondary, summary)
+        await self._merge_scores(session, main, secondary, summary)
         await self._merge_farm(session, unit, main, secondary, now, summary)
 
         if (main.display_name or '') == 'Гость' and secondary.display_name not in (None, '', 'Гость'):
@@ -378,6 +382,19 @@ class AccountMergeService:
                            (AlchemyClaimCommand, 'alchemy_claim_commands')):
             moved[key] = (await session.execute(
                 update(model).where(model.account_id == secondary.id).values(account_id=main.id))).rowcount
+        await session.flush()
+
+    async def _merge_scores(self, session, main, secondary, summary):
+        """Journal events follow the main account; Alchemy's running total is rebuilt from them."""
+        moved = await RewardLedger.move_events(session, source_account=secondary.id, target_account=main.id)
+        summary['moved']['score_events'] = moved
+        summary['left_on_secondary']['score_events'] = await self._count(
+            session, ScoreEvent.account_id, secondary.id)
+        progress = await session.get(AlchemyProgress, main.id, populate_existing=True)
+        if progress is not None:
+            alchemy_total = (await RewardLedger.totals(session, main.id)).get('alchemy')
+            if alchemy_total is not None:
+                progress.points_total = alchemy_total
         await session.flush()
 
     async def _merge_rooms(self, session, main, secondary, summary):

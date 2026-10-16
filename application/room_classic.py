@@ -14,6 +14,7 @@ from application.classic_selection import list_classic_categories, select_classi
 from application.rooms import RoomApplicationService
 from storage.admin_actions import operation_fence
 from storage.games import GameRepository
+from storage.score_ledger import RewardLedger
 from storage.models import Account, ClassicAccountAnswer, Game, GameCommand, GameDeadline, GamePlayer
 
 
@@ -201,6 +202,11 @@ class RoomClassicApplicationService:
                 public = dict(player.public_state or {})
                 correct = selected_option == item['correct_option_index']
                 streak, points = classic_points(streak=int(public.get('streak', 0)), is_correct=correct, rules=self.rules)
+                # The journal takes the User/Account locks first, like an account merge does; GamePlayer rows come after.
+                if not await RewardLedger.award(
+                        self.session, account_id=account_id, source='classic', amount=points,
+                        key=f'room:{game.id}:{round_id}', game_id=game.id, room_id=room_id):
+                    raise RuntimeError('Очки за этот ответ уже записаны')
                 public.update(score=str(Decimal(public.get('score', '0')) + points), streak=streak)
                 player.public_state = public
                 self.session.add(ClassicAccountAnswer(game_id=game.id, round_id=round_id, account_id=account_id,

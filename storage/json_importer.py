@@ -725,6 +725,10 @@ class JsonToPostgresImporter:
             await session.flush()
             processed['question_categories'] = len(self.snapshot.question_categories)
 
+            # Legacy scores enter the account journal in the same transaction (global_score becomes its cache).
+            from .score_backfill import backfill
+            await backfill(session)
+
             for key, payload in self.snapshot.system_states.items():
                 await repository.upsert_system_state(key, payload)
                 verification.record('system_states', {'key': key, 'payload': payload})

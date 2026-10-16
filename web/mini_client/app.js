@@ -1024,7 +1024,8 @@
     function guestNavigate(page) {
         window.QuizTelegram.selection();
         if (page === 'profile') return guestProfile();
-        if (page === 'chats' || page === 'rating') return guestStub(page);
+        if (page === 'rating') return guestRating().catch(error => { feedback.textContent = error.message; });
+        if (page === 'chats') return guestStub(page);
         return guestHome();
     }
     const RENEW_AFTER_MS = 10 * 60 * 1000;   // сессия живёт 15 минут, продлеваем заранее
@@ -1995,7 +1996,7 @@
         if (state.launchLost) note(content, 'Чат из ссылки недоступен — возможно, доступ к нему закрыт.', 'error');
         const tab = ['play', 'stats', 'settings'].includes(state.chatTab) ? state.chatTab : 'play';
         content.append(segmented([['play', 'Играть'], ['rating', 'Рейтинг'], ['stats', 'Статистика'], ['settings', 'Настройки']], tab, value => {
-            if (value === 'rating') { state.ratingScope = 'chat'; navigate('rating'); }
+            if (value === 'rating') { window.QuizRating?.prefer({scope: 'chat', chatId: state.selected}); navigate('rating'); }
             else { state.chatTab = value; navigate('chat'); }
         }, 'Разделы чата'));
         let details, games;
@@ -2196,55 +2197,18 @@
         }, 'secondary'));
         if (state.chats.length && state.botUsername) content.append(button('Добавить бота в чат', () => openBotHome(), 'secondary'));
     }
-    // Rating: segments «Общий · Чат ▾ · Alchemia», podium for the top three, own row highlighted.
+    // Rating: one account ranking for guests and Telegram players alike; the UI lives in rating-ui.js.
     async function rating(version) {
-        const chat = state.chats.find(item => item.chat_id === state.selected) || state.chats[0] || null;
-        let scope = state.ratingScope === 'alchemia' ? 'alchemia' : state.ratingScope === 'global' || !chat ? 'global' : 'chat';
-        let offset = 0, requestSequence = 0, rows = [];
-        const segments = el('div'), picker = el('div'), podium = el('section', undefined, 'podium'), list = el('ol', undefined, 'list');
-        const failure = error => { if (!state.authenticated) loginScreen(error.message); else feedback.textContent = error.message; more.disabled = false; };
-        const more = button('Показать ещё', () => fetchPage().catch(failure), 'secondary'); more.hidden = true;
-        const mine = el('p', undefined, 'me-bar'); mine.hidden = true;
-        const choose = value => { scope = value; state.ratingScope = value; reload(); };
-        const reload = () => { offset = 0; rows = []; paint(); fetchPage().catch(failure); };
-        function paint() {
-            const options = [['global', 'Общий']];
-            if (chat) options.push(['chat', state.chats.length > 1 ? 'Чат ▾' : 'Чат']);
-            options.push(['alchemia', 'Alchemia']);
-            segments.replaceChildren(segmented(options, scope, choose, 'Область рейтинга'));
-            picker.replaceChildren();
-            if (scope === 'chat' && state.chats.length > 1) chatSelect(picker, reload);
-            podium.replaceChildren(); list.replaceChildren(); mine.hidden = true; more.hidden = true;
-        }
-        function addRows(items, scoreOf) {
-            for (const user of items) rows.push({rank: user.rank, name: user.display_name, me: Boolean(user.is_me), score: scoreOf(user)});
-            podium.replaceChildren(); list.replaceChildren();
-            // Podium order: 2nd, 1st, 3rd. It needs a full top three, otherwise the list shows everyone.
-            const top = rows.slice(0, 3), usePodium = top.length === 3 && top.every((row, index) => row.rank === index + 1);
-            if (usePodium) for (const row of [top[1], top[0], top[2]]) {
-                const place = el('div', undefined, `podium-place p${row.rank}${row.me ? ' me' : ''}`);
-                place.append(el('span', ['🥇', '🥈', '🥉'][row.rank - 1], 'medal'), el('strong', row.name + (row.me ? ' · ты' : '')), el('small', format(row.score)));
-                podium.append(place);
-            }
-            for (const row of usePodium ? rows.slice(3) : rows) {
-                const node = el('li', undefined, row.me ? 'me' : ''); node.append(el('span', `#${row.rank}`, 'rank'), el('span', `${row.name}${row.me ? ' · ты' : ''}`, 'name'), el('span', format(row.score), 'score')); list.append(node);
-            }
-            const me = rows.find(row => row.me);
-            mine.hidden = !me; if (me) mine.textContent = `Ты — №${me.rank} · ${format(me.score)}`;
-        }
-        async function fetchPage() {
-            more.disabled = true; const sequence = ++requestSequence, selection = scope === 'chat' ? state.selected || chat?.chat_id : '';
-            const path = scope === 'alchemia' ? '/api/mini/alchemy/leaderboard?limit=20'
-                : `${selection ? `/api/mini/chats/${selection}/leaderboard` : '/api/mini/leaderboard'}?limit=20&offset=${offset}`;
-            const result = await request(path);
-            if (version !== generation || sequence !== requestSequence) return;
-            if (!offset && !result.items.length) note(list, 'Пока нет результатов.');
-            addRows(result.items, scope === 'alchemia' ? user => user.discovered : user => user.score);
-            offset += result.items.length; more.hidden = scope === 'alchemia' || !result.has_more; more.disabled = false;
-        }
-        if (scope === 'chat' && !state.selected && chat) state.selected = chat.chat_id;
-        content.append(segments, picker, podium, list, more, mine); paint();
-        await fetchPage();
+        const identity = state.authenticated ? 'telegram' : state.guest ? 'guest' : '';
+        await window.QuizRating.render({content, el, button, note, segmented, format, identity,
+            isCurrent: () => version === generation,
+            onError: error => { if (error.status === 401) loginScreen(error.message); else feedback.textContent = error.message; },
+            onProfile: () => (state.authenticated ? navigate('profile') : guestProfile())});
+    }
+    async function guestRating() {
+        stopRoomClassic(); generation++; window.QuizPlay?.stop(); showGuestTab('rating');
+        feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'rating'; shell({page: 'rating'});
+        await rating(generation);
     }
     function achievementLine(item) {
         const badge = el('span', `${item.earned ? '✓' : '·'} ${item.title}`, `achievement ${item.earned ? 'earned' : ''}`.trim());

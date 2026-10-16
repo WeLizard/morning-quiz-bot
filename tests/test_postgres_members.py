@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import httpx
 import pytest
 from fastapi import FastAPI
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from telegram import User as TelegramUser
 
 from data_manager import DataManager
@@ -18,7 +18,7 @@ from modules.score_manager import ScoreManager
 from storage.database import Database, DatabaseSettings, normalize_database_url
 from storage.members import MemberService, ScoreConflict
 from storage.models import (
-    AccountIdentity, AchievementGrant, Chat, ChatMember, Game, PollAnswer,
+    Account, AccountIdentity, AchievementGrant, ScoreEvent, ScoreTotal, Chat, ChatMember, Game, PollAnswer,
     MiniAppSession, Room, User, MessageCleanupItem, SystemState,
 )
 from storage.repositories import OperationalRepository
@@ -65,7 +65,13 @@ async def scenario(url):
                 AccountIdentity.provider == 'telegram',
                 AccountIdentity.provider_subject.in_(str(uid) for uid in user_ids),
             ))
+            account_ids = [a for (a,) in (await session.execute(
+                select(User.account_id).where(User.id.in_(user_ids), User.account_id.is_not(None)))).all()]
+            await session.execute(delete(ScoreEvent).where(or_(
+                ScoreEvent.account_id.in_(account_ids), ScoreEvent.chat_id.in_(chat_ids))))
+            await session.execute(delete(ScoreTotal).where(ScoreTotal.account_id.in_(account_ids)))
             await session.execute(delete(User).where(User.id.in_(user_ids)))
+            await session.execute(delete(Account).where(Account.id.in_(account_ids)))
         await database.dispose()
 
 

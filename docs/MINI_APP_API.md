@@ -272,6 +272,8 @@ Telegram чтение и рейтинг соединяют прогресс че
 | `DELETE /api/mini/session` | Выход; никакие игровые записи не удаляются |
 | `GET /api/mini/me` | Только свой ID, имя из БД, точный счёт и число ответов |
 | `GET /api/mini/chats` | Своя история участия и собственные счётчики по чатам |
+| `GET /api/rating` | Единое ядро рейтинга по аккаунтам для гостя, пароля и Telegram: `scope` (`global`, `room`, `chat`, `friends`, `farm`, `alchemy`), `period` (`all`, `month`, `week` — скользящие 30 и 7 суток), `game` (`all`, `classic`, `photo`), `room_id`/`chat_id`, `limit`≤50, `offset`. Строка — `{rank, display_name, score, is_me}`: ни Telegram username/ID, ни account_id. `me` — своё место даже у скрытого или безымянного гостя. Гость попадает в публичные разрезы только после выбора ника; `chat` требует членства в чате, `room` — членства в комнате |
+| `POST /api/account/rating-visibility` | `{hidden: bool}`: «не показывать меня в рейтинге» (флаг аккаунта, действует во всех разрезах) |
 | `GET /api/mini/chats/{id}/leaderboard` | Рейтинг доступного чата: место, имя, счёт и `is_me`, без чужих Telegram ID/профилей |
 | `GET /api/mini/chats/{id}/games` | Тип игры, фаза, номер/число вопросов |
 | `GET /api/mini/chats/{id}/details` | Общая проекция чата и настроек Classic; подготовка не читает Telegram callbacks |

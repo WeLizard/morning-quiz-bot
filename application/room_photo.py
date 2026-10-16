@@ -4,6 +4,7 @@ The room owner controls the series. Other members receive only occupancy;
 group Photo rules remain an owner decision, not an implicit new game mode.
 """
 from datetime import datetime, timezone
+from decimal import Decimal
 from urllib.parse import quote
 
 from sqlalchemy import select, text
@@ -16,6 +17,7 @@ from domain.photo import (complete_round, normalize_photo, photo_deadlines, phot
                           prepare_photo, project_photo, record_attempt, reveal_hint, stop_photo)
 from storage.admin_actions import operation_fence
 from storage.games import GameRepository
+from storage.score_ledger import RewardLedger
 from storage.models import Game, GameCommand, GameDeadline
 from storage.photo_media import images_root, verified_image_path
 
@@ -166,8 +168,13 @@ class RoomPhotoApplicationService:
             state, verdict = record_attempt(state, round_id=round_id, answer=answer, now=now)
             if verdict == 'correct':
                 item = next(item for item in state['rounds'] if item['round_id'] == round_id)
+                points = photo_points(item, now=now)
+                if not await RewardLedger.award(
+                        self.session, account_id=account_id, source='photo', amount=Decimal(str(points)),
+                        key=f'room:{game.id}:{round_id}', game_id=game.id, room_id=room_id):
+                    raise RuntimeError('Очки за этот ответ уже записаны')
                 state = complete_round(state, round_id=round_id, correct=True,
-                    points=photo_points(item, now=now), reason='answer', now=now)
+                    points=points, reason='answer', now=now)
             event = 'photo_answered' if verdict == 'correct' else 'photo_attempted'
         else:
             state = stop_photo(state, expected_revision=expected_revision, now=now)

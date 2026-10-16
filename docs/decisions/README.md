@@ -30,6 +30,7 @@ ADR фиксирует значимое техническое решение в
 | ADR-013 | [PostgreSQL-каталог и content-addressed photo media](ADR-013-authoritative-photo-media.md) | `accepted` | 2026-09-04 |
 | ADR-014 | [Classic как серверный lifecycle с независимой доставкой](ADR-014-classic-shared-lifecycle.md) | `accepted` | 2026-09-04 |
 | ADR-015 | [Photo как общий серверный lifecycle](ADR-015-photo-shared-lifecycle.md) | `accepted` | 2026-09-04 |
+| ADR-016 | [Журнал очков по аккаунтам](ADR-016-account-score-ledger.md) | `accepted` | 2026-10-16 |
 
 Новый документ создаётся по [шаблону](ADR_TEMPLATE.md) и добавляется в этот
 реестр.

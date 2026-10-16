@@ -86,7 +86,7 @@ class RatingHandlers:
         user_first_name_escaped = escape_markdown_v2(user.first_name)
 
         try:
-            profile = (await self.score_manager.get_session_profiles(chat_id, [user_id_str])).get(user_id_str, {})
+            profile = (await self.score_manager.get_session_profiles(chat_id, [user_id_str], with_place=True)).get(user_id_str, {})
             user_chat_stats = profile.get("chat")
             user_global_stats = profile.get("global")
         except Exception:
@@ -119,6 +119,8 @@ class RatingHandlers:
             reply_parts.append(escape_markdown_v2(f"\n🌍 Глобально:"))
             # ИСПРАВЛЕНО: Округляем глобальный рейтинг до 1 знака после запятой
             reply_parts.append(escape_markdown_v2(f"⭐ Общий рейтинг: {round(global_total_score, 1)}"))
+            if user_global_stats.get('place'):
+                reply_parts.append(escape_markdown_v2(f"🏅 Место в общем рейтинге: №{user_global_stats['place']}"))
             reply_parts.append(escape_markdown_v2(f"🙋 Всего отвечено на опросы: {global_answered_polls}"))
             reply_parts.append(escape_markdown_v2(f"🎯 Средний балл за опрос: {global_avg_score:.1f}"))
         else:

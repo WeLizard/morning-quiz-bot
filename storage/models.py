@@ -77,6 +77,8 @@ class Account(ModerationMixin, TimestampMixin, Base):
     merged_into_id: Mapped[Optional[UUID]] = mapped_column(
         Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"))
     merged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # "Don't show me in the rating": the player still sees their own place.
+    rating_hidden: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     __table_args__ = (
         CheckConstraint("merged_into_id IS NULL OR merged_into_id <> id",
@@ -859,3 +861,42 @@ class ProblemReportImage(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
     __table_args__ = (UniqueConstraint('report_id', 'position', name='uq_problem_report_images_position'),)
+
+
+class ScoreEvent(Base):
+    """Append-only journal of every point change of an account, whatever the channel or game.
+
+    Written only through ``storage.score_ledger.RewardLedger.award``; ``(account_id, source, key)``
+    makes a repeated command a no-op. Negative amounts are admin corrections."""
+    __tablename__ = 'score_events'
+
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'), primary_key=True, autoincrement=True)
+    account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), nullable=False)
+    source: Mapped[str] = mapped_column(String(24), nullable=False)
+    key: Mapped[str] = mapped_column(String(300), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    game_id: Mapped[Optional[str]] = mapped_column(String(64))
+    room_id: Mapped[Optional[str]] = mapped_column(String(64))
+    chat_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('account_id', 'source', 'key', name='uq_score_events_key'),
+        Index('ix_score_events_created', 'created_at'),
+        Index('ix_score_events_source_created', 'source', 'created_at'),
+        Index('ix_score_events_room', 'room_id', 'created_at', postgresql_where=text('room_id IS NOT NULL')),
+        Index('ix_score_events_chat', 'chat_id', 'created_at', postgresql_where=text('chat_id IS NOT NULL')),
+    )
+
+
+class ScoreTotal(Base):
+    """Per-source running total of ``score_events``; rebuilt from the journal at any time."""
+    __tablename__ = 'score_totals'
+
+    account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), primary_key=True)
+    source: Mapped[str] = mapped_column(String(24), primary_key=True)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=Decimal('0'), server_default='0', nullable=False)
+    events: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (Index('ix_score_totals_source_total', 'source', 'total'),)

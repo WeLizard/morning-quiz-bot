@@ -1299,53 +1299,6 @@ async def get_categories_detailed_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
 
-@app.get("/api/analytics/users/leaderboard")
-async def get_users_leaderboard(limit: int = 20):
-    """Рейтинг пользователей"""
-    try:
-        global_stats_file = STATS_DIR / "global_stats.json"
-        
-        if not global_stats_file.exists():
-            return {"users": []}
-        
-        with open(global_stats_file, 'r', encoding='utf-8') as f:
-            stats = json.load(f)
-        
-        top_users = stats.get("top_users", [])[:limit]
-        
-        # Обогащаем данными из чатов
-        enriched_users = []
-        for user in top_users:
-            user_data = {
-                "user_id": user["user_id"],
-                "name": user["name"],
-                "global_score": user["global_score"],
-                "total_answers": 0,
-                "chats_participated": []
-            }
-            
-            # Ищем пользователя в чатах
-            for chat_dir in CHATS_DIR.iterdir():
-                if not chat_dir.is_dir():
-                    continue
-                
-                users_file = chat_dir / "users.json"
-                if users_file.exists():
-                    with open(users_file, 'r', encoding='utf-8') as f:
-                        chat_users = json.load(f)
-                    
-                    if user["user_id"] in chat_users:
-                        user_info = chat_users[user["user_id"]]
-                        user_data["total_answers"] += len(user_info.get("answered_polls", []))
-                        user_data["chats_participated"].append(chat_dir.name)
-            
-            enriched_users.append(user_data)
-        
-        return {"users": enriched_users, "total_count": stats.get("total_users", 0)}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
-
 @app.get("/api/analytics/activity/overview")
 async def get_activity_overview():
     """Обзор активности"""

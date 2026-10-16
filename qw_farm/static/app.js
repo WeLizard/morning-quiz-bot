@@ -1233,11 +1233,16 @@ function navPush(id,onBack){try{QW?.nav.push({id,onBack});}catch{}}
 function navPop(id){try{QW?.nav.pop(id);}catch{}}
 // Back stack (UI_RULES NAV-6): village / neighbor's farm below the open panel, a modal <dialog> above everything.
 // The mini-games push their own 'minigame' entry (see launchField/launchTripGame) and veto Back until the player confirms.
+// history.go(-n) from QW.nav.pop is asynchronous: a pushState issued in the same tick lands BEFORE the traversal and the
+// stack drifts one entry (the next Back then leaves the farm for /app). So after a pop that removed history entries, wait
+// for the (shell-suppressed) popstate before pushing the replacement entry.
+let navSettling=false;
+function navSettle(){navSettling=true;let tm=0;const fin=()=>{removeEventListener('popstate',fin);clearTimeout(tm);if(!navSettling)return;navSettling=false;syncNav();};addEventListener('popstate',fin);tm=setTimeout(fin,600);}
 function syncNav(){
- if(!QW)return;
- const village=!!S.me&&(villageVisible()||!own()),panel=!!S.me&&document.body.classList.contains('panel-open');
- if(village&&!QW.nav.has('village')){navPop('panel');navPush('village',returnToFarm);}
- else if(!village&&QW.nav.has('village'))navPop('village');
+ if(!QW||navSettling)return;
+ const village=!!S.me&&(villageVisible()||!own()),panel=!!S.me&&document.body.classList.contains('panel-open'),hist=!!(QW.config.history??QW.config.mode==='game');
+ if(village&&!QW.nav.has('village')){const hadPanel=QW.nav.has('panel');navPop('panel');if(hadPanel&&hist){navSettle();return;}navPush('village',returnToFarm);}
+ else if(!village&&QW.nav.has('village')){navPop('village');if(panel&&hist){navSettle();return;}}
  if(panel&&!QW.nav.has('panel'))navPush('panel',()=>{closePanel();});
  else if(!panel&&QW.nav.has('panel'))navPop('panel');
 }

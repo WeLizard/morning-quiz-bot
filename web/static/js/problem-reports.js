@@ -25,11 +25,22 @@
         try {
             const report = await api(`/api/admin/problem-reports/${id}`);
             const card = el('div', undefined, 'card');
-            card.append(el('h2', `Отчёт №${report.id} · ${STATUS[report.status] || report.status}`));
+            const auto = report.kind === 'auto_error';
+            card.append(el('h2', `${auto ? 'Автоошибка' : 'Отчёт'} №${report.id} · ${STATUS[report.status] || report.status}`));
             card.append(el('p', `${report.display_name} · ${report.channel}${report.telegram_user_id ? ' · tg ' + report.telegram_user_id : ''} · ${when(report.created_at)}`));
+            if (auto) card.append(el('p', `Повторов: ${report.occurrences} · аккаунтов: ${report.affected_accounts} · последний: ${when(report.last_seen_at)} · отпечаток ${(report.fingerprint || '').slice(0, 8)}`));
             const text = el('p', report.text);
             text.style.whiteSpace = 'pre-wrap';
             card.append(text);
+            const failure = report.context && report.context.error;
+            if (failure) {
+                card.append(el('p', `${failure.type}: ${failure.source || '—'}:${failure.line || 0}:${failure.column || 0}`));
+                if (failure.stack) card.append(el('pre', failure.stack));
+            }
+            const crumbs = (report.context && report.context.breadcrumbs) || [];
+            if (crumbs.length) card.append(el('p', 'Шаги: ' + crumbs.map((item) => `${item.t}мс ${item.kind}:${item.target}`).join(' → ')));
+            const last = report.context && report.context.last_error;
+            if (last) card.append(el('p', `Последняя ошибка: ${last.message}${last.source ? ' (' + last.source + ':' + (last.line || 0) + ')' : ''}${last.report_id ? ' (автоошибка №' + last.report_id + ')' : ''}`));
             const actions = el('div');
             for (const [value, label] of Object.entries(STATUS)) {
                 const button = el('button', label, 'btn btn-secondary');
@@ -46,7 +57,8 @@
                 actions.append(button, ' ');
             }
             card.append(actions);
-            const context = {version: report.build, account: report.account_id, request: report.request_id, ...report.context};
+            const {error: _error, breadcrumbs: _crumbs, ...rest} = report.context || {};
+            const context = {version: report.build, account: report.account_id, request: report.request_id, ...rest};
             const pre = el('pre', JSON.stringify(context, null, 2));
             pre.style.overflow = 'auto';
             card.append(el('h3', 'Контекст'), pre);
@@ -75,19 +87,21 @@
     async function load() {
         const list = document.getElementById('problemReportsList');
         const status = document.getElementById('problemReportsStatus').value;
+        const kind = document.getElementById('problemReportsKind').value;
         try {
-            const data = await api('/api/admin/problem-reports?limit=100' + (status ? `&status=${status}` : ''));
+            const data = await api('/api/admin/problem-reports?limit=100' + (status ? `&status=${status}` : '') + (kind ? `&kind=${kind}` : ''));
             if (!data.items.length) { list.replaceChildren(el('p', 'Отчётов нет.')); return; }
             const table = el('table', undefined, 'data-table');
             const head = el('tr');
-            for (const name of ['№', 'Время', 'Статус', 'Кто', 'Экран', 'Текст', 'Фото']) head.append(el('th', name));
+            for (const name of ['№', 'Время', 'Статус', 'Кто', 'Экран', 'Текст', 'Фото / повторы']) head.append(el('th', name));
             table.append(head);
             for (const item of data.items) {
                 const row = el('tr');
                 row.style.cursor = 'pointer';
                 row.tabIndex = 0;
                 for (const value of [item.id, when(item.created_at), STATUS[item.status] || item.status,
-                    `${item.display_name} (${item.channel})`, item.screen || '—', item.text, item.images]) row.append(el('td', String(value)));
+                    `${item.display_name} (${item.channel})`, item.screen || '—', item.text,
+                    item.kind === 'auto_error' ? `×${item.occurrences} / ${item.affected_accounts} ак. · ${when(item.last_seen_at)} · ${item.fingerprint || ''}` : item.images]) row.append(el('td', String(value)));
                 row.addEventListener('click', () => openCard(item.id));
                 row.addEventListener('keydown', (event) => { if (event.key === 'Enter') openCard(item.id); });
                 table.append(row);
@@ -102,6 +116,7 @@
     window.loadProblemReports = load;
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('problemReportsStatus')?.addEventListener('change', load);
+        document.getElementById('problemReportsKind')?.addEventListener('change', load);
         document.getElementById('problemReportsRefresh')?.addEventListener('click', load);
         document.querySelector('[data-section="problem-reports"]')?.addEventListener('click', load);
     });

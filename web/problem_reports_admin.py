@@ -25,11 +25,16 @@ def make_problem_reports_router():
 
     @router.get('/api/admin/problem-reports')
     async def list_reports(request: Request, status: Literal['new', 'in_progress', 'done'] | None = None,
+                           kind: Literal['manual', 'auto_error'] | None = None,
                            limit: Annotated[int, Query(ge=1, le=200)] = 50):
         async with request.app.state.admin_database.transaction() as session:
-            query = select(ProblemReport).order_by(ProblemReport.created_at.desc(), ProblemReport.id.desc()).limit(limit)
+            order = ((ProblemReport.last_seen_at.desc(), ProblemReport.id.desc()) if kind == 'auto_error'
+                     else (ProblemReport.created_at.desc(), ProblemReport.id.desc()))
+            query = select(ProblemReport).order_by(*order).limit(limit)
             if status:
                 query = query.where(ProblemReport.status == status)
+            if kind:
+                query = query.where(ProblemReport.kind == kind)
             reports = (await session.execute(query)).scalars().all()
             counts = dict((await session.execute(
                 select(ProblemReportImage.report_id, func.count()).where(
@@ -37,9 +42,11 @@ def make_problem_reports_router():
                 .group_by(ProblemReportImage.report_id))).all()) if reports else {}
             return {'items': [{
                 'id': row.id, 'created_at': _iso(row.created_at), 'status': row.status,
-                'display_name': row.display_name, 'channel': row.channel,
+                'display_name': row.display_name, 'channel': row.channel, 'kind': row.kind,
                 'screen': (row.context or {}).get('screen'), 'text': row.text[:200],
-                'images': counts.get(row.id, 0)} for row in reports]}
+                'images': counts.get(row.id, 0), 'occurrences': row.occurrences,
+                'affected_accounts': row.affected_accounts, 'last_seen_at': _iso(row.last_seen_at),
+                'fingerprint': (row.fingerprint or '')[:8] or None} for row in reports]}
 
     @router.get('/api/admin/problem-reports/{report_id}')
     async def read_report(report_id: ReportId, request: Request):
@@ -56,7 +63,10 @@ def make_problem_reports_router():
                 'status': row.status, 'display_name': row.display_name, 'channel': row.channel,
                 'telegram_user_id': row.telegram_user_id,
                 'account_id': str(row.account_id) if row.account_id else None,
-                'request_id': str(row.request_id), 'build': row.build, 'text': row.text,
+                'request_id': str(row.request_id), 'build': row.build, 'text': row.text, 'kind': row.kind,
+                'occurrences': row.occurrences, 'affected_accounts': row.affected_accounts,
+                'last_seen_at': _iso(row.last_seen_at), 'notified_at': _iso(row.notified_at),
+                'fingerprint': row.fingerprint,
                 'context': row.context or {},
                 'images': [{'position': p, 'width': w, 'height': h} for p, w, h in images]}
 

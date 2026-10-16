@@ -130,6 +130,7 @@
     let debugEl = null;
     let probe = null;
     function probeLength(name) {
+        if (!document.body) return '0px'; // an error can arrive before <body> exists
         probe ||= Object.assign(document.createElement('div'), {style: 'position:absolute;visibility:hidden;pointer-events:none;width:0'});
         if (!probe.isConnected) document.body.append(probe);
         probe.style.height = 'var(' + name + ')';
@@ -241,12 +242,24 @@
     async function runGuard(entry) {
         try { return (await entry.onBack?.()) !== false; } catch { return false; }
     }
+    /* Breadcrumbs for automatic error reports: a ring of the last 10 UI steps. Identifiers only — never text, values or links. */
+    const CRUMB_KINDS = new Set(['tap', 'nav', 'tab', 'visibility', 'menu']);
+    const crumbs = [];
+    function crumb(kind, target) {
+        try {
+            const clean = String(target ?? '').trim();
+            if (!CRUMB_KINDS.has(kind) || !/^[A-Za-z0-9_.:#/-]{1,60}$/.test(clean)) return;
+            crumbs.push({t: Math.round(performance.now()), kind, target: clean});
+            if (crumbs.length > 10) crumbs.shift();
+        } catch {}
+    }
     const nav = {
         push(entry) {
             if (!entry || !entry.id) throw new Error('QW.nav.push needs {id}');
             const existing = stack.find(item => item.id === entry.id);
             if (existing) { existing.onBack = entry.onBack; return existing; }
             const item = {id: String(entry.id), onBack: entry.onBack, historyPushed: false};
+            crumb('nav', 'push:' + item.id);
             stack.push(item);
             if (useHistory()) { call(() => history.pushState({qwNav: item.id}, '')); item.historyPushed = true; }
             syncBack();
@@ -254,6 +267,7 @@
         },
         pop(id) {
             const entry = id == null ? stack[stack.length - 1] : [...stack].reverse().find(item => item.id === String(id));
+            if (entry) crumb('nav', 'pop:' + entry.id);
             return entry ? removeEntry(entry, false) : false;
         },
         has(id) { return stack.some(item => item.id === String(id)); },
@@ -449,6 +463,7 @@
         refresh() { if (menu.isOpen()) renderMenu(); },
         open(opener) {
             if (menuEl) return;
+            crumb('menu', 'open');
             openerEl = opener || document.activeElement;
             scrimEl = document.createElement('div');
             scrimEl.className = 'qw-menu-scrim';
@@ -478,6 +493,7 @@
         },
         close() {
             if (!menuEl) return;
+            crumb('menu', 'close');
             document.removeEventListener('keydown', onMenuKey, true);
             scrimEl.remove(); menuEl.remove();
             scrimEl = menuEl = null;
@@ -532,10 +548,12 @@
             return null; // unknown: no ?identity= at all, the server picks by the single cookie
         }
         /** Everything that is attached to a report. Query, hash, initData and cookies are never included. */
-        function collectContext() {
+        function collectContext({withError = true} = {}) {
             const t = isTelegram() ? tg() : null;
             const px = name => Math.round(parseFloat(probeLength(name)) || 0);
+            const lastError = withError ? errors.last() : null;
             return {
+                ...(lastError ? {last_error: {report_id: lastError.report_id ?? null, message: lastError.message.slice(0, 300), source: lastError.source.slice(0, 200), line: lastError.line, at: lastError.at}} : {}),
                 screen: String(config.screen || config.gameId || 'hub').slice(0, 64),
                 title: String(config.title || gameTitle || document.title || '').slice(0, 80),
                 path: location.pathname,
@@ -570,6 +588,8 @@
                 ['Устройство', c.user_agent],
                 ['Время и язык', `${c.client_time} · ${c.language}`],
                 ['Аккаунт', account?.name ? `${account.name} (способ входа определит сервер)` : 'аккаунт и способ входа определит сервер'],
+                ...(c.last_error ? [['Последняя ошибка', `${c.last_error.message} (${c.last_error.source || '—'}:${c.last_error.line})`
+                    + (c.last_error.report_id ? ` · автоошибка №${c.last_error.report_id}` : '')]] : []),
             ];
         }
 
@@ -845,7 +865,225 @@
             if (isDesktop()) ui.text.focus({preventScroll: true}); else ui.sheet.focus({preventScroll: true});
             loadMeta().then(() => { if (ui) { update(); renderDetails(); } });
         }
-        return {open, close, isOpen: () => Boolean(ui)};
+        return {open, close, isOpen: () => Boolean(ui), context: collectContext, identity};
+    })();
+
+    /* ---------------- automatic error reports + soft toast (UI_RULES §5) ---------------- */
+    const errors = (() => {
+        const MAX_SENT = 5;
+        const MIN_GAP = 3000;
+        const TOAST_GAP = 5 * 60 * 1000;
+        const TOAST_MAX = 2;
+        const TOAST_KEY = 'qw-error-toast-at';
+        const seen = new Set();
+        const reportIds = new Map();
+        const queue = [];
+        let sent = 0;
+        let lastSendAt = 0;
+        let timer = 0;
+        let lastCheap = 0;
+        let handling = false; // reentrancy guard: nothing in here may raise or recurse
+        let last = null;
+        let toastEl = null;
+        let toastTimer = 0;
+        let toastShown = 0;
+        let toastAt = 0;
+
+        /** Drops ?query and #hash of a URL but keeps a trailing :line:col («x.js?v=1:10:5» → «x.js:10:5»). */
+        function stripUrl(url) {
+            const cut = url.search(/[?#]/);
+            if (cut < 0) return url;
+            return url.slice(0, cut) + (/(?::\d+){1,2}$/.exec(url)?.[0] || '');
+        }
+        /** Same rules as the server: strip query/hash from URLs, then redact initData fields, tokens, e-mails, phones. */
+        function scrub(value, max) {
+            // Cut first: the regexes below must never run over a huge string (a 100 KB message would hang the page).
+            let text = String(value ?? '').slice(0, max * 4 + 200);
+            text = text.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s)'"<>]+/gi, stripUrl);
+            text = text.replace(/\b(?:tgWebAppData|tgWebAppPlatform|tgWebAppVersion|hash|auth_date|query_id|token|signature)=[^\s&"')]*/gi, '[redacted]')
+                .replace(/\buser=%7B[^\s&"')]*/gi, '[redacted]')
+                .replace(/initData[^\s"')]*/gi, '[redacted]')
+                .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, '[redacted]')
+                .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[redacted]')
+                .replace(/(?:\+7|\b8)(?:[\s\-()]*\d){10}/g, '[redacted]')
+                .replace(/[A-Za-z0-9_-]{32,}/g, '[redacted]');
+            return text.slice(0, max);
+        }
+        function pathOf(source) {
+            try {
+                const url = new URL(String(source || ''), location.href);
+                if (/^[a-z-]+-extension:$/.test(url.protocol)) return url.protocol + '//';
+                return scrub(url.origin === location.origin ? url.pathname : url.host + url.pathname, 200);
+            } catch { return ''; }
+        }
+        const stackOf = value => scrub(String(value || '').split('\n').slice(0, 20).join('\n'), 2000);
+        const fingerprint = (message, source, line) => `${message.replace(/\d{3,}/g, '#')}|${source}|${line}`;
+        function isNoise(message, source, line) {
+            if (/ResizeObserver loop/i.test(message)) return true;
+            if (/^Script error\.?$/i.test(message.trim()) && !source && !line) return true;
+            return /^(?:chrome|moz|safari)(?:-web)?-extension:/i.test(source || '');
+        }
+
+        function frameOf(stack) {
+            const match = /((?:https?|file):\/\/[^\s)]+?):(\d+):(\d+)/.exec(String(stack || ''));
+            return match ? {source: match[1], line: Number(match[2]), column: Number(match[3])} : {};
+        }
+        /** Builds a sanitised record from an Error, an ErrorEvent or anything thrown. */
+        function normalize(type, error, info = {}) {
+            const isError = error && typeof error === 'object' && typeof error.message === 'string';
+            const rawStack = isError ? error.stack : '';
+            const frame = frameOf(rawStack);
+            const rawSource = info.source ?? frame.source ?? '';
+            const message = scrub(isError ? `${error.name || 'Error'}: ${error.message}`
+                : (info.message || (() => { try { return String(error); } catch { return 'Unknown error'; } })()).replace(/^Uncaught /, ''), 300);
+            return {
+                type, message, source: pathOf(rawSource), rawSource: String(rawSource || ''),
+                line: Math.min(1e7, Math.max(0, Math.round(Number(info.line ?? frame.line) || 0))),
+                column: Math.min(1e7, Math.max(0, Math.round(Number(info.column ?? frame.column) || 0))),
+                stack: stackOf(rawStack),
+            };
+        }
+
+        function pump() {
+            if (timer || !queue.length) return;
+            if (sent >= MAX_SENT) { queue.length = 0; return; }
+            const wait = lastSendAt + MIN_GAP - Date.now();
+            if (wait > 0) { timer = setTimeout(() => { timer = 0; pump(); }, wait); return; }
+            deliver(queue.shift());
+            if (queue.length) timer = setTimeout(() => { timer = 0; pump(); }, MIN_GAP);
+        }
+        function deliver(record) {
+            try {
+                const id = report.identity();
+                const url = '/api/account/problem-reports/errors' + (id ? '?identity=' + encodeURIComponent(id) : '');
+                const body = JSON.stringify({
+                    request_id: uuidv4(),
+                    error: {type: record.type, message: record.message, source: record.source, line: record.line, column: record.column, stack: record.stack},
+                    breadcrumbs: record.crumbs,
+                    context: (() => { try { return report.context({withError: false}); } catch { return {}; } })(),
+                });
+                sent += 1; lastSendAt = Date.now(); // spent only when a request really goes out
+                fetch(url, {method: 'POST', credentials: 'same-origin', keepalive: true, headers: {'content-type': 'application/json', 'x-guest-csrf': '1'}, body})
+                    .then(response => (response.ok ? response.json() : null))
+                    .then(data => { if (data && Number(data.report_id) > 0) { reportIds.set(record.fp, Number(data.report_id)); if (last && last.fp === record.fp) last.report_id = Number(data.report_id); } })
+                    .catch(() => {});
+            } catch {}
+        }
+        function uuidv4() {
+            if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+            const bytes = crypto.getRandomValues(new Uint8Array(16));
+            bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+            const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        }
+
+        function capture(error, info) {
+            if (handling) return false;
+            handling = true;
+            try {
+                if (sent + queue.length >= MAX_SENT) {
+                    // Budget spent: nothing more will be sent, so stay cheap (a loop could throw every frame). Refresh `last` at most once a second.
+                    const now = Date.now();
+                    if (now - lastCheap >= 1000) {
+                        lastCheap = now;
+                        const quick = normalize(info?.type || 'error', error, info || {});
+                        if (quick.message && !isNoise(quick.message, quick.rawSource, quick.line)) {
+                            last = {report_id: null, message: quick.message, source: quick.source, line: quick.line, at: new Date().toISOString(), fp: fingerprint(quick.message, quick.source, quick.line)};
+                        }
+                    }
+                    showToast();
+                    return false;
+                }
+                const record = normalize(info?.type || 'error', error, info || {});
+                if (!record.message || isNoise(record.message, record.rawSource, record.line)) return false;
+                const fp = fingerprint(record.message, record.source, record.line);
+                const at = (() => { try { return new Date().toISOString(); } catch { return ''; } })();
+                last = {report_id: reportIds.get(fp) ?? null, message: record.message, source: record.source, line: record.line, at, fp};
+                if (seen.has(fp)) return false; // one fingerprint is sent once per page load
+                seen.add(fp);
+                record.fp = fp;
+                record.crumbs = crumbs.map(item => ({...item}));
+                if (sent + queue.length < MAX_SENT) { queue.push(record); pump(); }
+                showToast();
+                return true;
+            } catch { return false; } finally { handling = false; }
+        }
+
+        /* ----- soft toast: never a modal, ≤ 1 per 5 min and ≤ 2 per page load ----- */
+        function hideToast() {
+            clearTimeout(toastTimer);
+            toastEl?.remove();
+            toastEl = null;
+        }
+        function showToast() {
+            try {
+                if (toastEl || toastShown >= TOAST_MAX || report.isOpen() || menu.isOpen() || !document.body) return;
+                let stored = 0;
+                try { stored = Number(sessionStorage.getItem(TOAST_KEY)) || 0; } catch {}
+                const now = Date.now();
+                if (now - Math.max(toastAt, stored) < TOAST_GAP) return;
+                const toast = document.createElement('div');
+                toast.className = 'qw-toast';
+                toast.setAttribute('role', 'status');
+                toast.setAttribute('aria-live', 'polite');
+                const text = document.createElement('span');
+                text.className = 'qw-toast-text';
+                text.textContent = 'Что-то пошло не так.';
+                const send = document.createElement('button');
+                send.type = 'button';
+                send.className = 'qw-btn secondary qw-toast-send';
+                send.textContent = 'Сообщить';
+                send.addEventListener('click', () => { hideToast(); report.open(); });
+                const close = iconButton('qw-toast-close', 'close', 'Закрыть');
+                close.addEventListener('click', hideToast);
+                toast.append(text, send, close);
+                const bar = document.querySelector('.tabbar:not([hidden])');
+                const barTop = bar ? bar.getBoundingClientRect().top : 0;
+                if (config.mode === 'game' || !bar || barTop <= 0) toast.classList.add(config.mode === 'game' ? 'qw-toast-top' : 'qw-toast-bottom');
+                else { toast.classList.add('qw-toast-bottom'); toast.style.bottom = Math.round(innerHeight - barTop + 8) + 'px'; }
+                document.body.append(toast);
+                toastShown += 1; toastAt = now; // counted only once the toast is really on screen
+                try { sessionStorage.setItem(TOAST_KEY, String(now)); } catch {}
+                toastEl = toast;
+                toastTimer = setTimeout(hideToast, 10000);
+            } catch {}
+        }
+
+        /* ----- listeners (installed once, at script load) ----- */
+        function tapTarget(node) {
+            const target = node.closest?.('button,a,[role=button],[data-qw-item],input[type=checkbox],input[type=radio],summary');
+            if (!target) return null;
+            const named = target.dataset?.qwItem || target.dataset?.action || target.dataset?.qwCrumb || target.id;
+            const tag = target.tagName.toLowerCase();
+            const cls = (typeof target.className === 'string' ? target.className : '').split(/\s+/)[0];
+            const kind = target.closest('.tabbar,[role=tablist]') ? 'tab' : 'tap';
+            return {kind, target: named || (cls ? `${tag}.${cls}` : tag)};
+        }
+        let lastPath = location.pathname;
+        try {
+            addEventListener('error', event => {
+                try {
+                    if (!event.message || (event.target && event.target !== window && event.target.tagName)) return; // resource errors have no message
+                    capture(event.error ?? event.message, {type: 'error', message: event.message, source: event.filename, line: event.lineno, column: event.colno});
+                } catch {}
+            }, true);
+            addEventListener('unhandledrejection', event => {
+                try { capture(event.reason, {type: 'unhandledrejection'}); } catch {}
+            });
+            document.addEventListener('click', event => {
+                try { const hit = tapTarget(event.target); if (hit) crumb(hit.kind, hit.target); } catch {}
+            }, true);
+            document.addEventListener('visibilitychange', () => crumb('visibility', document.hidden ? 'hidden' : 'visible'));
+            addEventListener('popstate', () => { if (location.pathname !== lastPath) { lastPath = location.pathname; crumb('nav', 'path:' + location.pathname.slice(0, 50)); } });
+        } catch {}
+
+        return {
+            /** Manual capture from a game: QW.errors.capture(error, {type?, source?, line?}). Returns true when it will be sent. */
+            capture,
+            last: () => (last ? {...last} : null),
+            crumb,
+            crumbs: () => crumbs.map(item => ({...item})),
+        };
     })();
 
     /* ---------------- haptics, session ---------------- */
@@ -934,7 +1172,7 @@
         get telegramReady() { return loadTelegramSdk(); },
         get sdkState() { return sdkState; },
         get tg() { return isTelegram() ? tg() : null; },
-        header, menu, nav, fullscreen, session, haptic, report,
+        header, menu, nav, fullscreen, session, haptic, report, errors,
         goHome, openProfile, icon: svg,
         prefs: {
             get() { return {...prefs}; },

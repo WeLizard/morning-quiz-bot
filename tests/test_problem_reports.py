@@ -333,7 +333,7 @@ async def report_database():
     from storage.models import Base
     database = _sqlite_database()
     tables = [Base.metadata.tables[name] for name in
-              ('accounts', 'problem_reports', 'problem_report_images', 'notification_outbox')]
+              ('accounts', 'problem_reports', 'problem_report_images', 'problem_error_hits', 'notification_outbox')]
     async with database.engine.begin() as connection:
         await connection.run_sync(lambda sync: Base.metadata.create_all(sync, tables=tables))
     try:

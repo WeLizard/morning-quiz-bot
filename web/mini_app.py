@@ -732,6 +732,30 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(error.status, error.message, code=error.code) from None
         return JSONResponse({'report_id': report_id, 'number': report_id}, 201 if created else 200)
 
+    @app.post('/api/account/problem-reports/errors')
+    async def account_problem_error(request: Request, identity: str | None = Query(None)):
+        """Automatic client error: scrubbed, deduplicated by fingerprint, announced to the owner once."""
+        from storage import problem_errors, problem_reports
+        from web.principal import PrincipalError, resolve_principal
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await bounded_request_body(request, max_bytes=problem_errors.BODY_BYTES_MAX)
+        request_id, error, breadcrumbs, context = problem_errors.parse_body(raw, urlsplit(settings.origin).netloc)
+        if error is None:  # browser/extension noise: nothing is stored
+            return JSONResponse({'accepted': True, 'report_id': None, 'new': False}, 202)
+        if identity == 'guest':
+            guest_access()
+        client_ip = problem_reports.ip_hash(settings.bot_token, request.client.host if request.client else '')
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                report_id, is_new = await problem_errors.ingest(
+                    session, who, request_id=request_id, error=error, breadcrumbs=breadcrumbs,
+                    context=context, client_ip_hash=client_ip)
+        except PrincipalError as exc:
+            raise MiniAppError(exc.status, exc.message, code=exc.code) from None
+        return JSONResponse({'accepted': True, 'report_id': report_id, 'new': is_new}, 202)
+
     @app.post('/api/guest/rooms')
     async def guest_create_room(request: Request):
         from application.rooms import RoomApplicationService

@@ -156,6 +156,10 @@ def sanitize_context(raw) -> dict:
     dpr = _number(raw.get('dpr'))
     if dpr is not None:
         out['dpr'] = dpr
+    from .problem_errors import sanitize_last_error
+    last_error = sanitize_last_error(raw.get('last_error'))
+    if last_error:
+        out['last_error'] = last_error
     return out
 
 
@@ -266,7 +270,8 @@ def _lock_key(scope: str, value: str) -> int:
 
 async def _count_since(session, column, value, since):
     return await session.scalar(select(func.count()).select_from(ProblemReport)
-                                .where(column == value, ProblemReport.created_at > since))
+                                .where(column == value, ProblemReport.kind == 'manual',
+                                       ProblemReport.created_at > since))
 
 
 async def create_report(session, who, *, request_id, body, context, images, client_ip_hash,
@@ -294,6 +299,7 @@ async def create_report(session, who, *, request_id, body, context, images, clie
             or await _count_since(session, ProblemReport.account_id, account_id, day) >= ACCOUNT_PER_DAY
             or await _count_since(session, ProblemReport.ip_hash, client_ip_hash, day) >= IP_PER_DAY
             or await session.scalar(select(func.count()).select_from(ProblemReport).where(
+                ProblemReport.kind == 'manual',
                 ProblemReport.created_at > now - timedelta(hours=1))) >= GLOBAL_PER_HOUR):
         raise MiniAppError(429, 'Слишком много отчётов, попробуй позже', code='rate_limited')
     report = ProblemReport(

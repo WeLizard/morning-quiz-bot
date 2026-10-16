@@ -3,7 +3,7 @@
 The bot runs with Defaults(parse_mode=MarkdownV2), so every call here sets parse_mode='HTML'
 explicitly and escapes everything that came from the player or the browser.
 """
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from html import escape
 from zoneinfo import ZoneInfo
@@ -84,11 +84,38 @@ def render_report(report, images_count: int) -> str:
     else:
         safe_line = None
 
+    error = context.get('error') if isinstance(context.get('error'), dict) else {}
+    crumbs = context.get('breadcrumbs') if isinstance(context.get('breadcrumbs'), list) else []
+    auto = getattr(report, 'kind', 'manual') == 'auto_error'
+    last = context.get('last_error') if isinstance(context.get('last_error'), dict) else None
+    last_error_line = None
+    if last and last.get('message'):
+        place = ':'.join(str(part) for part in (last.get('source'), last.get('line') or None) if part)
+        last_error_line = ('Последняя ошибка: ' + last['message'] + (f' ({place})' if place else '')
+                           + (f' (автоошибка №{last["report_id"]})' if last.get('report_id') else ''))
+
     def build(user_agent, body):
         # (plain, markup) pairs so the 4096 limit can be checked on text after tag parsing.
-        rows = [(f'🐞 Отчёт №{report.id} · {who} ({channel})',
-                 f'🐞 <b>Отчёт №{report.id}</b> · {escape(who)} ({escape(channel)})'),
-                (body, escape(body)), ('', ''), ('Контекст', '<b>Контекст</b>')]
+        if auto:
+            where = screen or context.get('path') or '—'
+            rows = [(f'⚠️ Автоошибка №{report.id} · {where}', f'⚠️ <b>Автоошибка №{report.id}</b> · {escape(where)}'),
+                    (report.text, escape(report.text))]
+            location = ':'.join(str(part) for part in (error.get('source') or '—', error.get('line') or None,
+                                                       error.get('column') or None) if part is not None)
+            rows.append((location, escape(location)))
+            if body:
+                rows.append((body, f'<pre>{escape(body)}</pre>'))
+            if crumbs:
+                line = 'Шаги: ' + ' → '.join(f'{item.get("kind")}:{item.get("target")}' for item in crumbs
+                                             if isinstance(item, dict))
+                rows.append((line, escape(line)))
+            rows.extend((('', ''), ('Контекст', '<b>Контекст</b>')))
+        else:
+            rows = [(f'🐞 Отчёт №{report.id} · {who} ({channel})',
+                     f'🐞 <b>Отчёт №{report.id}</b> · {escape(who)} ({escape(channel)})'),
+                    (body, escape(body))]
+            rows.extend(((last_error_line, escape(last_error_line)),) if last_error_line else ())
+            rows.extend((('', ''), ('Контекст', '<b>Контекст</b>')))
         lines = [screen_line, f'Версия: {report.build}', ' · '.join(tg)]
         if screens:
             lines.append(' · '.join(screens))
@@ -97,11 +124,16 @@ def render_report(report, images_count: int) -> str:
         if user_agent:
             lines.append('UA: ' + user_agent)
         lines.append(f'Аккаунт: {report.account_id or "—"}' + (f' · время: {when}' if when else ''))
-        lines.append(f'Картинок: {images_count}')
+        if auto:
+            lines.append(f'Повторов: {report.occurrences} · аккаунтов: {report.affected_accounts}')
+            lines.append('Повторы видны в админке.')
+        else:
+            lines.append(f'Картинок: {images_count}')
         rows.extend((line, escape(line)) for line in lines)
         return rows
 
-    body, user_agent = report.text, context.get('user_agent') or ''
+    body = '\n'.join(str(error.get('stack') or '').splitlines()[:12])[:1500] if auto else report.text
+    user_agent = context.get('user_agent') or ''
     for user_agent_limit in (len(user_agent), 120, 0):
         rows = build(user_agent[:user_agent_limit], body)
         if sum(_u16(plain) + 1 for plain, _ in rows) <= LIMIT:
@@ -114,6 +146,18 @@ def render_report(report, images_count: int) -> str:
                 break
             body = body[:-max(1, over // 2)]
     return '\n'.join(markup for _, markup in rows)
+
+
+def render_event(report, variant: str, count, accounts) -> str:
+    """Short follow-up about an already announced automatic error."""
+    message = (report.text or '')[:300]
+    if variant == 'returned':
+        head = (f'🔁 Ошибка №{report.id} вернулась (повторов: {count})',
+                f'🔁 <b>Ошибка №{report.id} вернулась</b> (повторов: {escape(str(count))})')
+    else:
+        head = (f'📈 Ошибка №{report.id}: уже {count} повторов у {accounts} аккаунтов',
+                f'📈 <b>Ошибка №{report.id}</b>: уже {escape(str(count))} повторов у {escape(str(accounts))} аккаунтов')
+    return head[1] + '\n' + escape(message) + '\nПовторы видны в админке.'
 
 
 async def _load(database, report_id, with_images):
@@ -133,11 +177,25 @@ async def _load(database, report_id, with_images):
 
 async def deliver(context, database, item):
     """Send one outbox item. Telegram errors propagate to the dispatcher (retry_after / uncertain)."""
-    report_id = item['payload']['report_id']
     chat_id = item['chat_id']
+    if item['kind'] == KIND_TEXT and item['payload'].get('variant') == 'digest':
+        since = datetime.fromisoformat(item['payload']['since'])
+        async with database.transaction() as session:
+            unannounced = await session.scalar(select(func.count()).select_from(ProblemReport).where(
+                ProblemReport.kind == 'auto_error', ProblemReport.notified_at.is_(None),
+                ProblemReport.created_at >= since, ProblemReport.created_at < since + timedelta(hours=1)))
+        if unannounced:  # counted at delivery time; nothing new means nothing to say
+            await context.bot.send_message(
+                chat_id, f'📊 +{unannounced} новых автоошибок за час — см. админку', parse_mode='HTML',
+                link_preview_options=LinkPreviewOptions(is_disabled=True))
+        return
+    report_id = item['payload']['report_id']
     if item['kind'] == KIND_TEXT:
         report, count = await _load(database, report_id, with_images=False)
-        await context.bot.send_message(chat_id, render_report(report, count), parse_mode='HTML',
+        variant = item['payload'].get('variant')
+        text = (render_event(report, variant, item['payload'].get('count'), item['payload'].get('accounts'))
+                if variant in ('returned', 'milestone') else render_report(report, count))
+        await context.bot.send_message(chat_id, text, parse_mode='HTML',
                                        link_preview_options=LinkPreviewOptions(is_disabled=True))
         return
     report, images = await _load(database, report_id, with_images=True)

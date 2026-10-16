@@ -116,3 +116,14 @@
   .qw-report.qw-open{transform:translate(-50%,-50%)}
   .qw-report-foot{padding-bottom:var(--qw-s-3)}}
 @media (prefers-reduced-motion:reduce){.qw-report{transition:none}}
+
+/* ---------- soft error toast (non-modal; the shell reports script errors automatically) ---------- */
+.qw-toast{position:fixed;z-index:2147482990;left:calc(var(--qw-gutter) + var(--qw-safe-left));right:calc(var(--qw-gutter) + var(--qw-safe-right));
+  margin-inline:auto;max-width:440px;box-sizing:border-box;display:flex;align-items:center;gap:var(--qw-s-2);padding:var(--qw-s-2) var(--qw-s-2) var(--qw-s-2) var(--qw-s-4);
+  background:var(--qw-game-surface);color:var(--qw-game-text);border:1px solid var(--qw-game-line);border-radius:var(--qw-r-card);box-shadow:var(--qw-shadow);
+  font:400 var(--qw-fs-body)/1.3 var(--qw-font)}
+.qw-toast-bottom{bottom:calc(var(--qw-safe-bottom) + var(--qw-s-3))}
+.qw-toast-top{top:calc(var(--qw-safe-top) + var(--qw-header-h) + var(--qw-s-2))}
+.qw-toast-text{flex:1;min-width:0}
+.qw-toast-close{flex:none}
+@media (max-width:359px){.qw-toast{flex-wrap:wrap}}

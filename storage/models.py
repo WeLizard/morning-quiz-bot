@@ -27,6 +27,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy import text as sql_text  # `text` is a column name inside ProblemReport
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -838,10 +839,22 @@ class ProblemReport(Base):
     status: Mapped[str] = mapped_column(String(16), default='new', server_default='new', nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Automatic client errors (kind='auto_error') are deduplicated by fingerprint into one row.
+    kind: Mapped[str] = mapped_column(String(16), default='manual', server_default='manual', nullable=False)
+    fingerprint: Mapped[Optional[str]] = mapped_column(String(64))
+    occurrences: Mapped[int] = mapped_column(Integer, default=1, server_default='1', nullable=False)
+    affected_accounts: Mapped[int] = mapped_column(Integer, default=1, server_default='1', nullable=False)
+    last_account_id: Mapped[Optional[UUID]] = mapped_column(Uuid)  # no FK: a hint, not an ownership link
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         UniqueConstraint('account_id', 'request_id', name='uq_problem_reports_account_request'),
         CheckConstraint("status IN ('new', 'in_progress', 'done')", name='ck_problem_reports_status'),
+        CheckConstraint("kind IN ('manual', 'auto_error')", name='ck_problem_reports_kind'),
+        Index('uq_problem_reports_auto_fingerprint', 'fingerprint', unique=True,
+              postgresql_where=sql_text("kind = 'auto_error'"), sqlite_where=sql_text("kind = 'auto_error'")),
+        Index('ix_problem_reports_kind_status_seen', 'kind', 'status', 'last_seen_at'),
         Index('ix_problem_reports_account_created', 'account_id', 'created_at'),
         Index('ix_problem_reports_ip_created', 'ip_hash', 'created_at'),
         Index('ix_problem_reports_status_created', 'status', 'created_at'),
@@ -861,6 +874,22 @@ class ProblemReportImage(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
     __table_args__ = (UniqueConstraint('report_id', 'position', name='uq_problem_report_images_position'),)
+
+
+class ProblemErrorHit(Base):
+    """One accepted automatic-error call; the rate limits count these, not the deduplicated rows."""
+    __tablename__ = 'problem_error_hits'
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'), primary_key=True, autoincrement=True)
+    account_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    ip_hash: Mapped[str] = mapped_column(String(64), default='', nullable=False)
+    report_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey('problem_reports.id', ondelete='CASCADE'), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('ix_problem_error_hits_account_created', 'account_id', 'created_at'),
+        Index('ix_problem_error_hits_ip_created', 'ip_hash', 'created_at'),
+    )
 
 
 class ScoreEvent(Base):

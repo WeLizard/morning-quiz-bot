@@ -1,6 +1,7 @@
 """Browser checks for docs/design/UI_RULES.md (Playwright).
 
     python tests/ui/ui_check.py nav                 # core shell: navigation, BackButton, menu, safe-area (no server)
+    python tests/ui/ui_check.py errors              # automatic error reports: capture, limits, sanitising, breadcrumbs, toast (no server)
     python tests/ui/ui_check.py gaps-selftest       # the button-gap scanner catches glued buttons (no server)
     python tests/ui/ui_check.py gaps --base URL     # real screens of a running app: glued buttons, tap height
 
@@ -436,6 +437,242 @@ def run_gaps(pw_browser, base, only=None):
     return c, report
 
 
+ERRORS_ROUTE = r'/problem-reports/errors'
+MANUAL_ROUTE = r'/problem-reports(\?|$)'
+
+
+def run_errors(pw_browser):
+    """Automatic error reports: capture, noise filter, dedup, rate limits, sanitising, breadcrumbs, soft toast, manual attach."""
+    import re
+    from playwright.sync_api import expect
+    c = Checks()
+
+    def count_is(locator, n):
+        try:
+            expect(locator).to_have_count(n, timeout=2000)
+            return True
+        except AssertionError:
+            return False
+
+    def clean_start(page, page_errors):
+        c.ok(page.evaluate('QW.errors.last() === null') and not page_errors and page.locator('.qw-toast').count() == 0, f'clean start (errors={page_errors})')
+
+    def diagnose(label, page, page_errors, before):
+        if len(c.failures) > before:
+            print(f'DIAG {label}: page_errors={page_errors} last={page.evaluate("QW.errors.last()")} toasts={page.locator(".qw-toast").count()}')
+
+    def settle(page, ms):
+        page.clock.run_for(ms)
+        page.wait_for_timeout(150)  # route callbacks run on the Python side
+
+    def fresh(clock=True, abort=False):
+        context = pw_browser.new_context(viewport={'width': 390, 'height': 800})
+        page = context.new_page()
+        posts, manual, page_errors = [], [], []
+        page.on('pageerror', lambda error: page_errors.append(str(error)))
+        if abort:
+            page.route(re.compile(ERRORS_ROUTE), lambda r: (posts.append(r.request.post_data), r.abort()))
+        else:
+            page.route(re.compile(ERRORS_ROUTE), lambda r: (posts.append(r.request.post_data), r.fulfill(status=202, content_type='application/json', body='{"accepted": true, "report_id": 7, "new": true}')))
+        page.route(re.compile(MANUAL_ROUTE), lambda r: (manual.append(r.request.post_data), r.fulfill(status=201, content_type='application/json', body='{"report_id": 9, "number": 9}')) if r.request.method == 'POST'
+                   else r.fulfill(status=404, content_type='application/json', body='{}'))
+        if clock:
+            page.clock.install(time=1_700_000_000_000)
+        harness(page, '?tg=none')
+        if clock:
+            page.clock.pause_at(1_700_000_001_000)  # install() alone lets time flow; pause it so every run_for is deterministic
+        page.evaluate("QW.boot({mode:'hub'}); QW.header.mountGear(document.getElementById('head'))")
+        return context, page, posts, manual, page_errors
+
+    fire = """(i) => window.dispatchEvent(new ErrorEvent('error', {message: 'Uncaught TypeError: boom ' + i, filename: location.href.split('#')[0] + '?q=1#h', lineno: 10 + i, colno: 3,
+        error: Object.assign(new TypeError('boom ' + i), {stack: 'TypeError: boom ' + i + '\\n    at f (' + location.href + '?a=1#b:' + (10 + i) + ':3)'})}))"""
+
+    # --- capture, noise, dedup, resource errors ---
+    context, page, posts, manual, page_errors = fresh()
+    page.evaluate(fire, 1)
+    settle(page, 50)
+    c.ok(len(posts) == 1, f'an error event is reported once, got {len(posts)}')
+    body = json.loads(posts[0]) if posts else {'error': {'source': '?', 'message': ''}}
+    c.ok(body['error'].get('type') == 'error' and body['error']['message'].startswith('TypeError: boom'), 'error record has type and message')
+    c.ok('?' not in body['error']['source'] and '#' not in body['error']['source'], 'source is a path without query and hash')
+    c.ok(bool(posts) and '?a=1' not in posts[0] and '#b' not in posts[0], 'stack URLs lose query and hash')
+    c.ok(bool(re.fullmatch(r'[0-9a-f-]{36}', body.get('request_id', ''))), 'request_id is a uuid')
+    page.evaluate(fire, 1)
+    settle(page, 4000)
+    c.ok(len(posts) == 1, 'the same fingerprint is sent once per page load')
+    page.evaluate("window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', {promise: Promise.resolve(), reason: new Error('rej 1')}))")
+    settle(page, 3100)
+    c.ok(len(posts) == 2 and json.loads(posts[1])['error']['type'] == 'unhandledrejection', 'unhandledrejection is reported')
+    page.evaluate("window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', {promise: Promise.resolve(), reason: 'plain string reason'}))")
+    settle(page, 3100)
+    c.ok('plain string reason' in posts[-1], 'a non-Error rejection reason becomes its string')
+    n = len(posts)
+    page.evaluate("window.dispatchEvent(new ErrorEvent('error', {message: 'ResizeObserver loop completed with undelivered notifications.', filename: location.href, lineno: 1}))")
+    page.evaluate("window.dispatchEvent(new ErrorEvent('error', {message: 'Script error.'}))")
+    page.evaluate("window.dispatchEvent(new ErrorEvent('error', {message: 'ext fail', filename: 'chrome-extension://abc/x.js', lineno: 4}))")
+    page.evaluate("const i = document.createElement('img'); i.src = 'missing-image.png'; document.body.append(i)")
+    settle(page, 4000)
+    c.ok(len(posts) == n, 'noise (ResizeObserver, Script error., extensions) and resource errors are ignored')
+    page.evaluate("(() => { const s = document.createElement('script'); s.textContent = \"throw new Error('real thrown 77')\"; document.head.append(s); Promise.reject(new Error('real rejected 88')); })()")
+    settle(page, 7000)
+    texts = ' '.join(posts[n:])
+    c.ok('real thrown' in texts and 'real rejected' in texts, 'real browser errors and rejections are captured')
+    context.close()
+
+    # --- rate limits: 1 per 3 s, 5 per load, queue is bounded ---
+    context, page, posts, manual, page_errors = fresh()
+    for i in range(20, 30):
+        page.evaluate(fire, i * 1000)
+    settle(page, 10)
+    c.ok(len(posts) == 1, f'first error goes out at once and the rest wait (3 s gap), got {len(posts)}')
+    for expected in (2, 3, 4, 5):
+        settle(page, 3100)
+        c.ok(len(posts) == expected, f'one more error per 3 s: expected {expected}, got {len(posts)}')
+    settle(page, 20000)
+    page.evaluate(fire, 99000)
+    settle(page, 5000)
+    c.ok(len(posts) == 5, f'at most 5 reports per page load, got {len(posts)}')
+    context.close()
+
+    # --- no recursion when the endpoint fails ---
+    context, page, posts, manual, page_errors = fresh(abort=True)
+    page.evaluate(fire, 5)
+    settle(page, 8000)
+    c.ok(len(posts) == 1 and not page_errors, f'a failing endpoint causes neither retries nor page errors (posts={len(posts)}, errors={page_errors})')
+    context.close()
+
+    # --- sanitising ---
+    context, page, posts, manual, page_errors = fresh()
+    page.evaluate("""() => { const dirty = 'bad https://x.example/a.js?token=SECRET1#frag tgWebAppData=query_id%3DAAA&user=%7B%22id%22%3A1%7D hash=deadbeef auth_date=1700000 '
+            + 'ivan@example.com +7 912 345 67 89 Bearer abc.def.ghi ' + 'A'.repeat(48);
+        window.dispatchEvent(new ErrorEvent('error', {message: dirty, filename: 'https://cdn.example/app.js?x=1#y', lineno: 3,
+            error: Object.assign(new Error(dirty), {stack: 'Error: ' + dirty + '\\n at q (https://cdn.example/app.js?x=1#y:3:1)'})})); }""")
+    settle(page, 50)
+    dirty = posts[0] if posts else ''
+    c.ok(bool(dirty), 'the sanitising probe was sent')
+    for needle in ('SECRET1', '#frag', 'tgWebAppData', 'user=%7B', 'hash=deadbeef', 'auth_date', 'ivan@example', '912 345', 'abc.def.ghi', 'AAAAAAAAAAAAAAAA', '?x=1', '#y'):
+        c.ok(needle not in dirty, f'sanitised: {needle!r} is not sent')
+    c.ok(bool(dirty) and json.loads(dirty)['error']['source'] == 'cdn.example/app.js', 'a foreign source keeps host and path only')
+    context.close()
+
+    # --- breadcrumbs: identifiers only ---
+    context, page, posts, manual, page_errors = fresh()
+    page.evaluate("""() => { const b = document.createElement('button'); b.className = 'plain big'; b.textContent = 'Иван Петров'; b.value = 'secret-value'; document.getElementById('main').append(b);
+        const d = document.createElement('button'); d.dataset.qwItem = 'sound'; d.textContent = 'Звук'; document.getElementById('main').append(d); }""")
+    page.click('button.plain')
+    page.click('[data-qw-item=sound]')
+    crumbs = page.evaluate('QW.errors.crumbs()')
+    c.ok(crumbs[-2]['target'] == 'button.plain' and crumbs[-1]['target'] == 'sound', f'crumb targets are ids or tag.class, got {crumbs[-2:]}')
+    c.ok('Иван' not in json.dumps(crumbs, ensure_ascii=False) and 'secret-value' not in json.dumps(crumbs), 'crumbs never contain text or values')
+    for _ in range(14):
+        page.click('button.plain')
+    page.evaluate("document.querySelector('[data-qw-gear]').click()")
+    page.evaluate("QW.menu.close(); QW.nav.push({id:'screen-x'}); QW.nav.pop('screen-x')")
+    crumbs = page.evaluate('QW.errors.crumbs()')
+    kinds = {x['kind'] for x in crumbs}
+    c.ok(len(crumbs) == 10, f'the ring keeps 10 crumbs, got {len(crumbs)}')
+    c.ok({'menu', 'nav'} <= kinds, f'menu and nav steps are recorded, got {kinds}')
+    page.evaluate(fire, 3)
+    settle(page, 50)
+    sent = json.loads(posts[0])
+    c.ok(len(sent['breadcrumbs']) == 10 and all(re.fullmatch(r'[A-Za-z0-9_.:#/-]{1,60}', x['target']) and isinstance(x['t'], int) for x in sent['breadcrumbs']), 'sent crumbs are 10 whitelisted ids with integer t')
+    c.ok('Иван' not in posts[0], 'no button text in the request')
+    context.close()
+
+    # --- soft toast ---
+    context, page, posts, manual, page_errors = fresh()
+    before = len(c.failures)
+    clean_start(page, page_errors)
+    page.evaluate(fire, 1)
+    c.ok(count_is(page.locator('.qw-toast[role=status]'), 1), 'a toast appears after the first error')
+    c.ok(page.evaluate("!document.querySelector('.qw-toast').hasAttribute('aria-modal') && !document.querySelector('.qw-menu-scrim')"), 'the toast is not modal')
+    c.ok(page.evaluate("[...document.querySelectorAll('.qw-toast button')].every(b => b.getBoundingClientRect().height >= 44)"), 'toast buttons are 44px tall')
+    page.evaluate(fire, 2)
+    c.ok(count_is(page.locator('.qw-toast'), 1), 'no second toast while one is shown')
+    page.click('.qw-toast-close')
+    c.ok(count_is(page.locator('.qw-toast'), 0), '✕ closes the toast')
+    page.evaluate(fire, 3)
+    c.ok(count_is(page.locator('.qw-toast'), 0), 'the toast is not shown again within 5 minutes')
+    diagnose('toast', page, page_errors, before)
+    context.close()
+
+    context, page, posts, manual, page_errors = fresh()
+    page.evaluate(fire, 1)
+    settle(page, 10100)
+    c.ok(count_is(page.locator('.qw-toast'), 0), 'the toast disappears after 10 s')
+    context.close()
+
+    context, page, posts, manual, page_errors = fresh()
+    page.evaluate("document.querySelector('[data-qw-gear]').click()")
+    page.evaluate(fire, 1)
+    c.ok(count_is(page.locator('.qw-toast'), 0), 'no toast while the menu is open')
+    context.close()
+
+    # --- «Сообщить» opens the form with last_error attached and visible ---
+    context, page, posts, manual, page_errors = fresh()
+    before = len(c.failures)
+    clean_start(page, page_errors)
+    page.evaluate(fire, 1)
+    settle(page, 50)
+    expect(page.locator('.qw-toast-send')).to_have_count(1, timeout=3000)
+    page.click('.qw-toast-send')
+    c.ok(page.evaluate('QW.report.isOpen()') and count_is(page.locator('.qw-toast'), 0), '«Сообщить» closes the toast and opens the report form')
+    page.click('.qw-report summary')
+    c.ok('Последняя ошибка' in (page.text_content('.qw-report-list') or '') and 'boom 1' in (page.text_content('.qw-report-list') or ''), 'the last error is visible in «Что приложится»')
+    page.fill('.qw-report-text', 'ошибка после нажатия')
+    page.click('.qw-report-foot .qw-btn')
+    page.wait_for_timeout(500)
+    context_sent = json.loads(manual[0])['context'] if manual else {}
+    last_error = context_sent.get('last_error', {})
+    c.ok(last_error.get('message', '').startswith('TypeError: boom 1') and last_error.get('report_id') == 7 and last_error.get('line') == 11, f'manual report carries last_error with the auto report id, got {last_error}')
+    diagnose('attach', page, page_errors, before)
+    context.close()
+
+    # --- URL clean-up keeps :line:col; huge input stays fast; spent budget stays cheap ---
+    context, page, posts, manual, page_errors = fresh()
+    page.evaluate("""() => { const stack = 'TypeError: t\\n at a (https://h.example/x.js?v=1:10:5)\\n at b (https://h.example/page#tgWebAppData=query_id%3DSECRETX&user=%7B1%7D:3:7)\\n    fn@https://h.example/y.js?v=1:20:9\\n at c (https://h.example/z.js:4:2)';
+        window.dispatchEvent(new ErrorEvent('error', {message: 'TypeError: t', filename: 'https://h.example/x.js?v=1', lineno: 10, error: Object.assign(new TypeError('t'), {stack})})); }""")
+    settle(page, 50)
+    stack = json.loads(posts[0])['error']['stack'] if posts else ''
+    for needle in ('x.js:10:5', 'page:3:7', 'y.js:20:9', 'z.js:4:2'):
+        c.ok(needle in stack, f'stack keeps line and column: {needle!r} in {stack!r}')
+    c.ok('SECRETX' not in stack and '?v=1' not in stack and 'tgWebAppData' not in stack, 'the secret hash and the query are gone from the stack')
+    context.close()
+
+    context, page, posts, manual, page_errors = fresh()
+    started = page.evaluate("""() => { const big = 'a'.repeat(100000) + '@' + 'b'.repeat(100000); const t = performance.now();
+        window.dispatchEvent(new ErrorEvent('error', {message: big, filename: location.href, lineno: 1, error: new Error(big)})); return performance.now() - t; }""")
+    settle(page, 50)
+    c.ok(started < 1000, f'a 200 KB message is handled quickly, took {started:.0f} ms')
+    c.ok(bool(posts) and len(posts[0]) < 16000, 'the 200 KB message is cut to a small request')
+    context.close()
+
+    context, page, posts, manual, page_errors = fresh()
+    for i in range(1, 30):
+        page.evaluate(fire, i * 1000)
+    settle(page, 20000)
+    c.ok(len(posts) == 5, f'budget caps sending at 5, got {len(posts)}')
+    c.ok(page.evaluate('QW.errors.last().message').startswith('TypeError: boom'), 'last() still follows later errors once the budget is spent')
+    context.close()
+
+    context, page, posts, manual, page_errors = fresh()
+    c.ok(page.evaluate("""() => { const body = document.body; body.remove(); let ok = true;
+        try { window.dispatchEvent(new ErrorEvent('error', {message: 'early failure', filename: location.href, lineno: 2, error: new Error('early failure')})); } catch { ok = false; }
+        document.documentElement.append(body); return ok && QW.errors.last()?.message === 'Error: early failure'; }"""), 'an error before <body> exists does not throw and is recorded')
+    settle(page, 50)
+    c.ok(len(posts) == 1 and not page_errors, f'the early error is still sent (posts={len(posts)}, errors={page_errors})')
+    context.close()
+
+    # --- public API ---
+    context, page, posts, manual, page_errors = fresh()
+    c.ok(page.evaluate("typeof QW.errors.capture === 'function' && typeof QW.errors.last === 'function' && typeof QW.errors.crumb === 'function' && QW.errors.last() === null"), 'QW.errors has capture, last and crumb')
+    page.evaluate("QW.errors.capture(new RangeError('manual capture'))")
+    settle(page, 50)
+    c.ok(page.evaluate("QW.errors.last().message") == 'RangeError: manual capture' and len(posts) == 1, 'QW.errors.capture reports a game-side error')
+    context.close()
+    return c
+
+
 def main(argv):
     command = argv[1] if len(argv) > 1 else 'nav'
     try:
@@ -451,6 +688,8 @@ def main(argv):
         try:
             if command == 'nav':
                 checks = run_nav(pw_browser)
+            elif command == 'errors':
+                checks = run_errors(pw_browser)
             elif command == 'startup':
                 base = argv[argv.index('--base') + 1].rstrip('/') if '--base' in argv else None
                 if not base:

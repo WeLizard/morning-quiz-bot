@@ -2,7 +2,10 @@
     'use strict';
     const content = document.getElementById('content'), nav = document.getElementById('navigation');
     const feedback = document.getElementById('feedback');
-    const tg = window.Telegram?.WebApp;
+    // Telegram launch data arrives with the SDK, which the shell loads asynchronously and only for Telegram launches;
+    // the entry below awaits QW.telegramReady before choosing between the Telegram and the browser path.
+    let tg = window.Telegram?.WebApp || null;
+    const telegramReady = (window.QW?.telegramReady || Promise.resolve(null)).then(webApp => { tg = webApp || tg; }, () => {});
     const LAUNCH_PAGES = {home: 'home', chats: 'chats', rating: 'rating', profile: 'profile',
                           achievements: 'achievements', history: 'history'};
     function launchTarget() {
@@ -2344,6 +2347,7 @@
         guestAllowed = config?.guest_enabled ?? config?.private_test !== true;
         return config?.offline ? request('/api/dev/info').catch(() => null) : null;
     }).then(async info => {
+        await telegramReady;
         state.demo = info?.demo === true;
         if (state.demo) { const banner = document.getElementById('environment'); banner.hidden = false; banner.textContent = info?.synthetic_player ? 'DEV · Тестовый игрок. Без отправки сообщений в Telegram.' : 'DEV · Просмотр твоего профиля из локальной БД.'; }
         if ((state.gameModes || []).some(mode => mode.id === 'farm' && mode.status === 'development') && farmLaunchHint()) {

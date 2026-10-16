@@ -15,14 +15,33 @@ const STYLES = ['web/shell/qw-tokens.css', 'web/shell/qw-shell.css', 'web/mini_c
     'qw_farm/static/style.css', 'minigames/alchemia-1.0/style.css'];
 const SCRIPTS = ['web/mini_client/app.js', 'web/mini_client/play-ui.js', 'qw_farm/static/app.js'];
 
-test('every page loads the shared tokens, shell and Telegram SDK in the right order', () => {
+test('every page loads the shared tokens and shell', () => {
     for (const page of PAGES) {
         const html = read(page);
-        for (const asset of ['/app/shell/qw-tokens.css', '/app/shell/qw-shell.css', '/app/shell/qw-shell.js', 'telegram.org/js/telegram-web-app.js']) {
+        for (const asset of ['/app/shell/qw-tokens.css', '/app/shell/qw-shell.css', '/app/shell/qw-shell.js']) {
             assert.ok(html.includes(asset), `${page} must include ${asset}`);
         }
-        assert.ok(html.indexOf('telegram-web-app.js') < html.indexOf('/app/shell/qw-shell.js'), `${page}: SDK before qw-shell.js`);
     }
+});
+
+// UI_RULES §7: a page never waits for another host. The Telegram SDK is a pinned local copy that qw-shell.js
+// loads asynchronously, and only for Telegram launches; telegram.org may be unreachable on a player's network.
+test('pages have no external <script src>, <link href> or Telegram SDK tag', () => {
+    for (const page of [...PAGES, 'web/mini_client/alchemy.html']) {
+        const html = read(page);
+        const external = [...html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)\s*=\s*["']((?:https?:)?\/\/[^"']+)/gi)].map(match => match[1]);
+        assert.deepEqual(external, [], `${page} loads ${external.join(', ')}`);
+        assert.ok(!/telegram-web-app\.js/.test(html), `${page}: the SDK is loaded by qw-shell.js, not by a tag`);
+    }
+});
+
+test('the pinned Telegram SDK is vendored with its provenance and is loaded only by the shell', () => {
+    const sdk = read('web/shell/vendor/telegram-web-app.js');
+    assert.match(sdk.slice(0, 600), /Source: https:\/\/telegram\.org\/js\/telegram-web-app\.js, Last-Modified [^\n]+\n[^\n]*fetched \d{4}-\d{2}-\d{2}/);
+    assert.ok(!/<script|importScripts|createElement\(['"]script/.test(sdk), 'SDK must not pull further scripts');
+    const shell = read('web/shell/qw-shell.js');
+    assert.ok(shell.includes("'/app/shell/vendor/telegram-web-app.js'") && shell.includes('telegramReady'));
+    assert.ok(!/https:\/\/telegram\.org\/js/.test(shell.replace(/\/\*[\s\S]*?\*\//g, '')), 'shell code must not reference telegram.org');
 });
 
 test('the built Alchemy keeps the shell links', () => {

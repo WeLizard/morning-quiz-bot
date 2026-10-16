@@ -151,7 +151,12 @@
 
 Мостом владеет только ядро. Его подключают все страницы: `/app`, `/app/farm`, `/app/alchemy`.
 
-- **SDK.** Скрипт `https://telegram.org/js/telegram-web-app.js` грузится всегда и без условий. CSP каждой страницы разрешает `'self'` и `https://telegram.org`. Вне Telegram SDK просто бездействует.
+- **SDK — только наш и только для Telegram.** Ни одна страница не грузит ничего с чужих хостов: ни telegram.org, ни шрифтов, ни CDN. На рабочей сети игрока telegram.org может быть недоступен, и раньше статический тег SDK держал страницу около 20 с.
+  - Закреплённая копия: `web/shell/vendor/telegram-web-app.js` (`/app/shell/vendor/…`). Источник: `https://telegram.org/js/telegram-web-app.js`, Last-Modified 2026-10-06, скачана 2026-10-16, sha256 оригинала `124bdff7…5908`. Версия, дата и хеш записаны в шапке файла. Обновление: скачать заново, убедиться, что SDK не тянет других скриптов, заменить, записать новые данные здесь и в шапке.
+  - В HTML тега SDK нет. Его асинхронно подгружает `qw-shell.js`, и только если страница похожа на запуск из Telegram: `tgWebApp*` в hash или query, сохранённые параметры запуска в `sessionStorage`, `window.TelegramWebviewProxy`. Таймаут 3 с.
+  - В браузере SDK не запрашивается, приложение сразу идёт браузерным путём: гость или вход.
+  - Код, которому нужны данные запуска Telegram (вход по initData), ждёт `await QW.telegramReady` — это WebApp или null, не дольше 3 с. Отрисовку этим ожиданием не задерживает.
+  - Проверки: `tests/js/ui_rules.test.cjs` (в HTML нет внешних script и link, есть шапка с версией SDK) и `tests/ui/ui_check.py startup --base URL` (все чужие хосты заблокированы — страницы рисуются за 2,5 с; Telegram-запуск получает наш SDK).
 - **На старте мост вызывает** `ready()`, `expand()`, `disableVerticalSwipes()` (7.7+), задаёт цвета шапки и фона Telegram под тему, подписывается на `safeAreaChanged`, `contentSafeAreaChanged`, `viewportChanged`, `fullscreenChanged`, `themeChanged` и `activated`.
 - **Безопасные отступы.** Пишет только мост:
   - `--qw-safe-top` = `max(env(safe-area-inset-top), tg.safeAreaInset.top)` + `tg.contentSafeAreaInset.top`;
@@ -257,7 +262,6 @@
 ```html
 <link rel="stylesheet" href="/app/shell/qw-tokens.css">
 <link rel="stylesheet" href="/app/shell/qw-shell.css">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="/app/shell/qw-shell.js"></script>   <!-- классический скрипт, window.QW -->
 ```
 

@@ -4,9 +4,8 @@
 (() => {
     'use strict';
     const QW = window.QW;
-    const tg = window.Telegram?.WebApp;
-    const root = document.documentElement;
-    if (tg?.initData) root.classList.add('in-telegram');
+    // The SDK may arrive after this file runs (the shell loads it asynchronously for Telegram launches only).
+    const webApp = () => window.Telegram?.WebApp;
     const FALLBACK_PREFS = {haptics: true, theme: 'system'};
     window.QuizTelegram = {
         // onBack is kept for the old call signature: BackButton is wired by QW.nav (app.js sets the root handler).
@@ -18,6 +17,7 @@
         openBot(username, action) {
             if (!/^[a-zA-Z0-9_]{5,32}$/.test(username || '') || !['quiz', 'photo', 'settings', 'home'].includes(action)) return false;
             const url = 'https://t.me/' + username + (action === 'home' ? '' : '?start=' + action);
+            const tg = webApp();
             if (tg?.initData && tg.openTelegramLink) { try { tg.openTelegramLink(url); tg.close(); } catch { return false; } }
             else window.open(url, '_blank', 'noopener,noreferrer');
             return true;

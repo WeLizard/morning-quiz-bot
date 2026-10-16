@@ -207,8 +207,9 @@ async function recoverFarmSession(renewFailed=false){
    await requestRaw(selectedMode==='telegram'?'/api/mini/session/renew':'/api/guest/resume',{method:'POST'});
   }catch(e){
    if(e.status!==401||selectedMode!=='telegram')return false;
-   // The SDK is loaded by the page before this module runs; QW.tg is set only when Telegram passed signed launch data
-   // (the SDK restores it from sessionStorage after in-tab navigation from /app).
+   // The shell loads the pinned SDK asynchronously and only for Telegram launches (UI_RULES §7); wait for it here.
+   // QW.tg is set only when Telegram passed signed launch data (restored from sessionStorage after in-tab navigation).
+   await QW?.telegramReady;
    const initData=QW?.tg?.initData;
    // Old launch data cannot authorize a new session. Do not repeatedly submit it.
    const authDate=Number(new URLSearchParams(initData||'').get('auth_date'));

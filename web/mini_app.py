@@ -221,7 +221,8 @@ def _etag_matches(request, response):
 
 
 SHELL_DIR = Path(__file__).parent / 'shell'
-SHELL_ASSETS = frozenset({'qw-tokens.css', 'qw-shell.css', 'qw-shell.js'})
+# vendor/telegram-web-app.js: pinned Telegram SDK, loaded by qw-shell.js only for Telegram launches (UI_RULES §7).
+SHELL_ASSETS = frozenset({'qw-tokens.css', 'qw-shell.css', 'qw-shell.js', 'vendor/telegram-web-app.js'})
 SHELL_ASSET_PATHS = frozenset('/app/shell/' + name for name in SHELL_ASSETS)
 
 
@@ -494,7 +495,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return HTMLResponse(content.replace(marker, scoped), headers={'Cache-Control': 'no-store'})
         return FileResponse(game_path)
 
-    @app.get('/app/shell/{asset}')
+    @app.get('/app/shell/{asset:path}')
     async def shell_asset(asset: str):
         # Общая оболочка QuizzyWizzy: токены, меню ⚙, навигация, Telegram-мост (docs/design/UI_RULES.md).
         if asset not in SHELL_ASSETS:

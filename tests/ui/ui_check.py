@@ -117,8 +117,10 @@ class Checks:
             self.failures.append(message)
 
 
-def harness(page, query=''):
-    page.goto(HARNESS + query)
+def harness(page, query='', hash_=''):
+    page.goto(HARNESS + query + hash_)
+    if hash_:
+        page.reload()  # a hash-only change does not reload the document; launch params are read at load time
     page.wait_for_function('window.QW')
 
 
@@ -273,6 +275,20 @@ def run_nav(pw_browser):
     c.ok(page.evaluate('QW.isTelegram()') is True, 'Telegram mode survives navigation via sessionStorage initParams')
     page.evaluate("sessionStorage.removeItem('__telegram__initParams')")
 
+    # --- SDK loading (UI_RULES §7): a plain browser never requests it; a Telegram launch never blocks the page ---
+    harness(page, '?tg=none')
+    c.ok(page.evaluate('QW.sdkState') == 'not-needed', 'browser: the Telegram SDK is not requested')
+    c.ok(page.evaluate("document.querySelectorAll('script[src*=\"telegram-web-app\"]').length") == 0, 'browser: no SDK script element')
+    c.ok(page.evaluate('QW.telegramReady.then(v => v === null)') is True, 'browser: telegramReady resolves to null at once')
+    harness(page, '?tg=none', '#tgWebAppData=x&tgWebAppPlatform=android&tgWebAppVersion=8.0')
+    page.evaluate("QW.boot({mode:'hub'}); window.headMounted = Boolean(QW.header.mountGear(document.getElementById('head')))")
+    c.ok(page.evaluate('window.headMounted') is True and page.evaluate('QW.sdkState') in ('loading', 'failed', 'timeout'),
+         f"Telegram launch: page boots without waiting for the SDK (state {page.evaluate('QW.sdkState')})")
+    started = page.evaluate('performance.now()')
+    page.evaluate('QW.telegramReady')
+    waited = page.evaluate('performance.now()') - started
+    c.ok(waited < 3600 and page.evaluate('QW.sdkState') in ('failed', 'timeout'), f'unreachable SDK gives up within 3 s (waited {round(waited)} ms)')
+
     # --- old Telegram (6.0): nothing throws, BackButton still wired ---
     harness(page, '?tg=android&v=6.0')
     page.evaluate("QW.boot({mode:'game'})")
@@ -301,6 +317,51 @@ def run_gaps_selftest(pw_browser):
 
 SETUP_PRELUDE = ("async () => { const wait = ms => new Promise(r => setTimeout(r, ms)); "
                  "const click = re => [...document.querySelectorAll('button,a')].find(x => re.test(x.textContent))?.click(); ")
+
+
+def run_startup(pw_browser, base):
+    """Pages render without any other host: telegram.org (and everything off-origin) is blocked; Telegram launches
+    still get the pinned SDK from our origin with working insets and BackButton."""
+    from urllib.parse import urlsplit
+    c = Checks()
+    origin = urlsplit(base).netloc
+    context = pw_browser.new_context(viewport={'width': 390, 'height': 844})
+    external = []
+
+    def guard(route):
+        host = urlsplit(route.request.url).netloc
+        if host and host != origin:
+            external.append(route.request.url)
+            return route.abort()
+        return route.continue_()
+    context.route('**/*', guard)
+    page = context.new_page()
+    for path, ready in (('/app', '[data-qw-gear]'), ('/app/farm', '[data-qw-gear], #login:not([hidden])'), ('/app/alchemy', '[data-qw-gear]')):
+        started = page.evaluate('performance.now()') if page.url.startswith('http') else 0
+        page.goto(base + path, wait_until='commit')
+        try:
+            page.wait_for_selector(ready, timeout=2500)
+            shown = True
+        except Exception:  # noqa: BLE001 - reported below
+            shown = False
+        c.ok(shown, f'{path}: rendered within 2.5 s with every other host blocked')
+        c.ok(page.evaluate('window.QW?.sdkState') in ('not-needed', None), f"{path}: browser does not request the SDK (state {page.evaluate('window.QW?.sdkState')})")
+        c.ok(not page.evaluate("document.body.innerText.includes('Открываем QuizzyWizzy')"), f'{path}: not stuck on the splash text')
+    c.ok(not external, f'no request leaves the origin: {external[:5]}')
+    tg_hash = ('#tgWebAppData=query_id%3Dx%26user%3D%257B%2522id%2522%253A1%257D%26auth_date%3D1%26hash%3Dx'
+               '&tgWebAppVersion=8.0&tgWebAppPlatform=android&tgWebAppThemeParams=%7B%7D')
+    page.goto(base + '/app/alchemy' + tg_hash, wait_until='load')
+    page.reload(wait_until='load')
+    page.wait_for_function('window.QW && QW.sdkState !== "loading"', timeout=4000)
+    c.ok(page.evaluate('QW.sdkState') == 'loaded' and page.evaluate('QW.isTelegram()'), f"Telegram launch: pinned SDK loaded from our origin ({page.evaluate('QW.sdkState')})")
+    page.evaluate("""() => { Telegram.WebView.receiveEvent('safe_area_changed', {top: 28, bottom: 0, left: 0, right: 0});
+        Telegram.WebView.receiveEvent('fullscreen_changed', {is_fullscreen: true}); }""")
+    page.wait_for_timeout(300)
+    c.ok(page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--qw-tg-safe-bottom').trim()") == '48px', 'Telegram launch: Android bottom fallback applied')
+    c.ok(page.evaluate('Telegram.WebApp.BackButton.isVisible') is True, 'Telegram launch: BackButton wired (game root → main menu)')
+    c.ok(not external, f'no request leaves the origin in Telegram mode either: {external[:5]}')
+    context.close()
+    return c
 
 
 def gap_scenarios(base):
@@ -380,6 +441,12 @@ def main(argv):
         try:
             if command == 'nav':
                 checks = run_nav(pw_browser)
+            elif command == 'startup':
+                base = argv[argv.index('--base') + 1].rstrip('/') if '--base' in argv else None
+                if not base:
+                    print('SKIP: startup needs --base URL of a running app')
+                    return 0
+                checks = run_startup(pw_browser, base)
             elif command == 'gaps-selftest':
                 checks = run_gaps_selftest(pw_browser)
             elif command == 'gaps':

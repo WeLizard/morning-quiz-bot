@@ -29,6 +29,10 @@ function check(t, ...args) {
 
 test('shell navigation, BackButton, ⚙ menu and safe-area work with and without Telegram', t => check(t, 'nav'));
 test('button-gap scanner catches glued buttons and allows .qw-btn-group', t => check(t, 'gaps-selftest'));
+test('pages render with telegram.org blocked; Telegram launches use the pinned SDK (QW_UI_BASE_URL)', t => {
+    if (!process.env.QW_UI_BASE_URL) { t.skip('set QW_UI_BASE_URL to a running app'); return; }
+    check(t, 'startup', '--base', process.env.QW_UI_BASE_URL);
+});
 test('real screens have no glued buttons and keep 44px taps (QW_UI_BASE_URL)', t => {
     if (!process.env.QW_UI_BASE_URL) { t.skip('set QW_UI_BASE_URL to a running app'); return; }
     check(t, 'gaps', '--base', process.env.QW_UI_BASE_URL);

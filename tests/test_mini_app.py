@@ -1160,11 +1160,13 @@ def test_admin_and_unscoped_routes_are_absent(pg_env, path):
 def test_shell_assets_are_served_to_every_game_page(pg_env):
     async def run():
         async with environment(pg_env) as env:
-            for name, kind in (('qw-shell.js', 'javascript'), ('qw-tokens.css', 'text/css'), ('qw-shell.css', 'text/css')):
+            for name, kind in (('qw-shell.js', 'javascript'), ('qw-tokens.css', 'text/css'), ('qw-shell.css', 'text/css'),
+                               ('vendor/telegram-web-app.js', 'javascript')):
                 response = await env.client.get('/app/shell/' + name)
                 assert response.status_code == 200 and kind in response.headers['content-type']
                 assert 'max-age' in response.headers['cache-control']
             assert (await env.client.get('/app/shell/app.js')).status_code == 404
+            assert (await env.client.get('/app/shell/vendor/app.js')).status_code == 404
             assert (await env.client.get('/app/shell/..%2Fmini_app.py')).status_code == 404
     asyncio.run(run())
 
@@ -1177,9 +1179,8 @@ def test_alchemia_atlas_is_served_as_self_contained_mini_app_page(pg_env):
             assert page.headers['content-type'].startswith('text/html')
             html = page.text
             assert 'атлас маленьких чудес' in html and 'alchemia.atlas.v1' in html
-            # Ресурсы автономны, кроме Telegram SDK; обе сетевые команды ведут только в наш API.
-            external = html.replace('src="https://telegram.org/js/telegram-web-app.js"', '')
-            assert 'src="http' not in external and 'href="http' not in html
+            # Ресурсы автономны (Telegram SDK грузит оболочка со своего origin); сеть — только наш API.
+            assert 'src="http' not in html and 'href="http' not in html and 'telegram-web-app.js' not in html
             # Общая оболочка QuizzyWizzy (docs/design/UI_RULES.md) подключается с того же origin.
             assert '/app/shell/qw-shell.js' in html and '/app/shell/qw-tokens.css' in html
             # sync.js builds endpoints from one per-identity base.

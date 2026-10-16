@@ -1,8 +1,10 @@
 /* QuizzyWizzy shell: Telegram bridge, safe-area, fullscreen, navigation stack and the ⚙ menu.
    Classic script (no modules) so the hub, the farm (ES modules) and the single-file Alchemy can all load it:
-     <script src="https://telegram.org/js/telegram-web-app.js"></script>
      <script src="/app/shell/qw-shell.js"></script>
-   Works the same with and without Telegram: outside Telegram the SDK is idle and every call degrades to the browser.
+   Pages never include the Telegram SDK themselves and never load anything from telegram.org. The shell loads the
+   pinned copy /app/shell/vendor/telegram-web-app.js asynchronously, and only when the page looks like a Telegram
+   launch (tgWebApp* params, saved launch params, TelegramWebviewProxy); a plain browser goes straight to its own
+   path. Code that needs Telegram launch data awaits QW.telegramReady (resolves to WebApp or null, ≤ 3 s).
    Rules: docs/design/UI_RULES.md (§4 header, §5 menu, §6 navigation, §7 bridge). */
 (() => {
     'use strict';
@@ -53,6 +55,40 @@
         try { return /tgWebAppData|tgWebAppPlatform/.test(sessionStorage.getItem('__telegram__initParams') || ''); } catch { return false; }
     }
     function isTelegram() { return Boolean(tg()?.initData) || (Boolean(tg()) && telegramSession() && tg().platform !== 'unknown'); }
+
+    /* ---------------- Telegram SDK: pinned local copy, loaded only for Telegram launches (UI_RULES §7) ---------------- */
+    const SDK_URL = '/app/shell/vendor/telegram-web-app.js';
+    const SDK_TIMEOUT = 3000;
+    let sdkState = 'absent';
+    function looksLikeTelegram() {
+        try { if (/tgWebApp/.test(location.hash) || /tgWebApp/.test(location.search)) return true; } catch {}
+        return telegramSession() || Boolean(window.TelegramWebviewProxy);
+    }
+    let sdkPromise = null;
+    function loadTelegramSdk() {
+        if (sdkPromise) return sdkPromise;
+        if (window.Telegram?.WebApp) { sdkState = 'present'; return (sdkPromise = Promise.resolve(window.Telegram.WebApp)); }
+        if (!looksLikeTelegram()) { sdkState = 'not-needed'; return (sdkPromise = Promise.resolve(null)); }
+        sdkState = 'loading';
+        sdkPromise = new Promise(resolve => {
+            let done = false;
+            const script = document.createElement('script');
+            const finish = state => {
+                if (done) return;
+                done = true; clearTimeout(timer);
+                sdkState = window.Telegram?.WebApp ? 'loaded' : state;
+                resolve(window.Telegram?.WebApp || null);
+            };
+            const timer = setTimeout(() => finish('timeout'), SDK_TIMEOUT);
+            script.src = SDK_URL;
+            script.async = true;
+            script.onload = () => finish('loaded');
+            script.onerror = () => finish('failed');
+            (document.head || document.documentElement).append(script);
+        });
+        return sdkPromise;
+    }
+    loadTelegramSdk();
     function platform() { return isTelegram() ? (tg().platform || 'unknown') : 'browser'; }
     function versionAtLeast(version) { return Boolean(call(() => tg()?.isVersionAtLeast?.(version))); }
     function isDesktop() { return root.classList.contains('qw-desktop') || matchMedia('(min-width: 1024px)').matches; }
@@ -114,7 +150,7 @@
         const vars = ['--qw-safe-top', '--qw-tg-safe-top', '--qw-tg-content-top', '--qw-safe-bottom', '--qw-tg-safe-bottom', '--qw-tg-content-bottom']
             .map(name => name.replace('--qw-', '') + '=' + probeLength(name));
         debugEl.textContent = [
-            'sdk ' + (t?.version || '-') + ' · ' + platform() + ' · telegram=' + isTelegram() + ' · fullscreen=' + Boolean(t?.isFullscreen),
+            'sdk ' + sdkState + ' ' + (t?.version || '-') + ' · ' + platform() + ' · telegram=' + isTelegram() + ' · fullscreen=' + Boolean(t?.isFullscreen),
             'safeAreaInset ' + JSON.stringify(t?.safeAreaInset || null) + ' · content ' + JSON.stringify(t?.contentSafeAreaInset || null),
             vars.slice(0, 3).join(' · ') + (root.classList.contains('qw-inset-fallback-top') ? ' · fallback-top' : ''),
             vars.slice(3).join(' · ') + (root.classList.contains('qw-inset-fallback-bottom') ? ' · fallback-bottom' : ''),
@@ -844,8 +880,26 @@
         if (config.title && !gameTitle) gameTitle = config.title;
         if (booted) { applyTheme(); syncBack(); return QW; }
         booted = true;
+        if (isTelegram()) attachTelegram();
+        else loadTelegramSdk().then(() => {
+            if (!isTelegram()) return;
+            attachTelegram(); writeInsets(); applyTheme(); syncBack(); menu.refresh();
+        });
+        document.addEventListener('fullscreenchange', onViewportChange);
+        addEventListener('resize', () => { if (!isTelegram()) call(() => config.onResize?.()); });
+        matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
+        writeInsets();
+        applyTheme();
+        syncBack();
+        return QW;
+    }
+
+    let telegramAttached = false;
+    function attachTelegram() {
+        if (telegramAttached) return;
+        telegramAttached = true;
         const t = tg();
-        if (isTelegram()) {
+        {
             root.classList.add('qw-telegram', 'in-telegram');
             if (DESKTOP_PLATFORMS.has(t.platform)) root.classList.add('qw-desktop');
             call(() => t.ready()); call(() => t.expand());
@@ -861,13 +915,6 @@
                 call(() => t.requestFullscreen());
             }
         }
-        document.addEventListener('fullscreenchange', onViewportChange);
-        addEventListener('resize', () => { if (!isTelegram()) call(() => config.onResize?.()); });
-        matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
-        writeInsets();
-        applyTheme();
-        syncBack();
-        return QW;
     }
 
     const QW = {
@@ -883,6 +930,9 @@
         },
         get config() { return {...config}; },
         isTelegram, isDesktop, platform, versionAtLeast,
+        /** Resolves to Telegram.WebApp for a Telegram launch, or null in a browser (never waits longer than 3 s). */
+        get telegramReady() { return loadTelegramSdk(); },
+        get sdkState() { return sdkState; },
         get tg() { return isTelegram() ? tg() : null; },
         header, menu, nav, fullscreen, session, haptic, report,
         goHome, openProfile, icon: svg,

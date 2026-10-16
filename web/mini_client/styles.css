@@ -305,4 +305,5 @@ body{font-size:var(--qw-fs-body);line-height:1.5}
 .qw-mode-game .environment{display:none!important}
 
 #content[data-page=guest-stub]{--col:var(--qw-col-read)}
-#content[data-page=guest-profile] .profile-card>.address-card{margin-top:var(--s-4)}
+#content[data-page=guest-settings] .profile-card>.address-card{margin-top:var(--s-4)}
+.address-example{margin:6px 0 12px;font-size:var(--qw-fs-h3);font-weight:700}.address-actions{display:flex;align-items:center;gap:var(--qw-s-3)}.address-snip{font-size:var(--qw-fs-small);opacity:.55;user-select:none;pointer-events:none}

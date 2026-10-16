@@ -66,6 +66,9 @@
   font:650 var(--qw-fs-small)/1.2 var(--qw-font);padding:8px 10px;cursor:pointer}
 .qw-btn-group>*+*{border-left:1px solid var(--qw-game-line)}
 .qw-btn-group>[aria-pressed="true"],.qw-btn-group>[aria-checked="true"],.qw-btn-group>[aria-current]{background:var(--qw-game-surface-2);color:var(--qw-game-text)}
+/* The chosen option is marked by more than shade: accent fill, bold text and a ✓ (UI_RULES §9). */
+.qw-btn-group>[aria-pressed="true"],.qw-btn-group>[aria-checked="true"]{background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink);font-weight:800}
+.qw-btn-group>[aria-pressed="true"]::before,.qw-btn-group>[aria-checked="true"]::before{content:"\2713\00a0"}
 
 /* ---------- problem report sheet (core menu item «Сообщить о проблеме») ---------- */
 .qw-report{position:fixed;z-index:2147483001;left:0;right:0;bottom:0;box-sizing:border-box;display:flex;flex-direction:column;

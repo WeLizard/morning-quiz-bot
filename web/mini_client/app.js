@@ -283,15 +283,15 @@
     const ADDRESS_TITLES = {m: 'Он', f: 'Она', n: 'Не указывать'};
     // Wording for the signed-in player's own form (Telegram profile or guest account); neutral until chosen.
     const gm = (m, f, n) => ADDRESS.g((state.me || state.guest)?.address_form, m, f, n);
-    function addressChooser(current, onPick) {
+    // The chosen option is marked explicitly (aria-pressed, fill, bold and ✓ from the core CSS), never by shade alone (UI_RULES §9).
+    function addressChooser(current, onPick, {allowSame = false} = {}) {
         const group = el('div', undefined, 'qw-btn-group address-choice'), message = el('p', '', 'error'); message.hidden = true;
-        group.setAttribute('role', 'radiogroup'); group.setAttribute('aria-label', 'Как к тебе обращаться');
+        group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Как к тебе обращаться');
         let value = current;
         const options = ADDRESS.FORMS.map(code => {
             const node = el('button', ADDRESS_TITLES[code]); node.type = 'button'; node.dataset.form = code;
-            node.setAttribute('role', 'radio');
             node.addEventListener('click', async () => {
-                if (code === value) return;
+                if (code === value && !allowSame) return;
                 options.forEach(option => { option.disabled = true; }); message.hidden = true;
                 try { await onPick(code); value = code; }
                 catch (error) { message.textContent = error.message; message.hidden = false; }
@@ -301,7 +301,7 @@
         });
         const paint = () => options.forEach(node => {
             const on = node.dataset.form === value;
-            node.setAttribute('aria-checked', String(on)); node.classList.toggle('selected', on);
+            node.setAttribute('aria-pressed', String(on)); node.classList.toggle('selected', on);
         });
         paint(); group.append(...options);
         const wrap = el('div'); wrap.append(group, message); return wrap;
@@ -316,20 +316,40 @@
         if (profile) Object.assign(profile, {address_form: result.address_form, address_form_chosen: true});
         return result;
     }
+    // The choice counts as made only when the server sent a known form and did not flag it as the default.
+    const addressChosen = profile => Boolean(profile) && profile.address_form_chosen !== false && ADDRESS.FORMS.includes(profile.address_form);
+    const ADDRESS_EXAMPLES = {m: 'Ты собрал урожай', f: 'Ты собрала урожай', n: 'Урожай собран'};
     // Шаг при первом входе: его можно пропустить («Не указывать» тоже запоминается, повторно не спрашиваем).
     function addressPrompt(channel, profile) {
-        if (!profile || profile.address_form_chosen) return null;
+        if (!profile || addressChosen(profile)) return null;
         const card = el('section', undefined, 'card address-card');
         card.append(el('span', 'Знакомство', 'eyebrow'), el('h2', 'Как к тебе обращаться?'));
         note(card, 'Чтобы игры говорили правильно: «собрал» или «собрала». Telegram пол не сообщает, поэтому мы не угадываем. Можно пропустить и поменять потом в настройках.');
         card.append(addressChooser(null, async code => { await saveAddressForm(channel, code); card.hidden = true; }));
         return card;
     }
+    // Chosen once: collapsed to an example plus «Исправить»; not chosen yet: the choice is open at once (UI_RULES §9).
     function addressSection(channel, profile) {
         const card = el('section', undefined, 'card address-card');
-        card.append(el('h2', 'Как к тебе обращаться'));
-        note(card, 'Игры будут говорить о тебе в нужной форме: «собрал» или «собрала». Выбор общий для приложения, Telegram и фермы.');
-        card.append(addressChooser(profile?.address_form_chosen ? profile.address_form : null, code => saveAddressForm(channel, code)));
+        const render = editing => {
+            card.replaceChildren(el('h2', 'Как к тебе обращаться'));
+            const chosen = addressChosen(profile);
+            if (chosen && !editing) {
+                note(card, 'Так игры будут к тебе обращаться');
+                card.append(el('p', ADDRESS_EXAMPLES[profile.address_form], 'address-example'));
+                const row = el('div', undefined, 'address-actions');
+                const scissors = el('span', '✂️', 'address-snip'); scissors.setAttribute('aria-hidden', 'true');
+                row.append(button('Исправить', () => { render(true); card.querySelector('.address-choice button')?.focus?.(); }, 'secondary'), scissors);
+                card.append(row);
+                return;
+            }
+            note(card, 'Игры будут говорить о тебе в нужной форме: «собрал» или «собрала». Выбор общий для приложения, Telegram и фермы.');
+            card.append(addressChooser(chosen ? profile.address_form : null, async code => {
+                if (chosen && code === profile.address_form) { render(false); return; }
+                await saveAddressForm(channel, code); render(false);
+            }, {allowSame: true}));
+        };
+        render(false);
         return card;
     }
     // Логин и пароль без почты: сессия та же, что у гостя (cookie выдаёт сервер).
@@ -347,7 +367,7 @@
             registering ? 'new-password' : 'current-password', 128);
         if (registering) note(form, 'Сохрани пароль. Если забудешь, а Telegram связан с профилем, войди через Telegram и задай новый пароль в разделе «Вход и устройства».', 'notice warn');
         let pickedForm = null;
-        if (registering && !state.guest?.address_form_chosen) {
+        if (registering && !addressChosen(state.guest)) {
             form.append(el('p', 'Как к тебе обращаться (можно пропустить)', 'field-label'));
             form.append(addressChooser(null, async code => { pickedForm = code; }));
         }
@@ -464,7 +484,7 @@
                 mergeScreen({preview: result.preview, auto: result.auto === true,
                     ids: {account_id: result.account_id, telegram_account_id: result.telegram_account_id},
                     confirm: body => guestRequest(TG_LOGIN + '/merge', 'POST', {headers: JSON_HEADERS, body: JSON.stringify(body)}),
-                    onCancel: () => state.guest ? guestProfile() : loginScreen()});
+                    onCancel: () => state.guest ? guestSettings() : loginScreen()});
                 return;
             }
             enterProfile(result.profile, result.result === 'linked' ? 'Telegram связан с профилем.'
@@ -580,7 +600,7 @@
                     await accountApi(identity, '/api/account/credentials', 'POST', {login: login.value, password: password.value});
                     if (!live()) return;
                     password.value = '';
-                    if (identity === 'guest' && state.guest) { state.guest.login = login.value; guestProfile(); feedback.textContent = 'Логин и пароль сохранены.'; return; }
+                    if (identity === 'guest' && state.guest) { state.guest.login = login.value; guestSettings(); feedback.textContent = 'Логин и пароль сохранены.'; return; }
                     await refresh(); feedback.textContent = 'Логин и пароль сохранены.';
                 } catch (error) { if (!live()) return; message.textContent = error.message; message.hidden = false; submit.disabled = false; }
             });
@@ -655,7 +675,7 @@
         }
         if (version !== generation || state.guest?.account_id !== accountId) return;
         if (pendingFarmInvite && resumeFarmInvite('guest', pendingFarmInvite)) return;
-        if (openSettingsOnLoad) { consumeSettingsHash(); await guestProfile(); return; }
+        if (openSettingsOnLoad) { consumeSettingsHash(); await guestSettings(); return; }
         window.QuizPlay?.stop(); showGuestTab('home'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest'; shell(); consumeSettingsHash();
         // Same hero and game cards as the Telegram home, limited to modes a guest can play.
         const hero = el('section', undefined, 'hero home-hero'), heroCopy = el('div', undefined, 'hero-copy');
@@ -806,16 +826,35 @@
         }).catch(error => { if (requestVersion === generation) note(roomList, error.message, 'error'); });
         guestSide.append(rooms);
     }
-    async function guestProfile({focusLink = false} = {}) {
+    // «Профиль» of a guest: the player card and a way into «Настройки», the same shape as for a Telegram player.
+    async function guestProfile() {
         stopRoomClassic();
         const version = ++generation, accountId = state.guest?.account_id;
         const nameImport = importGuestTelegramName();
         window.QuizPlay?.stop(); showGuestTab('profile'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-profile'; shell({page: 'profile'}); consumeSettingsHash();
+        const me = state.guest, saved = Boolean(me?.login), viaTelegram = Boolean(me?.telegram_user_id);
+        const card = el('section', undefined, 'card player-card'), who = el('div', undefined, 'player-who'), title = el('h1', me?.display_name || 'Гость');
+        who.append(title, el('small', saved ? `Профиль QuizzyWizzy · ${me.login}` : viaTelegram ? 'Профиль QuizzyWizzy · Telegram связан' : 'Гостевой профиль'));
+        card.append(el('span', initialOf(me?.display_name || 'Гость'), 'qw-avatar'), who, button('Настройки', () => guestSettings(), 'secondary settings-open'));
+        content.append(card);
+        if (!saved && !viaTelegram) note(content, 'Прогресс пока хранится только в этом браузере. Логин, пароль и привязка Telegram — в «Настройках».');
+        nameImport?.then(profile => {
+            if (version !== generation || state.guest?.account_id !== accountId || guestNamesEdited.has(accountId) || !profile) return;
+            if (state.guest.display_name === 'Гость') { state.guest = profile; title.textContent = profile.display_name; }
+        });
+    }
+    // «Профиль → Настройки» of a guest: name, form of address, login and Telegram link, devices, exit.
+    async function guestSettings({focusLink = false} = {}) {
+        stopRoomClassic();
+        const version = ++generation, accountId = state.guest?.account_id;
+        const nameImport = importGuestTelegramName();
+        window.QuizPlay?.stop(); showGuestTab('profile'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-settings'; shell({page: 'settings'}); consumeSettingsHash();
+        content.append(el('span', 'Профиль / Настройки', 'eyebrow settings-path'), el('h1', 'Настройки'));
         const guestLayout = el('div', undefined, 'guest-layout'), guestMain = el('div', undefined, 'guest-main'), guestSide = el('div', undefined, 'guest-side');
         guestLayout.append(guestMain, guestSide); content.append(guestLayout);
         const box = el('section', undefined, 'card profile-card');
         const saved = Boolean(state.guest?.login);
-        const profileTitle = el('h1', state.guest?.display_name || 'Гость');
+        const profileTitle = el('h2', state.guest?.display_name || 'Гость');
         const viaTelegram = Boolean(state.guest?.telegram_user_id);
         box.append(el('span', saved ? 'Профиль' : viaTelegram ? 'Профиль · Telegram' : 'Гостевой профиль', 'eyebrow'), profileTitle);
         const nameNotice = el('p', '', 'muted'); nameNotice.hidden = true; box.append(nameNotice);
@@ -849,7 +888,7 @@
                 guestNamesEdited.add(accountId);
                 state.guest = profile;
                 if (version !== generation) return;
-                await guestProfile();
+                await guestSettings();
             } catch (error) {
                 if (version !== generation) return;
                 nameMessage.textContent = error.message; nameMessage.hidden = false; saveName.disabled = false;
@@ -881,7 +920,7 @@
                             ids: {account_id: preview.account_id, telegram_account_id: preview.telegram_account_id},
                             confirm: body => guestRequest('/api/account/telegram-link/merge', 'POST', {headers: JSON_HEADERS,
                                 body: JSON.stringify({init_data: initData, ...body})}),
-                            onCancel: () => guestProfile()});
+                            onCancel: () => guestSettings()});
                         return;
                     }
                     if (preview.already_linked) {
@@ -936,7 +975,7 @@
             note(keep, 'Задай логин и пароль: прогресс останется за тобой и откроется с любого браузера.');
             note(keep, 'Сохрани пароль. Если забудешь, а Telegram связан с профилем, войди через Telegram и задай новый пароль в разделе «Вход и устройства».', 'notice warn');
             const open = button('Сохранить профиль: задать логин и пароль', () => {
-                open.hidden = true; keep.append(accountForm('save', guestProfile));
+                open.hidden = true; keep.append(accountForm('save', guestSettings));
             }, 'primary');
             keep.append(open); guestSide.append(keep);
         }
@@ -974,7 +1013,7 @@
         note(card, linked ? 'Профиль связан с Telegram. Войди через Telegram, чтобы увидеть чаты и рейтинг чатов.'
             : 'Чаты и рейтинг чатов появятся, когда ты свяжешь Telegram с профилем.');
         card.append(linked ? button('Войти через Telegram', guestSignInViaTelegram, 'primary')
-            : button('Связать Telegram', () => guestProfile({focusLink: true}), 'primary'));
+            : button('Связать Telegram', () => guestSettings({focusLink: true}), 'primary'));
         content.append(card);
     }
     // The same bottom bar as for Telegram players: the guest's four tabs share one structure.
@@ -1005,7 +1044,7 @@
             scheduleRenewal();
         } catch (error) {
             clearTimeout(renewTimer);
-            if (!state.authenticated) loginScreen('Сессия истекла. Откройте Mini App из Telegram заново.');
+            if (!state.authenticated) loginScreen('Сессия истекла. Войди снова: как гость, по логину и паролю или через Telegram.');
             else feedback.textContent = error.message;
         }
     }
@@ -1020,7 +1059,7 @@
     }
     function openAccountSettings() {
         if (state.authenticated) navigate('settings');
-        else if (state.guest) guestProfile();
+        else if (state.guest) guestSettings();
     }
     async function createTelegramSession(demo = state.demo, resume = false) {
         const result = await request(demo ? '/api/dev/session' : resume ? '/api/mini/session/resume' : '/api/mini/session', {method: 'POST',
@@ -2108,6 +2147,14 @@
         if (state.progress.last_activity) note(content, `Последняя активность: ${new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
         content.append(button('Обновить прогресс', load, 'text'));
     }
+    // Theme and haptics: per device, the same card for a Telegram player and a guest.
+    function appearanceCard() {
+        const preferences = el('section', undefined, 'card'); preferences.append(el('h2', 'Внешний вид'), el('p', 'Тема', 'field-label'));
+        preferences.append(segmented([['system', 'Как в системе'], ['dark', 'Тёмная'], ['light', 'Светлая']], window.QuizTelegram.prefs.theme, value => window.QuizTelegram.setTheme(value), 'Тема оформления'));
+        const haptics = button(window.QuizTelegram.prefs.haptics ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл', () => { const enabled = window.QuizTelegram.toggleHaptics(); haptics.textContent = enabled ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл'; haptics.setAttribute('aria-pressed', String(enabled)); }, 'secondary');
+        haptics.setAttribute('aria-pressed', String(window.QuizTelegram.prefs.haptics)); preferences.append(haptics);
+        return preferences;
+    }
     // «Профиль → Настройки»: only the account (UI_RULES §11). Game and schedule settings live on the chat page.
     async function settings() {
         content.append(el('span', 'Профиль / Настройки', 'eyebrow settings-path'), el('h1', 'Настройки'));
@@ -2116,11 +2163,7 @@
         const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
         row.append(copy, el('span', '✓', 'badge')); via.append(row);
         content.append(via, devicesSection('telegram'));
-        const preferences = el('section', undefined, 'card'); preferences.append(el('h2', 'Внешний вид'), el('p', 'Тема', 'field-label'));
-        preferences.append(segmented([['system', 'Как в системе'], ['dark', 'Тёмная'], ['light', 'Светлая']], window.QuizTelegram.prefs.theme, value => window.QuizTelegram.setTheme(value), 'Тема оформления'));
-        const haptics = button(window.QuizTelegram.prefs.haptics ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл', () => { const enabled = window.QuizTelegram.toggleHaptics(); haptics.textContent = enabled ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл'; haptics.setAttribute('aria-pressed', String(enabled)); }, 'secondary');
-        haptics.setAttribute('aria-pressed', String(window.QuizTelegram.prefs.haptics)); preferences.append(haptics);
-        content.append(preferences);
+        content.append(appearanceCard());
         const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}

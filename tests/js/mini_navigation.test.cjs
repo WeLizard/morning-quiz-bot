@@ -48,6 +48,7 @@ const findButton = (root, label) => {
     const found = root.querySelectorAll('button').find(n => n.textContent === label || n.textContent.startsWith(label));
     assert.ok(found, `Missing button: ${label}`); return found;
 };
+const openGuestSettings = async app => { await openGuestProfile(app); await findButton(app.content, 'Настройки').click(); await flush(); await flush(); };
 async function application(runtime = true, startParam = '', {overrides = {}, manualTimers = false, guestMode = false, savedGuest = false,
     farmEnabled = false, locationSearch = '', sessionValues = {}, miniCookie = false, autoLogin = true,
     historyThrows = false, replaceAvailable = true, initData = '', offline = true, assignFailures = 0, locationHash = ''} = {}) {
@@ -578,7 +579,7 @@ test('guest starts in a browser, resumes and logs out without a Telegram session
     const resumed = await application(true, '', {savedGuest: true});
     assert.equal(resumed.navigation.hidden, false);
     assert.doesNotMatch(resumed.content.textContent, /Гостевой профиль/);
-    await openGuestProfile(resumed);
+    await openGuestSettings(resumed);
     assert.match(resumed.content.textContent, /Гостевой профиль/);
     await findButton(resumed.content, 'Выйти и потерять доступ к гостю').click(); await flush();
     assert.ok(findButton(resumed.content, 'Продолжить как гость'));
@@ -596,10 +597,20 @@ test('guest gets the same four-tab bar: games and profile are separate, no dupli
     assert.equal(app.tab('profile').attrs['aria-current'], 'page');
     assert.equal(app.tab('home').attrs['aria-current'], undefined);
     assert.equal(app.qw.rootOptions.onScreen, false);
+    // The profile tab is only the player card with a way into «Настройки», like for a Telegram player.
+    assert.equal(app.content.querySelector('h1').textContent, 'Гость');
+    assert.doesNotMatch(app.content.textContent, /Вход и устройства|Сохранить имя|Выйти и потерять доступ|Как к тебе обращаться/);
+    await findButton(app.content, 'Настройки').click(); await flush(); await flush();
+    assert.equal(app.content.dataset.page, 'guest-settings');
+    assert.equal(app.content.querySelector('h1').textContent, 'Настройки');
+    assert.equal(app.tab('profile').attrs['aria-current'], 'page');
+    assert.equal(app.qw.rootOptions.onScreen, true);
     assert.ok(findButton(app.content, 'Сохранить имя'));
     assert.ok(findButton(app.content, 'Выйти и потерять доступ к гостю'));
     assert.match(app.content.textContent, /Вход и устройства/);
     assert.doesNotMatch(app.content.textContent, /Создать комнату|Классический квиз/);
+    app.ui.back(); await flush();
+    assert.equal(app.content.dataset.page, 'guest-profile', 'back from the settings returns to the profile card');
     await app.tab('home').click(); await flush();
     assert.equal(app.content.dataset.page, 'guest');
     assert.equal(app.tab('home').attrs['aria-current'], 'page');
@@ -618,7 +629,8 @@ test('guest Chats and Rating show a Telegram stub whose button opens the linking
         assert.equal(app.navigation.hidden, false);
     }
     await findButton(app.content, 'Связать Telegram').click(); await flush();
-    assert.equal(app.content.dataset.page, 'guest-profile');
+    // Account linking lives in «Профиль → Настройки» (UI_RULES §11), also for guests.
+    assert.equal(app.content.dataset.page, 'guest-settings');
     assert.equal(app.tab('profile').attrs['aria-current'], 'page');
     assert.ok(findButton(app.content, 'Связать с Telegram'));
     assert.equal(app.requests.filter(r => r.path.startsWith('/api/mini/chats') || r.path.includes('leaderboard')).length, 0);
@@ -932,7 +944,7 @@ test('linked account logout suppresses an existing Telegram cookie in ordinary a
     const first = await application(true, '', {savedGuest: true, miniCookie: true, initData: 'signed-return', offline: false,
         autoLogin: false, overrides: {'/api/guest/me': {status: 200, body: profile},
             '/api/guest/resume:POST': {status: 200, body: profile}}});
-    await openGuestProfile(first);
+    await openGuestSettings(first);
     await findButton(first.content, 'Выйти').click(); await flush();
     assert.equal(first.storage.get('mqb-telegram-logged-out'), '1');
     const reopened = await application(true, '', {miniCookie: true, initData: 'signed-return', offline: false, autoLogin: false,
@@ -974,7 +986,7 @@ test('Telegram link requires preview and checkbox, then keeps the guest account'
         }});
     assert.equal(app.content.dataset.page, 'guest');
     assert.equal(app.requests.filter(r => r.path === '/api/mini/session').length, 0);
-    await openGuestProfile(app);
+    await openGuestSettings(app);
     await findButton(app.content, 'Связать с Telegram').click();
     assert.match(app.content.textContent, /Алиса.*Alice TG.*99/);
     const confirm = findButton(app.content, 'Подтвердить связь');
@@ -992,7 +1004,7 @@ test('Telegram link requires preview and checkbox, then keeps the guest account'
     assert.deepEqual(JSON.parse(writes[1].options.body), {init_data: 'signed-link', confirm: true,
         account_id: 'account-a', telegram_user_id: 99});
     assert.match(app.content.textContent, /Telegram связан.*том же профиле/);
-    assert.equal(app.content.dataset.page, 'guest-profile');
+    assert.equal(app.content.dataset.page, 'guest-settings');
     assert.equal(app.requests.filter(r => r.path === '/api/mini/session').length, 0);
 });
 
@@ -1004,13 +1016,13 @@ test('Telegram link conflict leaves current guest account usable without confirm
             '/api/guest/resume:POST': {status: 200, body: profile},
             '/api/account/telegram-link/preview:POST': {status: 409, body: {detail: 'Telegram уже связан с другим профилем'}},
         }});
-    await openGuestProfile(app);
+    await openGuestSettings(app);
     const link = findButton(app.content, 'Связать с Telegram');
     await link.click();
     assert.match(app.content.textContent, /Telegram уже связан с другим профилем/);
     assert.equal(link.disabled, false);
     assert.equal(app.content.querySelectorAll('button').some(b => b.textContent === 'Подтвердить связь'), false);
-    assert.equal(app.content.dataset.page, 'guest-profile');
+    assert.equal(app.content.dataset.page, 'guest-settings');
     assert.equal(app.requests.filter(r => r.path === '/api/account/telegram-link/confirm').length, 0);
 });
 
@@ -1023,7 +1035,7 @@ test('returning to Telegram WebView resumes the chosen guest without silent Tele
             '/api/guest/resume:POST': {status: 200, body: profile},
         }});
     assert.equal(app.content.dataset.page, 'guest');
-    await openGuestProfile(app);
+    await openGuestSettings(app);
     assert.ok(findButton(app.content, 'Проверить связь с Telegram'));
     assert.equal(app.requests.filter(r => r.path === '/api/mini/session').length, 0);
     assert.equal(app.requests.filter(r => r.path.startsWith('/api/account/telegram-link/')).length, 0);
@@ -1796,7 +1808,7 @@ test('guest first entry offers the form of address once; a choice is saved on th
     assert.ok(prompt, 'the skippable first-entry step is shown');
     const radios = prompt.querySelectorAll('button');
     assert.deepEqual(radios.map(n => n.textContent), ['Он', 'Она', 'Не указывать']);
-    assert.ok(radios.every(n => n.attrs.role === 'radio'));
+    assert.ok(radios.every(n => n.attrs['aria-pressed'] === 'false'));
     await findButton(prompt, 'Она').click(); await flush();
     assert.deepEqual(saved, [{address_form: 'f'}]);
     assert.equal(prompt.hidden, true);
@@ -1804,17 +1816,59 @@ test('guest first entry offers the form of address once; a choice is saved on th
     assert.equal(request.options.headers['X-Guest-CSRF'], '1');
 });
 
-test('an already chosen form skips the first-entry card and is marked in the profile settings section', async () => {
+const addressCard = app => app.content.querySelectorAll('section').find(n => n.className.includes('address-card'));
+const pressed = node => node.querySelectorAll('button').filter(n => n.attrs['aria-pressed'] === 'true').map(n => n.textContent);
+
+test('an already chosen form skips the first-entry card and shows a collapsed example in guest settings', async () => {
+    const examples = {m: 'Ты собрал урожай', f: 'Ты собрала урожай', n: 'Урожай собран'};
+    for (const [form, example] of Object.entries(examples)) {
+        const chosen = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Ира', authentication: 'guest',
+            capabilities: ['guest-profile'], address_form: form, address_form_chosen: true};
+        const app = await application(true, '', {savedGuest: true, overrides: {
+            '/api/guest/me': {status: 200, body: chosen}, '/api/guest/resume:POST': {status: 200, body: chosen}}});
+        assert.doesNotMatch(app.content.textContent, /Как к тебе обращаться\?/, 'the onboarding card is gone');
+        await openGuestSettings(app);
+        const cards = app.content.querySelectorAll('section').filter(n => n.className.includes('address-card'));
+        assert.equal(cards.length, 1);
+        assert.match(cards[0].textContent, /Так игры будут к тебе обращаться/);
+        assert.match(cards[0].textContent, new RegExp(example));
+        assert.deepEqual(cards[0].querySelectorAll('button').map(n => n.textContent), ['Исправить'], 'the choice is collapsed');
+        const snip = cards[0].querySelectorAll('span').find(n => n.textContent === '✂️');
+        assert.ok(snip && snip.attrs['aria-hidden'] === 'true' && snip.attrs.title === undefined && !snip.events.click, 'the scissors are a quiet, inert detail');
+    }
+});
+
+test('«Исправить» opens the choice with the current form marked, a pick is saved and the card collapses again', async () => {
     const chosen = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Ира', authentication: 'guest',
         capabilities: ['guest-profile'], address_form: 'm', address_form_chosen: true};
+    const sent = [];
     const app = await application(true, '', {savedGuest: true, overrides: {
-        '/api/guest/me': {status: 200, body: chosen}, '/api/guest/resume:POST': {status: 200, body: chosen}}});
-    await openGuestProfile(app);
-    const cards = app.content.querySelectorAll('section').filter(n => n.className.includes('address-card'));
-    assert.equal(cards.length, 1);
-    assert.doesNotMatch(cards[0].textContent, /Как к тебе обращаться\?/);
-    const selected = cards[0].querySelectorAll('button').filter(n => n.attrs['aria-checked'] === 'true');
-    assert.deepEqual(selected.map(n => n.textContent), ['Он']);
+        '/api/guest/me': {status: 200, body: chosen}, '/api/guest/resume:POST': {status: 200, body: chosen},
+        '/api/account/address-form?identity=guest:POST': options => {
+            const body = JSON.parse(options.body); sent.push(body);
+            return {status: 200, body: {account_id: chosen.account_id, address_form: body.address_form, address_form_chosen: true}};
+        }}});
+    await openGuestSettings(app);
+    const card = addressCard(app);
+    await findButton(card, 'Исправить').click();
+    const group = card.querySelectorAll('.qw-btn-group')[0];
+    assert.ok(group, 'the three options form a .qw-btn-group');
+    assert.deepEqual(group.querySelectorAll('button').map(n => n.textContent), ['Он', 'Она', 'Не указывать']);
+    assert.deepEqual(pressed(group), ['Он']);
+    assert.equal(sent.length, 0);
+    await findButton(group, 'Она').click(); await flush();
+    assert.deepEqual(sent, [{address_form: 'f'}]);
+    assert.equal(card.querySelectorAll('.qw-btn-group').length, 0, 'collapsed again');
+    assert.match(card.textContent, /Ты собрала урожай/);
+    assert.deepEqual(card.querySelectorAll('button').map(n => n.textContent), ['Исправить']);
+});
+
+test('without a made choice the guest settings open the choice at once, with no «Исправить»', async () => {
+    const app = await application(true, '', {savedGuest: true});
+    await openGuestSettings(app);
+    const card = addressCard(app);
+    assert.deepEqual(card.querySelectorAll('button').map(n => n.textContent), ['Он', 'Она', 'Не указывать']);
+    assert.deepEqual(pressed(card), []);
 });
 
 test('Telegram profile asks for the form at home and changes it in settings through the same endpoint', async () => {
@@ -1829,12 +1883,32 @@ test('Telegram profile asks for the form at home and changes it in settings thro
     await findButton(prompt, 'Не указывать').click(); await flush();
     app.tab('profile').click(); await flush();
     findButton(app.content, 'Настройки').click(); await flush();
-    const section = app.content.querySelectorAll('section').find(n => n.className.includes('address-card'));
-    assert.deepEqual(section.querySelectorAll('button').filter(n => n.attrs['aria-checked'] === 'true').map(n => n.textContent), ['Не указывать']);
+    const section = addressCard(app);
+    assert.match(section.textContent, /Урожай собран/);
+    await findButton(section, 'Исправить').click();
+    assert.deepEqual(pressed(section), ['Не указывать']);
     await findButton(section, 'Она').click(); await flush();
     assert.deepEqual(sent.map(item => item[0]), [{address_form: 'n'}, {address_form: 'f'}]);
     assert.ok(sent.every(item => item[1] === '1' && item[2] === '1'));
-    assert.deepEqual(section.querySelectorAll('button').filter(n => n.attrs['aria-checked'] === 'true').map(n => n.textContent), ['Она']);
+    assert.match(section.textContent, /Ты собрала урожай/);
+    assert.deepEqual(section.querySelectorAll('button').map(n => n.textContent), ['Исправить']);
+});
+
+test('the account lives in «Настройки» for a guest and no screen sends a player only to Telegram', async () => {
+    const app = await application(true, '', {savedGuest: true, initData: 'signed', offline: false, autoLogin: false});
+    await openGuestSettings(app);
+    for (const part of [/Вход и устройства/, /Сохранить профиль/, /Как к тебе обращаться/, /Связать с Telegram/])
+        assert.match(app.content.textContent, part);
+    assert.ok(findButton(app.content, 'Выйти и потерять доступ к гостю'));
+    // An expired session offers the in-browser ways in, with Telegram as one option.
+    const expired = await application(true, '', {manualTimers: true,
+        overrides: {'/api/mini/session/renew': {status: 401, body: {detail: 'Сессия завершена'}}}});
+    await expired.timers.find(timer => timer.delay === 600000).callback(); await flush(); await flush();
+    assert.match(expired.content.textContent, /Сессия истекла\. Войди снова/);
+    assert.doesNotMatch(expired.content.textContent, /Mini App из Telegram/);
+    assert.ok(findButton(expired.content, 'Продолжить как гость'));
+    assert.ok(findButton(expired.content, 'Войти по логину'));
+    assert.ok(findButton(expired.content, 'Создать аккаунт'));
 });
 
 test('player-facing profile text follows the chosen form and stays neutral by default', async () => {
@@ -1844,7 +1918,7 @@ test('player-facing profile text follows the chosen form and stays neutral by de
             login: 'ira', capabilities: ['guest-profile'], ...(form ? {address_form: form, address_form_chosen: true} : {})};
         const app = await application(true, '', {savedGuest: true, overrides: {
             '/api/guest/me': {status: 200, body: profile}, '/api/guest/resume:POST': {status: 200, body: profile}}});
-        await openGuestProfile(app);
+        await openGuestSettings(app);
         assert.match(app.content.textContent, expected, `form ${form}`);
         assert.doesNotMatch(app.content.textContent, /\(а\)|вошёл\(а\)/);
     }
@@ -1976,7 +2050,7 @@ test('Mini App link preview with merge_required opens the merge screen and confi
             telegram_account_id: 'account-t', preview: mergePreview, already_linked: false}},
         '/api/account/telegram-link/merge:POST': {status: 200, body: {result: 'merged', account_id: 'account-a', lost_login: null, profile: {...profile, telegram_user_id: 99}}},
     }});
-    await openGuestProfile(app);
+    await openGuestSettings(app);
     await findButton(app.content, 'Связать с Telegram').click();
     assert.equal(app.content.dataset.page, 'merge');
     assert.equal(app.content.querySelectorAll('button').some(b => b.textContent.startsWith('Главный')), false);
@@ -2027,7 +2101,7 @@ test('guest home outside Telegram offers linking through the same flow', async (
         [LOGIN + '/status']: {status: 200, body: {status: 'approved', expires_at: 'x'}},
         [LOGIN + '/complete:POST']: {status: 200, body: {result: 'linked', account_id: 'account-a', profile: {...profile, telegram_user_id: 99}}},
     }});
-    await openGuestProfile(app);
+    await openGuestSettings(app);
     await findButton(app.content, 'Связать с Telegram').click();
     await pollOnce(app);
     assert.equal(app.content.dataset.page, 'guest');
@@ -2043,7 +2117,7 @@ const guestDevicesApp = (overrides, profileExtra = {}) => {
     const profile = {account_id: 'account-a', display_name: 'Алиса', login: 'alice', authentication: 'guest', ...profileExtra};
     return application(true, '', {savedGuest: true, offline: false, autoLogin: false, overrides: {
         '/api/guest/me': {status: 200, body: profile}, '/api/guest/resume:POST': {status: 200, body: profile}, ...overrides}})
-        .then(async app => { await openGuestProfile(app); return app; });
+        .then(async app => { await openGuestSettings(app); return app; });
 };
 const inputNamed = (root, name) => root.querySelectorAll('input').find(n => n.name === name);
 
@@ -2122,7 +2196,7 @@ test('password change omits an empty current password and shows current_password
     assert.deepEqual(JSON.parse(posts[0].options.body), {new_password: 'brand-new-pass'});
     assert.deepEqual(JSON.parse(posts[1].options.body), {new_password: 'brand-new-pass', current_password: 'old-pass-123'});
     assert.match(app.feedback.textContent, /Пароль изменён/);
-    assert.equal(app.content.dataset.page, 'guest-profile');
+    assert.equal(app.content.dataset.page, 'guest-settings');
 });
 
 test('Telegram profile page shows the devices section with identity=telegram', async () => {

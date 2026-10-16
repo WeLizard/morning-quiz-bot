@@ -25,8 +25,11 @@ _STATE_ERROR = ('invalid_minigame_state', 'Некорректное состоя
 _COIN_REWARDS = {max(10, value // 100) for _, _, value in INCOME_REF_BANDS}
 
 
-def next_reward(farm):
-    return {'kind': 'coins', 'amount': max(10, income_ref(level(farm['xp'])) // 100)}
+def next_reward(farm, game=None):
+    reward = {'kind': 'coins', 'amount': max(10, income_ref(level(farm['xp'])) // 100)}
+    if game == 'barn':
+        reward['bonus_feed'] = 1   # barn pays coins and one feed; the house pays coins only
+    return reward
 
 
 def _attempt_reward(game, active):
@@ -71,7 +74,7 @@ def public(farm, now):
         else:
             challenge = None
         result[game] = {'available_at': state['available_at'], 'active': challenge,
-                        'last_result': deepcopy(state['last_result']), 'next_reward': next_reward(farm)}
+                        'last_result': deepcopy(state['last_result']), 'next_reward': next_reward(farm, game)}
     return result
 
 
@@ -112,7 +115,7 @@ def start(farm, data, now, question=None):
         solution = {key: category for key, _, category in sacks}
     state['active'] = {'attempt_id': str(uuid4()), 'started_at': now,
                        'expires_at': now + LIFETIME, 'challenge': challenge, 'solution': solution,
-                       'reward': next_reward(farm)}
+                       'reward': next_reward(farm, game)}
     state['available_at'] = now + COOLDOWN
     return 'Задание начато.', True
 
@@ -149,8 +152,14 @@ def answer(farm, data, now):
         farm['coins'] += reward
     else:
         farm['inventory']['feed'] = farm['inventory'].get('feed', 0) + reward
-    state['last_result'] = {'attempt_id': attempt_id, 'correct': correct,
-                            'reward': reward, 'reward_kind': payout['kind'], 'answered_at': now}
+    last = {'attempt_id': attempt_id, 'correct': correct,
+            'reward': reward, 'reward_kind': payout['kind'], 'answered_at': now}
+    if 'bonus_feed' in payout:
+        bonus = payout['bonus_feed'] if correct else 0
+        if bonus:
+            farm['inventory']['feed'] = farm['inventory'].get('feed', 0) + bonus
+        last['bonus_feed'] = bonus
+    state['last_result'] = last
     state['active'] = None
     return ('Верно!' if correct else 'На этот раз не вышло.'), True
 
@@ -170,9 +179,12 @@ def validate(farm):
             need(type(active) is dict and set(active) in (base_fields, base_fields | {'reward'}), *_STATE_ERROR)
             if 'reward' in active:
                 payout = active['reward']
-                need(type(payout) is dict and set(payout) == {'kind', 'amount'} and
+                need(type(payout) is dict and set(payout) in ({'kind', 'amount'}, {'kind', 'amount', 'bonus_feed'}) and
                      payout['kind'] == 'coins' and type(payout['amount']) is int and
                      payout['amount'] in _COIN_REWARDS, *_STATE_ERROR)
+                need('bonus_feed' not in payout or
+                     (game == 'barn' and type(payout['bonus_feed']) is int and payout['bonus_feed'] == 1),
+                     *_STATE_ERROR)
             need(_valid_attempt_id(active['attempt_id']) and _time(active['started_at']) and
                  _time(active['expires_at']) and active['expires_at']-active['started_at'] == LIFETIME and
                  state['available_at'] >= active['started_at'] + COOLDOWN, *_STATE_ERROR)
@@ -200,7 +212,12 @@ def validate(farm):
         result = state['last_result']
         if result is not None:
             base_fields = {'attempt_id', 'correct', 'reward', 'answered_at'}
-            need(type(result) is dict and set(result) in (base_fields, base_fields | {'reward_kind'}), *_STATE_ERROR)
+            need(type(result) is dict and set(result) in (base_fields, base_fields | {'reward_kind'},
+                                                            base_fields | {'reward_kind', 'bonus_feed'}), *_STATE_ERROR)
+            if 'bonus_feed' in result:
+                need(game == 'barn' and result['reward_kind'] == 'coins' and type(result['bonus_feed']) is int and
+                     result['bonus_feed'] == (1 if type(result['correct']) is bool and result['correct'] else 0),
+                     *_STATE_ERROR)
             if 'reward_kind' in result:
                 allowed_rewards = (_COIN_REWARDS | ({10} if game == 'house' else set())
                                    if result['reward_kind'] == 'coins' else

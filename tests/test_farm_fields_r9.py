@@ -718,8 +718,9 @@ def test_a_run_opened_before_the_rule_keeps_the_plain_quality_and_its_old_deadli
     del run['qrule']
     run['expires_at'] = T0 + 900                                                              # how such a run was stored
     path = fields.reference_path(fld(f), run)
+    expected = fields.quality(fields.simulate(fld(f), run, path))         # the plain quality of this exact route (the layout depends on the random farm id)
     finish(f, path, T0 + 800)                                                                   # far beyond the 225 s of a timed run
-    assert fld(f)['q_cult'] == 1100
+    assert fld(f)['q_cult'] == expected and expected > Q_AUTO
     g = equipped()
     old = start(g, 'cultivate', T0)
     del old['qrule']

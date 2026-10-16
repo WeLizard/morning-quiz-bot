@@ -502,7 +502,8 @@ function renderMinigameResult(game,result,parent){
  const box=el('div',null,`minigame-result ${result.correct?'is-correct':'is-missed'}`);
  const reward=Number(result.reward)||0;
  const rewardKind=result.reward_kind||(game==='house'?'coins':'feed');
- const rewardText=rewardKind==='feed'?`${reward} корма`:`${reward} монет`;
+ const bonusFeed=rewardKind==='coins'&&Number(result.bonus_feed)>0?Number(result.bonus_feed):0;
+ const rewardText=rewardKind==='feed'?`${reward} корма`:bonusFeed?`${reward} монет и ${bonusFeed} корм`:`${reward} монет`;
  box.append(el('strong',result.correct?`Верно! +${rewardText}`:'Ответ сохранён, но приз не получен.'),el('small',`Последняя игра · ${new Date(result.answered_at*1000).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'})}`));
  parent.append(box);
 }
@@ -511,10 +512,11 @@ function renderMinigame(game,parent){
  const state=S.me?.minigames?.[game];if(!state)return;
  const active=state.active,house=game==='house',title=house?'Вопрос Филиныча':'Шесть мешков';
  const reward=active?.reward||state.next_reward,kind=reward?.kind||(house?'coins':'feed'),amount=reward?.amount??(house?10:1);
- const payout=kind==='feed'?`${amount} корма`:`${amount} монет`;
+ const bonusFeed=kind==='coins'&&Number(reward?.bonus_feed)>0?Number(reward.bonus_feed):0;
+ const payout=kind==='feed'?`${amount} корма`:bonusFeed?`${amount} монет и ${bonusFeed} корм`:`${amount} монет`;
  const box=card(title,house?`Проверь смекалку · +${payout}`:`Разбери доставку для Филиныча · +${payout}`,'home');
  box.classList.add('minigame-card',`minigame-${game}`);
- box.append(el('p',house?'Выбери правильный ответ. Филиныч вручит приз.':kind==='feed'?'Подбери каждому мешку подходящую полку. За помощь Филиныч даст корм.':'Подбери каждому мешку подходящую полку. Это доставка для Филиныча; за помощь он заплатит монетами.','minigame-intro'));
+ box.append(el('p',house?'Выбери правильный ответ. Филиныч вручит приз.':kind==='feed'?'Подбери каждому мешку подходящую полку. За помощь Филиныч даст корм.':'Подбери каждому мешку подходящую полку. Это доставка для Филиныча; за помощь он заплатит монетами'+(bonusFeed?' и даст корм.':'.'),'minigame-intro'));
  if(active){
   const clock=el('div',null,'minigame-clock');clock.append(el('span','На задание осталось'),timer(active.expires_at));box.append(clock);
   if(Number(state.available_at)>now()){const cooldown=el('p',null,'minigame-cooldown');cooldown.append(el('span','Повторно можно будет через '),timer(state.available_at));box.append(cooldown);}

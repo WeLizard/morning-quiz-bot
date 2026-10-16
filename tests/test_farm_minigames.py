@@ -60,7 +60,7 @@ def test_wrong_house_answer_gives_no_reward_and_records_result():
     assert farm['minigames']['house']['last_result']['reward'] == 0
 
 
-def test_barn_correct_answer_rewards_feed_and_public_state_never_exposes_solution():
+def test_barn_correct_answer_rewards_coins_and_feed_and_public_state_never_exposes_solution():
     farm = _farm()
     minigames.start(farm, {'game': 'barn'}, NOW)
     active = farm['minigames']['barn']['active']
@@ -71,11 +71,81 @@ def test_barn_correct_answer_rewards_feed_and_public_state_never_exposes_solutio
     assert all('category' not in sack for sack in public['sacks'])
     solution = deepcopy(active['solution'])
     assert minigames.answer(farm, {'game': 'barn', 'attempt_id': active['attempt_id'], 'answer': solution}, NOW + 1) == ('Верно!', True)
-    assert farm['coins'] == public['reward']['amount'] and farm['inventory'].get('feed', 0) == 0
+    assert public['reward'] == {'kind': 'coins', 'amount': public['reward']['amount'], 'bonus_feed': 1}
+    assert farm['coins'] == public['reward']['amount'] and farm['inventory'].get('feed', 0) == 1
+    assert farm['minigames']['barn']['last_result']['bonus_feed'] == 1
+    assert minigames.public(farm, NOW + 2)['barn']['next_reward']['bonus_feed'] == 1
+    assert 'bonus_feed' not in minigames.public(farm, NOW + 2)['house']['next_reward']
+    # replaying the same attempt pays nothing more
+    assert minigames.answer(farm, {'game': 'barn', 'attempt_id': active['attempt_id'], 'answer': solution}, NOW + 3)[1] is False
+    assert farm['inventory']['feed'] == 1 and farm['coins'] == public['reward']['amount']
+    minigames.validate(farm)
+
+
+def test_barn_wrong_answer_pays_nothing():
+    farm = _farm()
+    minigames.start(farm, {'game': 'barn'}, NOW)
+    active = farm['minigames']['barn']['active']
+    wrong = {key: 'berry' if value != 'berry' else 'grain' for key, value in active['solution'].items()}
+    assert minigames.answer(farm, {'game': 'barn', 'attempt_id': active['attempt_id'], 'answer': wrong}, NOW + 1) == ('На этот раз не вышло.', True)
+    assert farm['coins'] == 0 and farm['inventory'].get('feed', 0) == 0
+    assert farm['minigames']['barn']['last_result']['bonus_feed'] == 0
+    minigames.validate(farm)
+
+
+def test_old_barn_attempts_keep_their_payout_and_old_states_validate():
+    amount = minigames.next_reward(_farm())['amount']
+    for reward, coins, feed in ((None, 0, 1), ({'kind': 'coins', 'amount': amount}, amount, 0),
+                                ({'kind': 'coins', 'amount': amount, 'bonus_feed': 1}, amount, 1)):
+        farm = _farm()
+        minigames.start(farm, {'game': 'barn'}, NOW)
+        active = farm['minigames']['barn']['active']
+        if reward is None:
+            del active['reward']
+        else:
+            active['reward'] = reward
+        minigames.validate(farm)
+        solution = deepcopy(active['solution'])
+        minigames.answer(farm, {'game': 'barn', 'attempt_id': active['attempt_id'], 'answer': solution}, NOW + 1)
+        assert (farm['coins'], farm['inventory'].get('feed', 0)) == (coins, feed)
+        minigames.validate(farm)
+    legacy = {'attempt_id': str(uuid4()), 'correct': True, 'reward': 1, 'reward_kind': 'feed', 'answered_at': NOW}
+    farm = _farm()
+    minigames.upgrade(farm)
+    farm['minigames']['barn']['last_result'] = legacy
+    minigames.validate(farm)
+    farm['minigames']['barn']['last_result'] = {k: v for k, v in legacy.items() if k != 'reward_kind'}
+    minigames.validate(farm)
+
+
+def test_validate_rejects_bad_bonus_feed():
+    def bad(game, mutate):
+        farm = _farm()
+        minigames.start(farm, {'game': game}, NOW, QUESTION)
+        mutate(farm['minigames'][game]['active'])
+        with pytest.raises(FarmError):
+            minigames.validate(farm)
+
+    bad('barn', lambda a: a['reward'].update(bonus_feed=2))
+    bad('barn', lambda a: a['reward'].update(bonus_feed=True))
+    bad('house', lambda a: a['reward'].update(bonus_feed=1))
+    farm = _farm()
+    minigames.upgrade(farm)
+    result = {'attempt_id': str(uuid4()), 'correct': True, 'reward': 10, 'reward_kind': 'coins',
+              'bonus_feed': 1, 'answered_at': NOW}
+    farm['minigames']['house']['last_result'] = dict(result)
+    with pytest.raises(FarmError):
+        minigames.validate(farm)
+    for bonus, correct in ((2, True), (0, True), (1, False)):
+        farm['minigames']['house']['last_result'] = None
+        farm['minigames']['barn']['last_result'] = dict(result, bonus_feed=bonus, correct=correct,
+                                                         reward=10 if correct else 0)
+        with pytest.raises(FarmError):
+            minigames.validate(farm)
 
 
 def test_attempt_started_before_the_reward_snapshot_keeps_its_old_payout():
-    # old attempts have no 'reward' key and still pay what they promised: 1 feed for the barn
+    # old attempts have no 'reward' key and still pay what they promised: 1 feed for the barn (no coins)
     farm = _farm()
     minigames.start(farm, {'game': 'barn'}, NOW)
     active = farm['minigames']['barn']['active']

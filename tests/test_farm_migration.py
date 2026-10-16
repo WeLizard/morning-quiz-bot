@@ -174,11 +174,12 @@ def test_farm_migration_preserves_accounts_and_dump_restores_pre_farm_state(tmp_
         async def seed_baseline():
             db = Database(DatabaseSettings(url=migration_url))
             try:
-                # Core inserts name only the pre-farm columns: the ORM would also write
-                # columns added by later migrations (e.g. accounts.address_form).
+                # Name only the pre-farm columns: a Core/ORM insert would also write Python-side
+                # defaults of columns added by later migrations (accounts.address_form, rating_hidden).
                 async with db.transaction() as session:
-                    await session.execute(Account.__table__.insert().values(
-                        id=account_id, display_name="Farm migration fixture"))
+                    await session.execute(
+                        text("INSERT INTO accounts (id, display_name) VALUES (:id, :name)"),
+                        {"id": account_id, "name": "Farm migration fixture"})
                     await session.execute(User.__table__.insert().values(
                         id=user_id, account_id=account_id, display_name="Farm migration user"))
             finally:

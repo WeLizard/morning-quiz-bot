@@ -65,6 +65,7 @@ MERGE_POLICY = {
     ('farm_states', 'account_id'): 'special',
     ('farm_receipts', 'account_id'): 'special',
     ('farm_ledger', 'actor_account_id'): 'history',
+    ('problem_reports', 'account_id'): 'history',
 }
 
 _UNION_LISTS = ('discovered', 'crafted', 'verified_discovered', 'verified_crafted',

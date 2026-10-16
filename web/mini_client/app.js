@@ -59,7 +59,9 @@
         const parent = page ? PARENT[page] : null;
         // Tab roots (Чаты, Рейтинг, Профиль): the bottom bar is the navigation, so no on-screen ‹ (UI_RULES §4).
         QW.nav.setRoot(back !== undefined ? back : parent ? () => navigate(parent) : null, {onScreen: !TAB_ROOTS.has(page)});
-        QW.configure(game ? {mode: 'game', onHome} : {mode: 'hub', onHome: null});
+        // Same identity rule as the account API calls: the Telegram session when signed in through it, else the guest cookie; '' = unknown.
+        const identity = state.authenticated ? 'telegram' : state.guest ? 'guest' : '';
+        QW.configure(game ? {mode: 'game', onHome, screen: 'mafia', identity} : {mode: 'hub', onHome: null, screen: page || 'hub', identity});
         QW.menu.register([]);
         setHubTitle(game ? null : title ?? (page ? PAGE_TITLES[page] || null : null));
         const profile = state.authenticated ? state.me : state.guest;

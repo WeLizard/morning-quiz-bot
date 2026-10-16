@@ -1019,8 +1019,8 @@
     window.installPostgresAdmin = () => {
         document.documentElement.dataset.adminTheme = 'night';
         document.body.classList.add('pg-admin');
-        const supported = new Set(['dashboard', 'chats', 'users', 'photo-quiz', 'questions', 'analytics', 'settings', 'bot-metrics', 'claude-ai', 'malformed-questions']);
-        const labels = {dashboard: 'Обзор', questions: 'Банк вопросов', 'photo-quiz': 'Фото-квиз', analytics: 'Статистика', users: 'Участники', chats: 'Чаты и расписания', settings: 'Управление', 'bot-metrics': 'Тестовый бот', 'claude-ai': 'AI-помощник', 'malformed-questions': 'Проверка вопросов'};
+        const supported = new Set(['dashboard', 'chats', 'users', 'photo-quiz', 'questions', 'analytics', 'settings', 'bot-metrics', 'claude-ai', 'malformed-questions', 'problem-reports']);
+        const labels = {dashboard: 'Обзор', questions: 'Банк вопросов', 'photo-quiz': 'Фото-квиз', analytics: 'Статистика', users: 'Участники', chats: 'Чаты и расписания', settings: 'Управление', 'bot-metrics': 'Тестовый бот', 'claude-ai': 'AI-помощник', 'malformed-questions': 'Проверка вопросов', 'problem-reports': 'Отчёты'};
         document.querySelectorAll('.nav-item').forEach(nav => {
             nav.hidden = !supported.has(nav.dataset.section);
             if (!nav.hidden) {

@@ -17,7 +17,9 @@ from sqlalchemy import (
     Index,
     Integer,
     JSON,
+    LargeBinary,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -816,3 +818,44 @@ class AlchemyClaimCommand(Base):
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProblemReport(Base):
+    """A player-submitted problem report; delivered to the owner through the notification outbox."""
+    __tablename__ = 'problem_reports'
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'), primary_key=True, autoincrement=True)
+    account_id: Mapped[Optional[UUID]] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='SET NULL'))
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    telegram_user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    display_name: Mapped[str] = mapped_column(String(120), default='', nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    build: Mapped[str] = mapped_column(String(40), default='unknown', nullable=False)
+    ip_hash: Mapped[str] = mapped_column(String(64), default='', nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default='new', server_default='new', nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint('account_id', 'request_id', name='uq_problem_reports_account_request'),
+        CheckConstraint("status IN ('new', 'in_progress', 'done')", name='ck_problem_reports_status'),
+        Index('ix_problem_reports_account_created', 'account_id', 'created_at'),
+        Index('ix_problem_reports_ip_created', 'ip_hash', 'created_at'),
+        Index('ix_problem_reports_status_created', 'status', 'created_at'),
+    )
+
+
+class ProblemReportImage(Base):
+    """Sanitised JPEG screenshot (EXIF stripped, <=1600 px) stored in the shared database."""
+    __tablename__ = 'problem_report_images'
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'), primary_key=True, autoincrement=True)
+    report_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey('problem_reports.id', ondelete='CASCADE'), nullable=False)
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(32), default='image/jpeg', nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    __table_args__ = (UniqueConstraint('report_id', 'position', name='uq_problem_report_images_position'),)

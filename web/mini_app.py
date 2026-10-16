@@ -682,6 +682,35 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         except PrincipalError as error:
             raise MiniAppError(error.status, error.message, code=error.code) from None
 
+    @app.get('/api/account/problem-reports/meta')
+    async def problem_report_meta():
+        from storage import problem_reports
+        return problem_reports.meta()
+
+    @app.post('/api/account/problem-reports')
+    async def account_problem_report(request: Request, identity: str | None = Query(None)):
+        """Player problem report with sanitised screenshots; delivered to the owner via the outbox."""
+        from storage import problem_reports
+        from web.principal import PrincipalError, resolve_principal
+        if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
+            raise MiniAppError(415, 'Ожидается JSON')
+        raw = await bounded_request_body(request, max_bytes=problem_reports.BODY_BYTES_MAX)
+        request_id, body, context, images = problem_reports.parse_body(raw)
+        if identity == 'guest':
+            guest_access()
+        images = await problem_reports.prepare_images(images)  # before any DB connection is taken
+        client_ip = problem_reports.ip_hash(settings.bot_token, request.client.host if request.client else '')
+        try:
+            # lock=True: the Telegram channel opens a READ ONLY transaction otherwise.
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                report_id, created = await problem_reports.create_report(
+                    session, who, request_id=request_id, body=body, context=context,
+                    images=images, client_ip_hash=client_ip)
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
+        return JSONResponse({'report_id': report_id, 'number': report_id}, 201 if created else 200)
+
     @app.post('/api/guest/rooms')
     async def guest_create_room(request: Request):
         from application.rooms import RoomApplicationService

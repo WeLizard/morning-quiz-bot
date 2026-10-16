@@ -157,6 +157,21 @@ def run_nav(pw_browser):
     page.evaluate("document.querySelector('[data-qw-item=quiz-settings]').click()")
     c.ok(page.evaluate('!QW.menu.isOpen() && window.quizSettings === true'), 'action item closes the menu and runs')
 
+    # problem report: core item, sheet in the nav stack, Esc and ‹ close it
+    page.evaluate('gear.click()')
+    c.ok('qw-report' in page.evaluate("[...document.querySelectorAll('.qw-menu .qw-menu-item')].map(n => n.dataset.qwItem)"), 'hub menu has «Сообщить о проблеме»')
+    page.evaluate("document.querySelector('[data-qw-item=qw-report]').click()")
+    c.ok(page.evaluate("!QW.menu.isOpen() && QW.report.isOpen() && QW.nav.depth === 1 && !!document.querySelector('.qw-report[role=dialog]')"), 'report item opens the sheet and pushes the nav stack')
+    page.evaluate("document.querySelector('.qw-report-text').value = 'x'.repeat(5); document.querySelector('.qw-report-text').dispatchEvent(new Event('input'))")
+    c.ok(page.evaluate("document.querySelector('.qw-report-counter').textContent") == '5/2000', 'report counter shows x/2000')
+    page.keyboard.press('Escape')
+    c.ok(page.evaluate('!QW.report.isOpen() && QW.nav.depth === 0'), 'Escape closes the report sheet and pops the stack')
+    page.evaluate('QW.report.open()')
+    c.ok(page.evaluate("document.querySelector('.qw-report-text').value") == 'xxxxx', 'report draft survives closing')
+    page.evaluate('QW.nav.back()')
+    page.wait_for_timeout(50)
+    c.ok(page.evaluate('!QW.report.isOpen() && QW.nav.depth === 0'), 'nav back closes the report sheet, not the page')
+
     # --- outside Telegram: game mode with guarded stack and history ---
     harness(page, '?tg=none')
     page.evaluate("""() => { QW.boot({mode:'game', onHome(){ window.home = (window.home||0) + 1; }});

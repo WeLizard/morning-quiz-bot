@@ -382,7 +382,8 @@ class MafiaHandlers:
                 worker_id,
                 kinds={'mafia.phase', 'classic.question', 'classic.finished',
                        'photo.question', 'photo.hint', 'photo.feedback',
-                       'photo.result', 'photo.finished'},
+                       'photo.result', 'photo.finished',
+                       'problem_report.text', 'problem_report.images'},
             )
             if item is None:
                 return
@@ -390,6 +391,11 @@ class MafiaHandlers:
                 await queue.uncertain(item['id'], worker_id, 'MissingChatId', claim_version=item['claim_version'])
                 continue
             try:
+                if item['kind'].startswith('problem_report.'):
+                    from handlers.problem_report_delivery import deliver as deliver_problem_report
+                    await deliver_problem_report(context, self.database, item)
+                    await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
+                    continue
                 if item['kind'] == 'classic.question':
                     await self._deliver_classic_question(context, queue, worker_id, item)
                     continue

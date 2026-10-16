@@ -77,6 +77,10 @@
                     <span class="nav-icon">💬</span>
                     Чаты и подписки
                 </a>
+                <a class="nav-item" data-section="problem-reports">
+                    <span class="nav-icon">🐞</span>
+                    Отчёты
+                </a>
                 <a class="nav-item" data-section="claude-ai">
                     <span class="nav-icon">🤖</span>
                     Claude AI
@@ -503,6 +507,24 @@
                 </div>
             </section>
             
+            <!-- Problem reports Section -->
+            <section id="problem-reports" class="section">
+                <div class="content-header">
+                    <h1 class="page-title">🐞 Отчёты о проблемах</h1>
+                    <div class="header-actions">
+                        <select id="problemReportsStatus" class="form-select" aria-label="Статус">
+                            <option value="">Все</option>
+                            <option value="new">Новые</option>
+                            <option value="in_progress">В работе</option>
+                            <option value="done">Готово</option>
+                        </select>
+                        <button class="btn btn-secondary" id="problemReportsRefresh" type="button">Обновить</button>
+                    </div>
+                </div>
+                <div id="problemReportsList"><p>Загрузка...</p></div>
+                <div id="problemReportCard"></div>
+            </section>
+
             <!-- Claude AI Section -->
             <section id="claude-ai" class="section">
                 <div class="content-header">
@@ -787,6 +809,7 @@
     <!-- JavaScript -->
     <script src="/static/js/app.js"></script>
     <script src="/static/js/postgres-admin.js"></script>
+    <script src="/static/js/problem-reports.js"></script>
     <script>
         // Инициализация модального окна при загрузке
         document.addEventListener('DOMContentLoaded', () => {

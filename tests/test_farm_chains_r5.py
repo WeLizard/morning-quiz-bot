@@ -6,14 +6,21 @@ from uuid import uuid4
 
 import pytest
 
-from qw_farm.catalog import ANIMALS, BUILDINGS, ITEMS, LEVELS, R9_RECIPE_IDS, RECIPES, VERSION, validate
+from qw_farm.catalog import ANIMALS, BUILDINGS, ITEMS, LEVELS, RECIPES, VERSION, validate
 from qw_farm.domain import FarmError, apply, make_order, new_farm, reachable, validate_state
 from qw_farm.expansion import upgrade_state
 
 STATIC = Path(__file__).resolve().parents[1] / 'qw_farm' / 'static'
 # building -> level at which it unlocks
 NEW_BUILDINGS = {'oil_press': 10, 'juicery': 13, 'cannery': 14, 'smokehouse': 15, 'tailor': 17, 'confectionery': 19}
-NEW_RECIPES = {k: r for k, r in RECIPES.items() if r['building'] in NEW_BUILDINGS and k not in R9_RECIPE_IDS}   # r9 adds its own rows to these workshops
+# The 21 rows r5 itself added to the six workshops. Later stages (r9 rows, and the level 21-50 rows of land progression:
+# currant_morse, silk_scarf, felt_boots, viburnum_jelly, pomegranate_juice, peach_tart, harvest_cake) put their own rows in
+# the same workshops and are covered by their own tests; this file pins what r5 promised, so the set is explicit.
+R5_RECIPE_IDS = frozenset({
+    'butter', 'nut_paste', 'poppy_oil', 'grape_juice', 'melon_nectar', 'cranberry_morse', 'ajvar', 'marinated_mushrooms',
+    'preserves_set', 'smoked_cheese', 'smoked_quail', 'smoke_platter', 'dyed_linen', 'sundress', 'alpaca_coat', 'croissant',
+    'grape_jelly', 'poppy_roll', 'praline_cake', 'pastila', 'saffron_cake'})
+NEW_RECIPES = {k: r for k, r in RECIPES.items() if k in R5_RECIPE_IDS}
 NEW_ITEMS = {i for r in NEW_RECIPES.values() for i in r['outputs']}
 # Luxury goods: the end of a chain, nothing in r5 consumes them.
 LUXURY = {i for i in NEW_ITEMS if not any(i in r['inputs'] for r in NEW_RECIPES.values())}
@@ -152,7 +159,8 @@ def test_chains_are_complete_and_two_to_three_stages_deep():
 
 
 def test_depth_is_rewarded_but_balance_stays_in_the_old_class():
-    old = [per_hour(r) for k, r in RECIPES.items() if k not in NEW_RECIPES and r['seconds'] >= 300]
+    # the pre-r5 class (OLD_RECIPES), not 'every other recipe': later stages raise income per hour with the level by design
+    old = [per_hour(RECIPES[k]) for k in OLD_RECIPES if RECIPES[k]['seconds'] >= 300]
     best_old = max(old)
     assert 380 <= best_old <= 400  # mint tea; if an old recipe moves, revisit this table
     first_stage = [per_hour(r) for r in NEW_RECIPES.values() if not any(producer(i) and producer(i)['id'] in NEW_RECIPES for i in r['inputs'])]
@@ -174,7 +182,7 @@ def test_whole_chain_per_hour_does_not_explode():
         acc['hours'] += batches * r['seconds'] / 3600
         for k, q in r['inputs'].items():
             expand(k, q * batches, acc)
-    best_old = max(per_hour(r) for k, r in RECIPES.items() if k not in NEW_RECIPES and r['seconds'] >= 300)
+    best_old = max(per_hour(RECIPES[k]) for k in OLD_RECIPES if RECIPES[k]['seconds'] >= 300)
     for item in LUXURY:
         r = producer(item)
         acc = dict(raw=0, hours=0)

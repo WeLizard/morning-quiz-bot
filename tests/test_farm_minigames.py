@@ -5,7 +5,7 @@ import pytest
 
 from qw_farm import minigames
 from qw_farm import economy, progression
-from qw_farm.catalog import LEVELS
+from qw_farm.catalog import LEVELS, income_ref
 from qw_farm.domain import FarmError, new_farm
 from qw_farm.expansion import upgrade_state
 from qw_farm.service import FarmService, Principal
@@ -17,7 +17,8 @@ QUESTION = {'question': 'Сколько будет два плюс два?',
 
 
 def _farm():
-    return {'coins': 0, 'inventory': {}}
+    # every real farm carries xp: the reward size depends on the player's level (minigames.next_reward)
+    return {'coins': 0, 'inventory': {}, 'xp': 0}
 
 
 def _start_house(farm, now=NOW):
@@ -36,12 +37,15 @@ def test_house_question_reward_cooldown_and_repeat_answer_are_idempotent():
     assert active['solution'] == '4'
     assert farm['minigames']['house']['available_at'] == NOW + minigames.COOLDOWN
     assert minigames.should_select_question(farm, {'game': 'house'}, NOW) is False
+    # the payout is snapshotted at start and scales with the player's level: coins = income_ref(level) // 100, at least 10
+    reward = active['reward']
+    assert reward == {'kind': 'coins', 'amount': max(10, income_ref(1) // 100)} and reward['amount'] >= 10
 
     assert minigames.answer(farm, {'game': 'house', 'attempt_id': attempt_id, 'answer': '4'}, NOW + 2) == ('Верно!', True)
-    assert farm['coins'] == 10
+    assert farm['coins'] == reward['amount']
     assert farm['minigames']['house']['active'] is None
     assert minigames.answer(farm, {'game': 'house', 'attempt_id': attempt_id, 'answer': '3'}, NOW + 3) == ('Верно!', False)
-    assert farm['coins'] == 10
+    assert farm['coins'] == reward['amount']
     with pytest.raises(FarmError) as error:
         minigames.start(farm, {'game': 'house'}, NOW + 4, QUESTION)
     assert error.value.code == 'minigame_cooldown'
@@ -62,12 +66,23 @@ def test_barn_correct_answer_rewards_feed_and_public_state_never_exposes_solutio
     active = farm['minigames']['barn']['active']
     public = minigames.public(farm, NOW)['barn']['active']
 
-    assert set(public) == {'sacks', 'shelves', 'attempt_id', 'started_at', 'expires_at'}
+    assert set(public) == {'sacks', 'shelves', 'attempt_id', 'started_at', 'expires_at', 'reward'}   # the promised payout is public, the solution is not
     assert 'solution' not in public
     assert all('category' not in sack for sack in public['sacks'])
     solution = deepcopy(active['solution'])
     assert minigames.answer(farm, {'game': 'barn', 'attempt_id': active['attempt_id'], 'answer': solution}, NOW + 1) == ('Верно!', True)
-    assert farm['inventory']['feed'] == 1
+    assert farm['coins'] == public['reward']['amount'] and farm['inventory'].get('feed', 0) == 0
+
+
+def test_attempt_started_before_the_reward_snapshot_keeps_its_old_payout():
+    # old attempts have no 'reward' key and still pay what they promised: 1 feed for the barn
+    farm = _farm()
+    minigames.start(farm, {'game': 'barn'}, NOW)
+    active = farm['minigames']['barn']['active']
+    del active['reward']
+    solution = deepcopy(active['solution'])
+    assert minigames.answer(farm, {'game': 'barn', 'attempt_id': active['attempt_id'], 'answer': solution}, NOW + 1) == ('Верно!', True)
+    assert farm['inventory']['feed'] == 1 and farm['coins'] == 0
 
 
 def test_expired_attempt_is_hidden_and_cannot_be_answered():

@@ -70,7 +70,7 @@ def test_v1_partial_escrow_keeps_old_recipe_until_delivery():
     original_inventory = deepcopy(farm['inventory'])
 
     projects.upgrade_state(farm)
-    assert state['version'] == 2
+    assert state['version'] == projects.initial_state()['version']  # upgrade lands on the current version (3: gazebo stage)
     assert entry['revision'] == 0
     assert entry['legacy_needs'] == {'wheat': 6, 'flour': 2}
     assert projects.effective_needs(state, 'lake_pier', entry) == {'wheat': 6, 'flour': 2}
@@ -120,7 +120,7 @@ def test_v1_empty_stage_changes_recipe_and_revision_but_finished_stage_stays_fin
     state['entries']['tea_arbor']['stage'] = 2
     state['entries']['tea_arbor']['revision'] = 5
     projects.upgrade_state(farm)
-    assert state['version'] == 2
+    assert state['version'] == projects.initial_state()['version']  # upgrade lands on the current version (3: gazebo stage)
     assert state['entries']['lake_pier'] == {'stage': 0, 'revision': 9, 'reserved': {}}
     assert state['entries']['tea_arbor'] == {'stage': 2, 'revision': 5, 'reserved': {}}
     projects.upgrade_state(farm)

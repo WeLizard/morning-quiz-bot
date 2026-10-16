@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from qw_farm import catalog, progression, undo
-from qw_farm.catalog import (ANIMALS, BUILDINGS, CROP_TUNING_R9, CROPS, ITEMS, LEVELS, R9_ITEM_IDS, R9_RECIPE_IDS, RECIPES, VERSION,
+from qw_farm.catalog import (ANIMALS, BUILDINGS, CROP_TUNING_R9, CROPS, ITEMS, LEVELS, R9_ITEM_IDS, R9_RECIPE_IDS, R16_CROP_IDS, R16_ITEM_IDS, RECIPES, VERSION,
                              crop_class, validate)
 from qw_farm.domain import apply, new_farm, reachable, validate_state
 from qw_farm.expansion import upgrade_state
@@ -14,6 +14,10 @@ from qw_farm.expansion import upgrade_state
 R8_PRICES = {'wheat': 2, 'carrot': 5, 'corn': 8, 'clover': 6, 'strawberry': 16, 'potato': 14, 'sunflower': 24, 'pumpkin': 35, 'lavender': 28, 'tomato': 19, 'flour': 10, 'feed': 8, 'hay': 12, 'egg': 11, 'milk': 18, 'wool': 25, 'honey': 46, 'bread': 29, 'bun': 39, 'jam': 53, 'cheese': 53, 'oil': 64, 'soup': 57, 'pie': 175, 'yarn': 67, 'bouquet': 99, 'pancake': 69, 'salad': 70, 'oat': 6, 'beet': 11, 'cucumber': 14, 'cabbage': 18, 'peas': 15, 'rye': 14, 'raspberry': 22, 'basil': 18, 'blueberry': 25, 'flax': 24, 'rice': 25, 'watermelon': 42, 'mushroom': 18, 'chanterelle': 23, 'wildberry': 17, 'blackberry': 24, 'herbs': 14, 'hazelnut': 21, 'duck_egg': 14, 'goat_milk': 24, 'rabbit_fluff': 28, 'alpaca_fiber': 36, 'feather': 22, 'mushroom_soup': 83, 'berry_jam': 66, 'tea': 53, 'pickles': 58, 'goat_cheese': 72, 'linen': 94, 'forest_pie': 96, 'oat_cookie': 65, 'pillow': 100, 'scarf': 96, 'vegetable_stew': 132, 'berry_milk': 117, 'rice_pudding': 125, 'pepper': 48, 'eggplant': 55, 'buckwheat': 46, 'mint': 66, 'grape': 72, 'chamomile': 64, 'hops': 86, 'garlic': 74, 'poppy': 86, 'melon': 116, 'cranberry': 104, 'saffron': 140, 'porridge': 205, 'mint_tea': 230, 'grape_roll': 230, 'hop_wreath': 340, 'truffle': 60, 'turkey_egg': 38, 'quail_egg': 24, 'peacock_feather': 66, 'mohair': 108, 'swan_down': 130, 'truffle_tart': 150, 'truffle_soup': 170, 'omelet': 230, 'sponge_cake': 230, 'quail_salad': 215, 'feather_fan': 280, 'plume_bouquet': 330, 'mittens': 190, 'mohair_plaid': 460, 'down_blanket': 700, 'gingerbread': 110, 'butter': 57, 'nut_paste': 197, 'poppy_oil': 341, 'grape_juice': 91, 'melon_nectar': 169, 'cranberry_morse': 209, 'ajvar': 155, 'marinated_mushrooms': 92, 'preserves_set': 513, 'smoked_cheese': 95, 'smoked_quail': 72, 'smoke_platter': 546, 'dyed_linen': 252, 'sundress': 746, 'alpaca_coat': 881, 'croissant': 49, 'grape_jelly': 157, 'poppy_roll': 294, 'praline_cake': 934, 'pastila': 279, 'saffron_cake': 702}
 GRID = {30, 120, 300, 900, 1800, 3600, 7200, 14400, 28800, 43200, 86400}
 K = {30: .091, 120: .183, 300: .289, 900: .5, 1800: .707, 3600: 1, 7200: 1.414, 14400: 2, 28800: 2.83, 43200: 3.3, 86400: 4.0}
+# The r9 crop set. R16 (levels 18-50, docs/tasks/FARM_GROWTH_PLAN.md) added crops to the catalog later; they deliberately repeat
+# the top r9 tiers (the same few time/yield/XP rows from level 18 to 50) and are not on the r9 value law, so the r9 rules below
+# are checked on the r9 crops only. What must hold for every crop (grid, class, field flag) has its own test at the end of the file.
+R9_CROPS = {k: c for k, c in CROPS.items() if k not in R16_CROP_IDS}
 STARTERS = {'wheat', 'carrot', 'corn', 'clover'}       # the first minutes of the game are not on the law
 BANDS = {
     (1, 4): dict(fast={'wheat', 'carrot', 'corn', 'clover', 'beet', 'strawberry', 'basil'},
@@ -39,12 +43,14 @@ def obj(kind, oid, animal=None):
 def test_catalog_validates_and_is_versioned():
     validate()
     assert VERSION == 'farm-2026-10-r9'
-    assert set(CROP_TUNING_R9) == set(CROPS)
+    assert set(CROP_TUNING_R9) == set(R9_CROPS)      # every r9 crop is tuned; later crops live in the R16 rows
+    assert set(CROP_TUNING_R9).isdisjoint(R16_CROP_IDS) and set(CROPS) == set(R9_CROPS) | R16_CROP_IDS
 
 
 def test_every_crop_time_is_on_the_grid_and_matches_the_tuning_table():
     for key, c in CROPS.items():
-        assert c['seconds'] in GRID, key
+        assert c['seconds'] in GRID, key                 # the grid applies to every crop, R16 included
+    for key, c in R9_CROPS.items():
         assert (c['cost'], c['seconds'], c['yield_qty'], c['xp'], c['level']) == CROP_TUNING_R9[key]
 
 
@@ -52,14 +58,14 @@ def test_every_crop_time_is_on_the_grid_and_matches_the_tuning_table():
 def test_every_band_has_all_three_classes_as_designed(band):
     lo, hi = band
     found = {'fast': set(), 'medium': set(), 'long': set()}
-    for key, c in CROPS.items():
+    for key, c in R9_CROPS.items():
         if lo <= c['level'] <= hi:
             found[crop_class(c['seconds'])].add(key)
     assert found == BANDS[band]
 
 
 def test_the_value_law_holds_within_12_percent_except_the_starters():
-    for key, c in CROPS.items():
+    for key, c in R9_CROPS.items():
         if key in STARTERS:
             continue
         law = 11 * 1.055 ** (c['level'] - 1) * K[c['seconds']]
@@ -70,7 +76,7 @@ def test_the_value_law_holds_within_12_percent_except_the_starters():
 
 def test_same_time_means_a_better_newer_crop_r2():
     by_time = {}
-    for c in CROPS.values():
+    for c in R9_CROPS.values():
         by_time.setdefault(c['seconds'], []).append(c)
     for seconds, group in by_time.items():
         group.sort(key=lambda c: c['level'])
@@ -80,7 +86,7 @@ def test_same_time_means_a_better_newer_crop_r2():
 
 def test_field_crops_are_exactly_the_long_class():
     assert {k for k, c in CROPS.items() if c['field']} == {k for k, c in CROPS.items() if crop_class(c['seconds']) == 'long'}
-    assert sorted(k for k, c in CROPS.items() if c['field']) == sorted(
+    assert sorted(k for k, c in R9_CROPS.items() if c['field']) == sorted(
         ['cabbage', 'flax', 'rice', 'watermelon', 'eggplant', 'buckwheat', 'chamomile', 'hops', 'saffron'])
     assert all(c['seconds'] >= catalog.FIELD_MIN_GROW for c in CROPS.values() if c['field'])
 
@@ -88,7 +94,11 @@ def test_field_crops_are_exactly_the_long_class():
 def test_item_prices_of_existing_goods_did_not_change():
     for key, price in R8_PRICES.items():
         assert ITEMS[key]['price'] == price, key
-    assert set(ITEMS) - set(R8_PRICES) == R9_ITEM_IDS
+    # Items are only ever added: every r9, R16 and energy good is new relative to r8 (later stages - fish, wood - add more,
+    # so the new set is a superset of the known groups, not an exact list that goes stale with each addition).
+    added = set(ITEMS) - set(R8_PRICES)
+    assert R9_ITEM_IDS <= added and R16_ITEM_IDS <= added and catalog.ENERGY_ITEM_IDS <= added
+    assert set(R8_PRICES) <= set(ITEMS)
 
 
 def test_ingredient_rule_for_r9_and_corrected_recipes():
@@ -221,7 +231,8 @@ def test_old_plantings_jobs_and_batches_finish_by_their_old_parameters():
 
 
 def test_legacy_seed_costs_are_the_r8_prices():
-    assert set(undo.LEGACY_SEED_COST) == set(CROPS)
+    assert set(undo.LEGACY_SEED_COST) == set(R9_CROPS)       # R16 crops never existed in r8: no legacy price, the current one applies
+    assert undo.crop_cost(dict(id='zucchini')) == CROPS['zucchini']['cost']
     assert undo.LEGACY_SEED_COST['pepper'] == 50 and undo.LEGACY_SEED_COST['saffron'] == 96 and undo.LEGACY_SEED_COST['corn'] == 7
     assert undo.crop_cost(dict(id='mint')) == CROPS['mint']['cost']                   # the cheaper of the two
     assert undo.crop_cost(dict(id='chamomile')) == 62                                 # the r8 price is cheaper than the new one

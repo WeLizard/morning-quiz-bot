@@ -99,13 +99,19 @@ jobs:
       - name: Run Python and PostgreSQL tests
         run: |
           mkdir -p .local/acceptance
-          python -m pytest -q --disable-warnings -ra --tb=short \
+          python -m pytest -q --disable-warnings -rfE --tb=line \
             --junitxml=.local/acceptance/tests.xml
 
+      - name: Summarise failed tests (annotations and job summary)
+        if: ${{ !cancelled() }}
+        run: python scripts/ci_test_summary.py .local/acceptance/tests.xml
+
       - name: Run JavaScript tests
+        if: ${{ !cancelled() }}
         run: node --test tests/js/mini_navigation.test.cjs tests/js/alchemy_sync.test.cjs
 
       - name: Run repository checks
+        if: ${{ !cancelled() }}
         run: |
           python scripts/project_checks.py --worktree
           python -m unittest discover -s tests -p test_project_checks.py

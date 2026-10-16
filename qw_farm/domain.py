@@ -86,6 +86,11 @@ def place(farm, x, y, w=1, h=1, ignore=None):
     need(not used & cells, 'occupied', 'На этом месте уже что-то стоит.')
 
 
+def rotatable(typ):
+    """Walled buildings drawn in tile space can face either way; decor, plots, roads and the duck pond are screen sprites."""
+    return typ in {'house','barn'} or (typ in BUILDINGS and not BUILDINGS[typ].get('decor') and typ!='duckpond')
+
+
 def barn_sell_bonus(farm):
     """Percent added to the sale price by the best barn; farms without a barn (or older saves) get 0."""
     return max([BARN_SELL_BONUS[effective_level(o.get('level'))] for o in farm['objects'] if o['type']=='barn'] or [0])
@@ -153,6 +158,12 @@ def make_order(farm, slot, now):
     if seq==2: needs={'flour':1,'egg':2}
     price=sum(ITEMS[k]['price']*q for k,q in needs.items())
     npc,subtitle=NPCS[rng % len(NPCS)]
+    if seq>2:   # a resident with a signature theme (Медведь Пух: energy drinks) mostly asks for it, when it is reachable
+        from .catalog import NPC_SIGNATURE, SIGNATURE_PCT
+        sig=[i for i in NPC_SIGNATURE.get(npc,()) if i in products]
+        if sig and (rng//41)%100<SIGNATURE_PCT:
+            needs={sig[(rng//43)%len(sig)]:1+(rng//47)%3}
+            price=sum(ITEMS[k]['price']*q for k,q in needs.items())
     special=None
     if seq>2:
         from . import market
@@ -195,7 +206,7 @@ SCHEMAS={
  'plant':{'object','crop','revision'},'dig_up':{'object','revision'},'harvest':{'object','revision'},'collect_all':set(),
  'queue':{'object','recipe'},'collect':{'object','job'},'cancel_job':{'object','job'},
  'feed':{'object'},'collect_animal':{'object'},'buy_animal':{'object','animal'},
- 'build':{'type','x','y'},'move':{'object','x','y','revision'},'demolish':{'object','revision'},'upgrade':{'object','revision'},
+ 'build':{'type','x','y'},'move':{'object','x','y','revision'},'rotate':{'object','revision'},'demolish':{'object','revision'},'upgrade':{'object','revision'},
  'rescue':set(),'expand':set(),'sell':{'item','qty'},'order':{'order'},'skip_order':{'order'},'quest':{'quest'},
  'settings':{'name','visibility','allow_help','allow_gifts','allow_pranks','allow_trade'},
  'request_neighbor':set(),'accept_neighbor':set(),'claim_neighbor_reward':set(),'remove_neighbor':set(),'block':set(),'unblock':set(),
@@ -309,6 +320,14 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
     elif kind=='move':
         place(me,data['x'],data['y'],obj['w'],obj['h'],obj['id'])
         obj['x']=data['x'];obj['y']=data['y'];obj['revision']+=1;text='Новое место сохранено.'
+    elif kind=='rotate':
+        need(rotatable(obj['type']),'cannot_rotate','Эту постройку поворачивать не нужно.')
+        try:place(me,obj['x'],obj['y'],obj['h'],obj['w'],obj['id'])
+        except FarmError as error:
+            if error.code not in {'occupied','outside_land'}:raise
+            raise FarmError(error.code,'Для поворота не хватает места.',error.status) from None
+        obj['w'],obj['h']=obj['h'],obj['w']
+        obj['orientation']=1-obj.get('orientation',0);obj['revision']+=1;text='Постройка повёрнута.'
     elif kind=='demolish':
         need(obj['type'] not in {'house','barn'},'cannot_demolish','Дом и склад нельзя снести.')
         need(not (obj.get('crop') or obj.get('jobs') or obj.get('animal_job') or obj.get('animal')),
@@ -463,6 +482,7 @@ def validate_state(farm):
     used=set()
     for obj in farm['objects']:
         need(type(obj.get('level',1)) is int and 1<=obj.get('level',1)<=4,'invalid_level','Некорректный уровень постройки.',500)
+        need(type(obj.get('orientation',0)) is int and obj.get('orientation',0) in (0,1),'invalid_orientation','Некорректная ориентация постройки.',500)
         cells=object_cells(obj)
         need(not cells&used and all(0<=x<farm['size'] and 0<=y<farm['size'] for x,y in cells),'invalid_layout','Некорректная планировка.',500)
         used|=cells

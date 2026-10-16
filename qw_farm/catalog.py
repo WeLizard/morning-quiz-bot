@@ -70,7 +70,7 @@ QUESTS=[
  dict(id='q9',name='Ферма, которая дружит',text='Помоги соседям пять раз. Благодарность остаётся в журнале.',stat='helps',goal=5,coins=0,xp=45),
  dict(id='q10',name='Мастер хозяйства',text='Выполни двадцать пять заказов и оставь себе время на отдых.',stat='orders',goal=25,coins=400,xp=100),
 ]
-NPCS=[('Филиныч','Для вечернего чаепития'),('Агата','На маленький деревенский праздник'),('Почтальон Ёж','В корзинку для дальней дороги'),('Механик Крот','Обед мастерской'),('Кошка Кая','К чаю и мурлыканью'),('Кошка Соня','Для сладкой дремоты на печке'),('Суслик Игорь','В запас на долгую зиму'),('Неведома Зверушка','Угощение для загадочного гостя')]
+NPCS=[('Филиныч','Для вечернего чаепития'),('Агата','На маленький деревенский праздник'),('Почтальон Ёж','В корзинку для дальней дороги'),('Механик Крот','Обед мастерской'),('Кошка Кая','К чаю и мурлыканью'),('Кошка Соня','Для сладкой дремоты на печке'),('Суслик Игорь','В запас на долгую зиму'),('Неведома Зверушка','Угощение для загадочного гостя'),('Медведь Пух','Для бодрости перед работой')]   # new residents go to the END: old indexes stay
 
 # Expansion r2. Stable IDs; existing crops/recipes retain their original values.
 for row in [
@@ -501,7 +501,11 @@ NPC_TASTES={
  'Кошка Соня':('pillow','down_blanket','scarf','mohair_plaid','mittens'),
  'Суслик Игорь':('sunflower','oat_cookie','porridge','corn','pumpkin'),
  'Неведома Зверушка':('truffle','saffron','lavender','peacock_feather','truffle_tart'),
+ 'Медведь Пух':('berry_charge','honey_charge','forest_charge','honey','gingerbread'),
 }
+# Residents who order a themed product most of the time (only goods reachable for the player count; see domain.make_order)
+NPC_SIGNATURE={'Медведь Пух':('berry_charge','honey_charge','forest_charge')}
+SIGNATURE_PCT=70
 MARKET=dict(
  rep_names=REP_NAMES,rep_points=REP_POINTS,rep_bonus=REP_BONUS,special_level=REP_SPECIAL_LEVEL,special_bonus=20,
  tastes={k:list(v) for k,v in NPC_TASTES.items()},
@@ -723,7 +727,7 @@ for i,n,c,l in [('creamery','Молокозавод',6000,21),('sausage_shop','�
 ANIMALS['calf']=dict(id='calf',name='Бычки',building='cattle_barn',inputs={'hay':2,'feed':2,'beet':1},outputs={'meat':2},seconds=4800,level=25,cost=2600)
 
 def _xp_r9(b,t):
-    if b in ('creamery','sausage_shop','oil_press','juicery','cannery','smokehouse','tailor','confectionery','syrupery','soapery','noodle_shop'):return max(6,t//80)
+    if b in ('creamery','sausage_shop','oil_press','juicery','energy_shop','cannery','smokehouse','tailor','confectionery','syrupery','soapery','noodle_shop'):return max(6,t//80)
     if b=='mill':return max(1,t//45)
     return max(4,t//90)
 
@@ -931,6 +935,20 @@ for i,n,b,inputs,out,t,l,c in R16_ANIMAL_ROWS:
     ANIMALS[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,cost=c)
 for i,n,b,inputs,out,t,l in R16_RECIPE_ROWS:
     RECIPES[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,xp=_xp_r9(b,t))
+# ---- energy corner: «Бодрильня» and the berry-and-honey charges (additive; ordered by Медведь Пух, see docs/tasks/FARM_PUKH_ENERGY.md) ----
+# price = inputs + minutes * (2.5 + 0.1 * level), like the neighbouring workshops
+for i,n,p,col in [('berry_charge','Ягодный энергетос',85,'#d9475e'),('honey_charge','Медовый энергетос',108,'#e0a93a'),('forest_charge','Лесной энергетос',79,'#6f9a55')]:
+    ITEMS[i]=dict(id=i,name=n,price=p,color=col,kind='product')
+BUILDINGS['energy_shop']=dict(id='energy_shop',name='Бодрильня',cost=1800,level=11,w=2,h=2,decor=False)
+for i,n,b,inputs,out,t,l in [
+ ('berry_charge','Ягодный заряд','energy_shop',{'raspberry':4,'honey':1},{'berry_charge':2},600,11),
+ ('forest_charge','Лесной заряд','energy_shop',{'wildberry':4,'blackberry':1,'herbs':2},{'forest_charge':2},600,12),
+ ('honey_charge','Медовый заряд','energy_shop',{'honey':2,'mint':1},{'honey_charge':2},900,13),
+]:
+    RECIPES[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,xp=_xp_r9(b,t))
+ENERGY_ITEM_IDS=frozenset({'berry_charge','honey_charge','forest_charge'})
+ENERGY_RECIPE_IDS=ENERGY_ITEM_IDS
+
 # Paid decor and trophies that fill the levels between the five shop tiers (separate from DECOR_SHOP: its tier levels are pinned).
 DECOR_EXTRA=[dict(id=i,name=n,cost=c,level=l,w=w,h=h,trophy=tr) for i,n,c,l,w,h,tr in R16_DECOR_ROWS]
 for _d in DECOR_EXTRA:

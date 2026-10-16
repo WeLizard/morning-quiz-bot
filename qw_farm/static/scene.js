@@ -602,7 +602,7 @@ export class FarmScene {
   // Lake dwellers: the wild duck is always about (it paddles a lazy loop and tips over to feed now and then); a pair of swans
   // glides by in turn; every minute or so a flock of swan-geese crosses the sky above the water. Pure scene clock, no state.
   const face=v=>v>=0?1:-1,sprite=(kind,x,y,dir,tilt=0)=>{c.save();c.translate(x,y);c.scale(dir,1);if(tilt)c.rotate(tilt);smallAnimal(this,0,0,kind);c.restore()};
-  {const u=t*.13,dx=-Math.sin(u)*70,x=p.x-80+Math.cos(u)*70,y=p.y+34+Math.sin(u*2)*14,dive=this.motion&&Math.sin(t*.55)>.93;
+  {const u=t*.13,dx=-Math.sin(u)*70,x=p.x-42+Math.cos(u)*70,y=p.y+8+Math.sin(u*2)*16,dive=this.motion&&Math.sin(t*.55)>.93;
    this.ellipse(x,y+6,15,3.4,'#83aba2a0');
    if(dive){this.ellipse(x,y,8,5,'#b0a485');this.poly([{x:x-3,y:y-2},{x:x+3,y:y-2},{x:x,y:y-9}],'#8a7d5f');this.ellipse(x,y+6,6,2,'#eef7f0b0')}
    else sprite('duck',x,y,face(dx));}

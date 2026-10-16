@@ -220,6 +220,11 @@ def _etag_matches(request, response):
     return '*' in candidates or etag.removeprefix('W/') in candidates
 
 
+SHELL_DIR = Path(__file__).parent / 'shell'
+SHELL_ASSETS = frozenset({'qw-tokens.css', 'qw-shell.css', 'qw-shell.js'})
+SHELL_ASSET_PATHS = frozenset('/app/shell/' + name for name in SHELL_ASSETS)
+
+
 def create_app(*, database=None, settings=None, membership=None, clock=time.time, allowed_user_ids=None,
                runtime_enabled=None, scoring_rules=None, room_classic_enabled=None,
                room_photo_enabled=None, dev_guest_access=False):
@@ -323,7 +328,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         static_game_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app/alchemy'}
         public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/address.js', '/app/telegram-ui.js', '/app/play-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp', '/app/farm-card-v2.webp'}
         public_page = public_page or (request.method in {'GET', 'HEAD'} and
-            (request.url.path == '/app/farm' or request.url.path.startswith('/app/farm/assets/')))
+            (request.url.path == '/app/farm' or request.url.path.startswith('/app/farm/assets/')
+             or request.url.path in SHELL_ASSET_PATHS))
         # Файлы интерфейса — не API: их качает каждый клиент при каждом открытии, и за общим
         # NAT/VPN они съедали лимит API. Персональный /app/alchemy (с гостевым cookie) ходит в БД,
         # его оставляем под лимитом и без кэша.
@@ -358,7 +364,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         # Login needs a deliberately tight bucket. Every gameplay read/write is
         # bounded normally; clients poll shared state at a modest interval.
         elif not static_request and not shared_farm_api and not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
-                request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/mini/session/resume', '/api/guest/start', '/api/guest/resume', '/api/account/register', '/api/account/login'},
+                request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/mini/session/resume', '/api/guest/start', '/api/guest/resume', '/api/account/register', '/api/account/login', '/api/account/telegram-login/start', '/api/account/telegram-login/complete', '/api/account/password', '/api/account/credentials', '/api/account/telegram-login/merge', '/api/account/telegram-link/merge'},
                 frequent_read=request.url.path.startswith('/api/farm/') and request.method in {'GET', 'HEAD'},
                 farm_write=request.url.path.startswith('/api/farm/') and request.method not in {'GET', 'HEAD'}):
             response = JSONResponse({'detail': 'Слишком много запросов'}, 429, headers={'Retry-After': '60'})
@@ -395,8 +401,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             # внутри документа. Политика мини-аппа со `default-src 'none'` такие
             # страницы ломает, поэтому inline разрешён явно. Сеть ограничена своим
             # origin: игре разрешена только синхронизация прогресса с сервером.
-            response.headers['Content-Security-Policy'] = ("default-src 'none'; script-src 'unsafe-inline'; "
-                "style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; "
+            # Общая оболочка (/app/shell) и Telegram SDK подключаются отдельными файлами.
+            response.headers['Content-Security-Policy'] = ("default-src 'none'; script-src 'self' 'unsafe-inline' https://telegram.org; "
+                "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; "
                 "connect-src 'self'; base-uri 'none'; form-action 'none'; "
                 "frame-ancestors https://web.telegram.org https://*.telegram.org")
         return response
@@ -487,6 +494,13 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return HTMLResponse(content.replace(marker, scoped), headers={'Cache-Control': 'no-store'})
         return FileResponse(game_path)
 
+    @app.get('/app/shell/{asset}')
+    async def shell_asset(asset: str):
+        # Общая оболочка QuizzyWizzy: токены, меню ⚙, навигация, Telegram-мост (docs/design/UI_RULES.md).
+        if asset not in SHELL_ASSETS:
+            raise MiniAppError(404, 'Файл не найден')
+        return FileResponse(SHELL_DIR / asset)
+
     @app.get('/app/{asset}')
     async def frontend_asset(asset: str):
         if asset == 'host.webp':
@@ -520,7 +534,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.post('/api/guest/start')
     async def guest_start(request: Request):
         guest_access()
-        profile, raw = await guest_store.start(request.cookies.get(guest_cookie))
+        from web.client_hint import client_hint
+        profile, raw = await guest_store.start(
+            request.cookies.get(guest_cookie), user_agent=client_hint(request.headers.get('user-agent')))
         return guest_response(profile, raw)
 
     @app.get('/api/guest/me')
@@ -619,18 +635,22 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.post('/api/account/register')
     async def account_register(request: Request):
         guest_access()
+        from web.client_hint import client_hint
         value = await account_json(request, {'login', 'password', 'display_name', 'address_form'}, {'login', 'password'})
         profile, raw = await password_store.register(
             value['login'], value['password'], value.get('display_name'), request.cookies.get(guest_cookie),
-            address_form=value.get('address_form'))
+            address_form=value.get('address_form'),
+            user_agent=client_hint(request.headers.get('user-agent')))
         return guest_response(profile, raw)
 
     @app.post('/api/account/login')
     async def account_login(request: Request):
         guest_access()
+        from web.client_hint import client_hint
         value = await account_json(request, {'login', 'password'}, {'login', 'password'})
         profile, raw = await password_store.login(
-            value['login'], value['password'], request.client.host if request.client else '')
+            value['login'], value['password'], request.client.host if request.client else '',
+            user_agent=client_hint(request.headers.get('user-agent')))
         return guest_response(profile, raw)
 
     @app.post('/api/account/logout')
@@ -2098,6 +2118,21 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @app.post('/api/mini/mafia/chats/{chat_id}/restart')
     async def mafia_restart(request: Request, chat_id: int):
         return await mafia_game_command(request, chat_id, 'restart')
+
+    # Account cycle (login with Telegram in the browser, credentials, devices, merge): one
+    # context object so the route modules do not reach into this factory's locals.
+    from types import SimpleNamespace
+    from web.account_security_routes import install_account_security
+    from web.telegram_login_routes import install_telegram_login
+    account_context = SimpleNamespace(
+        database=database, settings=settings, clock=clock, guest_store=guest_store,
+        password_store=password_store, mini_store=store, allowed_user_ids=allowed_user_ids,
+        guest_access=guest_access, guest_response=guest_response, account_json=account_json,
+        guest_cookie=guest_cookie, guest_cookie_secure=guest_cookie_secure)
+    install_telegram_login(app, account_context)
+    install_account_security(app, account_context)
+    from web.account_merge_routes import install_account_merge
+    install_account_merge(app, account_context)
 
     from qw_farm.integration import install_farm
     install_farm(app, database, settings, allowed_user_ids=allowed_user_ids, clock=clock)

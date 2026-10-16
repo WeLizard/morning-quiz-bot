@@ -4,15 +4,19 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#efeee4"><meta name="color-scheme" content="light">
 <title>Весёлый фермер · QuizzyWizzy</title>
+<link rel="stylesheet" href="/app/shell/qw-tokens.css">
+<link rel="stylesheet" href="/app/shell/qw-shell.css">
 <link rel="stylesheet" href="/app/farm/assets/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app/shell/qw-shell.js"></script>
 <script type="module" src="/app/farm/assets/app.js"></script>
 </head>
 <body class="compact farm-login">
 <header class="topbar">
  <button id="lighting-toggle" class="lighting-toggle" type="button" data-mode="auto" data-dark="false" aria-label="Свет: по времени. Нажми, чтобы сменить режим" title="Свет: по времени"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">
-  <g class="lighting-sun"><path d="M20 3v4m0 26v4M3 20h4m26 0h4M8 8l3 3m18 18 3 3M8 32l3-3m18-18 3-3" fill="none" stroke="#bd7937" stroke-width="2.4" stroke-linecap="round"/><circle cx="20" cy="20" r="10" fill="#edbd58" stroke="#b77c38" stroke-width="1.8"/><path d="M14 17c1-4 5-6 9-5" fill="none" stroke="#fff0b5" stroke-width="2" stroke-linecap="round"/></g>
-  <g class="lighting-moon"><path d="M29 26A14 14 0 0 1 15 8a14 14 0 1 0 14 18Z" fill="#e8dda1" stroke="#a7b29a" stroke-width="1.8" stroke-linejoin="round"/><path d="m29 5 1.2 3.6L34 10l-3.8 1.2L29 15l-1.2-3.8L24 10l3.8-1.4Z" fill="#f4d37a"/><circle cx="35" cy="20" r="1.4" fill="#f4d37a"/></g>
-  <g class="lighting-auto" fill="none" stroke="#387353" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M28 30a5 5 0 0 1 8-1l1 2m0-4v4h-4M37 34a5 5 0 0 1-8 1l-1-2m0 4v-4h4"/></g>
+  <g class="lighting-sun"><g fill="#f2c763"><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(0 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(45 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(90 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(135 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(180 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(225 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(270 20 20)"/><rect x="18.4" y="2.6" width="3.2" height="6" rx="1.6" transform="rotate(315 20 20)"/></g><circle cx="20" cy="20" r="9.6" fill="#eeb64f"/><circle cx="20" cy="20" r="8.2" fill="#f5c862"/><ellipse cx="16.6" cy="16.4" rx="3.6" ry="2.3" fill="#fff2c4" opacity=".85" transform="rotate(-32 16.6 16.4)"/></g>
+  <g class="lighting-moon"><mask id="lt-moon-cut"><rect width="40" height="40" fill="#fff"/><circle cx="26.2" cy="13.8" r="10.2" fill="#000"/></mask><g mask="url(#lt-moon-cut)"><circle cx="19" cy="20.6" r="13.4" fill="#d6bf6f"/><circle cx="19.8" cy="19.8" r="12" fill="#ecd88d"/><circle cx="12.8" cy="24.6" r="2" fill="#dcc77e"/><circle cx="17.4" cy="29.6" r="1.4" fill="#dcc77e"/></g><path d="m31 4.8 1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1Z" fill="#f6d77c"/><circle cx="34.6" cy="20.4" r="1.3" fill="#f6d77c"/></g>
+  <g class="lighting-auto"><g fill="#f2c763"><rect x="17.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(-45 19 20)"/><rect x="17.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(-90 19 20)"/><rect x="17.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(-135 19 20)"/></g><path class="la-day" d="M19 9a11 11 0 0 0 0 22Z" fill="#f2c25e"/><path class="la-night" d="M19 9a11 11 0 0 1 0 22Z" fill="#7488b2"/><ellipse cx="14.4" cy="15.6" rx="2.4" ry="1.6" fill="#fff2c4" opacity=".8" transform="rotate(-35 14.4 15.6)"/><path class="la-night" d="m24 12.6.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7Z" fill="#f6e3a0"/><circle class="la-night" cx="24.4" cy="22.8" r="1" fill="#f6e3a0"/><g class="la-cycle" fill="none" stroke="#5f9a6e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M35.6 32.4A4.8 4.8 0 1 1 33.8 26.6"/><path d="m31.2 25.2 2.8 1.2-1 2.8"/></g></g>
  </svg></button>
  <button id="return-home" class="light small header-return-home" type="button" aria-label="Вернуться на свою ферму" hidden>Своя ферма</button>
  <nav class="header-destinations" aria-label="Места фермы">
@@ -26,10 +30,7 @@
  </nav>
  <div class="header-center"><span class="leaf-dot"></span> Весёлый фермер <span class="alpha">ALPHA 0.2</span></div>
  <div id="hud" class="hud"><span>Открываем калитку…</span></div>
- <div class="header-actions" id="header-actions" hidden>
-  <button id="fullscreen" title="На весь экран · F" aria-label="На весь экран">⛶</button>
-  <button id="toggle-ui" title="Скрыть панели · H" aria-label="Скрыть или показать панели" aria-pressed="false">☷</button>
- </div>
+ <div class="header-actions" id="header-actions"></div>
  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 </header>
 <main class="workspace" id="game" hidden>
@@ -53,9 +54,9 @@
       <span>Собрать урожай</span>
      </button>
     </div>
-    <div class="map-controls"><button id="zoom-in" title="Приблизить" aria-label="Приблизить">+</button><button id="zoom-out" title="Отдалить" aria-label="Отдалить">−</button><button id="center-map" title="Вся ферма" aria-label="Показать всю ферму">⌖</button></div>
+    <div class="map-controls" data-qw-group><button id="zoom-in" title="Приблизить" aria-label="Приблизить">+</button><button id="zoom-out" title="Отдалить" aria-label="Отдалить">−</button><button id="center-map" title="Вся ферма" aria-label="Показать всю ферму">⌖</button></div>
    </div>
-   <div id="seedbar" class="seedbar" aria-label="Семена"></div>
+   <div id="seedbar" class="seedbar" data-qw-group aria-label="Семена"></div>
   </div>
   <button id="object-list-button" class="object-list-button">Список объектов</button>
  </section>

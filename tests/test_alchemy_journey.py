@@ -344,7 +344,7 @@ def test_complete_alembic_chain_reaches_new_head_in_private_schema(pg_env):
         from qw_farm.integration import register_models
         register_models()
         scripts = ScriptDirectory.from_config(Config('alembic.ini'))
-        assert scripts.get_heads() == ['20261015_0030']
+        assert scripts.get_heads() == ['20261015_0032']
         async with isolated_database(pg_env) as (db, schema):
             async with db.engine.begin() as connection:
                 # Remove only this fixture's empty synthetic tables to exercise
@@ -355,7 +355,7 @@ def test_complete_alembic_chain_reaches_new_head_in_private_schema(pg_env):
                             fn=lambda current, _: scripts._upgrade_revs('head', current)) as environment:
                         environment.configure(connection=sync, version_table_schema=schema)
                         environment.run_migrations()
-                    assert sync.scalar(text('SELECT version_num FROM alembic_version')) == '20261015_0030'
+                    assert sync.scalar(text('SELECT version_num FROM alembic_version')) == '20261015_0032'
                     tables = set(inspect(sync).get_table_names())
                     assert {'alchemy_progress', 'alchemy_craft_commands', 'alchemy_stage_claims', 'alchemy_claim_commands'} <= tables
                     for name in ('alchemy_stage_claims', 'alchemy_claim_commands'):

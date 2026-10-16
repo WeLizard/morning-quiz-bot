@@ -141,6 +141,72 @@
             "neutral"
           ],
           "description": "Эпоха пула случайных имён NPC (пул ведёт сервер, не автор дела)."
+        },
+        "style_pack": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Пакет визуального стиля дела (палитра, рамки, детали). По умолчанию noir_print_a. Единый стиль держится в пределах одного дела; другому делу может подойти другой пакет."
+        },
+        "world": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Мир (серия дел с общим пакетом стиля и героями), например manor_lake."
+        },
+        "crime_type": {
+          "enum": [
+            "theft",
+            "missing",
+            "forgery",
+            "blackmail",
+            "sabotage",
+            "impostor",
+            "hoax",
+            "prevention",
+            "exoneration"
+          ],
+          "description": "Тип фабулы — для разнообразия плана на год."
+        },
+        "modules": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 6,
+          "items": {
+            "enum": [
+              "refutation",
+              "final_questions",
+              "victim_clock",
+              "secret_identity",
+              "outsider",
+              "archive_requests",
+              "cipher",
+              "version_archive",
+              "sanity",
+              "turning_point",
+              "ghost_visions",
+              "expert",
+              "efficiency",
+              "turn_limit",
+              "survival_clock"
+            ]
+          },
+          "description": "Модули правил, которые включает дело (см. NIGHT_CITY_CASE_SLATE §1)."
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Сложность для карточки в меню (1–5)."
+        },
+        "duration": {
+          "enum": [
+            "week",
+            "short"
+          ],
+          "description": "week — 7 дней, short — 3–4 дня."
+        },
+        "logline": {
+          "$ref": "#/$defs/shorttext",
+          "description": "Публичная завязка для карточки в меню, без спойлеров."
         }
       }
     },

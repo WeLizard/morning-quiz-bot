@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from storage.admin_actions import operation_fence
 from storage.guest_accounts import normalize_display_name
 from storage.mini_app import MiniAppError
-from storage.models import AccountIdentity, AlchemyProgress, User
+from storage.models import Account, AccountIdentity, AlchemyProgress, User
 
 
 CONFLICT = ('Этот Telegram уже связан с другим профилем или требует восстановления. '
@@ -48,6 +48,20 @@ class AccountLinkingService:
                             or expected_telegram_user_id != str(uid)):
                 raise MiniAppError(409, 'Профиль изменился. Повтори подтверждение.', code='profile_changed')
             active = [row for row in mappings if row.revoked_at is None]
+            other_id = None
+            if (len(active) == 1 and active[0].verified_at is not None and active[0].account_id != account.id
+                    and (user is None or user.account_id in (None, active[0].account_id))):
+                other_id = active[0].account_id
+            elif not mappings and user is not None and user.account_id not in (None, account.id):
+                other_id = user.account_id
+            if other_id is not None:
+                # One account for the whole app: the Telegram already owns another account,
+                # so offer the merge (preview only); confirmation goes through
+                # /api/account/telegram-link/merge with an explicit choice of the main profile.
+                if confirm:
+                    raise MiniAppError(409, 'Нужно объединить профили. Повтори подтверждение.',
+                                       code='merge_required')
+                return await self._merge_offer(session, account, other_id, identity)
             if (user is not None and user.account_id not in (None, account.id)) or (
                     mappings and (len(active) != 1 or active[0].account_id != account.id
                                   or active[0].verified_at is None)):
@@ -101,3 +115,15 @@ class AccountLinkingService:
             await session.flush()
             return {**result, 'already_linked': True, 'linked': True,
                     'profile': await self.guest_store.projection_in(session, account, browser)}
+
+    async def _merge_offer(self, session, account, other_id, identity):
+        from application.account_merge import AccountMergeService
+        other = await session.get(Account, other_id, populate_existing=True)
+        plan = await AccountMergeService(clock=self.guest_store.clock).plan_in(
+            session, current=account, telegram_account=other)
+        return {'account_id': str(account.id), 'display_name': account.display_name,
+                'telegram_user_id': str(identity.user_id),
+                'telegram_display_name': normalize_display_name(
+                    f'{identity.first_name} {identity.last_name}')[:40] or 'Игрок',
+                'already_linked': False, 'merge_required': True, 'auto': plan['auto'],
+                'telegram_account_id': str(other_id), 'preview': plan['preview']}

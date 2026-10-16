@@ -121,3 +121,30 @@ test('after dusk animals walk to their house door and vanish; after dawn they co
   calm.lighting.darkness=0;for(let i=0;i<10;i++){tick(33);E.teamSprites(calm)}assert.equal(visible(calm),day);
  });
 });
+
+test('a farm refresh at night does not make indoor animals pop out and run home again, and opening after dark starts them indoors',async()=>{
+ const E=await import('../../qw_farm/static/scene_expansion.js');
+ const farm={id:'f',size:12,pranks:[],equipment:{},helpers:{},objects:[
+  {id:'coop',type:'coop',animal:'chicken',x:2,y:2,w:2,h:2},{id:'gh',type:'goose_house',animal:'goose',x:6,y:6,w:2,h:2}]};
+ const s={farm,motion:true,time:0,now:()=>0,view:null,placement:null,lighting:{darkness:1},goose(){},c:{save(){},restore(){},translate(){},scale(){},rotate(){},stroke(){},fillText(){},strokeText(){}}};
+ withClock(tick=>{
+  E.resetWalkingGeese(s);E.resetLivestock(s);
+  tick(33);assert.equal(E.teamSprites(s).length,0,'opened after dark: all indoors from the first frame');
+  for(let i=0;i<5;i++){tick(33);E.teamSprites(s)}
+  E.resetWalkingGeese(s);E.resetLivestock(s);   // what every farm refresh does
+  tick(33);assert.equal(E.teamSprites(s).length,0,'a refresh keeps them indoors');
+  assert.ok(s.walkingGeese.every(g=>g.mode==='inside')&&s.livestock.every(l=>l.mode==='inside'));
+ });
+});
+
+test('a goose coming out of its house at dawn always walks back to its strip (no standing at the door)',async()=>{
+ const E=await import('../../qw_farm/static/scene_expansion.js');
+ const farm={id:'f',size:12,pranks:[],equipment:{},helpers:{},objects:[{id:'gh',type:'goose_house',animal:'goose',x:6,y:6,w:2,h:2},{id:'wall',type:'barn',x:5,y:8,w:4,h:2}]};
+ const s={farm,motion:true,time:0,now:()=>0,view:null,placement:null,lighting:{darkness:0},goose(){},c:{save(){},restore(){},translate(){},scale(){},rotate(){},stroke(){},fillText(){},strokeText(){}}};
+ withClock(tick=>{
+  E.resetWalkingGeese(s);const g=s.walkingGeese[0];E.teamSprites(s);
+  g.mode='inside';g.pos={x:g.door.x,y:g.door.y};g.exitAt=undefined;
+  for(let i=0;i<400;i++){tick(33);E.teamSprites(s)}
+  assert.equal(g.mode,'idle','the goose is back to its normal walk');
+ });
+});

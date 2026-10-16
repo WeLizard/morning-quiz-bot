@@ -1,5 +1,6 @@
-/* Optional Telegram UX bridge; no login, token forwarding or automatic messages. */
+/* Farm invitation links and sharing helpers. The Telegram bridge (SDK, safe-area, fullscreen, BackButton) lives in the shared shell: /app/shell/qw-shell.js (window.QW). */
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+const SHARE_TOKEN=/^[A-Za-z0-9_-]{43}$/;
 export function parseInvite(input){
   if(typeof input!=='string'||input.length>2048)return null;
   let value=input.trim();
@@ -10,11 +11,23 @@ export function parseInvite(input){
     if(!raw)return null;return parseInvite(raw);
   }catch{return null;}
 }
+// Shared links carry a one-use secret. A bare farm UUID is still accepted for
+// older links and manual requests, but it never authorizes immediate joining.
+export function parseInviteHint(input){
+  if(typeof input!=='string'||input.length>2048)return null;
+  let value=input.trim();
+  if(value.startsWith('farm_'))value=value.slice(5);
+  if(SHARE_TOKEN.test(value))return value;
+  if(UUID.test(value))return value.toLowerCase();
+  try{const u=new URL(value);if(!['http:','https:'].includes(u.protocol))return null;
+    return parseInviteHint(u.searchParams.get('invite')||u.searchParams.get('startapp')||u.searchParams.get('tgWebAppStartParam')||'');
+  }catch{return null;}
+}
 export function incomingInvite(){
   const params=new URLSearchParams(location.search);
   const raw=params.get('invite')||params.get('tgWebAppStartParam')||params.get('startapp');
-  let found=parseInvite(raw)||parseInvite(window.Telegram?.WebApp?.initDataUnsafe?.start_param);
-  try{if(found)sessionStorage.setItem('qw-farm.incoming',found);else found=parseInvite(sessionStorage.getItem('qw-farm.incoming'));}catch{}
+  let found=parseInviteHint(raw)||parseInviteHint(window.Telegram?.WebApp?.initDataUnsafe?.start_param);
+  try{if(found)sessionStorage.setItem('qw-farm.incoming',found);else found=parseInviteHint(sessionStorage.getItem('qw-farm.incoming'));}catch{}
   return found;
 }
 export function clearInvite(){
@@ -44,33 +57,4 @@ export async function shareLink(info,copy){
     try{await navigator.share(d);return 'shared';}catch(e){if(e&&e.name==='AbortError')return 'cancelled';}
   }
   try{await copy(d.url||(d.text));return 'copied';}catch{return 'failed';}
-}
-export function inTelegram(){return !!window.Telegram?.WebApp?.initData;}
-export async function bootTelegram(onResize,onBack,force=false){
-  const seemsTelegram=location.hash.includes('tgWebApp')||location.search.includes('tgWebApp')||window.Telegram?.WebApp?.initData;
-  if(!seemsTelegram&&!force)return null;
-  if(!window.Telegram?.WebApp){
-    await new Promise(resolve=>{const script=document.createElement('script');script.src='https://telegram.org/js/telegram-web-app.js';script.async=true;script.onload=resolve;script.onerror=resolve;document.head.append(script);});
-  }
-  const tg=window.Telegram?.WebApp;if(!tg)return null;
-  function syncViewport(kind,event){
-    const stable=Number(tg.viewportStableHeight),current=Number(tg.viewportHeight);
-    const valid=n=>Number.isFinite(n)&&n>0;
-    // Telegram reports the visible WebView height; the shell applies its safe insets separately.
-    const useCurrent=kind==='fullscreenChanged'||event?.isStateStable===false;
-    const height=useCurrent&&valid(current)?current:valid(stable)?stable:current;
-    if(valid(height))document.documentElement.style.setProperty('--app-height',`${height}px`);
-    else document.documentElement.style.removeProperty('--app-height');
-    for(const [prefix,inset]of [['safe',tg.safeAreaInset],['content',tg.contentSafeAreaInset]]){
-      for(const edge of ['top','right','bottom','left'])document.documentElement.style.setProperty(`--tg-${prefix}-${edge}`,Math.max(0,Number(inset?.[edge])||0)+'px');
-    }
-    onResize?.();
-  }
-  try{tg.ready();tg.expand();tg.BackButton?.show();tg.BackButton?.onClick(onBack);
-    for(const name of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged','fullscreenChanged'])tg.onEvent?.(name,event=>syncViewport(name,event));
-    syncViewport('initial');
-  }catch{}
-  try{if(tg.isVersionAtLeast?.('7.7'))tg.disableVerticalSwipes?.();}catch{}
-  try{tg.setHeaderColor?.('#f6f5ed');tg.setBackgroundColor?.('#edf3e2');}catch{}
-  return tg;
 }

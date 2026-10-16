@@ -84,12 +84,43 @@
             let preferred = command === '/photo_quiz' ? 'photo' : command === '/quiz' ? 'classic' : null;
             const images = new Map();
             const page = el('section', undefined, 'play-screen'), top = el('div', undefined, 'play-topline');
-            const button = (text, fn, cls = '') => { const b = el('button', text, cls); b.type = 'button'; b.onclick = fn; return b; };
-            const back = button('К играм', onHome, 'quiet'), mode = el('span', 'Твой ход', 'eyebrow'); top.append(back, mode);
+            // Core classes from qw-shell.css; self-styled option buttons keep only their own class.
+            const button = (text, fn, cls = '') => {
+                const b = el('button', text, /play-option|qw-btn/.test(cls) ? cls : ('qw-btn ' + cls.replace('quiet', 'secondary quiet')).trim());
+                b.type = 'button'; b.onclick = fn; return b;
+            };
+            const mode = el('span', 'Твой ход', 'eyebrow'); top.append(mode);
             const status = el('p', '', 'play-connection'); status.setAttribute('role', 'status');
             const stage = el('div', undefined, 'play-stage'), notice = el('div', '', 'play-notice'); notice.setAttribute('role', 'status');
-            page.append(top, status, stage, notice); host.append(page);
-            dispose = () => { active = false; clearTimeout(timer); clearInterval(ticker); images.forEach(url => URL.revokeObjectURL(url)); document.body?.classList.toggle('is-playing', false); };
+            // Confirmation for «Завершить раунд» (menu item). In-page: confirm() is unreliable inside Telegram.
+            const exitBox = el('section', undefined, 'round-exit card'); exitBox.hidden = true; exitBox.setAttribute('role', 'alert');
+            page.append(top, status, stage, exitBox, notice); host.append(page);
+            let screen = 'setup', shown = null;
+            const kindNow = () => shown || preferred;
+            const canStop = () => screen === 'question' && (shown === 'photo' ? directPhoto?.revision !== undefined : direct?.revision !== undefined
+                && !['finished', 'stopped', 'interrupted'].includes(direct?.status));
+            const canSettings = () => typeof onSettings === 'function' && !room && screen === 'setup' && preferred === 'classic' && Boolean(classicSetup);
+            function closeExit() { exitBox.hidden = true; exitBox.replaceChildren(); }
+            function askStop() {
+                if (!canStop()) return;
+                const stop = shown === 'photo' ? stopPhotoDirect : stopDirect;
+                const row = el('div', undefined, 'qw-btn-row');
+                row.append(button('Отмена', closeExit, 'qw-btn secondary'), button('Да, завершить', () => { closeExit(); stop(); }, 'qw-btn danger'));
+                exitBox.replaceChildren(el('h3', 'Завершить раунд?'), el('p', 'Уже полученные баллы сохранятся.', 'muted'), row);
+                exitBox.hidden = false;
+                exitBox.scrollIntoView?.({block: 'nearest'});
+            }
+            // Page items of the ⚙ menu (UI_RULES §5): replaced on every render, cleared on leaving the page.
+            function syncMenu() {
+                if (!active || !window.QW?.menu) return;
+                window.QW.menu.register([
+                    {id: 'quiz-settings', icon: 'sliders', label: 'Настройки квиза', hint: 'Темы, число вопросов и время ответа', hidden: () => !canSettings(), onSelect: () => onSettings()},
+                    {id: 'round-stop', icon: 'flag', label: 'Завершить раунд', danger: true, hidden: () => !canStop(), onSelect: askStop},
+                ], kindNow() === 'photo' ? 'Фото-загадки' : 'Классический квиз');
+            }
+            dispose = () => { active = false; window.QW?.menu?.register([]); clearTimeout(timer); clearInterval(ticker); images.forEach(url => URL.revokeObjectURL(url)); document.body?.classList.toggle('is-playing', false); };
+            // Action groups never stand as bare neighbours (UI_RULES §9): one .qw-btn-stack, the main action first.
+            function actionStack(...buttons) { const group = el('div', undefined, 'qw-btn-stack'); group.append(...buttons); stage.append(group); }
             function hostLine(text, cls = '') {
                 const row = el('div', undefined, `host-line ${cls}`), image = el('img'); image.src = '/app/host.webp'; image.alt = ''; row.append(image, el('p', text)); return row;
             }
@@ -138,7 +169,6 @@
                         : config.category_mode === 'exclude' && config.categories?.length
                             ? `Без тем: ${config.categories.join(', ')}` : (room ? 'Темы — любые' : 'Темы — по настройкам чата');
                     facts.append(el('span', categoryText)); stage.append(facts);
-                    if (typeof onSettings === 'function') stage.append(button('Настройки квиза', onSettings, 'quiet play-secondary'));
                     stage.append(button('Начать игру', startDirect, 'primary play-primary'));
                 } else if (preferred === 'photo') {
                     if (!photoSetup) { stage.append(hostLine('Проверяю фото-каталог…')); return; }
@@ -163,11 +193,10 @@
                     }
                 } else {
                     stage.append(el('h1', 'Выбери игру'));
-                    stage.append(hostLine('Можно начать классический квиз или фото-загадки. Настройки квиза находятся в Профиль → Настройки.'));
-                    stage.append(button('Классический квиз', () => chooseDirectMode('classic'), 'primary play-primary'));
-                    stage.append(button('Фото-загадки', () => chooseDirectMode('photo'), 'primary play-secondary'));
+                    stage.append(hostLine('Можно начать классический квиз или фото-загадки. Настройки квиза открываются из меню ⚙.'));
+                    actionStack(button('Классический квиз', () => chooseDirectMode('classic'), 'primary play-primary'), button('Фото-загадки', () => chooseDirectMode('photo'), 'quiet play-secondary'));
                 }
-                if (!room) stage.append(el('p', 'Глобальные настройки доступны в Профиль → Настройки. Этот раунд использует состояние выбранного чата.', 'play-footnote'));
+                if (!room) stage.append(el('p', 'Настройки квиза — в меню ⚙. Этот раунд использует состояние выбранного чата.', 'play-footnote'));
             }
             // Room Classic setup: the same options as the Telegram settings (count, time, pause, theme mode and themes).
             function roomClassicForm(config) {
@@ -274,7 +303,7 @@
                     el('h1', complete ? 'Квиз пройден.' : 'Продолжим в другой раз.', 'result-title'));
                 const score = el('div', undefined, 'result-score'); score.append(el('strong', number(myScore(view))), el('span', 'баллов за партию')); stage.append(score);
                 acceptedVerdict(view); scoreList(view);
-                stage.append(button('Сыграть ещё', () => replay('classic'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
+                actionStack(button('Сыграть ещё', () => replay('classic'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
             }
             function sharedQuestion(view) {
                 const poll = view.question, game = view.game || {current: poll.question_number, total: poll.question_number};
@@ -308,11 +337,6 @@
                 } else if (poll.closed) stage.append(hostLine(room ? 'Время вышло. Ждём следующий вопрос.' : 'Время вышло. Ждём следующий вопрос общей игры.'));
                 else stage.append(el('p', busy ? 'Ответ сохраняется…' : room ? 'Нажми на вариант — ответ сразу сохранится.' : 'Нажми на вариант — ответ сразу попадёт в общую игру.', 'play-footnote'));
                 scoreList(view);
-                if (view.revision !== undefined && !['finished', 'stopped', 'interrupted'].includes(view.status)) {
-                    const exit = el('details', undefined, 'round-exit');
-                    exit.append(el('summary', 'Завершить раунд'), el('p', 'Уже полученные баллы сохранятся.'));
-                    exit.append(button('Да, завершить', stopDirect, 'quiet')); stage.append(exit);
-                }
             }
             function sharedPhoto(view) {
                 const question = view.question;
@@ -331,8 +355,6 @@
                 if (!question.closed) inputForm('Твой ответ', question.round_id, false, true);
                 else stage.append(hostLine('Этот фото-вопрос уже закрыт. Готовим следующий.'));
                 stage.append(el('p', room ? 'Картинка загружена из текущей серии.' : 'Картинка загружена из общей игровой сессии, без копии сообщения Telegram.', 'play-footnote'));
-                const exit = el('details', undefined, 'round-exit'); exit.append(el('summary', 'Завершить раунд'), el('p', 'Уже полученные баллы сохранятся.'));
-                exit.append(button('Да, завершить', stopPhotoDirect, 'quiet')); stage.append(exit);
             }
             function sharedPhotoResult(view) {
                 const complete = view.status === 'finished';
@@ -341,10 +363,19 @@
                 const score = el('div', undefined, 'result-score'); score.append(el('strong', number(view.score)), el('span', 'баллов за серию')); stage.append(score);
                 stage.append(el('p', `${view.correct} правильных из ${view.game.total}`, 'previous-answer'));
                 if (view.last_result?.answer) stage.append(hostLine(`Последний ответ: ${view.last_result.answer}`));
-                stage.append(button('Сыграть ещё', () => room ? replay('photo') : onReplay('/photo_quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
+                actionStack(button('Сыграть ещё', () => room ? replay('photo') : onReplay('/photo_quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
             }
             function render() {
                 if (!active) return;
+                if (starting) { screen = 'setup'; }
+                else if (directPhoto) { shown = 'photo'; screen = directPhoto.question ? 'question' : 'result'; }
+                else if (direct?.question) { shown = 'classic'; screen = 'question'; }
+                else if (direct && ['finished', 'stopped', 'interrupted'].includes(direct.status)) { shown = 'classic'; screen = 'result'; }
+                else { shown = null; screen = 'setup'; }
+                if (screen !== 'question') closeExit();
+                renderView(); syncMenu();
+            }
+            function renderView() {
                 if (starting) { stage.replaceChildren(hostLine('Готовлю твою игру. Сейчас начнём.')); return; }
                 if (directPhoto?.question) {
                     const hash = JSON.stringify([directPhoto, busy]); if (hash === lastHash) return;

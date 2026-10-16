@@ -846,7 +846,34 @@ function lateAnimalHouse(s,o){
  if(!silk&&!yak&&!pheasant){E(s,o.x+1.5,o.y+1.38,1,12,5,'#b69c6f');for(let k=0;k<3;k++)E(s,o.x+1.44+k*.08,o.y+1.38,5,3.4,4.5,'#f1e6c9')}
  return 68;
 }
-const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse};
+/* «Бодрильня» (energy_shop): warm brick-and-plaster workshop, copper brewing tank on the roof, cans of farm energy drinks at the door. */
+function energyShop(s,o){
+  const g=gparams({x0:o.x+.14,y0:o.y+.14,x1:o.x+o.w-.36,y1:o.y+o.h-.62,H:30,col:'#e6caa1',roof:'#6f978a',base:'#b8735a',baseH:9,corner:'#f7ecd2',axis:'y',prof:GABLE,R:20,ov:.12,trim:'#d8e6dc'},{});
+  ground(s,o.x+.02,o.y+.02,o.x+o.w-.02,o.y+o.h-.02,'rgba(214,190,150,.42)');
+  shadowAt(s,g.x0,g.y0,g.x1,g.y1);body(s,g);
+  const Y=g.y1,xm=(g.x0+g.x1)/2;
+  boards(s,'y',Y,g.x0,g.x1,1,8,3,'rgba(120,60,40,.22)');boards(s,'x',g.x1,g.y0,g.y1,1,8,3,'rgba(100,50,35,.22)');
+  doorY(s,Y,g.x0+.38,.36,21,'#7f9a6c','#f7ecd2');winY(s,Y,xm+.32,10,.5,12,'#b9d1cf','#f7ecd2');winX(s,g.x1,(g.y0+g.y1)/2,11,.42,12,'#a9c4c2','#ece0c4');
+  awning(s,xm-.02,g.x1-.06,Y,27,.26,7,'#f3ead6','#8fb276',4);
+  // sign above the door: green leaf with a honey-coloured lightning bolt
+  const sx=g.x0+.38;Q(s,'#f3e6c4',[sx-.26,Y+.01,24,sx+.26,Y+.01,24,sx+.26,Y+.01,33,sx-.26,Y+.01,33]);
+  E(s,sx,Y+.02,28.5,6,3.4,'#86ad70');Q(s,'#e8b54a',[sx+.03,Y+.03,32,sx-.08,Y+.03,28,sx,Y+.03,28.5,sx-.04,Y+.03,25,sx+.08,Y+.03,29.4,sx,Y+.03,29]);
+  roofOf(s,g);
+  // copper brewing tank on the roof with a pressure gauge and a pipe down the shaded wall
+  const tx=xm-.05,ty=g.y0+.48,tz=g.H+12;
+  cyl(s,tx,ty,.2,tz,tz+16,'#c98c5a','#e0ad7c');E(s,tx,ty,tz+19,3,2,'#a8714a');L(s,tx,ty,tz+16,tx,ty,tz+21,'#8a5a3a',1.6);
+  L(s,tx+.12,ty+.12,tz+8,g.x1+.04,ty+.12,tz+2,'#a8714a',2.4);L(s,g.x1+.04,ty+.12,tz+2,g.x1+.04,ty+.12,4,'#a8714a',2.4);
+  E(s,tx+.14,ty+.14,tz+10,2.3,2.3,'#f3ead6');L(s,tx+.14,ty+.14,tz+10,tx+.17,ty+.14,tz+11.4,'#6b4a33',.8);
+  smoke(s,tx,ty,tz+21,!!o.jobs?.length,.7);
+  // yard: a crate of cans (berry, honey, forest), a keg with a hose, a stack of crates
+  const cx=g.x0+.5,cy=o.y+o.h-.3;
+  fullBox(s,'#c9a672',cx-.3,cy-.16,cx+.3,cy+.16,0,7,'#d8b886');boards(s,'y',cy+.16,cx-.3,cx+.3,0,7,3.5,'rgba(80,55,30,.3)');
+  ['#c25a6a','#e3b04a','#7fa36a','#e3b04a','#c25a6a'].forEach((c,k)=>{const ux=cx-.22+k*.11;cyl(s,ux,cy,.045,7,12,c,'#f1ead8')});
+  const kx=g.x1+.18,ky=cy-.02;barrel(s,kx,ky,.15,13,'#b98b5c');
+  s.line(px(kx,ky)-2,py(kx,ky,13),px(g.x1+.04,ty+.12)+3,py(g.x1+.04,ty+.12,6),'#5f6b5e',1.6);
+  fullBox(s,'#b48f63',kx+.12,ky-.42,kx+.42,ky-.14,0,8,'#c9a57a');fullBox(s,'#c9a672',kx+.15,ky-.4,kx+.39,ky-.16,8,15,'#d8b886');
+  return g.H+g.R+30}
+const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop};
 /* ---------- r6 building upgrades (view only; the level comes from the server object) ----------
    level 2: flower boxes, a lantern post with a hanging sign. level 3: adds a lean-to annex with its own chimney and a
    waving flag on the roof. Both levels get a small gold badge. Buildings without a level (older saves) are level 1. */

@@ -10,7 +10,7 @@ function fixture(stored='auto',blocked=false){
  const root={dataset:{},style:{}};
  const document={documentElement:root,hidden:false,querySelector:selector=>({setAttribute:(k,v)=>meta[selector]=v})};
  let timerId=0;
- const context=vm.createContext({document,window:{Telegram:{WebApp:Object.fromEntries(['setHeaderColor','setBackgroundColor','setBottomBarColor'].map(k=>[k,v=>calls.push([k,v])]))}},
+ const context=vm.createContext({document,QW:{configure:o=>calls.push(['chrome',o.color])},
   localStorage:{getItem:()=>{if(blocked)throw Error('denied');return stored;},setItem:(k,v)=>{if(blocked)throw Error('denied');saved.push([k,v]);}},
   $:id=>id==='lighting-toggle'?toggle:setting,scene:{setLighting:s=>calls.push(['scene',s])},
   farmLightingAt:(date,mode)=>({mode,phase:mode==='day'?'day':'night',darkness:mode==='day'?0:1,warmth:0}),
@@ -19,11 +19,11 @@ function fixture(stored='auto',blocked=false){
  vm.runInContext(source.slice(source.indexOf('function syncUITimers(){'),source.indexOf('syncUITimers();document.addEventListener')),context);
  return {context,root,attrs,meta,calls,saved,timers,cleared,document,setting};
 }
-test('saved night synchronizes scene, surfaces, accessible control and Telegram chrome',()=>{
+test('saved night synchronizes scene, surfaces, accessible control and the shell chrome color',()=>{
  const f=fixture('night');vm.runInContext('updateFarmLighting()',f.context);
  assert.equal(f.root.dataset.farmTheme,'night');assert.equal(f.root.style.colorScheme,'dark');assert.equal(f.context.$('lighting-toggle').dataset.mode,'night');assert.match(f.attrs['aria-label'],/всегда ночь/);assert.equal(f.setting.value,'night');
  assert.equal(f.meta['meta[name="theme-color"]'],'#172821');
- assert.deepEqual(f.calls.filter(c=>c[0]!=='scene').map(c=>c[1]),['#172821','#172821','#172821']);assert.equal(f.calls.find(c=>c[0]==='scene')[1].mode,'night');
+ assert.deepEqual(f.calls.filter(c=>c[0]==='chrome').map(c=>c[1]),['#172821']);assert.equal(f.calls.find(c=>c[0]==='scene')[1].mode,'night');
  vm.runInContext("setLightingMode('day')",f.context);assert.equal(f.root.dataset.farmTheme,'day');assert.equal(f.meta['meta[name="theme-color"]'],'#efeee4');assert.deepEqual(f.saved,[['qw-farm.lighting','day']]);
 });
 test('blocked storage and invalid saved mode do not break lighting',()=>{
@@ -65,11 +65,16 @@ test('forest and lake wrappers are transparent without changing destination art'
  assert.match(css,/\.header-destinations #forest-door,\.header-destinations #lake-door\{background:transparent;border:0;box-shadow:none\}/);
 });
 
-test('QW home navigation is available in settings and before login',()=>{
- assert.match(source,/function renderViewSettings\(p\)\{\s*p.append\(quizzyHomeLink\(\)\)/);
- assert.match(source,/if\(message\)note\(message,c\);c.append\(quizzyHomeLink\(\)\)/);
- assert.match(source,/function quizzyHomeLink\(\)\{[\s\S]*?mark=el\('span','Q','brand-icon'\);mark.append\(el\('span','W'\)\)/);
- assert.match(source,/link.href=invite\?`\/app\?invite=\$\{invite\}`:'\/app'/);
+test('QW home navigation goes through the shared shell ⚙ menu (also before login); settings have no home link',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/index.html'),'utf8');
+ assert.match(html,/<div class="header-actions" id="header-actions"><\/div>/,'⚙ container is always visible, including the login screen');
+ assert.match(source,/QW\?\.boot\(\{mode:'game',gameId:'farm',title:'Весёлый фермер',home:'\/app'/);
+ assert.match(source,/QW\?\.header\.mountGear\(\$\('header-actions'\)\)/);
+ assert.doesNotMatch(source,/header-actions'\)\.hidden/);
+ assert.doesNotMatch(source,/quizzyHomeLink|На главную QuizzyWizzy|В профиль QuizzyWizzy/);
+ assert.match(source,/c\.append\(quizzyLoginLink\(\)\)/);
+ assert.match(source,/function quizzyLoginLink\(\)\{[\s\S]*?mark=el\('span','Q','brand-icon'\);mark\.append\(el\('span','W'\)\)/);
+ assert.match(source,/link\.href=invite\?`\/app\?invite=\$\{encodeURIComponent\(invite\)\}`:'\/app'/);
 });
 
 test('farm name remains on the map and in settings without a header duplicate',()=>{

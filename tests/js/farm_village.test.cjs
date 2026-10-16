@@ -27,15 +27,24 @@ function setup(){
  eco:()=>({fund_open:ctx.openFund}),ECON:()=>({fund_level:8}),repInfo:()=>({lv:1,bonus:5}),repBar:()=>new Node('div'),
  enough:needs=>Object.entries(needs).every(([k,v])=>S.me.inventory[k]>=v),
  command:async(kind,data)=>{calls.push([kind,data]);S.busy=true;return true;},fmt:String,
+ backHome:()=>calls.push('back-home'),
  card:(name)=>{const n=new Node('section');n.textContent=name;return n;},goods:()=>new Node('div'),note:(text,p)=>p.append(new Node(text)),
  showPanel(){bodyClasses.add('panel-open');bodyClasses.delete('panel-collapsed');},renderPanel(){ctx.syncVillageScene();},renderRail(){},updateHUD(){},renderSeeds(){},meter:()=>new Node('div'),heading(){},fundCard(){},upkeepCard(){},decorShop(){},openFund:false};
  // Register dynamically created scene exactly as a browser's getElementById would.
  area.append=n=>nodes.set(n.id,n);
- vm.createContext(ctx);vm.runInContext(declarations+block+'\n'+source.slice(source.indexOf('function selectTab(id)'),source.indexOf('let seedCardVisible'))+'\n'+source.slice(source.indexOf('function closePanel()'),source.indexOf('function showPanel()'))+'\nObject.assign(globalThis,{closePanel,exitVillage,resetVillageView,openVillageTownHall,villageStage,villageOrders,deliverVillageOrder,chooseVillageResident,syncVillageScene,renderVillageResident,selectTab,syncScenePause})',ctx);
+ vm.createContext(ctx);vm.runInContext(declarations+block+'\n'+source.slice(source.indexOf('function selectTab(id)'),source.indexOf('let seedCardVisible'))+'\n'+source.slice(source.indexOf('function closePanel()'),source.indexOf('function showPanel()'))+'\nObject.assign(globalThis,{closePanel,exitVillage,returnToFarm,resetVillageView,openVillageTownHall,villageStage,villageOrders,deliverVillageOrder,chooseVillageResident,syncVillageScene,renderVillageResident,selectTab,syncScenePause})',ctx);
  return {ctx,S,nodes,calls,pause,bodyClasses,sheetFocus,title};
 }
 test('entering village from guest routes to own farm and invalidates older requests',()=>{
  const h=setup();h.ctx.selectTab('village');assert.equal(h.S.farm,h.S.me);assert.equal(h.S.tab,'village');assert.equal(h.ctx.farmViewEpoch,5);assert.ok(h.calls.includes('scene'));assert.equal(h.bodyClasses.has('panel-open'),false);assert.equal(h.bodyClasses.has('panel-collapsed'),true);const world=AC(h);assert.equal(world.children.filter(n=>n.dataset.villageNpc&&n.attrs['aria-pressed']==='true').length,0);
+});
+test('Farm return card shows its in-app caption and routes from a neighbor or Village',()=>{
+ const h=setup(),start=source.indexOf('function addDestinationCard('),end=source.indexOf('\naddDestinationCard(',start),cards=[];
+ const ctx={button:(text,run,cls)=>{const n=new Node('button');n.onclick=run;n.className=cls;return n;},headerCardArt:()=>new Node('svg'),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},$:()=>({before:n=>cards.push(n)})};
+ vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);ctx.addDestinationCard({id:'farm-card-door',label:'Ферма',art:'',run:h.ctx.returnToFarm});
+ assert.equal(cards.length,1);assert.equal(cards[0].dataset.label,'Ферма');assert.equal(cards[0].attrs['aria-label'],'Ферма');assert.equal(cards[0].title,undefined);
+ h.S.farm={id:'neighbor',is_owner:false};h.S.tab='neighbors';cards[0].onclick();assert.equal(h.calls.at(-1),'back-home');
+ h.calls.length=0;h.S.farm=h.S.me;h.S.tab='village';h.bodyClasses.add('village-open');cards[0].onclick();assert.equal(h.S.tab,'orders');assert.equal(h.calls.includes('back-home'),false);assert.equal(h.bodyClasses.has('panel-open'),false);
 });
 test('one real request delivers through the existing order command, a busy repeat does not',async()=>{
  const h=setup();h.S.tab='village';h.ctx.chooseVillageResident('Филиныч');assert.equal(await h.ctx.deliverVillageOrder('one'),true);assert.equal(await h.ctx.deliverVillageOrder('one'),false);
@@ -109,11 +118,11 @@ test('placing town hall decor returns to the farm before entering placement mode
  vm.runInContext(source.slice(start,end)+'\nthis.beginPlacement=beginPlacement',h.ctx);const spec={id:'flowerbed',w:1,h:1};h.ctx.beginPlacement(spec);
  assert.equal(h.S.tab,'orders');assert.equal(h.pause.at(-1),false);assert.equal(h.S.placing.spec,spec);assert.equal(h.nodes.get('farm-canvas').inert,false);
 });
-test('debt shortcut opens town hall services and all eight resident positions exist',()=>{
+test('debt shortcut opens town hall services and all nine resident positions exist',()=>{
  const h=setup();h.S.farm=h.S.me;h.ctx.eco=()=>({debt:50});
  const start=source.indexOf('function hudDebt()'),end=source.indexOf('\n',start);
  vm.runInContext(source.slice(start,end)+'\nthis.hudDebt=hudDebt;this.spotCount=Object.keys(VILLAGE_SPOTS).length',h.ctx);
- h.ctx.hudDebt().onclick();assert.equal(h.S.tab,'village');assert.equal(h.bodyClasses.has('panel-open'),true);assert.equal(h.title.focused,true);assert.equal(h.ctx.spotCount,8);
+ h.ctx.hudDebt().onclick();assert.equal(h.S.tab,'village');assert.equal(h.bodyClasses.has('panel-open'),true);assert.equal(h.title.focused,true);assert.equal(h.ctx.spotCount,9);
 });
 
 test('world keeps 44px targets without overlap at phone and desktop widths; walking and HUD exist',()=>{
@@ -144,4 +153,14 @@ test('daily guests follow the date only, differ from each other, and place signs
  const all=[...spots,...places,...guests,{x:hall[0],y:hall[1],w:62,h:44},{x:gate[0],y:gate[1],w:132,h:48}];
  for(const width of [1600,3200]){const height=width*.75,T=all.map(t=>({x:t.x*width/100,y:t.y*height/100,w:t.w,h:t.h}));
   for(let i=0;i<T.length;i++)for(let j=i+1;j<T.length;j++){const a=T[i],b=T[j];assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2||Math.abs(a.y-b.y)>=(a.h+b.h)/2,`targets ${i}/${j} overlap at ${width}`);}}
+});
+test('easter-egg guests are extra, rare, deterministic and complete',()=>{
+ const h=setup();const today=vm.runInContext('villageVisitorsToday',h.ctx),eggs=vm.runInContext('VILLAGE_EGGS',h.ctx),base=vm.runInContext('VILLAGE_VISITORS',h.ctx);
+ const ids=[...base,...eggs].map(v=>v[0]);assert.equal(new Set(ids).size,ids.length,'ids unique');
+ const tabs=new Set(['orders','inventory','build','production','forest','lake','neighbors','secrets','journal']);
+ for(const v of eggs){assert.ok(v[1]&&v[2]&&v[3].length>20&&v[4],`${v[0]} has text`);assert.ok(tabs.has(v[5]),`${v[0]} leads to existing tab`);}
+ let withEgg=0;const seen=new Set();
+ for(let d=0;d<120;d++){const t=Date.UTC(2026,9,1+d,9),a=today(t),b=today(t+5*3600e3);assert.deepEqual(a.map(x=>x.v[0]),b.map(x=>x.v[0]));assert.ok(a.length<=3);assert.ok(a.slice(0,2).every(x=>base.includes(x.v)),'daily guests unchanged');
+  if(a.length===3){withEgg++;seen.add(a[2].v[0]);assert.ok(eggs.includes(a[2].v));assert.equal(new Set(a.map(x=>x.spot.join())).size,3,'distinct spots');}}
+ assert.ok(withEgg>=15&&withEgg<=40,'egg guests are rare: '+withEgg);assert.equal(seen.size,eggs.length,'every egg appears');
 });

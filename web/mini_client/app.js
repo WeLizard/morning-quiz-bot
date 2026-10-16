@@ -25,9 +25,47 @@
     const stopRoomClassic = () => { clearTimeout(roomClassicTimer); roomClassicTimer = null; stopRoomPhoto(); };
     window.addEventListener?.('pagehide', stopRoomClassic);
     const el = (tag, text, cls) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; };
-    const button = (label, action, cls = '') => { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', action); return node; };
+    // Core button classes (qw-shell.css): 'primary' / 'secondary' / 'text' / 'danger'; legacy 'quiet' maps to secondary.
+    // Self-styled buttons (mafia seats, play options, cards) keep their own classes without .qw-btn.
+    const BARE_BUTTON = /mafia-person|settings-link|resume-game|play-option|answer-option/;
+    const button = (label, action, cls = '') => {
+        const node = el('button', label, BARE_BUTTON.test(cls) ? cls : ('qw-btn ' + cls.replace(/\bquiet\b/, 'secondary quiet')).trim());
+        node.type = 'button'; node.addEventListener('click', action); return node;
+    };
     const format = value => new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 3}).format(Number(value));
     const note = (parent, text, cls = 'muted') => parent.append(el('p', text, cls));
+    // Shared shell (web/shell/qw-shell.js): header ‹ ⚙, ⚙ menu, back stack. Without the core every call is a no-op.
+    const QW = window.QW || {nav: {setRoot() {}}, menu: {register() {}, setAccount() {}}, header: {mountBack() {}, mountGear() {}}, configure() {}};
+    const hubBar = document.getElementById('hubbar'), hubTitle = document.getElementById('hubTitle'), brandLink = document.querySelector('.brand');
+    if (hubBar) { QW.header.mountBack(hubBar); QW.header.mountGear(hubBar); }
+    // Parent screen of every hub page: «назад» goes one level up, not always home (UI_RULES §6).
+    const PARENT = {home: null, mafia: null, chats: 'home', rating: 'home', profile: 'home', play: 'home', help: 'home',
+                    settings: 'profile', achievements: 'profile', history: 'profile', 'alchemy-top': 'achievements', chat: 'chats'};
+    const PAGE_TITLES = {chats: 'Чаты', chat: 'Чат', rating: 'Рейтинг', profile: 'Профиль', settings: 'Настройки', achievements: 'Достижения',
+                         history: 'История', 'alchemy-top': 'Рейтинг атласа', help: 'Как играть', play: 'Игра'};
+    let openSettingsOnLoad = typeof location !== 'undefined' && location.hash === '#settings';
+    function consumeSettingsHash() {
+        openSettingsOnLoad = false;
+        try { if (location.hash === '#settings') history.replaceState(history.state, '', location.pathname + location.search); } catch {}
+    }
+    function setHubTitle(title) {
+        if (hubTitle) { hubTitle.hidden = !title; hubTitle.textContent = title || ''; }
+        if (brandLink) brandLink.hidden = Boolean(title);
+    }
+    // One place for the shell state of a screen: back target, mode (hub or game), header title, account row.
+    // Called by every screen entry (Telegram pages, guest pages, login), because guests never pass navigate().
+    const TAB_ROOTS = new Set(['chats', 'rating', 'profile']);
+    function shell({page = null, back, title = null, game = false, onHome = null} = {}) {
+        const parent = page ? PARENT[page] : null;
+        // Tab roots (Чаты, Рейтинг, Профиль): the bottom bar is the navigation, so no on-screen ‹ (UI_RULES §4).
+        QW.nav.setRoot(back !== undefined ? back : parent ? () => navigate(parent) : null, {onScreen: !TAB_ROOTS.has(page)});
+        QW.configure(game ? {mode: 'game', onHome} : {mode: 'hub', onHome: null});
+        QW.menu.register([]);
+        setHubTitle(game ? null : title ?? (page ? PAGE_TITLES[page] || null : null));
+        const profile = state.authenticated ? state.me : state.guest;
+        QW.menu.setAccount(profile ? {name: profile.display_name || 'Гость',
+            subtitle: state.authenticated ? 'Telegram · профиль и настройки' : profile.login ? `${profile.login} · профиль` : 'Гостевой профиль'} : null);
+    }
     async function request(path, options = {}) {
         const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 12000);
         try {
@@ -42,7 +80,7 @@
             let data; try { data = await response.json(); } catch { throw new Error('Сервис временно недоступен. Повторите позже.'); }
             if (!response.ok) {
                 if (response.status === 401) state.authenticated = false;
-                const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; throw error;
+                const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; if (typeof data.code === 'string') error.code = data.code; throw error;
             }
             return data;
         } catch (error) {
@@ -60,7 +98,7 @@
                 headers: {...(options.headers || {}), ...(method === 'GET' ? {} : {'X-Guest-CSRF': '1'})}});
             if (response.status === 204) return null;
             let data; try { data = await response.json(); } catch { throw new Error('Сервис временно недоступен. Повтори позже.'); }
-            if (!response.ok) { const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; throw error; }
+            if (!response.ok) { const error = new Error(typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос.'); error.status = response.status; if (typeof data.code === 'string') error.code = data.code; throw error; }
             return data;
         } catch (error) {
             if (error.name === 'AbortError' || error instanceof TypeError) throw new Error('Нет связи с приложением. Проверь подключение и повтори.');
@@ -70,13 +108,14 @@
     // An invitation is a navigation hint. Only the server session identifies the player.
     function farmLaunchHint() {
         const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+        const shareToken = /^[A-Za-z0-9_-]{43}$/;
         const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
         const explicit = query.get('invite') || query.get('tgWebAppStartParam') || query.get('startapp') || '';
         let raw = explicit || tg?.initDataUnsafe?.start_param || '';
         try { raw = raw || sessionStorage.getItem('qw-farm.incoming') || ''; } catch {}
         if (raw.startsWith('farm_')) raw = raw.slice(5);
-        if (!uuid.test(raw)) return null;
-        const id = raw.toLowerCase();
+        if (!uuid.test(raw) && !shareToken.test(raw)) return null;
+        const id = uuid.test(raw) ? raw.toLowerCase() : raw;
         try {
             // Telegram keeps start_param when returning to /app. Only a fresh
             // URL query may reopen the invitation after it was consumed.
@@ -139,7 +178,7 @@
         }
     }
     function farmSessionChoice(savedGuest, savedTelegram) {
-        generation++; nav.hidden = true; feedback.textContent = ''; content.replaceChildren();
+        generation++; nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); shell();
         const box = el('section', undefined, 'login');
         box.append(el('h1', 'С какой фермы войти?'));
         note(box, 'В этом браузере доступны два профиля. Выбери один для приглашения соседа. Профили не объединяются.');
@@ -189,7 +228,7 @@
         loginScreen();
     }
     function bootstrapError(error, retry) {
-        generation++; nav.hidden = true; feedback.textContent = ''; content.replaceChildren();
+        generation++; nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); shell();
         const box = el('section', undefined, 'login');
         box.append(el('h1', 'Не удалось проверить профили'));
         note(box, error.message, 'error');
@@ -240,7 +279,7 @@
     // Wording for the signed-in player's own form (Telegram profile or guest account); neutral until chosen.
     const gm = (m, f, n) => ADDRESS.g((state.me || state.guest)?.address_form, m, f, n);
     function addressChooser(current, onPick) {
-        const group = el('div', undefined, 'address-choice'), message = el('p', '', 'error'); message.hidden = true;
+        const group = el('div', undefined, 'qw-btn-group address-choice'), message = el('p', '', 'error'); message.hidden = true;
         group.setAttribute('role', 'radiogroup'); group.setAttribute('aria-label', 'Как к тебе обращаться');
         let value = current;
         const options = ADDRESS.FORMS.map(code => {
@@ -301,7 +340,7 @@
         const login = field('Логин (латиница, цифры, _ . -)', 'text', 'username', 'username', 32);
         const password = field(registering ? 'Пароль (не короче 8 символов)' : 'Пароль', 'password', 'password',
             registering ? 'new-password' : 'current-password', 128);
-        if (registering) note(form, 'Сохрани пароль: его сброс пока недоступен. Telegram можно связать с этим профилем внутри Telegram.', 'notice warn');
+        if (registering) note(form, 'Сохрани пароль. Если забудешь, а Telegram связан с профилем, войди через Telegram и задай новый пароль в разделе «Вход и устройства».', 'notice warn');
         let pickedForm = null;
         if (registering && !state.guest?.address_form_chosen) {
             form.append(el('p', 'Как к тебе обращаться (можно пропустить)', 'field-label'));
@@ -338,6 +377,266 @@
         }
         return guestNameImports.get(key);
     }
+    // ---- Сквозной аккаунт: вход через Telegram в браузере, слияние профилей, устройства ----
+    const JSON_HEADERS = {'Content-Type': 'application/json'};
+    const TG_LOGIN = '/api/account/telegram-login';
+    const FORGOT_PASSWORD = () => gm('Забыл пароль? ', 'Забыла пароль? ', 'Не помнишь пароль? ')
+        + 'Если Telegram связан с профилем, войди через Telegram и задай новый пароль в разделе «Вход и устройства».';
+    // identity: 'guest' (cookie профиля) | 'telegram' (сессия Mini App). guestRequest не сбрасывает вход при 401.
+    function accountApi(identity, path, method = 'GET', body = undefined) {
+        const url = `${path}?identity=${identity}`;
+        const headers = {...(body === undefined ? {} : JSON_HEADERS), ...(identity === 'telegram' ? {'X-Mini-CSRF': '1'} : {})};
+        return guestRequest(url, method, {headers, ...(body === undefined ? {} : {body: JSON.stringify(body)})});
+    }
+    function enterProfile(profile, message) {
+        state.guest = profile;
+        try { sessionStorage.setItem('mqb-auth-choice', 'guest'); } catch {}
+        try { localStorage.removeItem('mqb-telegram-logged-out'); } catch {}
+        guestHome(); feedback.textContent = message;
+    }
+    // Вход (или привязка) через Telegram в браузере: ссылка в бота, опрос статуса, завершение с тем же cookie.
+    function telegramLogin(host, startLabel) {
+        const version = generation;
+        let run = 0, timer = null, polls = 0;
+        const live = mine => version === generation && mine === run;
+        // Every 3 s for the first minute (20 polls), then every 5 s.
+        const pollDelay = () => polls < 20 ? 3000 : 5000;
+        const stop = () => { run++; clearTimeout(timer); timer = null; };
+        const idle = (message = '', cls = 'muted', label = startLabel) => {
+            stop(); host.replaceChildren();
+            if (message) note(host, message, cls);
+            host.append(button(label, begin, 'quiet'));
+        };
+        async function begin() {
+            stop(); polls = 0; const mine = run; host.replaceChildren(); note(host, 'Готовим ссылку для входа…');
+            let started;
+            try { started = await guestRequest(TG_LOGIN + '/start', 'POST'); }
+            catch (error) { if (live(mine)) idle(error.message, 'error', 'Начать заново'); return; }
+            if (!live(mine)) return;
+            host.replaceChildren();
+            note(host, 'Открой Telegram и нажми «Войти» в сообщении бота.');
+            const link = el('a', 'Открыть Telegram', 'link-button');
+            link.href = started.link; link.target = '_blank'; link.rel = 'noopener';
+            host.append(link, el('p', 'Ждём подтверждения…', 'muted'), button('Отмена', () => idle(), 'quiet'));
+            timer = setTimeout(() => poll(mine), pollDelay()); timer?.unref?.();
+        }
+        async function poll(mine) {
+            if (!live(mine)) return;
+            polls++;
+            let status;
+            try { status = await guestRequest(TG_LOGIN + '/status'); }
+            catch (error) { if (live(mine)) idle(error.message, 'error', 'Начать заново'); return; }
+            if (!live(mine)) return;
+            if (status.status === 'pending') { timer = setTimeout(() => poll(mine), pollDelay()); timer?.unref?.(); return; }
+            if (status.status === 'approved') { await finish('auto', mine); return; }
+            idle(status.status === 'cancelled' ? 'Вход отменили в Telegram. Можно начать заново.'
+                : status.status === 'expired' ? 'Время на подтверждение вышло. Начни заново.'
+                    : 'Эта ссылка уже использована. Начни заново.', 'notice warn', 'Начать заново');
+        }
+        async function finish(mode, mine) {
+            host.replaceChildren(); note(host, 'Входим…');
+            let result;
+            try {
+                result = await guestRequest(TG_LOGIN + '/complete', 'POST', {headers: JSON_HEADERS, body: JSON.stringify({mode})});
+            } catch (error) {
+                if (!live(mine)) return;
+                if (error.code === 'telegram_other_linked') {
+                    host.replaceChildren(); note(host, error.message, 'notice warn');
+                    host.append(button('Войти в профиль этого Telegram', () => finish('switch', mine), 'primary'),
+                        button('Отмена', () => idle(), 'quiet'));
+                } else idle(error.message, 'error', 'Начать заново');
+                return;
+            }
+            if (!live(mine)) return;
+            if (result.result === 'link_required') {
+                host.replaceChildren();
+                note(host, `Связать профиль «${result.display_name || 'Игрок'}» с Telegram «${result.telegram_display_name || 'без имени'}»?`, 'notice warn');
+                host.append(button('Связать', () => finish('link', mine), 'primary'), button('Отмена', () => idle(), 'quiet'));
+                return;
+            }
+            stop();
+            if (result.result === 'merge_required') {
+                mergeScreen({preview: result.preview, auto: result.auto === true,
+                    ids: {account_id: result.account_id, telegram_account_id: result.telegram_account_id},
+                    confirm: body => guestRequest(TG_LOGIN + '/merge', 'POST', {headers: JSON_HEADERS, body: JSON.stringify(body)}),
+                    onCancel: () => state.guest ? guestProfile() : loginScreen()});
+                return;
+            }
+            enterProfile(result.profile, result.result === 'linked' ? 'Telegram связан с профилем.'
+                : result.result === 'already_linked' ? 'Этот Telegram уже связан с профилем.'
+                    : result.result === 'merged' ? 'Профили объединены.'
+                        : gm('Ты вошёл через Telegram.', 'Ты вошла через Telegram.', 'Вход через Telegram выполнен.'));
+        }
+        idle();
+    }
+    // Russian noun form for a count: plural(5, 'открытие', 'открытия', 'открытий').
+    function plural(count, one, few, many) {
+        const n = Math.abs(Number(count)) % 100, last = n % 10;
+        return n > 10 && n < 20 ? many : last === 1 ? one : last >= 2 && last <= 4 ? few : many;
+    }
+    function mergeCard(title, info) {
+        const card = el('section', undefined, 'card merge-card');
+        card.append(el('h3', title), el('strong', info.display_name || 'Игрок'));
+        note(card, info.login ? `Логин: ${info.login}` : 'Без логина');
+        const found = Number(info.alchemy?.discovered || 0), points = Number(info.alchemy?.points_total || 0);
+        note(card, `Алхимия: ${format(found)} ${plural(found, 'открытие', 'открытия', 'открытий')}, ${format(points)} ${plural(Math.floor(points), 'очко', 'очка', 'очков')}`);
+        note(card, info.farm?.exists ? `Ферма: уровень ${info.farm.level ?? '—'}, монет ${format(info.farm.coins || 0)}` : 'Фермы пока нет');
+        note(card, `Комнаты: ${(info.rooms_owned || 0) + (info.rooms_member || 0)}, игры: ${info.games || 0}`);
+        return card;
+    }
+    // Экран слияния: confirm(body) -> {result:'merged', profile, lost_login}; при auto главный выбирает сервер.
+    function mergeScreen({preview, auto, ids, confirm, onCancel}) {
+        generation++; stopRoomClassic(); window.QuizPlay?.stop(); nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'merge';
+        const version = generation, box = el('section', undefined, 'login merge');
+        shell({back: () => { if (version === generation) onCancel(); }});
+        box.append(el('h1', 'Объединить профили?'));
+        note(box, 'Этот профиль и профиль этого Telegram — разные. Их можно собрать в один.');
+        const grid = el('div', undefined, 'merge-grid');
+        grid.append(mergeCard('Этот профиль', preview.current), mergeCard('Профиль Telegram', preview.telegram)); box.append(grid);
+        if ((preview.rules || []).length) {
+            const rules = el('ul', undefined, 'merge-rules');
+            for (const rule of preview.rules) rules.append(el('li', rule));
+            box.append(rules);
+        }
+        let main = auto ? 'current' : null;
+        // Which login stops working depends on the chosen main profile; before a choice show both cases.
+        const warning = el('p', '', 'notice warn'); box.append(warning);
+        const updateWarning = () => {
+            const split = 'lost_login_if_current_main' in preview || 'lost_login_if_telegram_main' in preview;
+            const ifCurrent = split ? preview.lost_login_if_current_main : preview.lost_login;
+            const ifTelegram = split ? preview.lost_login_if_telegram_main : preview.lost_login;
+            let text = '';
+            if (auto || !split) text = preview.lost_login ? `Вход по логину «${preview.lost_login}» перестанет работать.` : '';
+            else if (main) { const login = main === 'current' ? ifCurrent : ifTelegram; text = login ? `Вход по логину «${login}» перестанет работать.` : ''; }
+            else if (ifCurrent && ifTelegram) text = `Один из логинов перестанет работать: если главным станет этот профиль — «${ifCurrent}», если профиль Telegram — «${ifTelegram}».`;
+            warning.textContent = text; warning.hidden = !text;
+        };
+        updateWarning();
+        const message = el('p', '', 'error'); message.hidden = true;
+        const submit = button(auto ? 'Объединить профили' : 'Объединить', async () => {
+            if (!main) return;
+            submit.disabled = true; message.hidden = true;
+            try {
+                const result = await confirm({main, ...ids});
+                if (version !== generation) return;
+                enterProfile(result.profile, 'Профили объединены.' + (result.lost_login ? ` Вход по логину «${result.lost_login}» больше не работает.` : ''));
+            } catch (error) {
+                if (version !== generation) return;
+                message.textContent = error.message; message.hidden = false; submit.disabled = false;
+            }
+        }, 'primary');
+        if (!auto) {
+            note(box, 'Выбери главный профиль: его очки, рейтинг и логин сохранятся.');
+            const group = el('div', undefined, 'qw-btn-stack merge-choice'), picks = [];
+            group.setAttribute('role', 'radiogroup'); group.setAttribute('aria-label', 'Главный профиль');
+            for (const [value, label] of [['current', 'Главный — этот профиль'], ['telegram', 'Главный — профиль Telegram']]) {
+                const pick = button(label, () => {
+                    main = value; submit.disabled = false; updateWarning();
+                    picks.forEach(node => { const on = node === pick; node.setAttribute('aria-checked', String(on)); node.classList.toggle('selected', on); });
+                });
+                pick.setAttribute('role', 'radio'); pick.setAttribute('aria-checked', 'false'); picks.push(pick); group.append(pick);
+            }
+            box.append(group); submit.disabled = true;
+        }
+        box.append(message, submit, button('Отмена', () => { if (version === generation) onCancel(); }, 'quiet'));
+        content.append(box);
+    }
+    function deviceTime(value) {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ru-RU');
+    }
+    // «Вход и устройства»: логин/пароль, смена пароля, список входов с отзывом.
+    function devicesSection(identity, {credentials = true} = {}) {
+        const version = generation, card = el('section', undefined, 'card devices-card'), body = el('div');
+        card.append(el('span', 'Безопасность', 'eyebrow'), el('h2', 'Вход и устройства'), body);
+        const live = () => version === generation;
+        const VIA = {guest: 'Гость', password: 'Логин', telegram: 'Telegram'};
+        const field = (form, label, type, name, auto, required) => {
+            const wrap = el('label', label, 'field'), input = el('input');
+            Object.assign(input, {type, name, autocomplete: auto, maxLength: 128, required});
+            if (type === 'text') { input.autocapitalize = 'none'; input.spellcheck = false; }
+            wrap.append(input); form.append(wrap); return input;
+        };
+        const act = async (control, path, payload) => {
+            control.disabled = true; feedback.textContent = '';
+            try { await accountApi(identity, path, 'POST', payload); if (live()) await refresh(); }
+            catch (error) { if (live()) { feedback.textContent = error.message; control.disabled = false; } }
+        };
+        const credentialsForm = () => {
+            const form = el('form', undefined, 'account-form');
+            form.append(el('h3', 'Логин и пароль для входа в браузере'));
+            const login = field(form, 'Логин (латиница, цифры, _ . -)', 'text', 'username', 'username', true);
+            const password = field(form, 'Пароль (не короче 8 символов)', 'password', 'password', 'new-password', true);
+            const message = el('p', '', 'error'); message.hidden = true;
+            const submit = el('button', 'Сохранить логин и пароль', 'primary'); submit.type = 'submit'; form.append(message, submit);
+            form.addEventListener('submit', async event => {
+                event.preventDefault(); submit.disabled = true; message.hidden = true;
+                try {
+                    await accountApi(identity, '/api/account/credentials', 'POST', {login: login.value, password: password.value});
+                    if (!live()) return;
+                    password.value = '';
+                    if (identity === 'guest' && state.guest) { state.guest.login = login.value; guestProfile(); feedback.textContent = 'Логин и пароль сохранены.'; return; }
+                    await refresh(); feedback.textContent = 'Логин и пароль сохранены.';
+                } catch (error) { if (!live()) return; message.textContent = error.message; message.hidden = false; submit.disabled = false; }
+            });
+            return form;
+        };
+        const passwordForm = () => {
+            const form = el('form', undefined, 'account-form');
+            form.append(el('h3', 'Сменить пароль'));
+            const current = field(form, 'Текущий пароль', 'password', 'current_password', 'current-password', false);
+            const next = field(form, 'Новый пароль (не короче 8 символов)', 'password', 'new_password', 'new-password', true);
+            note(form, gm('Если ты вошёл через Telegram в последние 15 минут, текущий пароль можно не вводить.',
+                'Если ты вошла через Telegram в последние 15 минут, текущий пароль можно не вводить.',
+                'Если вход через Telegram был в последние 15 минут, текущий пароль можно не вводить.'));
+            const message = el('p', '', 'error'); message.hidden = true;
+            const submit = el('button', 'Сменить пароль', 'primary'); submit.type = 'submit'; form.append(message, submit);
+            form.addEventListener('submit', async event => {
+                event.preventDefault(); submit.disabled = true; message.hidden = true;
+                try {
+                    await accountApi(identity, '/api/account/password', 'POST',
+                        {new_password: next.value, ...(current.value ? {current_password: current.value} : {})});
+                    if (!live()) return;
+                    current.value = ''; next.value = '';
+                    await refresh(); feedback.textContent = 'Пароль изменён.';
+                } catch (error) { if (!live()) return; message.textContent = error.message; message.hidden = false; submit.disabled = false; }
+            });
+            return form;
+        };
+        const render = data => {
+            body.replaceChildren();
+            if (data.has_password && data.login) note(body, `Логин для входа в браузере: «${data.login}».`);
+            if (data.telegram_sessions > 0) note(body, `Активных входов через Telegram: ${data.telegram_sessions}.`);
+            // An unsaved guest already sees the «Сохранить профиль» card; one login form is enough.
+            if (data.has_password) body.append(passwordForm());
+            else if (credentials) body.append(credentialsForm());
+            if (data.has_password) note(body, FORGOT_PASSWORD(), 'muted');
+            body.append(el('h3', 'Устройства', 'devices-title'));
+            const list = el('ul', undefined, 'device-list');
+            for (const item of data.sessions || []) {
+                const row = el('li', undefined, 'device-row'), copy = el('div', undefined, 'device-copy');
+                const when = deviceTime(item.created_at);
+                copy.append(el('strong', item.user_agent || 'Неизвестное устройство'),
+                    el('small', [VIA[item.created_via] || 'Вход', when && `вход ${when}`, item.current && 'это устройство'].filter(Boolean).join(' · ')));
+                row.append(copy);
+                if (!item.current) row.append(button('Выйти', event => act(event.currentTarget, '/api/account/sessions/revoke', {id: item.id}), 'quiet'));
+                list.append(row);
+            }
+            body.append(list);
+            if ((data.sessions || []).some(item => !item.current)) {
+                body.append(button('Выйти на других устройствах', event => act(event.currentTarget, '/api/account/sessions/revoke-others'), 'quiet'));
+            }
+        };
+        const refresh = async () => {
+            try { const data = await accountApi(identity, '/api/account/sessions'); if (live()) render(data); }
+            catch (error) {
+                if (!live()) return;
+                body.replaceChildren(); note(body, error.message, 'error'); body.append(button('Повторить', refresh, 'quiet'));
+            }
+        };
+        refresh();
+        return card;
+    }
     async function guestHome() {
         stopRoomClassic();
         const version = ++generation, accountId = state.guest?.account_id;
@@ -351,7 +650,8 @@
         }
         if (version !== generation || state.guest?.account_id !== accountId) return;
         if (pendingFarmInvite && resumeFarmInvite('guest', pendingFarmInvite)) return;
-        window.QuizPlay?.stop(); nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest';
+        if (openSettingsOnLoad) { consumeSettingsHash(); await guestProfile(); return; }
+        window.QuizPlay?.stop(); showGuestTab('home'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest'; shell(); consumeSettingsHash();
         // Same hero and game cards as the Telegram home, limited to modes a guest can play.
         const hero = el('section', undefined, 'hero home-hero'), heroCopy = el('div', undefined, 'hero-copy');
         heroCopy.append(el('span', 'Филиныч на связи', 'eyebrow'));
@@ -372,107 +672,6 @@
         const guestAddressPrompt = addressPrompt('guest', state.guest);
         if (guestAddressPrompt) guestMain.append(guestAddressPrompt);
         guestMain.append(guestCards);
-        const box = el('section', undefined, 'card profile-card');
-        const saved = Boolean(state.guest?.login);
-        const profileTitle = el('h1', state.guest?.display_name || 'Гость');
-        box.append(el('span', saved ? 'Профиль' : 'Гостевой профиль', 'eyebrow'), profileTitle);
-        const nameNotice = el('p', '', 'muted'); nameNotice.hidden = true; box.append(nameNotice);
-        const nameForm = el('form', undefined, 'account-form');
-        const nameLabel = el('label', 'Твоё имя', 'field'), nameInput = el('input');
-        Object.assign(nameInput, {type: 'text', name: 'display_name', autocomplete: 'name',
-            maxLength: 40, required: true, value: state.guest?.display_name || ''});
-        nameLabel.append(nameInput);
-        const nameMessage = el('p', '', 'error'); nameMessage.hidden = true;
-        const saveName = el('button', 'Сохранить имя', 'primary'); saveName.type = 'submit';
-        nameForm.append(nameLabel, nameMessage, saveName); box.append(nameForm);
-        box.append(addressSection('guest', state.guest));
-        nameImport?.then(profile => {
-            if (version !== generation || state.guest?.account_id !== accountId || guestNamesEdited.has(accountId)) return;
-            if (!profile) {
-                nameNotice.textContent = 'Имя из Telegram не удалось получить. Его можно указать ниже.';
-                nameNotice.hidden = false;
-            } else if (state.guest.display_name === 'Гость') {
-                state.guest = profile;
-                profileTitle.textContent = profile.display_name;
-                if (nameInput.value === 'Гость') nameInput.value = profile.display_name;
-            }
-        });
-        nameForm.addEventListener('submit', async event => {
-            event.preventDefault(); saveName.disabled = true; nameMessage.hidden = true;
-            try {
-                const profile = await guestRequest('/api/guest/profile', 'POST', {
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({display_name: nameInput.value})});
-                if (state.guest?.account_id !== accountId) return;
-                guestNamesEdited.add(accountId);
-                state.guest = profile;
-                if (version !== generation) return;
-                await guestHome();
-            } catch (error) {
-                if (version !== generation) return;
-                nameMessage.textContent = error.message; nameMessage.hidden = false; saveName.disabled = false;
-            }
-        });
-        if (saved) {
-            note(box, gm(`Ты вошёл как «${state.guest.login}». `, `Ты вошла как «${state.guest.login}». `, `Вход выполнен как «${state.guest.login}». `) + 'Прогресс привязан к логину, войти можно с любого браузера.');
-            note(box, 'Сброс забытого пароля пока недоступен. Связанный Telegram даёт ещё один способ входа в этот профиль.', 'muted');
-        } else {
-            note(box, 'Открытия «Алхимии» сохраняются в приложении. Войти снова можно в этом браузере, пока действует гостевая сессия.');
-            note(box, state.guest?.telegram_user_id
-                ? 'Telegram связан с этим профилем. Через него можно снова открыть ту же ферму и прогресс.'
-                : 'Если очистить данные браузера или выйти, доступ к этому профилю будет потерян. Сохрани логин и пароль или свяжи Telegram в этом окне.', 'muted');
-        }
-        if (tg?.initData) {
-            const linkPanel = el('div'), linkMessage = el('p', '', 'muted');
-            const current = () => version === generation && state.guest?.account_id === accountId;
-            const link = button(state.guest?.telegram_user_id ? 'Проверить связь с Telegram' : 'Связать с Telegram', async () => {
-                link.disabled = true; linkPanel.replaceChildren(); linkMessage.textContent = '';
-                const initData = tg.initData;
-                try {
-                    const preview = await guestRequest('/api/account/telegram-link/preview', 'POST', {
-                        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({init_data: initData})});
-                    if (!current()) return;
-                    if (preview.already_linked) {
-                        state.guest.telegram_user_id = preview.telegram_user_id;
-                        linkMessage.textContent = 'Этот Telegram уже связан с текущим профилем.';
-                        link.disabled = false; return;
-                    }
-                    note(linkPanel, `Связать профиль «${preview.display_name}» с Telegram «${preview.telegram_display_name}» (ID ${preview.telegram_user_id})? Ферма и прогресс останутся в этом профиле.`);
-                    const agree = el('input'); agree.type = 'checkbox';
-                    const consent = el('label', undefined, 'field');
-                    consent.append(agree, el('span', 'Я подтверждаю связь текущего профиля с этим Telegram.'));
-                    const confirm = button('Подтвердить связь', async () => {
-                        if (!agree.checked || !current()) return;
-                        confirm.disabled = true;
-                        try {
-                            const result = await guestRequest('/api/account/telegram-link/confirm', 'POST', {
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({init_data: initData, confirm: true,
-                                    account_id: preview.account_id, telegram_user_id: preview.telegram_user_id})});
-                            if (!current()) return;
-                            state.guest = result.profile;
-                            linkPanel.replaceChildren(); link.textContent = 'Проверить связь с Telegram';
-                            linkMessage.textContent = 'Telegram связан. Ты продолжаешь играть в том же профиле. Для следующего входа можно выбрать Telegram.';
-                            link.disabled = false;
-                        } catch (error) {
-                            if (!current()) return;
-                            linkPanel.replaceChildren(); linkMessage.textContent = error.message; link.disabled = false;
-                        }
-                    }, 'primary');
-                    confirm.disabled = true;
-                    agree.addEventListener('change', () => { confirm.disabled = !agree.checked; });
-                    linkPanel.append(consent, confirm, button('Отмена', () => {
-                        linkPanel.replaceChildren(); link.disabled = false;
-                    }, 'quiet'));
-                } catch (error) {
-                    if (!current()) return;
-                    linkMessage.textContent = error.message; link.disabled = false;
-                }
-            }, 'primary');
-            box.append(link, linkMessage, linkPanel);
-        } else if (!state.guest?.telegram_user_id) {
-            note(box, 'Связывание доступно внутри Telegram, когда в этом же окне открыт текущий профиль. Можно войти в него по логину и паролю.', 'muted');
-        }
         const rooms = el('section', undefined, 'card guest-rooms'); guestRoomsSection = rooms;
         rooms.append(el('span', 'Играть вместе', 'eyebrow'), el('h2', 'Твои комнаты'));
         note(rooms, 'Создавай закрытые комнаты, приглашай друзей и играйте в Ночной город.');
@@ -555,9 +754,11 @@
             else for (const room of data.items) {
                 const item = el('article', undefined, 'guest-room-item');
                 item.append(el('strong', room.title), el('span', room.role === 'owner' ? 'Твоя комната' : 'Ты в комнате'));
-                item.append(button('Открыть Ночной город', () => openGuestMafia(room), 'primary'));
-                item.append(button('Открыть классический квиз', () => openGuestClassic(room)));
-                item.append(button('Открыть фото-загадки', () => openGuestPhoto(room)));
+                const roomActions = el('div', undefined, 'qw-btn-stack');
+                roomActions.append(button('Открыть Ночной город', () => openGuestMafia(room), 'primary'),
+                    button('Открыть классический квиз', () => openGuestClassic(room), 'secondary'),
+                    button('Открыть фото-загадки', () => openGuestPhoto(room), 'secondary'));
+                item.append(roomActions);
                 if (room.role !== 'owner') {
                     const leavePanel = el('div', undefined, 'guest-room-leave');
                     const leave = button('Выйти из комнаты', () => {
@@ -599,22 +800,143 @@
             }
         }).catch(error => { if (requestVersion === generation) note(roomList, error.message, 'error'); });
         guestSide.append(rooms);
-        if (tg?.initData) box.append(button('Войти через Telegram', () => {
-            state.guest = null;
-            try { sessionStorage.setItem('mqb-auth-choice', 'telegram'); } catch {}
-            loginScreen();
-        }, 'quiet'));
-        if (!saved) {
+    }
+    async function guestProfile({focusLink = false} = {}) {
+        stopRoomClassic();
+        const version = ++generation, accountId = state.guest?.account_id;
+        const nameImport = importGuestTelegramName();
+        window.QuizPlay?.stop(); showGuestTab('profile'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-profile'; shell({page: 'profile'}); consumeSettingsHash();
+        const guestLayout = el('div', undefined, 'guest-layout'), guestMain = el('div', undefined, 'guest-main'), guestSide = el('div', undefined, 'guest-side');
+        guestLayout.append(guestMain, guestSide); content.append(guestLayout);
+        const box = el('section', undefined, 'card profile-card');
+        const saved = Boolean(state.guest?.login);
+        const profileTitle = el('h1', state.guest?.display_name || 'Гость');
+        const viaTelegram = Boolean(state.guest?.telegram_user_id);
+        box.append(el('span', saved ? 'Профиль' : viaTelegram ? 'Профиль · Telegram' : 'Гостевой профиль', 'eyebrow'), profileTitle);
+        const nameNotice = el('p', '', 'muted'); nameNotice.hidden = true; box.append(nameNotice);
+        const nameForm = el('form', undefined, 'account-form');
+        const nameLabel = el('label', 'Твоё имя', 'field'), nameInput = el('input');
+        Object.assign(nameInput, {type: 'text', name: 'display_name', autocomplete: 'name',
+            maxLength: 40, required: true, value: state.guest?.display_name || ''});
+        nameLabel.append(nameInput);
+        const nameMessage = el('p', '', 'error'); nameMessage.hidden = true;
+        const saveName = el('button', 'Сохранить имя', 'primary'); saveName.type = 'submit';
+        nameForm.append(nameLabel, nameMessage, saveName); box.append(nameForm);
+        box.append(addressSection('guest', state.guest));
+        nameImport?.then(profile => {
+            if (version !== generation || state.guest?.account_id !== accountId || guestNamesEdited.has(accountId)) return;
+            if (!profile) {
+                nameNotice.textContent = 'Имя из Telegram не удалось получить. Его можно указать ниже.';
+                nameNotice.hidden = false;
+            } else if (state.guest.display_name === 'Гость') {
+                state.guest = profile;
+                profileTitle.textContent = profile.display_name;
+                if (nameInput.value === 'Гость') nameInput.value = profile.display_name;
+            }
+        });
+        nameForm.addEventListener('submit', async event => {
+            event.preventDefault(); saveName.disabled = true; nameMessage.hidden = true;
+            try {
+                const profile = await guestRequest('/api/guest/profile', 'POST', {
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({display_name: nameInput.value})});
+                if (state.guest?.account_id !== accountId) return;
+                guestNamesEdited.add(accountId);
+                state.guest = profile;
+                if (version !== generation) return;
+                await guestProfile();
+            } catch (error) {
+                if (version !== generation) return;
+                nameMessage.textContent = error.message; nameMessage.hidden = false; saveName.disabled = false;
+            }
+        });
+        if (saved) {
+            note(box, gm(`Ты вошёл как «${state.guest.login}». `, `Ты вошла как «${state.guest.login}». `, `Вход выполнен как «${state.guest.login}». `) + 'Прогресс привязан к логину, войти можно с любого браузера.');
+            note(box, FORGOT_PASSWORD(), 'muted');
+        } else if (viaTelegram) {
+            note(box, 'Профиль привязан к Telegram: войти в него можно в любом браузере через Telegram, прогресс общий для всех игр.');
+            note(box, 'Логин и пароль для входа без Telegram можно задать в разделе «Вход и устройства».', 'muted');
+        } else {
+            note(box, 'Открытия «Алхимии» сохраняются в приложении. Войти снова можно в этом браузере, пока действует гостевая сессия.');
+            note(box, 'Если очистить данные браузера или выйти, доступ к этому профилю будет потерян. Сохрани логин и пароль или свяжи Telegram.', 'muted');
+        }
+        const linkAnchor = el('div'); linkAnchor.id = 'telegram-link'; box.append(linkAnchor);
+        if (tg?.initData) {
+            const linkPanel = el('div'), linkMessage = el('p', '', 'muted');
+            const current = () => version === generation && state.guest?.account_id === accountId;
+            const link = button(state.guest?.telegram_user_id ? 'Проверить связь с Telegram' : 'Связать с Telegram', async () => {
+                link.disabled = true; linkPanel.replaceChildren(); linkMessage.textContent = '';
+                const initData = tg.initData;
+                try {
+                    const preview = await guestRequest('/api/account/telegram-link/preview', 'POST', {
+                        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({init_data: initData})});
+                    if (!current()) return;
+                    if (preview.merge_required) {
+                        mergeScreen({preview: preview.preview, auto: preview.auto === true,
+                            ids: {account_id: preview.account_id, telegram_account_id: preview.telegram_account_id},
+                            confirm: body => guestRequest('/api/account/telegram-link/merge', 'POST', {headers: JSON_HEADERS,
+                                body: JSON.stringify({init_data: initData, ...body})}),
+                            onCancel: () => guestProfile()});
+                        return;
+                    }
+                    if (preview.already_linked) {
+                        state.guest.telegram_user_id = preview.telegram_user_id;
+                        linkMessage.textContent = 'Этот Telegram уже связан с текущим профилем.';
+                        link.disabled = false; return;
+                    }
+                    note(linkPanel, `Связать профиль «${preview.display_name}» с Telegram «${preview.telegram_display_name}» (ID ${preview.telegram_user_id})? Ферма и прогресс останутся в этом профиле.`);
+                    const agree = el('input'); agree.type = 'checkbox';
+                    const consent = el('label', undefined, 'field');
+                    consent.append(agree, el('span', 'Я подтверждаю связь текущего профиля с этим Telegram.'));
+                    const confirm = button('Подтвердить связь', async () => {
+                        if (!agree.checked || !current()) return;
+                        confirm.disabled = true;
+                        try {
+                            const result = await guestRequest('/api/account/telegram-link/confirm', 'POST', {
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({init_data: initData, confirm: true,
+                                    account_id: preview.account_id, telegram_user_id: preview.telegram_user_id})});
+                            if (!current()) return;
+                            state.guest = result.profile;
+                            linkPanel.replaceChildren(); link.textContent = 'Проверить связь с Telegram';
+                            linkMessage.textContent = 'Telegram связан. Ты продолжаешь играть в том же профиле. Для следующего входа можно выбрать Telegram.';
+                            link.disabled = false;
+                        } catch (error) {
+                            if (!current()) return;
+                            linkPanel.replaceChildren(); linkMessage.textContent = error.message; link.disabled = false;
+                        }
+                    }, 'primary');
+                    confirm.disabled = true;
+                    agree.addEventListener('change', () => { confirm.disabled = !agree.checked; });
+                    linkPanel.append(consent, confirm, button('Отмена', () => {
+                        linkPanel.replaceChildren(); link.disabled = false;
+                    }, 'quiet'));
+                } catch (error) {
+                    if (!current()) return;
+                    linkMessage.textContent = error.message; link.disabled = false;
+                }
+            }, 'secondary');
+            box.append(link, linkMessage, linkPanel);
+        } else if (!state.guest?.telegram_user_id) {
+            if (state.botUsername) {
+                const linkHost = el('div', undefined, 'telegram-login');
+                telegramLogin(linkHost, 'Связать с Telegram'); box.append(linkHost);
+            } else note(box, 'Связывание доступно внутри Telegram, когда в этом же окне открыт текущий профиль. Можно войти в него по логину и паролю.', 'muted');
+        }
+        guestSide.append(devicesSection('guest', {credentials: saved || viaTelegram}));
+        if (tg?.initData) box.append(button('Войти через Telegram', guestSignInViaTelegram, 'secondary'));
+        if (!saved && !viaTelegram) {
             const keep = el('section', undefined, 'card keep-card');
             keep.append(el('span', 'Аккаунт', 'eyebrow'), el('h2', 'Сохранить профиль'));
             note(keep, 'Задай логин и пароль: прогресс останется за тобой и откроется с любого браузера.');
-            note(keep, 'Сброс пароля пока недоступен. Сохрани его; связанный Telegram даёт ещё один способ входа.', 'notice warn');
+            note(keep, 'Сохрани пароль. Если забудешь, а Telegram связан с профилем, войди через Telegram и задай новый пароль в разделе «Вход и устройства».', 'notice warn');
             const open = button('Сохранить профиль: задать логин и пароль', () => {
-                open.hidden = true; keep.append(accountForm('save', guestHome));
+                open.hidden = true; keep.append(accountForm('save', guestProfile));
             }, 'primary');
             keep.append(open); guestSide.append(keep);
         }
-        box.append(button(saved || state.guest?.telegram_user_id ? 'Выйти' : 'Выйти и потерять доступ к гостю', async event => {
+        const guestExit = el('div', undefined, 'qw-danger-zone');
+        guestExit.append(button(saved || state.guest?.telegram_user_id ? 'Выйти' : 'Выйти и потерять доступ к гостю', async event => {
             event.currentTarget.disabled = true;
             try {
                 await guestRequest(saved ? '/api/account/logout' : '/api/guest/logout', 'POST');
@@ -627,8 +949,39 @@
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}
                 loginScreen();
             } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
-        }, 'quiet'));
+        }, 'danger'));
+        box.append(guestExit);
         guestMain.append(box);
+        if (focusLink) { linkAnchor.scrollIntoView?.({block: 'center'}); linkAnchor.nextElementSibling?.focus?.(); }
+    }
+    // Guest «Чаты» / «Рейтинг»: both depend on Telegram chats, so a guest sees one clear step instead of an empty list.
+    function guestSignInViaTelegram() {
+        state.guest = null;
+        try { sessionStorage.setItem('mqb-auth-choice', 'telegram'); } catch {}
+        loginScreen();
+    }
+    function guestStub(page) {
+        stopRoomClassic(); generation++; window.QuizPlay?.stop(); showGuestTab(page);
+        feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-stub'; shell({page});
+        const linked = Boolean(state.guest?.telegram_user_id), card = el('section', undefined, 'card guest-stub');
+        card.append(el('span', page === 'chats' ? 'Чаты' : 'Рейтинг', 'eyebrow'),
+            el('h2', page === 'chats' ? 'Чатов пока нет' : 'Рейтинга пока нет'));
+        note(card, linked ? 'Профиль связан с Telegram. Войди через Telegram, чтобы увидеть чаты и рейтинг чатов.'
+            : 'Чаты и рейтинг чатов появятся, когда ты свяжешь Telegram с профилем.');
+        card.append(linked ? button('Войти через Telegram', guestSignInViaTelegram, 'primary')
+            : button('Связать Telegram', () => guestProfile({focusLink: true}), 'primary'));
+        content.append(card);
+    }
+    // The same bottom bar as for Telegram players: the guest's four tabs share one structure.
+    function showGuestTab(tab) {
+        nav.hidden = false;
+        nav.querySelectorAll('button').forEach(node => { if (node.dataset.page === tab) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
+    }
+    function guestNavigate(page) {
+        window.QuizTelegram.selection();
+        if (page === 'profile') return guestProfile();
+        if (page === 'chats' || page === 'rating') return guestStub(page);
+        return guestHome();
     }
     const RENEW_AFTER_MS = 10 * 60 * 1000;   // сессия живёт 15 минут, продлеваем заранее
     let renewTimer = null;
@@ -652,8 +1005,17 @@
         }
     }
     function configureTelegram() {
-        window.QuizTelegram.configure(() => { if (state.authenticated) navigate(state.page === 'settings' ? 'profile' : 'home'); },
-            () => { if (state.authenticated) navigate('settings'); }, () => { if (state.authenticated) load(); });
+        // BackButton is owned by QW.nav (shell() sets the root handler per screen); ⚙ → «Профиль и настройки» lands here.
+        window.QuizTelegram.configure(null, openAccountSettings, () => { if (state.authenticated) load(); });
+    }
+    // Chat game settings (admin form, read-only for members) are a segment of the chat page, not part of the account settings.
+    function openChatSettings() {
+        if (!state.selected) { navigate('chats'); return; }
+        state.chatTab = 'settings'; navigate('chat');
+    }
+    function openAccountSettings() {
+        if (state.authenticated) navigate('settings');
+        else if (state.guest) guestProfile();
     }
     async function createTelegramSession(demo = state.demo, resume = false) {
         const result = await request(demo ? '/api/dev/session' : resume ? '/api/mini/session/resume' : '/api/mini/session', {method: 'POST',
@@ -662,9 +1024,9 @@
         return result;
     }
     function telegramFirstStart() {
-        generation++; nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'first-start';
+        generation++; nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'first-start'; shell();
         const box = el('section', undefined, 'login');
-        box.append(el('h1', 'Добро пожаловать в Morning Quiz'));
+        box.append(el('h1', 'Добро пожаловать в QuizzyWizzy'));
         note(box, 'Создай игровой профиль, чтобы сохранять прогресс.');
         const start = button('Начать играть', async () => {
             start.disabled = true; feedback.textContent = '';
@@ -676,10 +1038,10 @@
     }
     function loginScreen(message = '') {
         stopRoomClassic();
-        generation++; state.guest = null; window.QuizPlay?.stop(); nav.hidden = true; content.replaceChildren(); content.dataset.page = 'login';
+        generation++; state.guest = null; window.QuizPlay?.stop(); nav.hidden = true; content.replaceChildren(); content.dataset.page = 'login'; shell();
         const box = el('section', undefined, 'login');
-        const hero = el('div', undefined, 'hero'); const image = el('img'); image.src = '/app/host.webp'; image.alt = 'Филиныч, сова-ведущий Morning Quiz'; hero.append(image); box.append(hero);
-        box.append(el('span', 'Morning Quiz · Филиныч на связи', 'eyebrow'), el('h1', 'Играй. Узнавай. Возвращайся.'));
+        const hero = el('div', undefined, 'hero'); const image = el('img'); image.src = '/app/host.webp'; image.alt = 'Филиныч, сова-ведущий QuizzyWizzy'; hero.append(image); box.append(hero);
+        box.append(el('span', 'QuizzyWizzy · Филиныч на связи', 'eyebrow'), el('h1', 'Играй. Узнавай. Возвращайся.'));
         note(box, 'Квиз, фото-загадки и твой прогресс. Играй здесь или в Telegram — как удобнее.');
         if (message) note(box, message, 'error');
         const initData = tg?.initData;
@@ -726,7 +1088,7 @@
             guest.classList.add('guest-entry'); box.append(guest);
             note(box, 'Гостевой вход работает без Telegram. Открытия «Алхимии» сохраняются на сервере и привязаны к гостевой сессии этого браузера.', 'muted');
             const panel = el('div', undefined, 'account-panel');
-            const toggles = el('div', undefined, 'actions');
+            const toggles = el('div', undefined, 'actions qw-btn-row');
             const show = kind => {
                 panel.replaceChildren(accountForm(kind, guestHome));
                 panel.querySelector('input')?.focus();
@@ -734,6 +1096,11 @@
             toggles.append(button('Войти по логину', () => show('login'), 'quiet'),
                            button('Создать аккаунт', () => show('register'), 'quiet'));
             box.append(toggles, panel);
+            note(box, FORGOT_PASSWORD(), 'muted');
+        }
+        if (!initData && state.botUsername && guestAllowed) {
+            const telegramHost = el('div', undefined, 'telegram-login');
+            telegramLogin(telegramHost, 'Войти через Telegram'); box.append(telegramHost);
         }
         content.append(box);
     }
@@ -755,6 +1122,8 @@
                 state.selected = '';
             }
             if (!state.selected) state.selected = state.chats[0]?.chat_id || '';
+            // /app#settings (the ⚙ menu of a game) opens «Профиль → Настройки» once the player is in.
+            if (openSettingsOnLoad) { consumeSettingsHash(); state.page = 'settings'; }
             nav.hidden = false; await navigate(state.page);
         } catch (error) {
             if (version !== generation) return;
@@ -777,13 +1146,26 @@
     }
     async function command(text) {
         if (text === '/help') { navigate('help'); return; }
-        if (text === '/adminsettings') { navigate('settings'); return; }
+        if (text === '/adminsettings') { openChatSettings(); return; }
         const selected = state.chats.find(chat => chat.chat_id === state.selected);
         const action = {'/quiz': 'quiz', '/photo_quiz': 'photo'}[text];
         if (action && selected?.type === 'private' && window.QuizTelegram.openBot(state.botUsername, action)) return;
         try { await navigator.clipboard.writeText(text); feedback.textContent = `${text} скопирована. Отправь её боту в нужном чате.`; }
         catch { feedback.replaceChildren(el('span', 'Отправь в чат: '), el('code', text)); }
     }
+    // Segmented control (.qw-btn-group): one choice among equals (UI_RULES §9).
+    function segmented(options, current, onPick, label) {
+        const group = el('div', undefined, 'qw-btn-group seg-scroll'); group.setAttribute('role', 'radiogroup');
+        if (label) group.setAttribute('aria-label', label);
+        const items = options.map(([value, text]) => {
+            const node = el('button', text); node.type = 'button'; node.dataset.value = value;
+            node.setAttribute('role', 'radio'); node.setAttribute('aria-checked', String(value === current));
+            node.addEventListener('click', () => { items.forEach(item => item.setAttribute('aria-checked', String(item === node))); onPick(value); });
+            return node;
+        });
+        group.append(...items); return group;
+    }
+    const initialOf = name => (name || '').trim().charAt(0).toUpperCase() || '?';
     function modeCard(parent, title, description, cmd, active) {
         const item = el('article', undefined, 'card'); const heading = el('div', undefined, 'card-heading'); heading.append(el('h2', title));
         if (active) heading.append(el('span', 'Идёт игра', 'badge')); item.append(heading); note(item, description);
@@ -791,9 +1173,10 @@
             note(item, `Вопрос ${active.question_number} из ${active.question_count}`);
             const progress = el('progress'); progress.max = Math.max(1, active.question_count); progress.value = active.question_number; progress.setAttribute('aria-label', `Прогресс: ${active.question_number} из ${active.question_count}`); item.append(progress);
         }
-        item.append(button(active ? 'Продолжить игру' : 'Настроить и играть', () => play(cmd), 'primary'));
-        if (active) item.append(button('Команда остановки', () => command(cmd === '/quiz' ? '/stopquiz' : '/stop_photo_quiz'), 'quiet'));
-        parent.append(item);
+        const actions = el('div', undefined, 'qw-btn-stack');
+        actions.append(button(active ? 'Продолжить игру' : 'Настроить и играть', () => play(cmd), 'primary'));
+        if (active) actions.append(button('Команда остановки', () => command(cmd === '/quiz' ? '/stopquiz' : '/stop_photo_quiz'), 'danger'));
+        item.append(actions); parent.append(item);
     }
     function play(command) { playCommand = command; navigate('play'); }
     const HOME_GAME_CARDS = [
@@ -860,6 +1243,7 @@
         stopRoomClassic(); window.QuizPlay?.stop();
         const version = ++generation;
         state.page = 'guest-play'; nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-play';
+        shell({back: () => guestHome(), title: kind === 'photo' ? 'Фото-загадки' : 'Классический квиз'});
         const api = window.QuizPlay.roomApi(room.id, roomPlayRequest, {accountId: state.guest?.account_id || null});
         const command = kind === 'photo' ? '/photo_quiz' : '/quiz';
         try {
@@ -871,7 +1255,7 @@
                 }});
         } catch (error) {
             if (version !== generation) return;
-            note(content, error.message, 'error'); content.append(button('К играм', () => guestHome(), 'quiet'));
+            note(content, error.message, 'error'); content.append(button('Повторить', () => mountSoloPlay(kind, room), 'quiet'));
         }
     }
     // Solo play for guests: reuse the personal owner room, creating it on first use.
@@ -986,7 +1370,7 @@
     }
     function openBotHome() {
         if (!window.QuizTelegram.openBot(state.botUsername, 'home')) {
-            feedback.textContent = 'Не удалось открыть ссылку. Найди Morning Quiz в Telegram и отправь /start.';
+            feedback.textContent = 'Не удалось открыть ссылку. Найди QuizzyWizzy в Telegram и отправь /start.';
         }
     }
     function noChatPlay() {
@@ -1025,6 +1409,7 @@
         const clearTimer = () => { clearTimeout(timer); timer = null; };
         roomPhotoDispose = () => { clearTimer(); lifetime.abort(); };
         state.page = 'guest-photo'; nav.hidden = true; feedback.textContent = '';
+        shell({back: () => guestHome(), title: 'Фото-загадки'});
         const active = () => !lifetime.signal.aborted && version === generation && state.page === 'guest-photo';
         const call = (path, method = 'GET', options = {}) => guestRequest(base + path, method, {...options, signal: lifetime.signal});
         const pending = () => roomPhotoPending?.key === key ? roomPhotoPending : null;
@@ -1066,7 +1451,7 @@
                     rendered = fingerprint;
                     const focused = document.activeElement?.getAttribute?.('aria-label') === 'Твой ответ на фото';
                     const selection = focused ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
-                    content.replaceChildren(button('К комнатам', guestHome, 'quiet'));
+                    content.replaceChildren();
                     const box = el('section', undefined, 'card'); content.append(box);
                     box.append(el('h1', room.title), el('h2', 'Фото-загадки'));
                     note(box, 'Личная серия владельца комнаты.');
@@ -1120,7 +1505,7 @@
             } catch (error) {
                 if (!active()) return;
                 rendered = undefined;
-                content.replaceChildren(button('К комнатам', guestHome, 'quiet'));
+                content.replaceChildren();
                 note(content, error.message, 'error'); content.append(button('Повторить', refresh));
             } finally { refreshing = false; }
         };
@@ -1143,6 +1528,7 @@
         let submitting = false;
         let lastAnswer = null, rendered = undefined;
         state.page = 'guest-classic'; nav.hidden = true; feedback.textContent = '';
+        shell({back: () => guestHome(), title: 'Классический квиз'});
         const active = () => version === generation && state.page === 'guest-classic';
         const command = async (action, body) => {
             if (submitting) return;
@@ -1176,7 +1562,7 @@
                 const fingerprint = JSON.stringify({current, pending, lastAnswer});
                 if (fingerprint === rendered) { roomClassicTimer = setTimeout(refresh, 3000); return; }
                 rendered = fingerprint;
-                content.replaceChildren(button('К комнатам', guestHome, 'quiet'));
+                content.replaceChildren();
                 const box = el('section', undefined, 'card'); content.append(box);
                 box.append(el('h1', room.title), el('h2', 'Классический квиз'));
                 if (pending) {
@@ -1230,7 +1616,7 @@
             } catch (error) {
                 if (!active()) return;
                 rendered = undefined;
-                content.replaceChildren(button('К комнатам', guestHome, 'quiet'));
+                content.replaceChildren();
                 note(content, error.message, 'error');
                 content.append(button('Повторить', refresh));
             }
@@ -1283,10 +1669,21 @@
         stopRoomClassic();
         const version = ++generation;
         window.QuizPlay?.stop();
-        nav.hidden = true; state.page = 'guest-mafia'; feedback.textContent = ''; content.replaceChildren();
-        content.append(button('К комнатам', () => guestHome(), 'quiet'));
+        nav.hidden = true; state.page = 'guest-mafia'; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-mafia';
+        // Night City is a game inside /app: own header, no tab bar. Back: Telegram BackButton, ⚙ → «Главное меню».
+        shell({game: true, onHome: () => guestHome()});
         try { await mafia(version, room); }
         catch (error) { if (version === generation) { note(content, error.message, 'error'); content.append(button('Повторить', () => openGuestMafia(room))); } }
+    }
+    // One persistent header row for Night City (the page re-renders on every poll; ⚙ is mounted once).
+    let gameBar = null, gameBarTitle = null;
+    function mafiaBar(title) {
+        if (!gameBar) {
+            gameBar = el('header', undefined, 'game-bar'); const box = el('div', undefined, 'game-bar-title');
+            gameBarTitle = el('h1'); box.append(el('small', 'Ночной город · Дело 01'), gameBarTitle);
+            gameBar.append(box); QW.header.mountGear(gameBar);
+        }
+        gameBarTitle.textContent = title; return gameBar;
     }
     const telegramMafiaRequest = request;
     const telegramMafiaNavigate = navigate;
@@ -1334,10 +1731,10 @@
         }
         if (version !== generation) return;
         if (pendingCommand) showPending('Действие могло быть принято. Проверь его результат.');
+        content.append(mafiaBar(draft.title));
         const top = el('section', undefined, 'mafia-case');
         const image = el('img'); image.src = '/app/mafia.webp'; image.alt = 'Филиныч в капюшоне у стола детектива';
         const copy = el('div', undefined, 'mafia-case-copy');
-        copy.append(el('span', 'НОЧНОЙ ГОРОД · ДЕЛО 01', 'eyebrow'), el('h1', draft.title));
         note(copy, room ? 'Собери друзей за столом. Город засыпает, а ваше дело продолжается.' : 'Собери состав стола. Черновик сохранится и не влияет на очки квиза.');
         top.append(image, copy); content.append(top);
         if (!room) {
@@ -1523,7 +1920,7 @@
         const boundary = el('section', undefined, 'mafia-boundary');
         boundary.append(el('h2', 'Полный ход дела'), el('p', 'Лобби, тайные роли, ночные действия, обсуждение, голосование, выбывание и победа сохраняются в общей партии.'));
           if (!room) boundary.append(el('h2', 'Ещё предстоит'), el('p', 'Живая проверка большого стола в отдельной тестовой Telegram-группе.'));
-          content.append(boundary, button('К играм', () => navigate('home'), 'quiet'));
+          content.append(boundary);
           if (!pendingCommand && (room || (lobbyData?.lobby && !['lobby', 'finished'].includes(lobbyData.lobby.status)))) {
               const poll = () => {
                   if (generation !== version || state.page !== (room ? 'guest-mafia' : 'mafia')) return;
@@ -1533,15 +1930,30 @@
               setTimeout(poll, 5000);
           }
     }
+    // Chat page: segments «Играть · Рейтинг · Статистика · Настройки». Settings are editable for admins and read-only for others.
+    function scheduleCard(details) {
+        const schedule = el('article', undefined, 'card'); schedule.append(el('h2', 'Следующая встреча'));
+        const times = (details.daily.times_msk || []).map(t => `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`).join(', ');
+        note(schedule, details.daily.enabled ? `Ежедневный квиз: ${times || 'время не задано'} · ${details.daily.timezone || 'Europe/Moscow'}` : 'Ежедневный квиз пока не включён. Расписание настраивает администратор чата.');
+        note(schedule, details.wisdom.enabled ? `Мудрость от Филиныча: ${details.wisdom.time || '09:00'} · ${details.wisdom.timezone}` : 'Мудрость дня выключена.');
+        return schedule;
+    }
+    function categoriesCard(details) {
+        const categories = el('article', undefined, 'card'); categories.append(el('h2', 'Темы этого чата'));
+        const enabled = details.enabled_categories || [], disabled = details.disabled_categories || [], usage = details.category_usage || [];
+        note(categories, enabled.length ? `Разрешены: ${enabled.join(', ')}` : 'Доступны категории банка с учётом настроек пула.');
+        if (disabled.length) note(categories, `Исключены: ${disabled.join(', ')}`);
+        if (usage.length) note(categories, usage.map(c => `${c.name}: ${c.uses}`).join(' · '));
+        return categories;
+    }
     async function chatHome(version) {
-        const hero = el('section', undefined, 'hero home-hero'), copy = el('div', undefined, 'hero-copy');
-        copy.append(el('span', 'Филиныч на связи', 'eyebrow'));
-        const title = el('h1', 'Ну что, '); title.append(el('em', 'сыграем?')); copy.append(title);
-        note(copy, 'Выбирай формат. Я приготовлю вопросы.');
-        const image = el('img'); image.src = '/app/host.webp'; image.alt = 'Сова Филиныч с микрофоном и карточкой вопроса'; hero.append(copy, image); content.append(hero); metrics(content);
         if (!state.selected) { note(content, 'Пока нет чатов с твоим участием. Сыграй первый квиз в боте, затем обнови приложение.', 'empty'); return; }
         if (state.launchLost) note(content, 'Чат из ссылки недоступен — возможно, доступ к нему закрыт.', 'error');
-        chatSelect(content, () => navigate('chat'));
+        const tab = ['play', 'stats', 'settings'].includes(state.chatTab) ? state.chatTab : 'play';
+        content.append(segmented([['play', 'Играть'], ['rating', 'Рейтинг'], ['stats', 'Статистика'], ['settings', 'Настройки']], tab, value => {
+            if (value === 'rating') { state.ratingScope = 'chat'; navigate('rating'); }
+            else { state.chatTab = value; navigate('chat'); }
+        }, 'Разделы чата'));
         let details, games;
         try { [details, games] = await Promise.all([request(`/api/mini/chats/${state.selected}/details`), request(`/api/mini/chats/${state.selected}/games`)]); }
         catch (error) {
@@ -1549,205 +1961,241 @@
             if (!isChatGone(error)) throw error;
             dropUnavailableChat(state.selected);
             note(content, 'Бот больше не в этом чате. Выбери другой чат или добавь бота обратно.', 'muted');
-            if (state.selected) content.append(button('Открыть другой чат', () => navigate('chat'), 'quiet'));
+            if (state.selected) content.append(button('Открыть другой чат', () => navigate('chat'), 'secondary'));
             return;
         }
         if (version !== generation) return;
-        const cards = el('section', undefined, 'cards');
-        modeCard(cards, 'Классический квиз', `${details.classic.questions} вопросов · ${details.classic.seconds} секунд на ответ. Категории, анонс и паузы настраиваются в чате.`, '/quiz', games.items.find(g => g.kind === 'classic'));
-        modeCard(cards, 'Фото-загадки', 'Узнай, что на картинке. Пиши ответ в чат, используй подсказки и получай бонус за скорость.', '/photo_quiz', games.items.find(g => g.kind === 'photo'));
-        content.append(cards);
-        if (details.me) {
-            const stats = el('article', undefined, 'card'); stats.append(el('h2', 'Твоя статистика в этом чате'));
-            const accuracy = details.me.accuracy === null || details.me.accuracy === undefined ? '—' : `${details.me.accuracy}%`;
-            note(stats, `Очков: ${details.me.score} · место ${details.me.rank} из ${details.me.members}`);
-            note(stats, `Ответов: ${details.me.answered}, правильных: ${details.me.correct} (${accuracy})`);
-            note(stats, `Серия сейчас: ${details.me.streak}, рекорд: ${details.me.best_streak}`);
-            note(stats, `Достижения чата: ${details.me.achievements_earned} из ${details.me.achievements_available}`);
-            if (details.me.last_answer_at) note(stats, `Последний ответ: ${new Date(details.me.last_answer_at).toLocaleString('ru-RU')}`);
-            content.append(stats);
+        if (tab === 'play') {
+            const cards = el('section', undefined, 'cards');
+            modeCard(cards, 'Классический квиз', `${details.classic.questions} вопросов · ${details.classic.seconds} секунд на ответ. Категории, анонс и паузы настраиваются в настройках чата.`, '/quiz', games.items.find(g => g.kind === 'classic'));
+            modeCard(cards, 'Фото-загадки', 'Узнай, что на картинке. Пиши ответ в чат, используй подсказки и получай бонус за скорость.', '/photo_quiz', games.items.find(g => g.kind === 'photo'));
+            content.append(cards, scheduleCard(details));
+            if (details.telegram_url) {
+                const link = el('a', 'Открыть этот чат в Telegram', 'qw-btn secondary'); link.href = details.telegram_url;
+                link.addEventListener('click', event => { if (tg?.openTelegramLink) { event.preventDefault(); tg.openTelegramLink(details.telegram_url); } }); content.append(link);
+            }
+        } else if (tab === 'stats') {
+            metrics(content);
+            if (details.me) {
+                const stats = el('article', undefined, 'card'); stats.append(el('h2', 'Твоя статистика в этом чате'));
+                const accuracy = details.me.accuracy === null || details.me.accuracy === undefined ? '—' : `${details.me.accuracy}%`;
+                note(stats, `Очков: ${details.me.score} · место ${details.me.rank} из ${details.me.members}`);
+                note(stats, `Ответов: ${details.me.answered}, правильных: ${details.me.correct} (${accuracy})`);
+                note(stats, `Серия сейчас: ${details.me.streak}, рекорд: ${details.me.best_streak}`);
+                note(stats, `Достижения чата: ${details.me.achievements_earned} из ${details.me.achievements_available}`);
+                if (details.me.last_answer_at) note(stats, `Последний ответ: ${new Date(details.me.last_answer_at).toLocaleString('ru-RU')}`);
+                content.append(stats);
+            }
+            content.append(categoriesCard(details));
+        } else await chatSettings(version, details);
+    }
+    async function chatSettings(version, details) {
+        const target = state.chats.find(chat => chat.chat_id === state.selected);
+        const game = el('section', undefined, 'card'); game.append(el('h2', 'Игра и расписание'));
+        if (!runtimeEnabled || !target) {
+            note(game, 'Изменение игровых параметров в этом preview отключено. В рабочем Mini App они сохраняются для выбранного чата.', 'muted');
+            content.append(game, scheduleCard(details), categoriesCard(details)); return;
         }
-        if (details.telegram_url) {
-            const link = el('a', 'Открыть этот чат в Telegram'); link.href = details.telegram_url;
-            link.addEventListener('click', event => { if (tg?.openTelegramLink) { event.preventDefault(); tg.openTelegramLink(details.telegram_url); } }); content.append(link);
+        if (!details.can_edit) {
+            note(game, 'Настройки меняют администраторы чата, ниже текущие значения. Чтобы изменить их, открой Mini App с Telegram-аккаунта администратора.', 'muted');
+            content.append(game, scheduleCard(details), categoriesCard(details)); return;
         }
-        const schedule = el('article', undefined, 'card'); schedule.append(el('h2', 'Следующая встреча'));
-        const times = (details.daily.times_msk || []).map(t => `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`).join(', ');
-        note(schedule, details.daily.enabled ? `Ежедневный квиз: ${times || 'время не задано'} · ${details.daily.timezone || 'Europe/Moscow'}` : 'Ежедневный квиз пока не включён. Расписание настраивает администратор чата.');
-        note(schedule, details.wisdom.enabled ? `Мудрость от Филиныча: ${details.wisdom.time || '09:00'} · ${details.wisdom.timezone}` : 'Мудрость дня выключена.'); content.append(schedule);
-        const categories = el('article', undefined, 'card'); categories.append(el('h2', 'Темы этого чата'));
-        note(categories, details.enabled_categories.length ? `Разрешены: ${details.enabled_categories.join(', ')}` : 'Доступны категории банка с учётом настроек пула.');
-        if (details.disabled_categories.length) note(categories, `Исключены: ${details.disabled_categories.join(', ')}`);
-        if (details.category_usage.length) note(categories, details.category_usage.map(c => `${c.name}: ${c.uses}`).join(' · '));
-        content.append(categories);
+        const categoryData = await request('/api/mini/categories');
+        if (version !== generation) return;
+        const form = el('form', undefined, 'native-settings');
+        const numeric = (title, value, min, max) => {
+            const field = el('label', title, 'field'), input = el('input'); input.type = 'number'; input.min = String(min); input.max = String(max); input.value = String(value); field.append(input); form.append(field); return input;
+        };
+        const questions = numeric('Вопросов в раунде', details.classic.questions, 1, 50);
+        const seconds = numeric('Секунд на ответ', details.classic.seconds, 5, 600);
+        const interval = numeric('Пауза между вопросами, секунд', details.classic.interval, 0, 600);
+        const announceDelay = numeric('Задержка анонса, секунд', details.classic.announce_delay, 0, 300);
+        const announceField = el('label', undefined, 'toggle-field'), announce = el('input'); announce.type = 'checkbox'; announce.checked = details.classic.announce;
+        announceField.append(announce, el('span', 'Показывать анонс перед игрой')); form.append(announceField);
+        const categoryPicker = (title, current) => {
+            const section = el('details', undefined, 'category-picker'), summary = el('summary', title);
+            const modeField = el('label', 'Как выбирать темы', 'field'), mode = el('select');
+            for (const [value, label] of [['all', 'Все темы'], ['random', 'Случайные темы'], ['specific', 'Только выбранные'], ['exclude', 'Все, кроме выбранных']]) {
+                const option = el('option', label); option.value = value; mode.append(option);
+            }
+            mode.value = current.category_mode || 'all'; modeField.append(mode);
+            const random = el('input'); random.type = 'number'; random.min = '1'; random.max = '10';
+            random.value = String(current.random_categories || 3);
+            const checks = el('div', undefined, 'category-checks'), selected = new Map();
+            for (const name of categoryData.items || []) {
+                const label = el('label', undefined, 'category-choice'), input = el('input');
+                input.type = 'checkbox'; input.checked = (current.categories || []).includes(name);
+                selected.set(name, input); label.append(input, el('span', name)); checks.append(label);
+            }
+            const randomField = el('label', 'Сколько случайных тем', 'field'); randomField.append(random);
+            section.append(summary, modeField, randomField, checks); form.append(section);
+            return {mode, random, selected};
+        };
+        const classicCategories = categoryPicker('Темы обычного квиза', details.classic);
+
+        form.append(el('h3', 'Расписание'));
+        const dailyEnabledField = el('label', undefined, 'toggle-field'), dailyEnabled = el('input'); dailyEnabled.type = 'checkbox'; dailyEnabled.checked = !!details.daily.enabled;
+        dailyEnabledField.append(dailyEnabled, el('span', 'Ежедневный квиз')); form.append(dailyEnabledField);
+        const timesField = el('label', 'Время запуска через запятую, ЧЧ:ММ', 'field'), dailyTimes = el('input');
+        dailyTimes.value = (details.daily.times_msk || []).map(item => `${String(item.hour).padStart(2, '0')}:${String(item.minute).padStart(2, '0')}`).join(', '); timesField.append(dailyTimes); form.append(timesField);
+        const zoneField = el('label', 'Часовой пояс', 'field'), dailyZone = el('input'); dailyZone.value = details.daily.timezone || 'Europe/Moscow'; zoneField.append(dailyZone); form.append(zoneField);
+        const dailyQuestions = numeric('Вопросов в ежедневном квизе', details.daily.num_questions || 10, 1, 50);
+        const dailyInterval = numeric('Пауза ежедневного квиза, секунд', details.daily.interval_seconds || 60, 10, 3600);
+        const dailySeconds = numeric('Время ответа в ежедневном квизе', details.daily.poll_open_seconds || 600, 30, 7200);
+        const dailyCategories = categoryPicker('Темы ежедневного квиза', {
+            category_mode: details.daily.categories_mode || 'random', categories: details.daily.specific_categories || [],
+            random_categories: details.daily.num_random_categories || 3,
+        });
+        const wisdomEnabledField = el('label', undefined, 'toggle-field'), wisdomEnabled = el('input'); wisdomEnabled.type = 'checkbox'; wisdomEnabled.checked = !!details.wisdom.enabled;
+        wisdomEnabledField.append(wisdomEnabled, el('span', 'Мудрость от Филиныча')); form.append(wisdomEnabledField);
+        const wisdomField = el('label', 'Время мудрости, ЧЧ:ММ', 'field'), wisdomTime = el('input'); wisdomTime.value = details.wisdom.time || '09:00'; wisdomField.append(wisdomTime); form.append(wisdomField);
+        const cleanupField = el('label', undefined, 'toggle-field'), autoDelete = el('input'); autoDelete.type = 'checkbox'; autoDelete.checked = details.auto_delete !== false;
+        cleanupField.append(autoDelete, el('span', 'Автоматически убирать игровые сообщения')); form.append(cleanupField);
+        const save = button('Сохранить параметры', () => {}, 'primary'); save.type = 'submit'; form.append(save);
+        form.onsubmit = async event => {
+            event.preventDefault(); save.disabled = true; feedback.textContent = '';
+            try {
+                const chosen = picker => [...picker.selected].filter(([, input]) => input.checked).map(([name]) => name);
+                const times = dailyTimes.value.split(',').map(value => value.trim()).filter(Boolean);
+                await request(`/api/mini/chats/${target.chat_id}/preferences`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                    classic: {questions: Number(questions.value), seconds: Number(seconds.value), interval: Number(interval.value), announce: announce.checked,
+                        announce_delay: Number(announceDelay.value), category_mode: classicCategories.mode.value,
+                        categories: chosen(classicCategories), random_categories: Number(classicCategories.random.value)},
+                    daily: {enabled: dailyEnabled.checked, times, timezone: dailyZone.value.trim(), questions: Number(dailyQuestions.value),
+                        interval: Number(dailyInterval.value), seconds: Number(dailySeconds.value), category_mode: dailyCategories.mode.value,
+                        categories: chosen(dailyCategories), random_categories: Number(dailyCategories.random.value)},
+                    wisdom: {enabled: wisdomEnabled.checked, time: wisdomTime.value.trim()}, auto_delete: autoDelete.checked,
+                    expected_revision: details.settings_revision,
+                })});
+                feedback.textContent = 'Параметры сохранены для этого чата и бота.'; await navigate('chat');
+            } catch (error) { feedback.textContent = error.message; save.disabled = false; }
+        };
+        game.append(form);
+        content.append(game);
     }
     function profile() {
-        content.append(el('span', 'Твой путь в Morning Quiz', 'eyebrow'), el('h1', state.me.display_name));
-        const settingsLink = button(undefined, () => navigate('settings'), 'settings-link');
-        const label = el('span'); label.append(el('strong', 'Настройки'), el('small', 'Игра, расписание и оформление'));
-        settingsLink.append(label); content.append(settingsLink);
-        metrics(content);
-        note(content, `Правильных ответов, включая фото: ${state.progress.correct_including_photo}. Лучшая из текущих серий по чатам: ${state.progress.current_streak}.`);
-        content.append(el('h2', 'Достижения'));
-        const summary = state.achievements?.summary;
-        if (!summary) note(content, 'Достижения загружаются…', 'muted');
+        const me = state.me, grid = el('div', undefined, 'profile-grid');
+        const card = el('section', undefined, 'card player-card'), avatar = el('span', initialOf(me.display_name), 'qw-avatar'), who = el('div', undefined, 'player-who');
+        who.append(el('h1', me.display_name), el('small', 'Telegram · профиль QuizzyWizzy'));
+        card.append(avatar, who, button('Настройки', () => navigate('settings'), 'secondary settings-open'));
+        content.append(card);
+        const stats = el('section', undefined, 'metrics profile-metrics'); stats.setAttribute('aria-label', 'Личный прогресс');
+        for (const [value, label] of [[me.score, 'очков всего'], [me.answered_count, 'квиз-ответов'], [state.progress.correct_including_photo, 'правильных, включая фото'],
+            [state.progress.current_streak, 'серия сейчас'], [state.progress.best_streak, 'рекорд серии'], [state.chats.length, 'чатов']]) {
+            const item = el('div', undefined, 'metric'); item.append(el('strong', format(value)), el('span', label)); stats.append(item);
+        }
+        grid.append(stats);
+        const summary = state.achievements?.summary, ach = el('section', undefined, 'card');
+        const head = el('div', undefined, 'card-heading'); head.append(el('h2', 'Достижения'));
+        if (summary) head.append(el('span', `${summary.earned} / ${summary.available}`, 'badge'));
+        ach.append(head);
+        if (!summary) note(ach, 'Достижения загружаются…', 'muted');
         else {
-            note(content, `Получено ${summary.earned} из ${summary.available}: ${summary.chat_achievements} за очки в чатах и ${summary.streak_achievements} за серии подряд.`);
+            note(ach, `Получено ${summary.earned} из ${summary.available}: ${summary.chat_achievements} за очки в чатах и ${summary.streak_achievements} за серии подряд.`);
             const recent = el('div');
             for (const chat of state.achievements.chats) for (const item of chat.items.filter(row => row.earned).slice(0, 2)) recent.append(el('span', item.title, 'achievement'));
-            if (recent.childElementCount) content.append(recent);
-            content.append(button('Все достижения', () => navigate('achievements'), 'quiet'));
-            content.append(button('История игр и ответов', () => navigate('history'), 'quiet'));
+            if (recent.childElementCount) ach.append(recent);
+            const links = el('div', undefined, 'qw-btn-stack');
+            links.append(button('Все достижения', () => navigate('achievements'), 'secondary'), button('История игр и ответов', () => navigate('history'), 'secondary'));
+            ach.append(links);
         }
+        grid.append(ach); content.append(grid);
         if (state.progress.last_activity) note(content, `Последняя активность: ${new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
-        content.append(button('Обновить прогресс', load, 'quiet'));
+        content.append(button('Обновить прогресс', load, 'text'));
     }
+    // «Профиль → Настройки»: only the account (UI_RULES §11). Game and schedule settings live on the chat page.
     async function settings() {
-        content.append(button('К профилю', () => navigate('profile'), 'quiet'), el('span', 'Профиль / Настройки', 'eyebrow settings-path'), el('h1', 'Настройки'));
+        content.append(el('span', 'Профиль / Настройки', 'eyebrow settings-path'), el('h1', 'Настройки'));
         content.append(addressSection('telegram', state.me));
-        const game = el('section', undefined, 'card'); game.append(el('h2', 'Игра и расписание'));
-        const personal = state.chats.find(chat => chat.type === 'private' && chat.chat_id === state.me.user_id);
-        const target = state.chats.find(chat => chat.chat_id === state.selected) || personal;
-        if (state.chats.length > 1) chatSelect(game, () => navigate('settings'));
-        if (runtimeEnabled && target) {
-            const [details, categoryData] = await Promise.all([
-                request(`/api/mini/chats/${target.chat_id}/details`), request('/api/mini/categories'),
-            ]);
-            if (!details.can_edit) {
-                note(game, 'Настройки доступны только администраторам этого чата. Войти в Mini App нужно с Telegram-аккаунта администратора.', 'muted');
-            } else {
-            note(game, target.type === 'private'
-                ? 'Личные параметры общие для Mini App и бота. Изменение применяется к следующему раунду.'
-                : 'Изменения применяются к этому чату и сразу видны в Telegram-боте.');
-            const form = el('form', undefined, 'native-settings');
-            const numeric = (title, value, min, max) => {
-                const field = el('label', title, 'field'), input = el('input'); input.type = 'number'; input.min = String(min); input.max = String(max); input.value = String(value); field.append(input); form.append(field); return input;
-            };
-            const questions = numeric('Вопросов в раунде', details.classic.questions, 1, 50);
-            const seconds = numeric('Секунд на ответ', details.classic.seconds, 5, 600);
-            const interval = numeric('Пауза между вопросами, секунд', details.classic.interval, 0, 600);
-            const announceDelay = numeric('Задержка анонса, секунд', details.classic.announce_delay, 0, 300);
-            const announceField = el('label', undefined, 'toggle-field'), announce = el('input'); announce.type = 'checkbox'; announce.checked = details.classic.announce;
-            announceField.append(announce, el('span', 'Показывать анонс перед игрой')); form.append(announceField);
-            const categoryPicker = (title, current) => {
-                const section = el('details', undefined, 'category-picker'), summary = el('summary', title);
-                const modeField = el('label', 'Как выбирать темы', 'field'), mode = el('select');
-                for (const [value, label] of [['all', 'Все темы'], ['random', 'Случайные темы'], ['specific', 'Только выбранные'], ['exclude', 'Все, кроме выбранных']]) {
-                    const option = el('option', label); option.value = value; mode.append(option);
-                }
-                mode.value = current.category_mode || 'all'; modeField.append(mode);
-                const random = el('input'); random.type = 'number'; random.min = '1'; random.max = '10';
-                random.value = String(current.random_categories || 3);
-                const checks = el('div', undefined, 'category-checks'), selected = new Map();
-                for (const name of categoryData.items || []) {
-                    const label = el('label', undefined, 'category-choice'), input = el('input');
-                    input.type = 'checkbox'; input.checked = (current.categories || []).includes(name);
-                    selected.set(name, input); label.append(input, el('span', name)); checks.append(label);
-                }
-                const randomField = el('label', 'Сколько случайных тем', 'field'); randomField.append(random);
-                section.append(summary, modeField, randomField, checks); form.append(section);
-                return {mode, random, selected};
-            };
-            const classicCategories = categoryPicker('Темы обычного квиза', details.classic);
-
-            form.append(el('h3', 'Расписание'));
-            const dailyEnabledField = el('label', undefined, 'toggle-field'), dailyEnabled = el('input'); dailyEnabled.type = 'checkbox'; dailyEnabled.checked = !!details.daily.enabled;
-            dailyEnabledField.append(dailyEnabled, el('span', 'Ежедневный квиз')); form.append(dailyEnabledField);
-            const timesField = el('label', 'Время запуска через запятую, ЧЧ:ММ', 'field'), dailyTimes = el('input');
-            dailyTimes.value = (details.daily.times_msk || []).map(item => `${String(item.hour).padStart(2, '0')}:${String(item.minute).padStart(2, '0')}`).join(', '); timesField.append(dailyTimes); form.append(timesField);
-            const zoneField = el('label', 'Часовой пояс', 'field'), dailyZone = el('input'); dailyZone.value = details.daily.timezone || 'Europe/Moscow'; zoneField.append(dailyZone); form.append(zoneField);
-            const dailyQuestions = numeric('Вопросов в ежедневном квизе', details.daily.num_questions || 10, 1, 50);
-            const dailyInterval = numeric('Пауза ежедневного квиза, секунд', details.daily.interval_seconds || 60, 10, 3600);
-            const dailySeconds = numeric('Время ответа в ежедневном квизе', details.daily.poll_open_seconds || 600, 30, 7200);
-            const dailyCategories = categoryPicker('Темы ежедневного квиза', {
-                category_mode: details.daily.categories_mode || 'random', categories: details.daily.specific_categories || [],
-                random_categories: details.daily.num_random_categories || 3,
-            });
-            const wisdomEnabledField = el('label', undefined, 'toggle-field'), wisdomEnabled = el('input'); wisdomEnabled.type = 'checkbox'; wisdomEnabled.checked = !!details.wisdom.enabled;
-            wisdomEnabledField.append(wisdomEnabled, el('span', 'Мудрость от Филиныча')); form.append(wisdomEnabledField);
-            const wisdomField = el('label', 'Время мудрости, ЧЧ:ММ', 'field'), wisdomTime = el('input'); wisdomTime.value = details.wisdom.time || '09:00'; wisdomField.append(wisdomTime); form.append(wisdomField);
-            const cleanupField = el('label', undefined, 'toggle-field'), autoDelete = el('input'); autoDelete.type = 'checkbox'; autoDelete.checked = details.auto_delete !== false;
-            cleanupField.append(autoDelete, el('span', 'Автоматически убирать игровые сообщения')); form.append(cleanupField);
-            const save = button('Сохранить параметры', () => {}, 'primary'); save.type = 'submit'; form.append(save);
-            form.onsubmit = async event => {
-                event.preventDefault(); save.disabled = true; feedback.textContent = '';
-                try {
-                    const chosen = picker => [...picker.selected].filter(([, input]) => input.checked).map(([name]) => name);
-                    const times = dailyTimes.value.split(',').map(value => value.trim()).filter(Boolean);
-                    await request(`/api/mini/chats/${target.chat_id}/preferences`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
-                        classic: {questions: Number(questions.value), seconds: Number(seconds.value), interval: Number(interval.value), announce: announce.checked,
-                            announce_delay: Number(announceDelay.value), category_mode: classicCategories.mode.value,
-                            categories: chosen(classicCategories), random_categories: Number(classicCategories.random.value)},
-                        daily: {enabled: dailyEnabled.checked, times, timezone: dailyZone.value.trim(), questions: Number(dailyQuestions.value),
-                            interval: Number(dailyInterval.value), seconds: Number(dailySeconds.value), category_mode: dailyCategories.mode.value,
-                            categories: chosen(dailyCategories), random_categories: Number(dailyCategories.random.value)},
-                        wisdom: {enabled: wisdomEnabled.checked, time: wisdomTime.value.trim()}, auto_delete: autoDelete.checked,
-                        expected_revision: details.settings_revision,
-                    })});
-                    feedback.textContent = 'Параметры сохранены для этого чата и бота.'; await navigate('settings');
-                } catch (error) { feedback.textContent = error.message; save.disabled = false; }
-            };
-            game.append(form);
-            }
-        } else {
-            note(game, state.chats.length
-                ? 'Изменение игровых параметров в этом preview отключено. В рабочем Mini App они сохраняются для выбранного чата.'
-                : 'Сначала открой бота и добавь чат — тогда здесь появятся игровые параметры.', 'muted');
-            if (state.chats.length > 1) chatSelect(game, () => navigate('settings'));
-        }
-        content.append(game);
-        const preferences = el('section', undefined, 'card'); preferences.append(el('h2', 'Как тебе удобно'));
-        const themeField = el('label', 'Оформление', 'field'), themeSelect = el('select');
-        for (const [value, label] of [['system', 'Как в Telegram / системе'], ['dark', 'Тёмное'], ['light', 'Светлое']]) { const option = el('option', label); option.value = value; themeSelect.append(option); }
-        themeSelect.value = window.QuizTelegram.prefs.theme; themeSelect.addEventListener('change', () => window.QuizTelegram.setTheme(themeSelect.value)); themeField.append(themeSelect); preferences.append(themeField);
-        const haptics = button(window.QuizTelegram.prefs.haptics ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл', () => { const enabled = window.QuizTelegram.toggleHaptics(); haptics.textContent = enabled ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл'; haptics.setAttribute('aria-pressed', String(enabled)); });
+        const via = el('section', undefined, 'card login-card'); via.append(el('h2', 'Вход'));
+        const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
+        row.append(copy, el('span', '✓', 'badge')); via.append(row);
+        content.append(via, devicesSection('telegram'));
+        const preferences = el('section', undefined, 'card'); preferences.append(el('h2', 'Внешний вид'), el('p', 'Тема', 'field-label'));
+        preferences.append(segmented([['system', 'Как в системе'], ['dark', 'Тёмная'], ['light', 'Светлая']], window.QuizTelegram.prefs.theme, value => window.QuizTelegram.setTheme(value), 'Тема оформления'));
+        const haptics = button(window.QuizTelegram.prefs.haptics ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл', () => { const enabled = window.QuizTelegram.toggleHaptics(); haptics.textContent = enabled ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл'; haptics.setAttribute('aria-pressed', String(enabled)); }, 'secondary');
         haptics.setAttribute('aria-pressed', String(window.QuizTelegram.prefs.haptics)); preferences.append(haptics);
-        if (window.QuizTelegram.canFullscreen) preferences.append(button('Развернуть на весь экран', () => window.QuizTelegram.fullscreen(), 'quiet'));
         content.append(preferences);
-        const actions = el('div', undefined, 'actions'); actions.append(button('Выйти', async () => {
+        const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}
                 loginScreen(); }
             catch (error) { feedback.textContent = error.message; }
-        }, 'quiet')); content.append(actions);
+        }, 'danger')); content.append(actions);
     }
     function chats() {
-        content.append(el('span', 'Игровые чаты', 'eyebrow'), el('h1', 'Твои чаты')); note(content, 'У каждого чата свой рейтинг, серия и расписание.');
+        content.append(el('p', 'Чаты, где ты играешь с ботом. Рейтинг, статистика и расписание — внутри каждого.', 'muted'));
         if (!state.chats.length) {
             note(content, 'Запусти /start в личном чате с ботом или добавь его в группу. После этого выбери появившийся чат — квиз и фото-загадки можно будет запускать прямо здесь.', 'empty');
             if (state.botUsername) content.append(button('Открыть бота', () => openBotHome(), 'primary'));
         }
         for (const chat of state.chats) {
-            const item = el('article', undefined, 'card'); item.append(el('h2', chat.title));
-            note(item, `${format(chat.own_statistics.score)} баллов · серия ${chat.own_statistics.streak} · рекорд ${chat.own_statistics.best_streak}`);
-            item.append(button('Открыть игры и расписание', () => { state.selected = chat.chat_id; navigate('chat'); }, 'primary')); content.append(item);
+            const item = el('article', undefined, 'card chat-card'), head = el('div', undefined, 'card-heading'), own = chat.own_statistics || {};
+            head.append(el('h2', chat.title));
+            if (typeof chat.can_edit === 'boolean') head.append(el('span', chat.can_edit ? 'админ' : 'участник', chat.can_edit ? 'badge admin' : 'badge'));
+            item.append(head);
+            const facts = [`${format(own.score ?? 0)} очков`];
+            if (own.rank != null) facts.push(own.members != null ? `№${own.rank} из ${own.members}` : `№${own.rank}`);
+            if (own.streak != null) facts.push(`серия ${own.streak}`);
+            if (own.best_streak != null) facts.push(`рекорд ${own.best_streak}`);
+            note(item, facts.join(' · '));
+            item.append(button('Открыть игры и расписание', () => { state.selected = chat.chat_id; state.chatTab = 'play'; navigate('chat'); }, 'primary')); content.append(item);
         }
         if (state.moreChats) content.append(button('Ещё чаты', async event => {
             const trigger = event.currentTarget; trigger.disabled = true;
             try { const result = await request(`/api/mini/chats?limit=50&offset=${state.chatOffset}`); state.chats.push(...result.items); state.chatOffset += result.items.length; state.moreChats = result.has_more; navigate('chats'); }
             catch (error) { feedback.textContent = error.message; trigger.disabled = false; }
-        }));
+        }, 'secondary'));
+        if (state.chats.length && state.botUsername) content.append(button('Добавить бота в чат', () => openBotHome(), 'secondary'));
     }
+    // Rating: segments «Общий · Чат ▾ · Alchemia», podium for the top three, own row highlighted.
     async function rating(version) {
-        content.append(el('span', 'Рейтинг', 'eyebrow'), el('h1', 'Гонка за знаниями'));
-        const field = el('label', 'Рейтинг', 'field'), select = el('select'); select.setAttribute('aria-label', 'Область рейтинга');
-        const global = el('option', 'Глобальный рейтинг'); global.value = ''; select.append(global);
-        for (const chat of state.chats) { const option = el('option', chat.title); option.value = chat.chat_id; select.append(option); }
-        select.value = state.selected; field.append(select); content.append(field);
-        const list = el('ol', undefined, 'list'); content.append(list); let offset = 0, requestSequence = 0;
+        const chat = state.chats.find(item => item.chat_id === state.selected) || state.chats[0] || null;
+        let scope = state.ratingScope === 'alchemia' ? 'alchemia' : state.ratingScope === 'global' || !chat ? 'global' : 'chat';
+        let offset = 0, requestSequence = 0, rows = [];
+        const segments = el('div'), picker = el('div'), podium = el('section', undefined, 'podium'), list = el('ol', undefined, 'list');
         const failure = error => { if (!state.authenticated) loginScreen(error.message); else feedback.textContent = error.message; more.disabled = false; };
-        const more = button('Показать ещё', () => fetchPage().catch(failure)); more.hidden = true; content.append(more);
-        async function fetchPage() {
-            more.disabled = true; const selection = select.value, sequence = ++requestSequence;
-            const result = await request(`${selection ? `/api/mini/chats/${selection}/leaderboard` : '/api/mini/leaderboard'}?limit=20&offset=${offset}`);
-            if (version !== generation || selection !== select.value || sequence !== requestSequence) return;
-            if (!offset && !result.items.length) note(list, 'Пока нет результатов.');
-            for (const user of result.items) {
-                const row = el('li', undefined, user.is_me ? 'me' : ''); row.append(el('span', `#${user.rank}`, 'rank'), el('span', `${user.display_name}${user.is_me ? ' · ты' : ''}`, 'name'), el('span', format(user.score), 'score')); list.append(row);
-            }
-            offset += result.items.length; more.hidden = !result.has_more; more.disabled = false;
+        const more = button('Показать ещё', () => fetchPage().catch(failure), 'secondary'); more.hidden = true;
+        const mine = el('p', undefined, 'me-bar'); mine.hidden = true;
+        const choose = value => { scope = value; state.ratingScope = value; reload(); };
+        const reload = () => { offset = 0; rows = []; paint(); fetchPage().catch(failure); };
+        function paint() {
+            const options = [['global', 'Общий']];
+            if (chat) options.push(['chat', state.chats.length > 1 ? 'Чат ▾' : 'Чат']);
+            options.push(['alchemia', 'Alchemia']);
+            segments.replaceChildren(segmented(options, scope, choose, 'Область рейтинга'));
+            picker.replaceChildren();
+            if (scope === 'chat' && state.chats.length > 1) chatSelect(picker, reload);
+            podium.replaceChildren(); list.replaceChildren(); mine.hidden = true; more.hidden = true;
         }
-        select.addEventListener('change', () => { list.replaceChildren(); offset = 0; fetchPage().catch(failure); });
+        function addRows(items, scoreOf) {
+            for (const user of items) rows.push({rank: user.rank, name: user.display_name, me: Boolean(user.is_me), score: scoreOf(user)});
+            podium.replaceChildren(); list.replaceChildren();
+            // Podium order: 2nd, 1st, 3rd. It needs a full top three, otherwise the list shows everyone.
+            const top = rows.slice(0, 3), usePodium = top.length === 3 && top.every((row, index) => row.rank === index + 1);
+            if (usePodium) for (const row of [top[1], top[0], top[2]]) {
+                const place = el('div', undefined, `podium-place p${row.rank}${row.me ? ' me' : ''}`);
+                place.append(el('span', ['🥇', '🥈', '🥉'][row.rank - 1], 'medal'), el('strong', row.name + (row.me ? ' · ты' : '')), el('small', format(row.score)));
+                podium.append(place);
+            }
+            for (const row of usePodium ? rows.slice(3) : rows) {
+                const node = el('li', undefined, row.me ? 'me' : ''); node.append(el('span', `#${row.rank}`, 'rank'), el('span', `${row.name}${row.me ? ' · ты' : ''}`, 'name'), el('span', format(row.score), 'score')); list.append(node);
+            }
+            const me = rows.find(row => row.me);
+            mine.hidden = !me; if (me) mine.textContent = `Ты — №${me.rank} · ${format(me.score)}`;
+        }
+        async function fetchPage() {
+            more.disabled = true; const sequence = ++requestSequence, selection = scope === 'chat' ? state.selected || chat?.chat_id : '';
+            const path = scope === 'alchemia' ? '/api/mini/alchemy/leaderboard?limit=20'
+                : `${selection ? `/api/mini/chats/${selection}/leaderboard` : '/api/mini/leaderboard'}?limit=20&offset=${offset}`;
+            const result = await request(path);
+            if (version !== generation || sequence !== requestSequence) return;
+            if (!offset && !result.items.length) note(list, 'Пока нет результатов.');
+            addRows(result.items, scope === 'alchemia' ? user => user.discovered : user => user.score);
+            offset += result.items.length; more.hidden = scope === 'alchemia' || !result.has_more; more.disabled = false;
+        }
+        if (scope === 'chat' && !state.selected && chat) state.selected = chat.chat_id;
+        content.append(segments, picker, podium, list, more, mine); paint();
         await fetchPage();
     }
     function achievementLine(item) {
@@ -1839,14 +2287,19 @@
     }
     async function navigate(page) {
         stopRoomClassic();
-        if (!state.authenticated) { loginScreen(); return; }
+        if (!state.authenticated) { if (state.guest) guestNavigate(page); else loginScreen(); return; }
         window.QuizPlay?.stop();
         window.QuizPlay?.stop();
         window.QuizTelegram.selection();
         state.page = page; const version = ++generation; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = page;
         const tab = page.startsWith('settings') || page === 'achievements' || page === 'history' || page === 'alchemy-top' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
         nav.querySelectorAll('button').forEach(node => { if (node.dataset.page === tab) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-        if (tg?.BackButton) { if (page === 'home') tg.BackButton.hide(); else tg.BackButton.show(); }
+        if (page === 'mafia') shell({game: true, onHome: () => navigate('home')});
+        else {
+            const chatTitle = state.chats.find(chat => chat.chat_id === state.selected)?.title;
+            shell({page, title: page === 'play' ? (playCommand === '/photo_quiz' ? 'Фото-загадки' : 'Классический квиз')
+                : page === 'chat' ? chatTitle || 'Чат' : undefined});
+        }
         try {
             if (page === 'home') await home(version);
             else if (page === 'play') {
@@ -1856,7 +2309,7 @@
                     throw new Error('Для этого игрового режима ещё нет прямого подключения. Выбери квиз, фото-загадки или Ночной город.');
                 }
                 if (!window.QuizPlay) throw new Error('Игровой экран не загрузился. Обнови приложение.');
-                await window.QuizPlay.mount({host: content, request, command, chatId: state.selected, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => navigate('settings'), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
+                await window.QuizPlay.mount({host: content, request, command, chatId: state.selected, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => openChatSettings(), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
                     const response = await fetch(path, {credentials: 'same-origin'});
                     if (!response.ok) throw new Error('Фото недоступно'); return response.blob();
                 }});
@@ -1878,7 +2331,7 @@
         }
     }
     nav.querySelectorAll('button').forEach(node => node.addEventListener('click', () => navigate(node.dataset.page)));
-    document.querySelector('.brand').addEventListener('click', event => { if (state.authenticated) { event.preventDefault(); navigate('home'); } });
+    brandLink?.addEventListener('click', event => { if (state.authenticated) { event.preventDefault(); navigate('home'); } });
     configureTelegram();
     request('/api/mini/config').catch(() => null).then(config => {
         state.botUsername = config?.bot_username || '';

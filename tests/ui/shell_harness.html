@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101317">
+<title>qw-shell harness</title>
+<link rel="stylesheet" href="../../web/shell/qw-tokens.css">
+<link rel="stylesheet" href="../../web/shell/qw-shell.css">
+<script>
+// ?tg=ios|android|tdesktop|none  &v=8.0  — a fake Telegram.WebApp that records every call.
+(() => {
+    const q = new URLSearchParams(location.search);
+    const platform = q.get('tg') || 'none';
+    window.__calls = [];
+    if (platform === 'none') return;
+    const log = name => (...args) => window.__calls.push([name, ...args]);
+    const handlers = {};
+    const version = q.get('v') || '8.0';
+    const webApp = {
+        initData: 'query_id=harness&user=%7B%22id%22%3A1%7D&auth_date=1&hash=x', platform, version,
+        colorScheme: 'dark', isFullscreen: q.get('fs') === '1', viewportStableHeight: 700,
+        safeAreaInset: q.get('zero') ? {top: 0, right: 0, bottom: 0, left: 0} : {top: 47, right: 0, bottom: 34, left: 0},
+        contentSafeAreaInset: {top: 0, right: 0, bottom: 0, left: 0},
+        isVersionAtLeast(v) { const a = version.split('.').map(Number), b = String(v).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; },
+        ready: log('ready'), expand: log('expand'), disableVerticalSwipes: log('disableVerticalSwipes'),
+        setHeaderColor: log('setHeaderColor'), setBackgroundColor: log('setBackgroundColor'), setBottomBarColor: log('setBottomBarColor'),
+        requestFullscreen() { window.__calls.push(['requestFullscreen']); webApp.isFullscreen = true; webApp.contentSafeAreaInset = {top: 46, right: 0, bottom: 0, left: 0}; (handlers.fullscreenChanged || []).forEach(fn => fn()); },
+        exitFullscreen() { window.__calls.push(['exitFullscreen']); webApp.isFullscreen = false; webApp.contentSafeAreaInset = {top: 0, right: 0, bottom: 0, left: 0}; (handlers.fullscreenChanged || []).forEach(fn => fn()); },
+        onEvent(name, fn) { (handlers[name] ||= []).push(fn); },
+        BackButton: {isVisible: false, onClick(fn) { handlers.__back = fn; }, show() { webApp.BackButton.isVisible = true; }, hide() { webApp.BackButton.isVisible = false; }},
+        SettingsButton: {isVisible: false, onClick(fn) { handlers.__settings = fn; }, show() { webApp.SettingsButton.isVisible = true; }, hide() { webApp.SettingsButton.isVisible = false; }},
+        HapticFeedback: {selectionChanged: log('haptic'), notificationOccurred: log('haptic'), impactOccurred: log('haptic')},
+    };
+    window.Telegram = {WebApp: webApp};
+    window.__tg = {
+        pressBack: () => handlers.__back?.(),
+        pressSettings: () => handlers.__settings?.(),
+        emit: (name, patch) => { Object.assign(webApp, patch || {}); (handlers[name] || []).forEach(fn => fn()); },
+    };
+})();
+</script>
+<script src="../../web/shell/qw-shell.js"></script>
+<style>body{margin:0;background:var(--qw-bg);color:var(--qw-text);font-family:var(--qw-font)} header{display:flex;align-items:center;gap:8px;padding:var(--qw-safe-top) 16px 0;height:56px} .gap-bad{display:flex;flex-direction:column} .gap-bad button{min-height:44px}</style>
+</head>
+<body>
+<header id="head"><strong style="flex:1">Harness</strong></header>
+<nav id="bottombar" style="position:fixed;left:0;right:0;bottom:0;height:56px;padding-bottom:var(--qw-safe-bottom)"></nav>
+<main id="main"></main>
+</body>
+</html>

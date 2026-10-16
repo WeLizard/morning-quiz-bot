@@ -518,6 +518,11 @@ async def main() -> None:
             logger.info("✅ Режим технического обслуживания не активен")
 
         logger.debug("Регистрация обработчиков PTB...")
+        if data_manager.postgres_storage:
+            # Before common handlers: '/start login_<token>' must not open the main menu.
+            from handlers.account_login_handlers import AccountLoginHandlers
+            application_instance.add_handlers(
+                AccountLoginHandlers(data_manager.postgres_storage.database).get_handlers())
         application_instance.add_handlers(quiz_manager.get_handlers())
         application_instance.add_handlers(rating_handlers.get_handlers())
         application_instance.add_handlers(common_handlers_instance.get_handlers())

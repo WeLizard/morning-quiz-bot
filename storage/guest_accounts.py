@@ -102,14 +102,15 @@ class GuestAccounts:
             )
             yield session, account, guest_session
 
-    def _session(self, account):
+    def _session(self, account, *, created_via=None, user_agent=None):
         raw = secrets.token_urlsafe(32)
         now = self.now()
         return raw, GuestSession(token_hash=credential_hash(raw), account_id=account.id,
             account_revision=account.moderation_revision, created_at=now,
-            expires_at=now + timedelta(seconds=SESSION_SECONDS), revoked=False)
+            expires_at=now + timedelta(seconds=SESSION_SECONDS), revoked=False,
+            created_via=created_via, user_agent=(user_agent or '')[:120] or None)
 
-    async def start(self, credential=None):
+    async def start(self, credential=None, user_agent=None):
         # A repeated start with an existing cookie never allocates another account.
         if credential is not None:
             return await self.profile(credential), None
@@ -117,7 +118,7 @@ class GuestAccounts:
             account = Account(display_name='Гость')
             session.add(account)
             await session.flush()
-            raw, row = self._session(account)
+            raw, row = self._session(account, created_via='guest', user_agent=user_agent)
             session.add(row)
             result = self.projection(account, row)
         return result, raw

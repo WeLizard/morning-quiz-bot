@@ -71,6 +71,59 @@ class Account(ModerationMixin, TimestampMixin, Base):
     # Form of address for game texts: 'm' | 'f' | 'n'. NULL = not asked yet (reads as neutral);
     # Telegram does not report gender, so it is never inferred.
     address_form: Mapped[Optional[str]] = mapped_column(String(1))
+    # Set once when this account was merged into another; it is then archived, never deleted.
+    merged_into_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"))
+    merged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint("merged_into_id IS NULL OR merged_into_id <> id",
+                        name="ck_accounts_not_merged_into_self"),
+    )
+
+
+class AccountMerge(Base):
+    """Audit record of one merge: what moved from ``merged_account_id`` into the main account."""
+    __tablename__ = "account_merges"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    main_account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
+    merged_account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
+    initiated_via: Mapped[str] = mapped_column(String(16), nullable=False)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("merged_account_id", name="uq_account_merges_merged"),
+        Index("ix_account_merges_main", "main_account_id"),
+    )
+
+
+class TelegramLoginRequest(Base):
+    """Browser-started Telegram login: the bot approves it, only the starting browser completes it."""
+    __tablename__ = "telegram_login_requests"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    start_token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    browser_secret_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending", nullable=False)
+    client_hint: Mapped[str] = mapped_column(String(120), default="", server_default="", nullable=False)
+    telegram_user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    telegram_display_name: Mapped[Optional[str]] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'approved', 'cancelled', 'consumed')",
+                        name="ck_telegram_login_requests_status"),
+        UniqueConstraint("start_token_hash", name="uq_telegram_login_requests_start"),
+        UniqueConstraint("browser_secret_hash", name="uq_telegram_login_requests_browser"),
+        Index("ix_telegram_login_requests_expires", "expires_at"),
+    )
 
 
 class AccountIdentity(Base):
@@ -193,6 +246,9 @@ class GuestSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # 'guest' | 'password' | 'telegram' (browser Telegram login); NULL for sessions before 0031.
+    created_via: Mapped[Optional[str]] = mapped_column(String(16))
+    user_agent: Mapped[Optional[str]] = mapped_column(String(120))
 
 
 class User(ModerationMixin, TimestampMixin, Base):

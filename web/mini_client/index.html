@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#101317">
-  <meta name="description" content="Morning Quiz: играй в квиз и фото-загадки в приложении или Telegram. Общие правила и прогресс.">
-  <title>Morning Quiz · Игры и прогресс</title>
+  <meta name="description" content="QuizzyWizzy: играй в квиз, фото-загадки, Алхимию и ферму в приложении или Telegram. Общие правила и прогресс.">
+  <title>QuizzyWizzy · Игры и прогресс</title>
+  <link rel="stylesheet" href="/app/shell/qw-tokens.css">
+  <link rel="stylesheet" href="/app/shell/qw-shell.css">
   <link rel="stylesheet" href="/app/styles.css">
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script defer src="/app/shell/qw-shell.js"></script>
   <script defer src="/app/address.js"></script>
   <script defer src="/app/telegram-ui.js"></script>
   <script defer src="/app/play-ui.js"></script>
@@ -16,15 +19,15 @@
 </head>
 <body>
   <div class="shell">
-    <header class="topbar"><a class="brand" href="/app" aria-label="Morning Quiz — главная"><span class="mark" aria-hidden="true"><i></i></span><span><small>MORNING QUIZ</small><strong>Daily drop</strong></span></a></header>
+    <header class="topbar" id="hubbar"><a class="brand" href="/app" aria-label="QuizzyWizzy — главная"><span class="mark" aria-hidden="true"><i></i></span><strong>QuizzyWizzy</strong></a><strong class="hub-title" id="hubTitle" hidden></strong></header>
     <p id="environment" class="environment" hidden></p>
-    <main id="content" tabindex="-1" aria-live="polite"><p class="muted">Открываем Morning Quiz…</p></main>
+    <main id="content" tabindex="-1" aria-live="polite"><p class="muted">Открываем QuizzyWizzy…</p></main>
     <p id="feedback" role="status"></p>
     <nav id="navigation" class="tabbar" aria-label="Разделы приложения" hidden>
-      <button type="button" data-page="home" aria-current="page">Игры</button>
-      <button type="button" data-page="chats">Чаты</button>
-      <button type="button" data-page="rating">Рейтинг</button>
-      <button type="button" data-page="profile">Профиль</button>
+      <button type="button" data-page="home" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg><span>Игры</span></button>
+      <button type="button" data-page="chats"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4Z"/></svg><span>Чаты</span></button>
+      <button type="button" data-page="rating"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 4h8v5a4 4 0 0 1-8 0Zm0 1H4v2a3 3 0 0 0 4 3m8-5h4v2a3 3 0 0 1-4 3m-4 3v4m-4 3h8"/></svg><span>Рейтинг</span></button>
+      <button type="button" data-page="profile"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Профиль</span></button>
     </nav>
   </div>
   <noscript>Для Mini App необходимо включить JavaScript. Обычный квиз по-прежнему доступен командами бота в чате.</noscript>

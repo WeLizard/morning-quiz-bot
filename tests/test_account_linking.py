@@ -163,7 +163,10 @@ def test_link_preserves_guest_farm_progress_and_repeated_confirmation(pg_env, mo
     asyncio.run(run())
 
 
-def test_existing_telegram_account_conflicts_without_changes(pg_env, monkeypatch):
+def test_existing_telegram_account_offers_merge_without_changes(pg_env, monkeypatch):
+    # Owner decision (2026-10-15): one account for the whole app. A Telegram that already
+    # owns another account is no longer a dead-end 409: preview offers the merge (here
+    # automatic, the Telegram side is empty), plain link confirmation refuses, nothing changes.
     async def run():
         async with environment(pg_env, monkeypatch) as env:
             mini = MiniAppStore(env.db, TOKEN, clock=lambda: env.now)
@@ -171,14 +174,19 @@ def test_existing_telegram_account_conflicts_without_changes(pg_env, monkeypatch
             await AlchemyService(env.db).guest_sync(env.raw,
                 expected_account_id=str(env.account_id), discovered=['steam'], attempts=9)
             before = await snapshot(env.db)
-            for endpoint, body in (
-                ('preview', {'init_data': signed(UID, date=env.now)}),
-                ('confirm', confirmation(env.account_id, env.now)),
-            ):
-                response = await env.client.post(LINK + '/' + endpoint, headers=HEADERS, json=body)
-                assert response.status_code == 409, response.text
-                assert response.json()['code'] == 'telegram_link_conflict'
-                assert await snapshot(env.db) == before
+            preview = await env.client.post(LINK + '/preview', headers=HEADERS,
+                                            json={'init_data': signed(UID, date=env.now)})
+            assert preview.status_code == 200, preview.text
+            offer = preview.json()
+            assert offer['merge_required'] is True and offer['auto'] is True
+            assert offer['account_id'] == str(env.account_id)
+            assert offer['preview']['telegram']['empty'] and not offer['preview']['current']['empty']
+            assert await snapshot(env.db) == before
+            response = await env.client.post(LINK + '/confirm', headers=HEADERS,
+                                             json=confirmation(env.account_id, env.now))
+            assert response.status_code == 409, response.text
+            assert response.json()['code'] == 'merge_required'
+            assert await snapshot(env.db) == before
     asyncio.run(run())
 
 

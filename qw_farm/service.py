@@ -10,6 +10,7 @@ from .domain import new_farm, apply, project, validate_state, can_visit, FarmErr
 from .catalog import tick, public_catalog, VERSION, level, FUND_LEVEL, INVITE
 from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, progression, trip_games
+from .sharing import new_invite_token, invite_digest, MAX_ACTIVE_SHARE_INVITES_PER_FARM
 
 @dataclass(frozen=True)
 class Principal:
@@ -43,19 +44,39 @@ class FarmService:
         return dict(farm=project(farm,farm,self.clock()),catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
                     invites=await self._invites(farm),address_form=self.p.address_form)
 
+    async def create_share_invite(self):
+        """Create a seven-day, one-use opaque link; only its digest is persisted."""
+        await self.u.lock('account:'+self.p.account_id)
+        farm=await self.me()
+        await self.u.lock('farm:'+farm['id'])
+        farm=await self.u.get(farm['id'])
+        token=new_invite_token()
+        now=self.clock()
+        await self.u.share_invite_create(invite_digest(token),farm['id'],now+7*24*60*60,
+                                         now,MAX_ACTIVE_SHARE_INVITES_PER_FARM)
+        return token
+
+    async def _invite_farm(self, code):
+        """Resolve a one-use opaque token or a legacy manually-entered UUID."""
+        if isinstance(code,str) and re.fullmatch(r'[A-Za-z0-9_-]{43}',code):
+            row=await self.u.share_invite(invite_digest(code))
+            return str(row['farm_id']) if row and row['accepted_by_farm_id'] is None and row['expires_at']>self.clock() else None
+        try:return str(UUID(str(code)))
+        except (ValueError,TypeError,AttributeError):return None
+
     async def _attach_invite(self, farm, code):
         """Link a FRESH farm to its inviter (any channel: Telegram, web link or typed code) and pay the starting bonus once."""
         if not hasattr(self.u,'invite_add'):return farm
-        try:code=str(UUID(str(code)))
-        except (ValueError,TypeError,AttributeError):raise FarmError('invalid_invite','Некорректный код приглашения.',422)
+        inviter_id=await self._invite_farm(code)
+        need(inviter_id is not None,'invalid_invite','Некорректный код приглашения.',422)
         now=self.clock()
-        need(code!=farm['id'],'self_invite','Нельзя пригласить самого себя.',422)
+        need(inviter_id!=farm['id'],'self_invite','Нельзя пригласить самого себя.',422)
         need(invites.fresh(farm,now),'invite_late','Приглашение можно ввести только на новой ферме.')
-        inviter=await self.u.get(code)
-        need(inviter is not None and await self.u.owner_account(code)!=self.p.account_id,'invite_unknown','Приглашение не найдено.',404)
-        if not await self.u.invite_add(farm['id'],code,now):return farm
+        inviter=await self.u.get(inviter_id)
+        need(inviter is not None and await self.u.owner_account(inviter_id)!=self.p.account_id,'invite_unknown','Приглашение не найдено.',404)
+        if not await self.u.invite_add(farm['id'],inviter_id,now):return farm
         before=deepcopy(farm)
-        invites.give_bonus(farm,code,inviter['name'],now)
+        invites.give_bonus(farm,inviter_id,inviter['name'],now)
         farm['revision']+=1
         validate_state(farm);await self.u.save(farm)
         await self.u.record(self.p.account_id,'invite-bonus','invite_bonus',before,farm,now)
@@ -69,6 +90,74 @@ class FarmService:
         farm=await self.u.get(me['id'])
         farm=await self._attach_invite(farm,code)
         return dict(invites=await self._invites(farm),coins=farm['coins'])
+
+    async def join_share_invite(self, token):
+        """Explicit recipient action: atomically establish accepted status both ways and pay once."""
+        need(isinstance(token,str) and re.fullmatch(r'[A-Za-z0-9_-]{43}',token) is not None,
+             'invalid_invite','Некорректная ссылка-приглашение.',422)
+        digest=invite_digest(token)
+        await self.u.lock('account:'+self.p.account_id)
+        me=await self.me()
+        await self.u.lock('share-invite:'+digest)
+        row=await self.u.share_invite(digest)
+        need(row is not None,'invite_unknown','Приглашение не найдено.',404)
+        now=self.clock()
+        inviter_id=str(row['farm_id'])
+        need(inviter_id!=me['id'],'self_invite','Нельзя стать соседом самому себе.',422)
+        need(row['expires_at']>now,'invite_expired','Срок приглашения истёк.',410)
+        if row['accepted_by_farm_id'] is not None:
+            need(str(row['accepted_by_farm_id'])==me['id'],'invite_used','Приглашение уже использовано.',409)
+            return dict(neighbor_reward_paid=False,notice='Приглашение уже принято.',
+                        neighbors=await self.neighbors())
+        await self.u.lock('farm:'+me['id'],'farm:'+inviter_id)
+        me=await self.u.get(me['id']); other=await self.u.get(inviter_id)
+        need(other is not None,'invite_unknown','Приглашение не найдено.',404)
+        need(me['id'] not in other['blocked'] and other['id'] not in me['blocked'],
+             'blocked','Взаимодействие недоступно.',403)
+        own_edge=me['neighbors'].get(other['id']); other_edge=other['neighbors'].get(me['id'])
+        already=bool(own_edge or other_edge)
+        if already:
+            need(own_edge and other_edge and own_edge.get('status')=='accepted' and other_edge.get('status')=='accepted',
+                 'invite_state','Сначала разреши текущее приглашение или удали существующее соседство.',409)
+        else:
+            need(len(me['neighbors'])<100 and len(other['neighbors'])<100,
+                 'neighbors_full','Список соседей заполнен.',409)
+        await self._settle(me,own=True)
+        await self._settle(other,await self.u.owner_account(other['id']))
+        before=deepcopy(me); before_other=deepcopy(other)
+        if not already:
+            me['neighbors'][other['id']]={'name':other['name'],'status':'accepted'}
+            other['neighbors'][me['id']]={'name':me['name'],'status':'accepted'}
+            from .domain import event
+            event(me,now,f'Ты стал(а) соседом с «{other["name"]}».','social')
+            event(other,now,f'{me["name"]} принял(а) приглашение. Теперь вы соседи!','social')
+        # Match ordinary accept_neighbor semantics: quota-limited pairs still
+        # become neighbours, with the reward left claimable when its limits reset.
+        reward_notice,reward_paid=await self._neighbor_reward(me,other,now)
+        need(await self.u.share_invite_accept(digest,me['id'],now),'invite_used','Приглашение уже использовано.',409)
+        me['revision']+=1; validate_state(me); await self.u.save(me)
+        await self.u.record(self.p.account_id,'share-invite:'+digest[:32],'accept_neighbor',before,me,now)
+        other['revision']+=1; validate_state(other); await self.u.save(other)
+        await self.u.record(self.p.account_id,'share-invite:'+digest[:32],'accept_neighbor',before_other,other,now)
+        return dict(neighbor_reward_paid=reward_paid,notice='Теперь вы соседи!'+reward_notice,
+                    neighbors=await self.neighbors())
+
+    async def revoke_share_invite(self, token):
+        """Revoke a pending invitation owned by the current farm."""
+        need(isinstance(token,str) and re.fullmatch(r'[A-Za-z0-9_-]{43}',token) is not None,
+             'invalid_invite','Некорректная ссылка-приглашение.',422)
+        digest=invite_digest(token)
+        await self.u.lock('account:'+self.p.account_id)
+        me=await self.me()
+        await self.u.lock('share-invite:'+digest)
+        row=await self.u.share_invite(digest)
+        need(row is not None and str(row['farm_id'])==me['id'],
+             'invite_unknown','Приглашение не найдено.',404)
+        need(row['accepted_by_farm_id'] is None,'invite_used',
+             'Принятое приглашение нельзя отменить.',409)
+        need(await self.u.share_invite_revoke(digest,me['id']),
+             'invite_used','Приглашение уже принято или отменено.',409)
+        return dict(revoked=True)
 
     async def _invites(self, farm):
         if not hasattr(self.u,'invite_list'):return None

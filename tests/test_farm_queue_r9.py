@@ -239,7 +239,7 @@ def test_both_neighbours_get_the_reward_once_per_pair_even_after_parting():
         for name, partner in (('a', 'b'), ('b', 'a')):
             own = (await p[name].view())['farm']
             assert own['neighbor_bonus']['rewards'] == [dict(id=ids[partner], partner_id=ids[partner],
-                partner_name=partner, amount=reward, at=W0)]
+                partner_name=world.farms[ids[partner]]['name'], amount=reward, at=W0)]
         assert world.farms[ids['a']]['neighbor_bonus']['earned'] == reward
         assert [r for r in world.records if r[2] == 'accept_neighbor'] and sum(1 for r in world.records if r[3] == reward) == 2
         await p['a'].command('k1-remove', 'remove_neighbor', {}, ids['b'])                 # parted

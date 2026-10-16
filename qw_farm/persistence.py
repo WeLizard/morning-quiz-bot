@@ -15,7 +15,7 @@ from .domain import FarmError, need
 
 def tables(metadata: sa.MetaData):
     if 'farm_states' in metadata.tables:
-        return {name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs']}
+        return {name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites']}
     states=sa.Table('farm_states',metadata,
         sa.Column('id',sa.Uuid,primary_key=True),
         sa.Column('account_id',sa.Uuid,sa.ForeignKey('accounts.id',ondelete='RESTRICT'),nullable=False,unique=True),
@@ -58,8 +58,18 @@ def tables(metadata: sa.MetaData):
         sa.Column('created_at',sa.Float,nullable=False),
         sa.CheckConstraint('farm_low_id <> farm_high_id',name='ck_farm_neighbor_pairs_distinct'))
     sa.Index('ix_farm_ledger_history',ledger.c.farm_id,ledger.c.created_at)
+    share_invites=sa.Table('farm_share_invites',metadata,
+        sa.Column('token_hash',sa.String(64),primary_key=True),
+        sa.Column('farm_id',sa.Uuid,sa.ForeignKey('farm_states.id',ondelete='RESTRICT'),nullable=False),
+        sa.Column('expires_at',sa.Float,nullable=False),
+        sa.Column('accepted_by_farm_id',sa.Uuid,sa.ForeignKey('farm_states.id',ondelete='RESTRICT'),nullable=True),
+        sa.Column('accepted_at',sa.Float,nullable=True),
+        sa.CheckConstraint('(accepted_by_farm_id IS NULL) = (accepted_at IS NULL)',name='ck_farm_share_invites_accept_pair'),
+        sa.CheckConstraint('accepted_by_farm_id IS NULL OR accepted_by_farm_id <> farm_id',name='ck_farm_share_invites_not_self'))
+    sa.Index('ix_farm_share_invites_farm',share_invites.c.farm_id)
+    sa.Index('ix_farm_share_invites_expires',share_invites.c.expires_at)
     sa.Index('ix_farm_states_public',states.c.visibility,states.c.name)
-    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs)
+    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites)
 
 
 def unpack(row):
@@ -102,6 +112,36 @@ class Unit:
         t=self.t['states']
         result=await self.execute(sa.select(t.c.account_id).where(t.c.id==UUID(str(farm_id))))
         return str(result.scalar_one())
+
+    async def share_invite_create(self, token_hash, farm_id, expires_at, now, maximum):
+        t=self.t['share_invites']
+        # Expired invitation rows have no valid replay semantics and can be
+        # discarded. Accepted rows remain until their expiry for active-token
+        # idempotency; the per-farm ceiling bounds issuance during that window.
+        await self.execute(sa.delete(t).where(t.c.expires_at<=now))
+        active=await self.execute(sa.select(sa.func.count()).select_from(t).where(
+            t.c.farm_id==UUID(str(farm_id)),t.c.expires_at>now))
+        need(active.scalar_one()<maximum,'share_invite_limit',
+             'Ты создал(а) слишком много ссылок за последние 7 дней. Попробуй позже.',429)
+        await self.execute(sa.insert(self.t['share_invites']).values(token_hash=token_hash,
+            farm_id=UUID(str(farm_id)),expires_at=expires_at))
+
+    async def share_invite(self, token_hash):
+        t=self.t['share_invites']
+        row=(await self.execute(sa.select(t).where(t.c.token_hash==token_hash))).mappings().first()
+        return dict(row) if row else None
+
+    async def share_invite_accept(self, token_hash, farm_id, now):
+        t=self.t['share_invites']
+        result=await self.execute(sa.update(t).where(t.c.token_hash==token_hash,
+            t.c.accepted_by_farm_id.is_(None)).values(accepted_by_farm_id=UUID(str(farm_id)),accepted_at=now))
+        return result.rowcount==1
+
+    async def share_invite_revoke(self, token_hash, farm_id):
+        t=self.t['share_invites']
+        result=await self.execute(sa.delete(t).where(t.c.token_hash==token_hash,
+            t.c.farm_id==UUID(str(farm_id)),t.c.accepted_by_farm_id.is_(None)))
+        return result.rowcount==1
 
     async def save(self, farm, account_id=None):
         t=self.t['states']; payload=deepcopy(farm)

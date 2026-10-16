@@ -141,6 +141,22 @@
         }
         return false;
     }
+    /* The Mini session cookie lives 15 minutes. While the page is open it is renewed (the same call as
+       QW.session.keepAlive, but with the X-Mini-CSRF header the server requires for cookie-authenticated POSTs). */
+    let renewTimer = 0, lastRenew = Date.now();
+    async function renewSession() {
+        if (guestId || document.hidden || !telegramSession) return;
+        lastRenew = Date.now();
+        try {
+            const response = await fetch('/api/mini/session/renew', {method: 'POST', credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'X-Mini-CSRF': '1'}, body: '{}'});
+            if (response.status === 401 || response.status === 403) { clearInterval(renewTimer); renewTimer = 0; }
+        } catch {}
+    }
+    function keepSessionAlive() {
+        if (guestId || renewTimer) return;
+        renewTimer = setInterval(renewSession, 8 * 60 * 1000);
+    }
     async function establishSession() {
         if (guestId) return !staleGuest;
         if (staleMini) return false;
@@ -268,6 +284,10 @@
     addEventListener('load', async () => {
         if (await establishSession()) await sync();
         setInterval(sync, 60000);
+        keepSessionAlive();
     });
-    addEventListener('visibilitychange', () => { if (document.hidden) sync(); });
+    addEventListener('visibilitychange', () => {
+        if (document.hidden) sync();
+        else if (renewTimer && Date.now() - lastRenew > 5 * 60 * 1000) renewSession();
+    });
 })();

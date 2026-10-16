@@ -303,6 +303,8 @@ export function openFieldGame(opts){
   root.append(box);stay.focus();
  }
  function cancelClose(){root.querySelector('.fg-confirm')?.remove();confirming=false;(sending?close:canvas).focus({preventScroll:true});}
+ // Back (Telegram BackButton, browser back) goes through the same confirmation as Escape. Returns true when the game closed, false when the player stays.
+ function backClose(){if(closed)return true;if(confirming){cancelClose();return false;}requestClose();return closed;}
  function doUnload(){
   if(sending||done)return;
   if(R.y!==0){say('Грузовик ждёт у верхнего края поля.',true);return;}
@@ -520,5 +522,5 @@ export function openFieldGame(opts){
  raf=requestAnimationFrame(draw);
  layoutTimer=setTimeout(()=>{layoutTimer=0;if(!closed)layout();},60);
  canvas.focus({preventScroll:true});
- return {close:finishClose};
+ return {close:finishClose,requestClose:backClose};
 }

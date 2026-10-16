@@ -10,7 +10,7 @@ from .domain import FarmError, need
 STATIC=Path(__file__).with_name('static')
 API='/api/farm/v1'
 LOCAL_LIMITS={False:600,True:300}  # per IP per minute: reads / writes (one farm action = one write + one read)
-ASSETS={'village.svg','app.js','scene.js','style.css','icons.svg','farm-card.svg','telegram.js','scene_expansion.js','scene_buildings.js','scene_map.js','tractor_game.js','trip_game.js','farm_runs.js','address.js'}
+ASSETS={'village.svg','app.js','scene.js','style.css','icons.svg','farm-card.svg','invite.js','scene_expansion.js','scene_buildings.js','scene_map.js','tractor_game.js','trip_game.js','farm_runs.js','address.js'}
 CSP="default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
 
 
@@ -70,12 +70,33 @@ def create_router(context, *, demo=False, origin="", bot_username="", mini_app_s
         async with context(request) as service:result=await service.neighbors()
         return result
     @router.get(API+'/invite')
-    async def invite(request:Request, recipient:str=''):
-        from .sharing import invite_info
+    async def invite(request:Request):
+        """Read-only legacy code and reward progress; viewing the screen creates no token."""
+        from .sharing import safe_public_origin
         async with context(request) as service:
             farm=await service.me()
-            result=invite_info(farm['id'],farm['name'],origin=origin,bot_username=bot_username,mini_app_short_name=mini_app_short_name,recipient=recipient)
+            return dict(code=farm['id'],farm_name=farm['name'],rewards=await service._invites(farm),
+                        local_only=not bool(safe_public_origin(origin) or bot_username))
+    @router.post(API+'/invite/share')
+    async def share_invite(request:Request):
+        from .sharing import invite_info
+        empty=(request.headers.get('content-length','0') in ('0','') and not request.headers.get('content-type'))
+        value={} if empty else await body(request,512)
+        need(set(value)<={'recipient'} and (value.get('recipient') is None or isinstance(value['recipient'],str)),
+             'invalid_body','Неверные поля запроса.',422)
+        recipient=value.get('recipient') or ''
+        async with context(request) as service:
+            farm=await service.me()
+            token=await service.create_share_invite()
+            result=invite_info(farm['id'],farm['name'],token=token,origin=origin,bot_username=bot_username,mini_app_short_name=mini_app_short_name,recipient=recipient)
             result['rewards']=await service._invites(farm)
+        return result
+    @router.post(API+'/invite/share/revoke')
+    async def revoke_share_invite(request:Request):
+        value=await body(request,512)
+        need(set(value)=={'token'} and isinstance(value['token'],str) and len(value['token'])==43,
+             'invalid_body','Неверные поля запроса.',422)
+        async with context(request) as service:result=await service.revoke_share_invite(value['token'])
         return result
     @router.post(API+'/invite/accept')
     async def accept_invite(request:Request):
@@ -84,6 +105,13 @@ def create_router(context, *, demo=False, origin="", bot_username="", mini_app_s
         code=value['code'].strip()
         if code.startswith('farm_'):code=code[5:]
         async with context(request) as service:result=await service.accept_invite(code)
+        return result
+    @router.post(API+'/invite/join')
+    async def join_invite(request:Request):
+        value=await body(request,512)
+        need(set(value)=={'token'} and isinstance(value['token'],str) and len(value['token'])==43,
+             'invalid_body','Неверные поля запроса.',422)
+        async with context(request) as service:result=await service.join_share_invite(value['token'])
         return result
     @router.get(API+'/ledger')
     async def ledger(request:Request):

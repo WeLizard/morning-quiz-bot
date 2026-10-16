@@ -114,7 +114,8 @@ class PasswordAccounts:
         self.database = guests.database
         self.limiter = limiter or AttemptLimiter()
 
-    async def register(self, login, password, display_name=None, guest_credential=None, address_form=None):
+    async def register(self, login, password, display_name=None, guest_credential=None, address_form=None,
+                       user_agent=None):
         """Returns (profile, raw_cookie_or_None). With a live guest session the
         credentials attach to THAT account (progress kept, cookie unchanged)."""
         login = normalize_login(login)
@@ -138,7 +139,7 @@ class PasswordAccounts:
                     if error.status != 401:
                         raise
                     # Stale cookie: continue with a fresh account.
-            return await self._create(login, digest, name, address_form)
+            return await self._create(login, digest, name, address_form, user_agent)
         except IntegrityError:
             raise MiniAppError(409, 'Этот логин уже занят') from None
 
@@ -173,7 +174,7 @@ class PasswordAccounts:
             await self._add(session, account, login, digest, name, address_form)
             return self.guests.projection(account, row, login), None
 
-    async def _create(self, login, digest, name, address_form=None):
+    async def _create(self, login, digest, name, address_form=None, user_agent=None):
         async with self.database.transaction() as session:
             from storage.admin_actions import operation_fence
             await operation_fence(session)
@@ -183,11 +184,11 @@ class PasswordAccounts:
             session.add(account)
             await session.flush()
             await self._add(session, account, login, digest, name, address_form)
-            raw, row = self.guests._session(account)
+            raw, row = self.guests._session(account, created_via='password', user_agent=user_agent)
             session.add(row)
             return self.guests.projection(account, row, login), raw
 
-    async def login(self, login, password, client):
+    async def login(self, login, password, client, user_agent=None):
         try:
             login = normalize_login(login)
         except MiniAppError:
@@ -212,6 +213,6 @@ class PasswordAccounts:
                 self.limiter.fail(*keys)
                 raise MiniAppError(401, BAD_CREDENTIALS)
             self.limiter.reset(keys[0])
-            raw, row = self.guests._session(account)
+            raw, row = self.guests._session(account, created_via='password', user_agent=user_agent)
             session.add(row)
             return self.guests.projection(account, row, login), raw

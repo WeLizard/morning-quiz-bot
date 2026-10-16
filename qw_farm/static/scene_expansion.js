@@ -85,8 +85,10 @@ const seen=(s,q)=>!s.view||(q.x+80>=s.view.x0&&q.x-80<=s.view.x1&&q.y+30>=s.view
 // After dusk the animals go home: they walk to their house door and disappear inside, and come out again after dawn.
 // Hysteresis keeps them from popping in and out while the light fades.
 function nightState(s){
- const d=s.lighting?.darkness||0;
- if(s.nightFlag===undefined)s.nightFlag=d>.5;else if(!s.nightFlag&&d>.62)s.nightFlag=true;else if(s.nightFlag&&d<.4)s.nightFlag=false;
+ if(!s.lighting)return !!s.nightFlag;
+ const d=s.lighting.darkness||0;
+ // The first reading at night means the game was opened after dark: everybody is already indoors (nightSnap), nobody runs home.
+ if(s.nightFlag===undefined){s.nightFlag=d>.5;if(s.nightFlag)s.nightSnap=true}else if(!s.nightFlag&&d>.62)s.nightFlag=true;else if(s.nightFlag&&d<.4)s.nightFlag=false;
  return s.nightFlag;
 }
 // Pick two adjacent empty cells near each owned goose house. The straight route stays on free ground.
@@ -120,7 +122,7 @@ export function resetWalkingGeese(s){
   yard.add(best.x+','+best.y);yard.add(best.nx+','+best.ny);
   const dcx=Math.floor(hx),dcy=Math.floor(house.y+house.h-.1);yard.add(dcx+','+dcy);
   const key=`${s.farm.id}|${house.id}|${best.x},${best.y}|${best.nx},${best.ny}`,old=previous.get(key);
-  s.walkingGeese.push({key,a:P(best.x+.5,best.y+.5),b:P(best.nx+.5,best.ny+.5),door:P(hx,house.y+house.h-.1),cells:[[best.x,best.y]],yard,phase:old?.phase??i*2.3,cool:old?.cool||0,mode:'idle',pos:null,face:1,since:0,last:0});
+  s.walkingGeese.push({key,a:P(best.x+.5,best.y+.5),b:P(best.nx+.5,best.ny+.5),door:P(hx,house.y+house.h-.1),cells:[[best.x,best.y]],yard,phase:old?.phase??i*2.3,cool:old?.cool||0,mode:old?.mode||'idle',pos:old?.pos||null,face:old?.face||1,since:old?.since||0,last:old?.last||0,exitAt:old?.exitAt});
  });
 }
 // Where a calm goose is: a pure function of the scene clock, so a frozen (calm-mode) scene simply stands still.
@@ -130,7 +132,7 @@ function idleBase(s,g){
 }
 const pointerLive=(s,now)=>{const p=s.geesePointer;return p&&now<p.until?p:null};
 // Advance one goose: idle -> (pointer close) chase -> hiss -> return -> idle. The state is local to the client and never reaches the server.
-function updateGoose(s,g,now,night=false){
+function updateGoose(s,g,now,night=false,snap=false){
  const base=idleBase(s,g),dt=Math.min(.05,Math.max(0,g.last?now-g.last:0));g.last=now;
  const ptr=night?null:pointerLive(s,now),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
  const inYard=q=>{const c=isoInverse(q.x,q.y);return g.yard.has(Math.floor(c.x)+','+Math.floor(c.y))};
@@ -139,7 +141,7 @@ function updateGoose(s,g,now,night=false){
   const step=Math.min(d,speed*dt),next={x:g.pos.x+(target.x-g.pos.x)/d*step,y:g.pos.y+(target.y-g.pos.y)/d*step};
   g.face=target.x>=g.pos.x?1:-1;if(!inYard(next))return false;g.pos=next;return true;
  };
- if(night&&g.mode!=='home'&&g.mode!=='inside'){if(!g.pos)g.pos={x:base.x,y:base.y};g.mode=s.motion?'home':'inside';g.exitAt=undefined}
+ if(night&&g.mode!=='home'&&g.mode!=='inside'){if(!g.pos)g.pos={x:base.x,y:base.y};g.mode=s.motion&&!snap?'home':'inside';if(g.mode==='inside'&&g.door)g.pos={x:g.door.x,y:g.door.y};g.exitAt=undefined}
  if(g.mode==='home'){
   const d=dist(g.pos,g.door);
   if(d<4){g.mode='inside';g.exitAt=undefined}
@@ -163,7 +165,10 @@ function updateGoose(s,g,now,night=false){
  }
  if(g.mode==='return'){
   if(!s.motion||dist(g.pos,base)<3){g.mode='idle';g.cool=Math.max(g.cool,now+GOOSE.cool);g.pos=base;g.face=base.face}
-  else toward(base,GOOSE.home*1.6);
+  else{ // a straight walk back: the door and the walking strip are not always connected through free yard cells
+   const d=dist(g.pos,base),step=Math.min(d,GOOSE.home*1.6*dt);g.face=base.x>=g.pos.x?1:-1;
+   g.pos={x:g.pos.x+(base.x-g.pos.x)/d*step,y:g.pos.y+(base.y-g.pos.y)/d*step};
+  }
  }
 }
 // The pointer (mouse hover, a touching finger or a held button) in world coordinates; `down` marks a press.
@@ -222,10 +227,11 @@ export function resetLivestock(s){
  }
  s.livestock=out;
 }
-function updateCreature(s,L,now,ptr,night=false){
+function updateCreature(s,L,now,ptr,night=false,snap=false){
  const dt=Math.min(.05,Math.max(0,L.last?now-L.last:0));L.last=now;
  const cfg=L.cfg,yard=L.yard,rand=L.rand,clampIn=()=>{L.x=Math.min(yard.x1,Math.max(yard.x0,L.x));L.y=Math.min(yard.y1,Math.max(yard.y0,L.y))};
  const goTo=(x,y,speed)=>{L.tx=x;L.ty=y;L.speed=speed;L.mode=speed>cfg.speed*1.5?'flee':'walk';L.face=(x-L.x)-(y-L.y)>=0?1:-1};
+ if(night&&snap&&L.mode!=='inside'){L.mode='inside';L.x=L.door.x;L.y=L.door.y;L.exitAt=undefined;return}
  if(night&&L.mode!=='home'&&L.mode!=='inside'){L.mode='home';L.tx=L.door.x;L.ty=L.door.y;L.speed=cfg.speed*1.7;L.face=(L.tx-L.x)-(L.ty-L.y)>=0?1:-1;L.exitAt=undefined}
  if(L.mode==='home'){
   const dx=L.tx-L.x,dy=L.ty-L.y,d=Math.hypot(dx,dy),step=L.speed*dt;
@@ -367,9 +373,9 @@ export function teamSprites(s){
   if(seen(s,pos))add(pos,()=>helper(s,pos.x,pos.y,id,active));
  });
  if(s.farm.pranks?.some(p=>p.until>s.now())){const p=P(2.3,3.6+Math.sin(s.time*.35)*.7);if(seen(s,p))add(p,()=>s.goose(p.x,p.y,s.time));}
- const now=performance.now()/1000,night=nightState(s);
+ const now=performance.now()/1000,night=nightState(s),snap=!!s.nightSnap;s.nightSnap=false;
  for(const g of s.walkingGeese||[]){
-  updateGoose(s,g,now,night);
+  updateGoose(s,g,now,night,snap);
   const q=g.pos;if(!q||g.mode==='inside'||!seen(s,q))continue;
   add(q,()=>{
    const pose=g.mode==='chase'?'run':g.mode==='hiss'?'hiss':null;
@@ -384,7 +390,7 @@ export function teamSprites(s){
   for(const L of s.livestock){
    const q=P(L.x,L.y);
    if(!seen(s,q)){if(night&&L.mode!=='inside'){L.mode='inside';L.x=L.door.x;L.y=L.door.y;L.exitAt=undefined}continue}
-   if(s.motion)updateCreature(s,L,now,ptr,night);
+   if(s.motion)updateCreature(s,L,now,ptr,night,snap);
    else L.mode=night?'inside':(L.mode==='inside'?'stand':L.mode);
    if(L.mode==='inside')continue;
    const c=isoInverse(P(L.x,L.y).x,P(L.x,L.y).y);

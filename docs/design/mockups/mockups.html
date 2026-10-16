@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QuizzyWizzy · макеты единой оболочки</title>
+<style>
+/* ===== qw-tokens (черновик web/shell/qw-tokens.css) ===== */
+:root{
+ --qw-bg:#101317;--qw-surface:#1a1e24;--qw-surface-2:#222831;--qw-line:#333941;--qw-text:#f6f8f2;--qw-muted:#b2b9c2;
+ --qw-accent:#d0fc50;--qw-accent-fill:#d0fc50;--qw-accent-ink:#172300;--qw-danger:#ffaaa3;--qw-scrim:rgb(0 0 0/.55);
+ --qw-game-surface:var(--qw-surface);--qw-game-text:var(--qw-text);--qw-game-accent:var(--qw-accent);--qw-game-header:var(--qw-bg);
+ --qw-fs-caption:12px;--qw-fs-small:13px;--qw-fs-body:15px;--qw-fs-control:15px;--qw-fs-h3:17px;--qw-fs-h2:20px;--qw-fs-h1:26px;--qw-fs-display:64px;
+ --qw-s-1:4px;--qw-s-2:8px;--qw-s-3:12px;--qw-s-4:16px;--qw-s-5:24px;--qw-s-6:32px;--qw-s-7:48px;
+ --qw-gutter:16px;--qw-r-control:12px;--qw-r-card:18px;--qw-r-hero:24px;--qw-header-h:56px;--qw-tabbar-h:64px;
+ --qw-safe-top:0px;--qw-safe-bottom:0px;--qw-col:100%;
+ font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color-scheme:dark}
+@media (max-width:359px){:root{--qw-gutter:12px}}
+@media (min-width:768px){:root{--qw-gutter:24px;--qw-col:720px}}
+@media (min-width:1024px){:root{--qw-gutter:32px;--qw-col:1120px;--qw-fs-caption:13px;--qw-fs-small:14px;--qw-fs-body:16px;--qw-fs-control:16px;--qw-fs-h3:19px;--qw-fs-h2:24px;--qw-fs-h1:32px;--qw-fs-display:88px;--qw-header-h:64px}}
+.tg-fs{--qw-safe-top:92px;--qw-safe-bottom:20px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--qw-bg);color:var(--qw-text);font-size:var(--qw-fs-body);line-height:1.5}
+button{font:inherit;color:inherit}
+svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+/* ===== Telegram fullscreen chrome (имитация) ===== */
+.tgchrome{display:none}
+.tg-fs .tgchrome{display:block;position:fixed;inset:0 0 auto 0;height:var(--qw-safe-top);z-index:50;pointer-events:none}
+.tgchrome .status{height:46px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:15px;font-weight:650;color:#fff}
+.tgchrome .pills{display:flex;justify-content:space-between;padding:0 12px}
+.tgchrome .pill{height:32px;padding:0 14px;border-radius:16px;background:rgb(40 44 50/.72);backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;color:#fff;font-size:14px;font-weight:600}
+@media (max-width:359px){.tgchrome .note{display:none}}
+.tgchrome .note{position:absolute;left:50%;top:52px;transform:translateX(-50%);font-size:12px;color:#ffd27a;background:rgb(0 0 0/.55);padding:2px 8px;border-radius:8px;white-space:nowrap}
+/* ===== шапка ===== */
+.qw-header{position:sticky;top:0;z-index:20;padding-top:var(--qw-safe-top);background:var(--qw-game-header);border-bottom:1px solid var(--qw-line)}
+.qw-header .row{height:var(--qw-header-h);max-width:var(--qw-col);margin:auto;padding:0 var(--qw-gutter);display:flex;align-items:center;gap:var(--qw-s-2)}
+.mode-game .qw-header .row{max-width:none}
+.qw-title{flex:1;min-width:0;font-size:var(--qw-fs-h3);font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qw-title small{display:block;font-size:var(--qw-fs-caption);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-accent);font-weight:700;line-height:1.2}
+.qw-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:transparent;border:0;cursor:pointer;color:var(--qw-game-text)}
+.qw-gear{background:var(--qw-game-surface);border:1px solid var(--qw-line)}
+.qw-gear.on{outline:2px solid var(--qw-game-accent);outline-offset:2px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:var(--qw-fs-h3)}
+.logo i{width:32px;height:32px;border-radius:10px;background:var(--qw-accent-fill);color:var(--qw-accent-ink);display:grid;place-items:center;font-style:normal;font-weight:900;font-size:14px}
+.hud{display:flex;align-items:center;gap:12px;font-weight:750;font-size:var(--qw-fs-control)}
+.hud b{display:flex;align-items:center;gap:6px}
+/* ===== контент ===== */
+.qw-main{max-width:var(--qw-col);margin:auto;padding:var(--qw-s-5) var(--qw-gutter) calc(var(--qw-tabbar-h) + var(--qw-safe-bottom) + var(--qw-s-6))}
+.mode-game .qw-main{padding-bottom:calc(var(--qw-safe-bottom) + var(--qw-s-6))}
+.narrow{max-width:760px;margin-inline:auto}
+.eyebrow{font-size:var(--qw-fs-caption);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-accent);margin:0 0 var(--qw-s-2)}
+h1{font-size:var(--qw-fs-h1);line-height:1.15;margin:0 0 var(--qw-s-3);font-weight:800}
+h2{font-size:var(--qw-fs-h2);margin:0 0 var(--qw-s-3);font-weight:750}
+h3{font-size:var(--qw-fs-h3);margin:0 0 var(--qw-s-1)}
+p{margin:0 0 var(--qw-s-3)}.muted{color:var(--qw-muted)}.small{font-size:var(--qw-fs-small)}
+.card{background:var(--qw-surface);border:1px solid var(--qw-line);border-radius:var(--qw-r-card);padding:var(--qw-s-4)}
+.stack{display:grid;gap:var(--qw-s-3)}
+.grid2{display:grid;gap:var(--qw-s-4)}
+@media (min-width:1024px){.grid2{grid-template-columns:1fr 1fr;align-items:start}.grid2.wide-left{grid-template-columns:1.2fr .8fr}}
+.btn{min-height:52px;border-radius:var(--qw-r-control);border:1px solid var(--qw-line);background:var(--qw-surface-2);font-size:var(--qw-fs-control);font-weight:650;padding:0 var(--qw-s-4);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.btn.primary{background:var(--qw-accent-fill);color:var(--qw-accent-ink);border-color:transparent}
+.btn.wide{width:100%}.btn.ghost{background:transparent}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 12px;border:1px solid var(--qw-line);border-radius:999px;font-size:var(--qw-fs-small);color:var(--qw-muted);background:var(--qw-surface)}
+.chip.on{color:var(--qw-accent-ink);background:var(--qw-accent-fill);border-color:transparent;font-weight:650}
+.seg{display:flex;background:var(--qw-surface);border:1px solid var(--qw-line);border-radius:14px;padding:4px;gap:4px;overflow-x:auto}
+.seg span{flex:1;min-height:40px;display:grid;place-items:center;border-radius:10px;font-size:var(--qw-fs-small);font-weight:650;color:var(--qw-muted);white-space:nowrap;padding:0 10px}
+.seg span.on{background:var(--qw-surface-2);color:var(--qw-text);box-shadow:inset 0 0 0 1px var(--qw-line)}
+.row-item{display:flex;align-items:center;gap:var(--qw-s-3);min-height:56px;padding:var(--qw-s-3) 0;border-bottom:1px solid var(--qw-line)}
+.row-item:last-child{border-bottom:0}.row-item .grow{flex:1;min-width:0}.row-item .grow small{display:block;color:var(--qw-muted);font-size:var(--qw-fs-small)}
+.chev{color:var(--qw-muted)}
+.toggle{width:46px;height:28px;border-radius:14px;background:var(--qw-line);position:relative;flex:none}.toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff}.toggle.on{background:var(--qw-game-accent)}.toggle.on::after{left:21px}
+.badge{font-size:var(--qw-fs-caption);font-weight:700;padding:3px 8px;border-radius:999px;background:var(--qw-surface-2);color:var(--qw-muted)}
+.badge.acc{background:color-mix(in srgb,var(--qw-accent) 18%,transparent);color:var(--qw-accent)}
+/* ===== нижняя панель ===== */
+.qw-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--qw-bg);border-top:1px solid var(--qw-line);padding-bottom:var(--qw-safe-bottom)}
+.qw-tabbar .tabs{height:var(--qw-tabbar-h);max-width:560px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px 8px}
+.qw-tabbar .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:14px;color:var(--qw-muted);font-size:var(--qw-fs-caption);font-weight:650}
+.qw-tabbar .tab.on{color:var(--qw-accent);background:var(--qw-surface)}
+.mode-game .qw-tabbar{display:none}
+/* ===== меню ⚙ ===== */
+.qw-scrim{position:fixed;inset:0;background:var(--qw-scrim);z-index:30}
+.qw-menu{position:fixed;z-index:40;left:0;right:0;bottom:0;max-height:85vh;overflow:auto;background:var(--qw-game-surface);color:var(--qw-game-text);border-radius:var(--qw-r-hero) var(--qw-r-hero) 0 0;padding:10px var(--qw-gutter) calc(var(--qw-s-4) + var(--qw-safe-bottom));box-shadow:0 -10px 40px rgb(0 0 0/.35)}
+.qw-menu .handle{width:40px;height:5px;border-radius:3px;background:var(--qw-line);margin:0 auto 10px}
+@media (min-width:768px){.qw-menu{left:auto;bottom:auto;right:max(var(--qw-gutter),calc((100vw - var(--qw-col))/2 + var(--qw-gutter)));top:calc(var(--qw-safe-top) + var(--qw-header-h) + 6px);width:340px;border-radius:var(--qw-r-hero);padding:var(--qw-s-3) var(--qw-s-4)}.mode-game .qw-menu{right:var(--qw-gutter)}.qw-menu .handle{display:none}.qw-scrim{background:rgb(0 0 0/.25)}}
+.qw-menu .acct{display:flex;align-items:center;gap:12px;padding:8px 0 12px;border-bottom:1px solid var(--qw-line)}
+.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#7bd389,#2f7d5b);display:grid;place-items:center;font-weight:800;color:#fff;flex:none}
+.qw-menu h4{margin:14px 0 4px;font-size:var(--qw-fs-caption);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-accent)}
+.mi{display:flex;align-items:center;gap:12px;min-height:48px;font-size:var(--qw-fs-control);font-weight:600;border-radius:12px;padding:0 8px;margin:0 -8px}
+.mi .grow{flex:1}.mi small{color:var(--qw-muted);font-size:var(--qw-fs-small);font-weight:400}
+.mi.danger{color:var(--qw-danger)}
+.mi.core{font-weight:700}
+.callout{position:fixed;z-index:60;background:#ffd27a;color:#2a1d00;font-size:13px;font-weight:700;padding:6px 10px;border-radius:10px;box-shadow:0 4px 14px rgb(0 0 0/.4)}
+/* ===== фон-скриншоты игр ===== */
+.shot{position:fixed;left:0;right:0;bottom:0;top:calc(var(--qw-safe-top) + var(--qw-header-h));background-repeat:no-repeat;background-size:100% auto;z-index:0}
+.mode-game.farm{--qw-game-header:#1b2b22;--qw-game-surface:#22372b;--qw-game-text:#f2f1e3;--qw-game-accent:#a6d37a;--qw-line:#3a5444;--qw-muted:#b9c7b4}
+.mode-game.alchemy{--qw-game-header:#183126;--qw-game-surface:#1d3a2d;--qw-game-text:#efe9d6;--qw-game-accent:#d7b46a;--qw-line:#355546;--qw-muted:#b5c4b5}
+.mode-game.mafia{--qw-game-header:#0d1014;--qw-game-surface:#171b21;--qw-game-accent:#e9a23b;--qw-accent-fill:#e9a23b;--qw-accent-ink:#241400;--qw-accent:#e9a23b}
+/* ===== экранные детали ===== */
+.hero{display:grid;grid-template-columns:1fr 38%;align-items:center;background:var(--qw-surface);border:1px solid var(--qw-line);border-radius:var(--qw-r-hero);overflow:hidden;min-height:180px}
+.hero .txt{padding:var(--qw-s-5) var(--qw-s-4)}.hero img{width:100%;height:100%;object-fit:cover}
+@media (min-width:1024px){.hero{min-height:300px}.hero .txt{padding:48px}}
+.games{display:grid;gap:var(--qw-s-3);margin-top:var(--qw-s-5)}
+@media (min-width:768px){.games{grid-template-columns:1fr 1fr}}@media (min-width:1024px){.games{grid-template-columns:repeat(3,1fr)}}
+.game{display:grid;grid-template-columns:64px 1fr auto;gap:var(--qw-s-3);align-items:center;background:var(--qw-surface);border:1px solid var(--qw-line);border-radius:var(--qw-r-card);padding:var(--qw-s-3)}
+.game .pic{width:64px;height:64px;border-radius:14px;background-size:cover;background-position:center;display:grid;place-items:center;font-size:30px;background-color:var(--qw-surface-2)}
+.game .tag{font-size:var(--qw-fs-caption);color:var(--qw-muted)}
+.facts{display:flex;flex-wrap:wrap;gap:8px;margin:var(--qw-s-4) 0}
+.owlrow{display:flex;gap:12px;align-items:center;margin:var(--qw-s-4) 0}.owlrow img{width:56px;height:56px;border-radius:14px;object-fit:cover}
+.score{font-size:var(--qw-fs-display);font-weight:850;line-height:1;color:var(--qw-accent);text-align:center;margin:var(--qw-s-4) 0 var(--qw-s-1)}
+.answers .row-item .ph{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#3b4a5a,#5d6f45);flex:none}
+.plus{font-weight:800;color:var(--qw-accent)}
+.mhero{border-radius:var(--qw-r-hero);overflow:hidden;position:relative;min-height:170px;background:#000 url(mafia-card.webp) center/cover;border:1px solid #3a2a12;display:flex;align-items:flex-end}
+.mhero .txt{padding:var(--qw-s-4);background:linear-gradient(transparent,rgb(0 0 0/.85));width:100%}
+@media (min-width:1024px){.mhero{min-height:260px}.mhero .txt{padding:32px}}
+.counts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:var(--qw-s-3) 0}
+.counts span{min-height:44px;display:grid;place-items:center;border:1px solid var(--qw-line);border-radius:12px;font-weight:700}
+.counts span.on{border-color:var(--qw-game-accent);color:var(--qw-game-accent);background:color-mix(in srgb,var(--qw-game-accent) 12%,transparent)}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:8px}.roles div{border:1px solid var(--qw-line);border-radius:14px;padding:10px 12px}.roles b{display:block;font-size:22px;color:var(--qw-game-accent)}
+.seat{display:flex;align-items:center;gap:10px;min-height:48px;border-bottom:1px dashed var(--qw-line)}.seat:last-child{border:0}
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin:var(--qw-s-4) 0}
+.podium>div{background:var(--qw-surface);border:1px solid var(--qw-line);border-radius:16px;text-align:center;padding:12px 6px}
+.podium .medal{font-size:28px}.podium>.p1{padding-top:20px;border-color:#c9a53a}.podium b{display:block;font-size:var(--qw-fs-control)}.podium small{color:var(--qw-muted);font-size:var(--qw-fs-small)}
+.rank{width:36px;text-align:center;font-weight:800;color:var(--qw-muted)}
+.me-bar{position:fixed;left:0;right:0;bottom:calc(var(--qw-tabbar-h) + var(--qw-safe-bottom));z-index:19;padding:0 var(--qw-gutter) 8px}
+.me-bar .in{max-width:calc(var(--qw-col) - 2*var(--qw-gutter));margin:auto;display:flex;align-items:center;gap:12px;background:var(--qw-surface-2);border:1px solid var(--qw-accent);border-radius:16px;padding:10px 14px;font-weight:700}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:768px){.metrics{grid-template-columns:repeat(3,1fr)}}
+.metric{background:var(--qw-surface);border:1px solid var(--qw-line);border-radius:16px;padding:12px 14px}.metric b{display:block;font-size:var(--qw-fs-h2)}.metric span{font-size:var(--qw-fs-small);color:var(--qw-muted)}
+.ach{display:flex;gap:10px;align-items:center}.ach i{font-style:normal;font-size:26px;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--qw-surface-2)}
+.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:var(--qw-fs-small);color:var(--qw-muted)}.select{min-height:48px;border:1px solid var(--qw-line);border-radius:12px;background:var(--qw-surface-2);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.newtag{font-size:var(--qw-fs-caption);font-weight:700;color:#2a1d00;background:#ffd27a;border-radius:6px;padding:1px 6px;margin-left:6px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+<symbol id="back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+<symbol id="chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+<symbol id="games" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></symbol>
+<symbol id="chats" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4Z"/></symbol>
+<symbol id="trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0Zm0 1H4v2a3 3 0 0 0 4 3m8-5h4v2a3 3 0 0 1-4 3m-4 3v4m-4 3h8"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3Z"/></symbol>
+<symbol id="full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+<symbol id="sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4Z"/><path d="M17 9a4 4 0 0 1 0 6"/></symbol>
+<symbol id="help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01"/></symbol>
+<symbol id="sliders" viewBox="0 0 24 24"><path d="M4 6h10m4 0h2M4 12h4m4 0h8M4 18h12m4 0h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+<symbol id="flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
+<symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+<symbol id="layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5Zm-9 9 9 5 9-5"/></symbol>
+<symbol id="book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2Zm0 0v16"/></symbol>
+<symbol id="door" viewBox="0 0 24 24"><path d="M14 3H5v18h9M10 12h11m-3-3 3 3-3 3"/></symbol>
+</defs></svg>
+<div class="tgchrome"><div class="status"><span>9:41</span><span>▮▮▮ ◔ 82%</span></div><div class="pills"><span class="pill">✕ Закрыть</span><span class="pill">⌄ ⋯</span></div><div class="note">зона Telegram: --qw-safe-top</div></div>
+<div id="app"></div>
+
+<!-- ============ ЭКРАНЫ ============ -->
+<template id="t-header-hub"><header class="qw-header"><div class="row">{{LEAD}}<div class="qw-title">{{TITLE}}</div><button class="qw-icon qw-gear {{GEARON}}" aria-label="Меню"><svg class="i"><use href="#gear"/></svg></button></div></header></template>
+<template id="t-tabbar"><nav class="qw-tabbar"><div class="tabs">
+<div class="tab" data-tab="games"><svg class="i"><use href="#games"/></svg>Игры</div>
+<div class="tab" data-tab="chats"><svg class="i"><use href="#chats"/></svg>Чаты</div>
+<div class="tab" data-tab="rating"><svg class="i"><use href="#trophy"/></svg>Рейтинг</div>
+<div class="tab" data-tab="profile"><svg class="i"><use href="#user"/></svg>Профиль</div></div></nav></template>
+
+<template id="s-home" data-mode="hub" data-tab="games" data-title='<span class="logo"><i>QW</i>QuizzyWizzy</span>'>
+<main class="qw-main">
+ <section class="hero"><div class="txt"><p class="eyebrow">Филиныч на связи</p><h1>Ну что, сыграем?</h1><p class="muted">Квизы, Алхимия и ферма — и в Telegram, и в браузере. Ночной город собирается с друзьями.</p></div><img src="host-card.webp" alt=""></section>
+ <div class="games">
+  <div class="game"><div class="pic" style="background-image:url(host-card.webp)"></div><div><h3>Классический квиз</h3><div class="tag">10 вопросов · очки в рейтинг чата</div></div><svg class="i chev"><use href="#chev"/></svg></div>
+  <div class="game"><div class="pic">🖼️</div><div><h3>Фото-загадки</h3><div class="tag">Угадай по картинке</div></div><svg class="i chev"><use href="#chev"/></svg></div>
+  <div class="game"><div class="pic" style="background-image:url(mafia-card.webp)"></div><div><h3>Ночной город</h3><div class="tag">Полный экран · 4–12 игроков</div></div><svg class="i chev"><use href="#chev"/></svg></div>
+  <div class="game"><div class="pic" style="background-image:url(farm-card-v2.webp)"></div><div><h3>Весёлый фермер</h3><div class="tag">Полный экран · своя ферма</div></div><svg class="i chev"><use href="#chev"/></svg></div>
+  <div class="game"><div class="pic">⚗️</div><div><h3>Alchemia</h3><div class="tag">Полный экран · 895 элементов</div></div><svg class="i chev"><use href="#chev"/></svg></div>
+ </div>
+</main></template>
+
+<template id="s-quiz" data-mode="hub" data-tab="games" data-title="Классический квиз" data-back="1">
+<main class="qw-main"><div class="narrow grid2 wide-left">
+ <section>
+  <p class="eyebrow">Перед первым вопросом</p><h1>Проверим интуицию?</h1>
+  <div class="owlrow"><img src="host-card.webp" alt=""><p class="muted" style="margin:0">Вопросы и правила берутся из настроек выбранного чата. Ответы и очки общие с игрой в чате.</p></div>
+  <div class="field"><label>Чат</label><div class="select">Утренний квиз <svg class="i chev"><use href="#chev"/></svg></div></div>
+  <div class="facts"><span class="chip">3 вопроса</span><span class="chip">10 секунд на ответ</span><span class="chip">Темы — по настройкам чата</span></div>
+  <button class="btn primary wide">Начать игру</button>
+ </section>
+ <aside class="card stack"><h3>Как идёт раунд</h3><p class="muted small" style="margin:0">Один вопрос — четыре варианта. Быстрый верный ответ приносит больше очков. Серия правильных ответов даёт бонус.</p><p class="muted small" style="margin:0">«Настройки квиза» и «Завершить раунд» — в меню ⚙.</p></aside>
+</div></main></template>
+
+<template id="s-quiz-menu" data-mode="hub" data-tab="games" data-title="Классический квиз" data-back="1" data-menu="quiz" data-from="s-quiz"></template>
+
+<template id="s-photo" data-mode="hub" data-tab="games" data-title="Фото-загадки" data-back="1">
+<main class="qw-main"><div class="narrow grid2">
+ <section class="card" style="text-align:center"><p class="eyebrow">Фото-серия завершена</p><h1>Образы сложились.</h1><div class="score">18</div><p class="muted">баллов за серию</p>
+  <div class="chips" style="justify-content:center;margin:12px 0 20px"><span class="chip">3 из 3 верно</span><span class="chip">серия 5 🔥</span><span class="chip">№4 в чате</span></div>
+  <div class="stack"><button class="btn primary wide">Сыграть ещё</button><button class="btn wide">Мой прогресс</button></div></section>
+ <section class="card answers"><h3>Разбор</h3>
+  <div class="row-item"><div class="ph"></div><div class="grow">Дуб<small>ответ за 4 с</small></div><span class="plus">+6</span></div>
+  <div class="row-item"><div class="ph"></div><div class="grow">Маяк<small>ответ за 6 с</small></div><span class="plus">+6</span></div>
+  <div class="row-item"><div class="ph"></div><div class="grow">Дуж<small>ответ за 3 с · последний</small></div><span class="plus">+6</span></div>
+ </section>
+</div></main></template>
+
+<template id="s-mafia" data-mode="game" data-game="mafia" data-tgfs="1" data-title='<small>Ночной город · дело 01</small>Сбор стола'>
+<main class="qw-main"><div class="narrow">
+ <section class="mhero"><div class="txt"><p class="eyebrow">Ночной город</p><h1 style="margin:0">Собери состав стола</h1><p class="muted small" style="margin:0">Черновик сохранится и не влияет на очки квиза.</p></div></section>
+ <div class="grid2" style="margin-top:16px">
+  <section class="card"><h3>Состав дела</h3><p class="muted small">Сколько человек сядет за стол? Роли пересчитаются сами.</p>
+   <div class="counts"><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span class="on">10</span><span>11</span><span>12</span></div>
+   <div class="roles"><div><b>3</b>Мафия</div><div><b>5</b>Мирные</div><div><b>1</b>Детектив</div><div><b>1</b>Доктор</div></div></section>
+  <section class="card"><h3>Стол игроков</h3><p class="muted small">Лобби собирается в групповом чате, где бот видит участников.</p>
+   <div class="seat"><span class="avatar" style="width:32px;height:32px">И</span>Илья <span class="badge acc">ведущий</span></div>
+   <div class="seat muted">Свободное место</div><div class="seat muted">Свободное место</div>
+   <button class="btn wide" style="margin-top:12px">Пригласить из чата</button></section>
+ </div>
+ <button class="btn primary wide" style="margin-top:16px">Начать дело</button>
+</div></main></template>
+
+<template id="s-farm-menu" data-mode="game" data-game="farm" data-tgfs="1" data-menu="farm"
+ data-title='<span class="hud"><svg class="i" style="color:#edbd58"><use href="#sun"/></svg><b><span style="width:18px;height:18px;border-radius:50%;background:#e8b84a;box-shadow:inset 0 0 0 3px #c99632;display:inline-block"></span>1 320</b><b>⭐ 10 ур.</b></span>'>
+<div class="shot" data-shot390="../../audits/2026-10-15/screens/nav-farm-390.png" data-shot1280="../../audits/2026-10-15/screens/nav-farm-1280.png" data-cut390="50" data-cut1280="45"></div></template>
+
+<template id="s-alchemy-menu" data-mode="game" data-game="alchemy" data-tgfs="1" data-menu="alchemy" data-noheader="1" data-ring390="357,30" data-ring1280="1233,39" data-head390="62" data-head1280="68">
+<div class="shot" data-shot390="../../audits/2026-10-15/screens/nav-alchemy-390.png" data-shot1280="../../audits/2026-10-15/screens/nav-alchemy-1280.png" data-cut390="0" data-cut1280="0"></div></template>
+
+<template id="s-chats" data-mode="hub" data-tab="chats" data-title="Чаты">
+<main class="qw-main">
+ <p class="muted">Чаты, где ты играешь с ботом. Рейтинг, статистика и расписание — внутри каждого.</p>
+ <div class="games" style="margin-top:12px">
+  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Утренний квиз</h3><span class="badge acc">админ</span></div><p class="muted small" style="margin:2px 0 10px">1 240 очков · №3 из 28 · серия 5 🔥</p><div class="row-item" style="min-height:0;padding:8px 0 0;border-top:1px solid var(--qw-line)"><div class="grow small">Ежедневный квиз <small>завтра в 09:00 · 10 вопросов</small></div><svg class="i chev"><use href="#chev"/></svg></div></div>
+  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Семья</h3><span class="badge">участник</span></div><p class="muted small" style="margin:2px 0 10px">410 очков · №1 из 6 · серия 2</p><div class="row-item" style="min-height:0;padding:8px 0 0;border-top:1px solid var(--qw-line)"><div class="grow small">Ежедневный квиз <small>сегодня в 20:00</small></div><svg class="i chev"><use href="#chev"/></svg></div></div>
+  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Работа · пятничный</h3><span class="badge">участник</span></div><p class="muted small" style="margin:2px 0 10px">95 очков · №12 из 40</p><div class="row-item" style="min-height:0;padding:8px 0 0;border-top:1px solid var(--qw-line)"><div class="grow small">Расписания нет <small>игры запускают вручную</small></div><svg class="i chev"><use href="#chev"/></svg></div></div>
+ </div>
+ <button class="btn wide ghost" style="margin-top:16px">＋ Добавить бота в чат</button>
+</main></template>
+
+<template id="s-chat" data-mode="hub" data-tab="chats" data-title="Утренний квиз" data-back="1">
+<main class="qw-main"><div class="narrow">
+ <div class="seg"><span>Играть</span><span>Рейтинг</span><span>Статистика</span><span class="on">Настройки</span></div>
+ <div class="grid2" style="margin-top:16px">
+  <section class="card"><h3>Ежедневный квиз</h3>
+   <div class="row-item"><div class="grow">Включён</div><span class="toggle on"></span></div>
+   <div class="field"><label>Время запуска (до 5)</label><div class="chips"><span class="chip on">09:00</span><span class="chip on">14:00</span><span class="chip">＋ время</span></div></div>
+   <div class="field"><label>Часовой пояс <span class="newtag">список</span></label><div class="select">Москва (UTC+3) <svg class="i chev"><use href="#chev"/></svg></div></div>
+   <div class="field"><label>Вопросов и интервал</label><div class="select">10 вопросов · каждые 60 с <svg class="i chev"><use href="#chev"/></svg></div></div>
+  </section>
+  <section class="card"><h3>Квиз в чате</h3>
+   <div class="field"><label>Тип /quiz <span class="newtag">новое</span></label><div class="select">Серия с интервалом <svg class="i chev"><use href="#chev"/></svg></div></div>
+   <div class="field"><label>Темы</label><div class="select">Только выбранные · 6 <svg class="i chev"><use href="#chev"/></svg></div></div>
+   <div class="field"><label>Исключённые темы <span class="newtag">редактор</span></label><div class="chips"><span class="chip">Спорт ✕</span><span class="chip">Аниме ✕</span><span class="chip">＋</span></div></div>
+   <div class="row-item"><div class="grow">Мудрость дня<small>каждый день в 08:00</small></div><span class="toggle on"></span></div>
+   <div class="row-item"><div class="grow">Удалять сообщения бота</div><span class="toggle"></span></div>
+  </section>
+ </div>
+ <div class="grid2" style="margin-top:16px"><button class="btn primary wide">Сохранить</button><button class="btn wide ghost">Сбросить к умолчанию <span class="newtag">новое</span></button></div>
+ <p class="muted small" style="margin-top:12px">Не-админ видит эти же значения только для чтения.</p>
+</div></main></template>
+
+<template id="s-rating" data-mode="hub" data-tab="rating" data-title="Рейтинг">
+<main class="qw-main" style="padding-bottom:180px"><div class="narrow">
+ <div class="seg"><span class="on">Общий</span><span>Утренний квиз ▾</span><span>Alchemia</span></div>
+ <div class="podium"><div><div class="medal">🥈</div><b>Марина</b><small>4 920</small></div><div class="p1"><div class="medal">🥇</div><b>Костя</b><small>5 310</small></div><div><div class="medal">🥉</div><b>Аня</b><small>4 480</small></div></div>
+ <section class="card">
+  <div class="row-item"><span class="rank">4</span><span class="avatar" style="width:36px;height:36px">П</span><div class="grow">Паша<small>серия 9</small></div><b>4 105</b></div>
+  <div class="row-item"><span class="rank">5</span><span class="avatar" style="width:36px;height:36px">О</span><div class="grow">Оля<small>серия 3</small></div><b>3 990</b></div>
+  <div class="row-item"><span class="rank">6</span><span class="avatar" style="width:36px;height:36px">Д</span><div class="grow">Дима<small>серия 1</small></div><b>3 870</b></div>
+  <div class="row-item"><span class="rank">7</span><span class="avatar" style="width:36px;height:36px">Л</span><div class="grow">Лена</div><b>3 702</b></div>
+  <div class="row-item"><span class="rank">8</span><span class="avatar" style="width:36px;height:36px">С</span><div class="grow">Серёжа</div><b>3 650</b></div>
+ </section>
+ <button class="btn wide ghost" style="margin-top:12px">Показать ещё</button>
+</div></main>
+<div class="me-bar"><div class="in"><span class="rank" style="color:var(--qw-accent)">14</span><span class="avatar" style="width:36px;height:36px">И</span><span style="flex:1">Ты · Илья</span><span>3 450</span></div></div></template>
+
+<template id="s-profile" data-mode="hub" data-tab="profile" data-title="Профиль">
+<main class="qw-main"><div class="narrow">
+ <section class="card" style="display:flex;align-items:center;gap:14px"><span class="avatar" style="width:56px;height:56px;font-size:22px">И</span><div style="flex:1"><h2 style="margin:0">Илья</h2><p class="muted small" style="margin:0">Telegram · играет с марта</p></div><button class="btn">Настройки</button></section>
+ <div class="grid2" style="margin-top:16px">
+  <section><div class="metrics"><div class="metric"><b>3 450</b><span>очков всего</span></div><div class="metric"><b>412</b><span>ответов</span></div><div class="metric"><b>78%</b><span>точность</span></div><div class="metric"><b>7,4</b><span>средний балл <span class="newtag">как /mystats</span></span></div><div class="metric"><b>5 🔥</b><span>серия · рекорд 12</span></div><div class="metric"><b>3</b><span>чата</span></div></div></section>
+  <section class="card"><div style="display:flex;justify-content:space-between"><h3>Достижения</h3><span class="badge acc">14 / 71</span></div>
+   <div class="row-item ach"><i>🦉</i><div class="grow">Ночная сова<small>Утренний квиз · вчера</small></div></div>
+   <div class="row-item ach"><i>🔥</i><div class="grow">Серия 10<small>Семья · 3 дня назад</small></div></div>
+   <div class="row-item"><div class="grow">Все достижения</div><svg class="i chev"><use href="#chev"/></svg></div>
+   <div class="row-item"><div class="grow">История игр и ответов</div><svg class="i chev"><use href="#chev"/></svg></div></section>
+ </div>
+</div></main></template>
+
+<template id="s-settings" data-mode="hub" data-tab="profile" data-title="Настройки" data-back="1">
+<main class="qw-main"><div class="narrow grid2">
+ <section class="stack">
+  <div class="card"><h3>Как к тебе обращаться</h3><p class="muted small">Тексты всех игр говорят о тебе в этой форме.</p><div class="seg"><span class="on">Он</span><span>Она</span><span>Не указывать</span></div></div>
+  <div class="card"><h3>Вход</h3>
+   <div class="row-item"><div class="grow">Telegram<small>@lizard · привязан</small></div><span class="badge acc">✓</span></div>
+   <div class="row-item"><div class="grow">Логин и пароль<small>для входа из браузера</small></div><svg class="i chev"><use href="#chev"/></svg></div>
+   <div class="row-item"><div class="grow">Устройства и сессии<small>2 активных</small></div><svg class="i chev"><use href="#chev"/></svg></div></div>
+ </section>
+ <section class="stack">
+  <div class="card"><h3>Внешний вид</h3><div class="field"><label>Тема</label><div class="seg"><span class="on">Как в системе</span><span>Тёмная</span><span>Светлая</span></div></div>
+   <div class="row-item"><div class="grow">Тактильный отклик</div><span class="toggle on"></span></div></div>
+  <div class="card"><h3>Настройки чатов</h3><p class="muted small" style="margin:0">Расписание и правила игры — в «Чаты → чат → Настройки чата».</p></div>
+  <button class="btn wide" style="color:var(--qw-danger)">Выйти из аккаунта</button>
+ </section>
+</div></main></template>
+
+<!-- меню ⚙: блоки игры -->
+<template id="m-quiz"><h4>Классический квиз</h4>
+<div class="mi"><svg class="i"><use href="#sliders"/></svg><span class="grow">Настройки квиза<br><small>чат «Утренний квиз»</small></span></div>
+<div class="mi"><svg class="i"><use href="#help"/></svg><span class="grow">Как играть</span></div>
+<div class="mi danger"><svg class="i"><use href="#flag"/></svg><span class="grow">Завершить раунд</span></div></template>
+<template id="m-farm"><h4>Весёлый фермер</h4>
+<div class="mi"><svg class="i"><use href="#sliders"/></svg><span class="grow">Настройки фермы<br><small>название, кто видит, соседи</small></span></div>
+<div class="mi"><svg class="i"><use href="#sun"/></svg><span class="grow">Свет на ферме</span><small>По времени ›</small></div>
+<div class="mi"><svg class="i"><use href="#layers"/></svg><span class="grow">Только ферма и счётчики · H</span><span class="toggle"></span></div>
+<div class="mi"><svg class="i"><use href="#help"/></svg><span class="grow">Управление и подсказки</span></div></template>
+<template id="m-alchemy"><h4>Alchemia</h4>
+<div class="mi"><svg class="i"><use href="#help"/></svg><span class="grow">Как играть</span></div>
+<div class="mi"><svg class="i"><use href="#sliders"/></svg><span class="grow">Настройки лаборатории<br><small>анимации, экспорт, сброс</small></span></div>
+<div class="mi muted small" style="min-height:0">Звук — иконкой в шапке, в меню не дублируется</div></template>
+
+<script>
+const q=new URLSearchParams(location.search),id=q.get('s')||'home',W=innerWidth;
+const tpl=document.getElementById('s-'+id),from=tpl.dataset.from?document.getElementById(tpl.dataset.from):tpl;
+const d=tpl.dataset,game=d.mode==='game',app=document.getElementById('app');
+document.body.className=(game?'mode-game '+(d.game||''):'mode-hub')+(d.tgfs&&W<768?' tg-fs':'');
+const inTelegram=d.tgfs&&W<768;
+let head=document.getElementById('t-header-hub').innerHTML
+ .replace('{{LEAD}}',d.back&&!inTelegram?'<button class="qw-icon" aria-label="Назад"><svg class="i"><use href="#back"/></svg></button>':'')
+ .replace('{{TITLE}}',d.title||'').replace('{{GEARON}}',d.menu?'on':'');
+if(d.extra)head=head.replace('<button class="qw-icon qw-gear',d.extra+'<button class="qw-icon qw-gear');
+app.innerHTML=(d.noheader?'':head)+from.innerHTML+(game?'':document.getElementById('t-tabbar').innerHTML);
+document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===d.tab));
+const shot=app.querySelector('.shot');
+if(shot){const big=W>=768;shot.style.backgroundImage=`url(${big?shot.dataset.shot1280:shot.dataset.shot390})`;
+ const cut=+(big?shot.dataset.cut1280:shot.dataset.cut390);shot.style.backgroundPosition=`0 -${cut}px`;
+ if(d.noheader){shot.style.top='var(--qw-safe-top)';const [x,y]=(big?d.ring1280:d.ring390).split(',').map(Number);
+  app.insertAdjacentHTML('beforeend',`<div style="position:fixed;z-index:45;left:${x-26}px;top:calc(var(--qw-safe-top) + ${y-26}px);width:52px;height:52px;border-radius:14px;outline:3px solid var(--qw-game-accent);outline-offset:-2px"></div>`);
+  document.documentElement.style.setProperty('--qw-header-h',(big?d.head1280:d.head390)+'px');}}
+if(d.menu){
+ const core=game?`<h4>QuizzyWizzy</h4><div class="mi core"><svg class="i"><use href="#home"/></svg><span class="grow">Главное меню</span></div>`+(inTelegram?'':`<div class="mi"><svg class="i"><use href="#full"/></svg><span class="grow">Во весь экран</span></div>`):(W>=768?`<h4>QuizzyWizzy</h4><div class="mi"><svg class="i"><use href="#full"/></svg><span class="grow">Во весь экран</span></div>`:'');
+ app.insertAdjacentHTML('beforeend',`<div class="qw-scrim"></div><div class="qw-menu" role="menu"><div class="handle"></div>
+ <div class="acct"><span class="avatar">И</span><div style="flex:1"><b>Илья</b><br><small class="muted">Профиль и настройки</small></div><svg class="i chev"><use href="#chev"/></svg></div>
+ ${document.getElementById('m-'+d.menu).innerHTML}${core}</div>`);
+}
+</script>
+</body>
+</html>

@@ -315,6 +315,8 @@ export function openTripGame(opts){
   root.append(box);box.querySelector('button').focus();
  }
  function cancelClose(){root.querySelector('.fg-confirm')?.remove();confirming=false;canvas.focus({preventScroll:true});}
+ // Back (Telegram BackButton, browser back) goes through the same confirmation as Escape. Returns true when the game closed, false when the player stays.
+ function backClose(){if(closed)return true;if(confirming){cancelClose();return false;}requestClose();return closed;}
  function finishClose(){
   if(closed)return;closed=true;cancelAnimationFrame(raf);raf=0;clearTimeout(srTimer);clearTimeout(layoutTimer);
   for(const el of inerted)el.inert=false;inerted.length=0;
@@ -417,5 +419,5 @@ export function openTripGame(opts){
  raf=requestAnimationFrame(draw);
  layoutTimer=setTimeout(()=>{layoutTimer=0;if(!closed)layout();},60);
  showIntro();
- return {close:finishClose};
+ return {close:finishClose,requestClose:backClose};
 }

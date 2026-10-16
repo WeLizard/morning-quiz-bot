@@ -229,20 +229,20 @@ def test_postgres_migration_0028_is_additive_and_refuses_to_drop_data(farm_pg_ur
         scripts = ScriptDirectory.from_config(Config('alembic.ini'))
         migration = scripts.get_revision('20261010_0028').module
         assert migration.down_revision == '20261010_0027'
-        async with isolated_database(farm_pg_url) as (db, _):
+        async with isolated_database(farm_pg_url) as (db, schema):
             async with db.engine.begin() as connection:
                 def roundtrip(sync):
                     sync.execute(text('DROP TABLE farm_invites'))
                     with monkeypatch.context() as patch:
                         patch.setattr(migration, 'op', Operations(MigrationContext.configure(sync)))
                         migration.upgrade()
-                    columns = {c['name'] for c in inspect(sync).get_columns('farm_invites')}
+                    columns = {c['name'] for c in inspect(sync).get_columns('farm_invites', schema=schema)}
                     assert columns == {'invitee_farm_id', 'inviter_farm_id', 'created_at', 'rewarded_at'}
                     with monkeypatch.context() as patch:
                         patch.setattr(migration, 'op', Operations(MigrationContext.configure(sync)))
                         migration.downgrade()
-                        assert 'farm_invites' not in inspect(sync).get_table_names()
+                        assert 'farm_invites' not in inspect(sync).get_table_names(schema=schema)
                         migration.upgrade()
-                    assert 'farm_invites' in inspect(sync).get_table_names()
+                    assert 'farm_invites' in inspect(sync).get_table_names(schema=schema)
                 await connection.run_sync(roundtrip)
     asyncio.run(run())

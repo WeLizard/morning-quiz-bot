@@ -298,22 +298,86 @@ def test_backfill_reconciles_every_balance_and_is_idempotent(pg_url):
     run(case())
 
 
-def test_backfill_leaves_profiles_with_foreign_telegram_identity_for_review(pg_url):
+def test_backfill_follows_an_active_identity_and_leaves_ambiguous_profiles_for_review(pg_url):
+    from storage.models import AccountIdentity
+
     async def case():
         async with environment(pg_url) as db:
             async with db.transaction() as session:
-                from storage.models import AccountIdentity
-                uid, _ = await make_user(session, score=D(5), account=False)
-                other = Account(id=uuid4(), display_name='Other')
-                session.add(other)
+                linked, _ = await make_user(session, score=D(5), account=False, name='Привязан')
+                taken, _ = await make_user(session, score=D(6), account=False, name='Занят')
+                revoked, _ = await make_user(session, score=D(7), account=False, name='Отозван')
+                now = datetime.now(timezone.utc)
+                free_account = Account(id=uuid4(), display_name='Свободный')
+                busy_account = Account(id=uuid4(), display_name='Чужой')
+                old_account = Account(id=uuid4(), display_name='Старый')
+                session.add_all([free_account, busy_account, old_account])
                 await session.flush()
-                session.add(AccountIdentity(account_id=other.id, provider='telegram', provider_subject=str(uid),
-                                            verified_at=datetime.now(timezone.utc)))
+                # the busy account already belongs to a different Telegram profile
+                session.add(User(id=next(_uid), account_id=busy_account.id, display_name='Другой'))
+                session.add_all([
+                    AccountIdentity(account_id=free_account.id, provider='telegram', provider_subject=str(linked), verified_at=now),
+                    AccountIdentity(account_id=busy_account.id, provider='telegram', provider_subject=str(taken), verified_at=now),
+                    AccountIdentity(account_id=old_account.id, provider='telegram', provider_subject=str(revoked),
+                                    verified_at=now, revoked_at=now)])
+                free_id = free_account.id
             async with db.transaction() as session:
                 await backfill(session)
             async with db.transaction() as session:
-                assert (await session.get(User, uid)).account_id is None
-                assert await session.scalar(select(func.count()).select_from(ScoreEvent)) == 0
+                assert (await session.get(User, linked)).account_id == free_id, 'follows the active identity'
+                assert (await totals(session, free_id)) == {'legacy_import': D(5)}
+                assert (await session.get(User, taken)).account_id is None, 'ambiguous: left for manual review'
+                technical = (await session.get(User, revoked)).account_id
+                assert technical is not None and technical != old_account.id, 'a revoked identity gets a technical account'
+                assert (await session.get(User, revoked)).global_score == D(7)
+                await assert_consistent(session)
+    run(case())
+
+
+def test_backfill_does_not_charge_alchemy_that_never_reached_global_score(pg_url):
+    """An old recompute or reset erased Alchemy from global_score: the player keeps both balances."""
+    async def case():
+        async with environment(pg_url) as db:
+            async with db.transaction() as session:
+                repo = OperationalRepository(session)
+                chat = -981070000021
+                await repo.ensure_chat({'id': chat, 'type': 'group'})
+                uid, _ = await make_user(session, score=D(10), account=False)
+                await repo.ensure_member({'chat_id': chat, 'user_id': uid})
+                await session.execute(update(ChatMember).where(ChatMember.user_id == uid).values(score=D(10)))
+                owner = Account(id=uuid4(), display_name='A')
+                session.add(owner)
+                await session.flush()
+                await session.execute(update(User).where(User.id == uid).values(account_id=owner.id))
+                session.add(AlchemyProgress(account_id=owner.id, user_id=uid, points_total=D(7)))
+            async with db.transaction() as session:
+                await backfill(session)
+            async with db.transaction() as session:
+                assert (await session.get(User, uid)).global_score == D(10)
+                assert (await totals(session, owner.id)) == {'legacy_import': D(10), 'alchemy': D(7)}
+    run(case())
+
+
+def test_first_points_of_a_profile_without_account_import_its_old_score(pg_url):
+    async def case():
+        async with environment(pg_url) as db:
+            chat = -981070000022
+            async with db.transaction() as session:
+                repo = OperationalRepository(session)
+                await repo.ensure_chat({'id': chat, 'type': 'group'})
+                uid, _ = await make_user(session, score=D('8.5'), account=False)
+                await repo.ensure_member({'chat_id': chat, 'user_id': uid})
+                await session.execute(update(ChatMember).where(ChatMember.user_id == uid).values(score=D(6)))
+            async with db.transaction() as session:
+                await OperationalRepository(session).record_answer_and_add_score(
+                    poll_id='lazy-1', user_id=uid, chat_id=chat, points_delta=D(1), selected_option=0,
+                    is_correct=True, payload={'quiz_type': 'classic'})
+            async with db.transaction() as session:
+                user = await session.get(User, uid)
+                assert user.global_score == D('9.5')
+                assert (await totals(session, user.account_id)) == {'legacy_import': D('8.5'), 'classic': D(1)}
+                assert await session.scalar(select(func.sum(ScoreEvent.amount)).where(ScoreEvent.chat_id == chat)) == D(7)
+                await assert_consistent(session)
     run(case())
 
 

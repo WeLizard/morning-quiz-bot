@@ -12,7 +12,7 @@ taking an Account lock after it would invert the merge order (Account -> Alchemy
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -21,7 +21,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import aliased
 
-from .models import Account, ScoreEvent, ScoreTotal, User
+from .models import Account, ChatMember, ScoreEvent, ScoreTotal, User
 
 # Counted by the common rating and cached in users.global_score.
 COMMON_SOURCES = ('classic', 'photo', 'mafia', 'admin', 'legacy_import')
@@ -29,7 +29,7 @@ COMMON_SOURCES = ('classic', 'photo', 'mafia', 'admin', 'legacy_import')
 SEPARATE_SOURCES = ('alchemy',)
 SOURCES = COMMON_SOURCES + SEPARATE_SOURCES
 # Legacy rows get this timestamp so they never fall into a week/month window.
-LEGACY_AT = datetime(2000, 1, 1)
+LEGACY_AT = datetime(2000, 1, 1, tzinfo=timezone.utc)
 MAX_KEY = 300
 QUANT = Decimal('0.001')
 LIMIT = Decimal('99999999999.999')
@@ -65,7 +65,25 @@ async def ensure_account_for_user(session, user: User) -> UUID:
     await session.flush()
     user.account_id = account.id
     await session.flush()
+    await _import_legacy_score(session, user, account.id)
     return account.id
+
+
+async def _import_legacy_score(session, user: User, account_id: UUID) -> None:
+    """A profile that reached the journal without migration 0034 (e.g. a foreign Telegram identity) keeps its score."""
+    members = (await session.execute(select(ChatMember.chat_id, ChatMember.score).where(
+        ChatMember.user_id == user.id, ChatMember.score != 0))).all()
+    if not members and not user.global_score:
+        return
+    rest = Decimal(user.global_score) - sum((Decimal(score) for _, score in members), Decimal('0'))
+    rows = [dict(account_id=account_id, source='legacy_import', key=f'legacy:chat:{chat}', amount=score,
+                 chat_id=chat, created_at=LEGACY_AT) for chat, score in members]
+    if rest:
+        rows.append(dict(account_id=account_id, source='legacy_import', key='legacy:residual', amount=rest,
+                         chat_id=None, created_at=LEGACY_AT))
+    if rows:
+        await session.execute(insert(ScoreEvent).values(rows).on_conflict_do_nothing(constraint='uq_score_events_key'))
+        await RewardLedger.recompute(session, account_id)
 
 
 async def account_id_for_telegram(session, user_id: int) -> UUID:
@@ -101,7 +119,7 @@ class RewardLedger:
         account_id = UUID(str(account_id))
         common = source in COMMON_SOURCES
         if common:
-            await session.execute(select(User.id).where(User.account_id == account_id).with_for_update())
+            await session.execute(select(User.id).where(User.account_id == account_id).order_by(User.id).with_for_update())
             merged = (await session.execute(
                 select(Account.id, Account.merged_into_id).where(Account.id == account_id).with_for_update(read=True)
             )).first()
@@ -150,9 +168,9 @@ class RewardLedger:
         await session.execute(delete(ScoreTotal).where(ScoreTotal.account_id == account_id))
         result = {}
         for source, total, events in rows:
-            session.add(ScoreTotal(account_id=account_id, source=source, total=total, events=events))
+            await session.execute(insert(ScoreTotal).values(
+                account_id=account_id, source=source, total=total, events=events))
             result[source] = Decimal(total)
-        await session.flush()
         common = sum((v for k, v in result.items() if k in COMMON_SOURCES), Decimal('0'))
         await session.execute(update(User).where(User.account_id == account_id).values(global_score=common))
         return result

@@ -19,6 +19,7 @@ place even when they are not listed.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -33,7 +34,9 @@ SCOPES = ('global', 'room', 'chat', 'friends', 'farm', 'alchemy')
 PERIODS = {'all': None, 'week': timedelta(days=7), 'month': timedelta(days=30)}
 GAMES = {'all': COMMON_SOURCES, 'classic': ('classic',), 'photo': ('photo',)}
 PUBLIC_SCOPES = ('global', 'farm', 'alchemy')
-PLACEHOLDER_NAMES = ('', 'Гость')
+PLACEHOLDER_NAMES = ('', 'Гость', 'Unknown')
+# The bot's fallback name embeds the Telegram id ("User 123"): never listed.
+FALLBACK_NAME = r'^User [0-9]+$'
 MAX_LIMIT = 50
 
 
@@ -81,7 +84,8 @@ def _scores(scope, game, room_id, chat_id, since, *, include_private=True, farm=
 
 
 def _eligible(scope):
-    conditions = [Account.archived.is_(False), Account.merged_into_id.is_(None), Account.rating_hidden.is_(False)]
+    conditions = [Account.archived.is_(False), Account.merged_into_id.is_(None), Account.rating_hidden.is_(False),
+                  Account.display_name.op('!~')(FALLBACK_NAME)]
     if scope in PUBLIC_SCOPES:
         conditions.append(Account.display_name.not_in(PLACEHOLDER_NAMES))
     return and_(*conditions)
@@ -143,6 +147,10 @@ async def rank(
         conditions = [_eligible(scope), s.c.score > 0]
         if friends is not None:
             conditions.append(s.c.account_id.in_(friends))
+        if scope == 'room':
+            # Former members keep their events but leave the room's table.
+            conditions.append(s.c.account_id.in_(select(RoomMembership.account_id).where(
+                RoomMembership.room_id == room_id, RoomMembership.status == 'active')))
         return s, conditions
 
     s, conditions = listing()
@@ -161,7 +169,7 @@ async def rank(
         mine = await session.scalar(select(own.c.score).where(own.c.account_id == viewer))
         account = await session.get(Account, viewer)
         listed = bool(account and account.archived is False and account.merged_into_id is None
-                      and not account.rating_hidden
+                      and not account.rating_hidden and not re.match(FALLBACK_NAME, account.display_name or '')
                       and (scope not in PUBLIC_SCOPES or account.display_name not in PLACEHOLDER_NAMES))
         place = None
         if mine is not None and Decimal(mine) > 0:
@@ -171,6 +179,7 @@ async def rank(
                 .where(*ahead_conditions, ahead.c.score > mine)) or 0)
         me = {'rank': place, 'score': _number(mine), 'listed': listed,
               'hidden': bool(account and account.rating_hidden),
-              'needs_nickname': bool(account and account.display_name in PLACEHOLDER_NAMES and scope in PUBLIC_SCOPES)}
+              'needs_nickname': bool(account and scope in PUBLIC_SCOPES and (
+                  account.display_name in PLACEHOLDER_NAMES or re.match(FALLBACK_NAME, account.display_name or '')))}
     return {'scope': scope, 'period': period, 'game': game, 'items': items, 'me': me,
             'has_more': len(rows) > limit}

@@ -266,7 +266,8 @@ class AdminActions:
         query = select(ChatMember).where(ChatMember.user_id == target_id if scope == 'users' else ChatMember.chat_id == target_id)
         members = (await session.scalars(query.order_by(ChatMember.chat_id, ChatMember.user_id))).all()
         user_ids = {m.user_id for m in members} | ({target_id} if scope == 'users' else set())
-        users = (await session.scalars(select(User).where(User.id.in_(user_ids)).order_by(User.id))).all()
+        users = (await session.scalars(select(User).where(User.id.in_(user_ids)).order_by(User.id)
+                                       .execution_options(populate_existing=True))).all()
         chats = {m.chat_id for m in members} | ({target_id} if scope == 'chats' else set())
         legacy_games = (await session.scalars(select(QuizSession).where(QuizSession.status == 'active', or_(
             QuizSession.chat_id.in_(chats), or_(QuizSession.state['user_id'].as_string() == str(target_id),

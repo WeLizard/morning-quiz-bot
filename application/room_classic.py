@@ -196,10 +196,7 @@ class RoomClassicApplicationService:
                 # or shared revision can reject another player's independent answer.
                 item = validate_classic_answer(game.state, round_id=round_id, selected_option=selected_option, now=now)
                 player = await self.session.get(GamePlayer, (game.id, account_id))
-                if player is None:
-                    player = GamePlayer(game_id=game.id, account_id=account_id, seat=account_id.hex, public_state={})
-                    self.session.add(player)
-                public = dict(player.public_state or {})
+                public = dict(player.public_state or {}) if player is not None else {}
                 correct = selected_option == item['correct_option_index']
                 streak, points = classic_points(streak=int(public.get('streak', 0)), is_correct=correct, rules=self.rules)
                 # The journal takes the User/Account locks first, like an account merge does; GamePlayer rows come after.
@@ -207,6 +204,9 @@ class RoomClassicApplicationService:
                         self.session, account_id=account_id, source='classic', amount=points,
                         key=f'room:{game.id}:{round_id}', game_id=game.id, room_id=room_id):
                     raise RuntimeError('Очки за этот ответ уже записаны')
+                if player is None:
+                    player = GamePlayer(game_id=game.id, account_id=account_id, seat=account_id.hex, public_state={})
+                    self.session.add(player)
                 public.update(score=str(Decimal(public.get('score', '0')) + points), streak=streak)
                 player.public_state = public
                 self.session.add(ClassicAccountAnswer(game_id=game.id, round_id=round_id, account_id=account_id,

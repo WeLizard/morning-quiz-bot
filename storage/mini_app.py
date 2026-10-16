@@ -6,7 +6,7 @@ import re
 import secrets
 import time
 
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from domain.address import effective_address_form
@@ -203,8 +203,9 @@ class MiniAppStore:
             await self.require_chat(session, user.id, chat_id)
             ranking = select(User.id.label('uid'), User.display_name.label('name'), ChatMember.score,
                 func.rank().over(order_by=ChatMember.score.desc()).label('rank')).join(
-                    ChatMember, ChatMember.user_id == User.id).where(ChatMember.chat_id == chat_id,
-                        User.bot_blocked.is_(False))
+                    ChatMember, ChatMember.user_id == User.id).outerjoin(
+                    Account, Account.id == User.account_id).where(ChatMember.chat_id == chat_id,
+                        User.bot_blocked.is_(False), or_(Account.id.is_(None), Account.rating_hidden.is_(False)))
             if chat_id > 0:
                 ranking = ranking.where(User.id == user.id)
             ranked = ranking.subquery()
@@ -494,7 +495,9 @@ class MiniAppStore:
     async def global_leaderboard(self, token, *, limit=20, offset=0):
         async with self.authorized(token) as (session, user):
             ranking = select(User.id, User.display_name, User.global_score,
-                func.rank().over(order_by=User.global_score.desc()).label('rank')).where(User.bot_blocked.is_(False)).subquery()
+                func.rank().over(order_by=User.global_score.desc()).label('rank')).outerjoin(
+                Account, Account.id == User.account_id).where(
+                User.bot_blocked.is_(False), or_(Account.id.is_(None), Account.rating_hidden.is_(False))).subquery()
             rows = (await session.execute(select(ranking).order_by(ranking.c.global_score.desc(), ranking.c.id).offset(offset).limit(limit + 1))).mappings().all()
             return {'items': [{'rank': row['rank'], 'display_name': row['display_name'], 'score': str(row['global_score']),
                                'is_me': row['id'] == user.id} for row in rows[:limit]], 'has_more': len(rows) > limit}

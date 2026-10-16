@@ -7,11 +7,22 @@ fall into a week/month window.
 Per Telegram profile (with an account):
   legacy:chat:<chat_id>  chat_members.score, with chat_id (the chat slice is rebuilt from the journal)
   legacy:residual        users.global_score - sum(chat_members.score) - Alchemy credit
-                         (admin edits, imports, anything the per-chat rows do not explain)
+                         (admin edits, imports, anything the per-chat rows do not explain). The credit is
+                         LEAST(points_total, GREATEST(global_score - sum(chats), 0)): Alchemy points reached
+                         global_score only on top of the chat scores, and an old recompute/reset may have erased them.
 Per Alchemy progress:    legacy:alchemy  points_total   (source alchemy, own slice)
 Per room Classic answer: room:<game>:<round>  points_delta (never counted before; now common)
 """
 LEGACY_AT = "TIMESTAMPTZ '2000-01-01 00:00:00+00'"
+
+# A profile whose Telegram identity is active but whose users.account_id was never set follows that identity.
+LINK_FROM_IDENTITY = """
+UPDATE users u SET account_id = i.account_id
+FROM account_identities i
+WHERE u.account_id IS NULL AND i.provider = 'telegram' AND i.provider_subject = u.id::text
+  AND i.revoked_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM users o WHERE o.account_id = i.account_id)
+"""
 
 PROVISION_ACCOUNTS = """
 INSERT INTO accounts (id, display_name, archived, bot_blocked, moderation_revision, moderation_reason)
@@ -20,7 +31,7 @@ SELECT md5('mqb-telegram-account:' || u.id::text)::uuid, LEFT(COALESCE(NULLIF(u.
 FROM users u
 WHERE u.account_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM account_identities i
-                  WHERE i.provider = 'telegram' AND i.provider_subject = u.id::text)
+                  WHERE i.provider = 'telegram' AND i.provider_subject = u.id::text AND i.revoked_at IS NULL)
 ON CONFLICT (id) DO NOTHING
 """
 
@@ -48,12 +59,14 @@ ON CONFLICT (account_id, source, key) DO NOTHING
 LEGACY_RESIDUAL_EVENTS = f"""
 INSERT INTO score_events (account_id, source, key, amount, created_at)
 SELECT u.account_id, 'legacy_import', 'legacy:residual',
-       u.global_score - COALESCE(m.total, 0) - COALESCE(ap.points_total, 0), {LEGACY_AT}
+       u.global_score - COALESCE(m.total, 0)
+         - LEAST(COALESCE(ap.points_total, 0), GREATEST(u.global_score - COALESCE(m.total, 0), 0)), {LEGACY_AT}
 FROM users u
 LEFT JOIN (SELECT user_id, SUM(score) AS total FROM chat_members GROUP BY user_id) m ON m.user_id = u.id
 LEFT JOIN alchemy_progress ap ON ap.user_id = u.id
 WHERE u.account_id IS NOT NULL
-  AND u.global_score - COALESCE(m.total, 0) - COALESCE(ap.points_total, 0) <> 0
+  AND u.global_score - COALESCE(m.total, 0)
+        - LEAST(COALESCE(ap.points_total, 0), GREATEST(u.global_score - COALESCE(m.total, 0), 0)) <> 0
 ON CONFLICT (account_id, source, key) DO NOTHING
 """
 
@@ -79,7 +92,7 @@ UPDATE users u SET global_score = COALESCE((
 WHERE u.account_id IS NOT NULL
 """
 
-STATEMENTS = (PROVISION_ACCOUNTS, LINK_ACCOUNTS, LEGACY_CHAT_EVENTS, LEGACY_ALCHEMY_EVENTS,
+STATEMENTS = (LINK_FROM_IDENTITY, PROVISION_ACCOUNTS, LINK_ACCOUNTS, LEGACY_CHAT_EVENTS, LEGACY_ALCHEMY_EVENTS,
               LEGACY_RESIDUAL_EVENTS, ROOM_CLASSIC_EVENTS, REBUILD_TOTALS, REBUILD_CACHE)
 
 

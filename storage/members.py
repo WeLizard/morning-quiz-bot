@@ -119,6 +119,8 @@ class MemberService:
                 ChatMember.chat_id == chat_id, ChatMember.user_id == user_id,
             ).with_for_update())
             data = member_data(member, user)
+            # Before any score changes: a profile without an account imports its old score at this moment.
+            account_id = await ensure_account_for_user(session, user)
             if (
                 await session.get(PollAnswer, (answer_id, user_id)) is not None
                 or (kind == "classic" and answer_id in (
@@ -144,7 +146,6 @@ class MemberService:
             await repo.add_achievement_codes(user_id, values["milestone_codes"])
             await repo.add_achievement_codes(user_id, values["streak_achievement_codes"])
             if delta:
-                account_id = await ensure_account_for_user(session, user)
                 if not await RewardLedger.award(
                     session, account_id=account_id, source=kind, amount=delta,
                     key=f"{kind}:{answer_id}", chat_id=chat_id, game_id=game_id or classic_game_id,
@@ -178,6 +179,7 @@ class MemberService:
             ).with_for_update())
             if user is None or member is None:
                 raise MemberNotFound("Пользователь не найден в чате")
+            account_id = await ensure_account_for_user(session, user)
             old_score = member.score
             if expected_score is not None and old_score != expected_score:
                 raise ScoreConflict("Баллы уже изменились. Обновите данные и повторите действие.")
@@ -185,7 +187,7 @@ class MemberService:
             delta = score - old_score
             if delta:
                 await RewardLedger.award(
-                    session, account_id=await ensure_account_for_user(session, user), source='admin',
+                    session, account_id=account_id, source='admin',
                     amount=delta, key=f"admin:set:{uuid4().hex}", chat_id=chat_id)
             await session.flush()
         return old_score

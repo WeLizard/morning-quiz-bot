@@ -188,7 +188,9 @@ class OperationalRepository:
         await operation_fence(self.session)
         await require_access(self.session, chat_id, user_id)
         # All score writers lock the user before their chat membership.
-        await self.session.scalar(select(User).where(User.id == user_id).with_for_update())
+        locked = await self.session.scalar(select(User).where(User.id == user_id).with_for_update())
+        # Before any score changes: a profile without an account imports its old score at this moment.
+        account_id = await ensure_account_for_user(self.session, locked) if locked is not None else None
         if not await self.reserve_answer(
             poll_id=poll_id, user_id=user_id, chat_id=chat_id,
             points_delta=points_delta, selected_option=selected_option,
@@ -218,13 +220,12 @@ class OperationalRepository:
         if result.rowcount != 1:
             raise LookupError(f"Chat member {chat_id}/{user_id} does not exist")
 
-        user = await self.session.scalar(select(User).where(User.id == user_id))
-        if user is None:
+        if account_id is None:
             raise LookupError(f"User {user_id} does not exist")
         if points_delta:
             kind = (payload or {}).get("quiz_type") or "classic"
             if not await RewardLedger.award(
-                self.session, account_id=await ensure_account_for_user(self.session, user),
+                self.session, account_id=account_id,
                 source=kind if kind in ("classic", "photo") else "classic",
                 amount=points_delta, key=f"poll:{poll_id}", chat_id=chat_id,
             ):

@@ -20,7 +20,7 @@
   события → агрегат → кэш; Алхимия блокировки User/Account не берёт (её сериализует `AlchemyProgress`).
 * Источники: `classic`, `photo`, `mafia` (резерв), `admin`, `legacy_import` — **общая часть** (рейтинг, `global_score`);
   `alchemy` — отдельный разрез. Ферма в журнал не пишется: её разрез читает `farm_states.xp` и `farm_ledger.xp_delta`.
-* Ключи: `poll:<id>`/`photo:<id>` (чат), `room:<game>:<round>`, `craft:<command>`, `admin:set:<uuid>`,
+* Ключи: `classic:<id>`/`photo:<id>` (чат), `room:<game>:<round>`, `craft:<command>`, `admin:set:<uuid>`,
   `admin:reset:<action>:<chat>:<user>`, `legacy:chat:<chat>`, `legacy:residual`, `legacy:alchemy`.
 * Миграция 0034 переносит старые очки без потерь (`storage/score_backfill.py`, идемпотентно): события `legacy_import` по чатам
   (`chat_id` сохранён, срез чата строится из журнала), остаток `legacy:residual = global_score − Σ чатов − кредит Алхимии`,

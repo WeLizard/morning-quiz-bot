@@ -130,10 +130,11 @@ def test_who_is_listed(pg_url):
                 hidden, _ = await player(session, 'Скрытая', rating_hidden=True)
                 guest, _ = await player(session, 'Гость')
                 blocked, _ = await player(session, 'Заблокированный', bot_blocked=True)
+                telegram_default, _ = await player(session, 'User 981080000777')   # the bot's fallback name embeds a Telegram id
                 archived, _ = await player(session, 'Архивная', archived=True)
                 main, _ = await player(session, 'Основная')
                 merged, _ = await player(session, 'Слитая')
-                for i, acc in enumerate((shown, hidden, guest, blocked, archived, merged), 1):
+                for i, acc in enumerate((shown, hidden, guest, blocked, archived, merged, telegram_default), 1):
                     await points(session, acc, 10 - i, f'poll:{i}')
                 (await session.get(Account, merged)).merged_into_id = main
             async with env.db.transaction() as session:
@@ -151,7 +152,10 @@ def test_who_is_listed(pg_url):
                 await session.flush()
                 for acc in (shown, guest):
                     session.add(RoomMembership(room_id='r1', account_id=acc, role='member', status='active'))
+                left, _ = await player(session, 'Вышел')
+                session.add(RoomMembership(room_id='r1', account_id=left, role='member', status='left'))
                 await session.flush()
+                await points(session, left, 50, 'room:g:old', room_id='r1')
                 await points(session, shown, 2, 'room:g:r1', room_id='r1')
                 await points(session, guest, 6, 'room:g:r2', room_id='r1')
                 in_room = await rank(session, viewer=guest, scope='room', room_id='r1', now=NOW)

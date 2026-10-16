@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import multiprocessing
+import queue
 
 import pytest
 from sqlalchemy import func, select
@@ -12,6 +13,9 @@ from application.game_deadlines import GameDeadlineProcessor
 from application.mafia import MafiaApplicationService
 from application.photo import PhotoApplicationService
 from application.rooms import RoomApplicationService
+from tests.deadline_worker_processes import (
+    HANG_GUARD_SECONDS, _process_worker_once, _process_worker_once_without_barrier,
+)
 from tests.local_database import isolated_database
 from tests.test_postgres_members import CHAT, USER, pg_env
 from storage.models import (
@@ -21,80 +25,20 @@ from storage.models import (
 from storage.repositories import OperationalRepository
 
 
-def _process_worker_once(database_url, schema, barrier, results, now=None):
-    """Run one real worker pass in a separate OS process and isolated schema."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from application.game_deadlines import GameDeadlineProcessor
-    from storage.database import Database, DatabaseSettings
-
-    async def run():
-        database = Database(DatabaseSettings(url=database_url))
-        await database.engine.dispose()
-        engine = create_async_engine(
-            database_url,
-            connect_args={'server_settings': {'search_path': f'"{schema}",public'}},
-        )
-        database.engine = engine
-        database.session_factory = async_sessionmaker(
-            engine, expire_on_commit=False, autoflush=False,
-        )
-
-        class SynchronizedWorker(GameDeadlineProcessor):
-            async def _apply_one(self, mode, chat_id, operation):
-                await asyncio.to_thread(barrier.wait, 10)
-                return await super()._apply_one(mode, chat_id, operation)
-
-        try:
-            await database.check_connection()
-            return await SynchronizedWorker(database).run_once(now=now)
-        finally:
-            await database.dispose()
-
-    try:
-        results.put(('ok', asyncio.run(run())))
-    except BaseException as error:
-        results.put(('error', f'{type(error).__name__}: {error}'))
-
-
-def _process_worker_once_without_barrier(database_url, schema, results, now=None):
-    """A fresh process must observe durable state without replaying it."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from application.game_deadlines import GameDeadlineProcessor
-    from storage.database import Database, DatabaseSettings
-
-    async def run():
-        database = Database(DatabaseSettings(url=database_url))
-        await database.engine.dispose()
-        engine = create_async_engine(
-            database_url,
-            connect_args={'server_settings': {'search_path': f'"{schema}",public'}},
-        )
-        database.engine = engine
-        database.session_factory = async_sessionmaker(
-            engine, expire_on_commit=False, autoflush=False,
-        )
-        try:
-            await database.check_connection()
-            return await GameDeadlineProcessor(database).run_once(now=now)
-        finally:
-            await database.dispose()
-
-    try:
-        results.put(('ok', asyncio.run(run())))
-    except BaseException as error:
-        results.put(('error', f'{type(error).__name__}: {error}'))
-
-
 def _finish_process(process, results):
-    process.join(20)
+    """Wait for the child's own result (event-driven), then for its clean exit."""
+    try:
+        result = results.get(timeout=HANG_GUARD_SECONDS)
+    except queue.Empty:
+        process.terminate()
+        process.join(5)
+        raise AssertionError('Deadline worker process reported no result') from None
+    process.join(HANG_GUARD_SECONDS)
     if process.is_alive():
         process.terminate()
         process.join(5)
-        raise AssertionError('Deadline worker process did not exit in time')
+        raise AssertionError('Deadline worker process did not exit after reporting')
     assert process.exitcode == 0
-    result = results.get(timeout=5)
     assert result[0] == 'ok', result[1]
     return result[1]
 

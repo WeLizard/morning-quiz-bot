@@ -249,7 +249,12 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         quiz_config = json.loads(config_path.read_text(encoding='utf-8'))
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         quiz_config = {}
-    streak_path = Path(__file__).resolve().parents[1] / 'data' / 'system' / 'streak_achievements.json'
+    # Operational texts (data/system, never committed) win; the committed defaults in config/ keep a
+    # clean checkout and the tests working.
+    root_path = Path(__file__).resolve().parents[1]
+    streak_path = next((path for path in (root_path / 'data' / 'system' / 'streak_achievements.json',
+                                          root_path / 'config' / 'streak_achievements.json')
+                        if path.is_file()), root_path / 'config' / 'streak_achievements.json')
     try:
         streak_raw = json.loads(streak_path.read_text(encoding='utf-8')).get('streak_achievements') or {} \
             if streak_path.is_file() else {}

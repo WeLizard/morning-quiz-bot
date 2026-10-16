@@ -49,7 +49,7 @@ async def scenario(url):
         yield database
     finally:
         async with database.transaction() as session:
-            chat_ids = [CHAT, OTHER_CHAT, USER, USER + 1]
+            chat_ids = [CHAT, OTHER_CHAT, *range(USER, USER + 4)]
             user_ids = range(USER, USER + 4)
             await session.execute(delete(SystemState).where(SystemState.key.in_([
                 "cleanup_retry_until", f"mafia_lobby:{CHAT}", f"mafia_lobby:{OTHER_CHAT}",

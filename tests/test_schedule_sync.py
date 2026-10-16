@@ -150,7 +150,8 @@ def test_inactive_or_deleted_chats_lose_jobs(pg_env):
                 await session.execute(delete(Chat).where(Chat.id == CHAT))
             await sync.run_once()
             assert job_ids(sync) == ([], [])
-            assert not sync._known_chats
+            # Only the deleted chat must be forgotten; other chats of the database stay known.
+            assert CHAT not in sync._known_chats
     asyncio.run(run())
 
 

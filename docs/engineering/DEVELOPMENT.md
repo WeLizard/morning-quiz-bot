@@ -120,6 +120,13 @@ Dev-контейнер и CI ставят Python-набор из `requirements-l
 CycloneDX SBOM вместе с JUnit-отчётом тестов на 14 дней. Обновляй lock через
 `uv pip compile --generate-hashes --python-version 3.13 -o requirements-local-lock.txt
 requirements-local-test.txt`.
+Тестовая БД герметична: в начале каждого прогона pytest (`tests/conftest.py`, фикстура 
+`_fresh_test_database`) схема `public` одноразовой `morning_quiz_test` (пользователь `mqb_dev`, 
+loopback или `postgres`) пересоздаётся и мигрируется до `head`, утёкшие схемы 
+`mqb_acceptance_*` удаляются. CI и локальный docker-прогон начинают с одного состояния, 
+результат не зависит от того, кто мигрировал базу последним. Отключить: `MQB_TEST_DB_RESET=0`. 
+Тесты воркеров дедлайнов запускают дочерние процессы (`spawn`) из лёгкого модуля 
+`tests/deadline_worker_processes.py` и ждут их результат без реальных таймаутов.
 Исторические `tests/run_all_tests.py` и `*_test.py` работают с прежним JSON-контуром
 и не заменяют этот gate. Инструкции запуска: [LOCAL_DEVELOPMENT](../LOCAL_DEVELOPMENT.md).
 

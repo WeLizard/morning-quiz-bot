@@ -233,7 +233,7 @@ def test_api_rating_hides_identifiers_and_works_for_guest_and_telegram(pg_url):
                 guest_account = response.json()['account_id']
                 async with env.db.transaction() as session:
                     await points(session, __import__('uuid').UUID(guest_account), 5, 'poll:g')
-                body = await client.get('/api/rating')
+                body = await client.get('/api/account/rating')
                 assert body.status_code == 200, body.text
                 data = body.json()
                 assert [r['display_name'] for r in data['items']] == ['Телеграмщик']
@@ -245,17 +245,17 @@ def test_api_rating_hides_identifiers_and_works_for_guest_and_telegram(pg_url):
                 assert 'options' in data and set(data['options']) == {'rooms', 'chats', 'telegram'}
                 # Choosing a nickname lists the guest; hiding removes them again.
                 assert (await client.post('/api/guest/profile', headers=HEADERS, json={'display_name': 'Ник'})).status_code == 200
-                data = (await client.get('/api/rating')).json()
+                data = (await client.get('/api/account/rating')).json()
                 assert [(r['display_name'], r['is_me']) for r in data['items']] == [('Телеграмщик', False), ('Ник', True)]
                 hide = await client.post('/api/account/rating-visibility', headers=HEADERS, json={'hidden': True})
                 assert hide.status_code == 200 and hide.json() == {'hidden': True}
-                data = (await client.get('/api/rating')).json()
+                data = (await client.get('/api/account/rating')).json()
                 assert [r['display_name'] for r in data['items']] == ['Телеграмщик']
                 assert data['me']['hidden'] and data['me']['rank'] == 2
                 bad = await client.post('/api/account/rating-visibility', headers=HEADERS, json={'hidden': 'yes'})
                 assert bad.status_code == 400
-                assert (await client.get('/api/rating?scope=bogus')).status_code == 422
-                assert (await client.get('/api/rating?scope=room&room_id=nope')).status_code == 404
+                assert (await client.get('/api/account/rating?scope=bogus')).status_code == 422
+                assert (await client.get('/api/account/rating?scope=room&room_id=nope')).status_code == 404
     run(case())
 
 
@@ -264,14 +264,14 @@ def test_api_rating_for_a_telegram_session_and_no_session(pg_url):
         async with environment(pg_url) as env:
             app, client = await web(env)
             async with client:
-                assert (await client.get('/api/rating')).status_code == 401
+                assert (await client.get('/api/account/rating')).status_code == 401
                 async with env.db.transaction() as session:
                     tg, uid = await player(session, 'Игрок', telegram=True)
                     await points(session, tg, 4, 'poll:t')
                 response = await client.post('/api/mini/session', json={
                     'init_data': signed(uid, date=int(time.time()), query_id=uuid4().hex)})
                 assert response.status_code == 200, response.text
-                data = (await client.get('/api/rating')).json()
+                data = (await client.get('/api/account/rating')).json()
                 assert data['items'][0]['is_me'] and data['me']['rank'] == 1 and data['options']['telegram']
                 assert json.dumps(data).count(str(uid)) == 0
     run(case())

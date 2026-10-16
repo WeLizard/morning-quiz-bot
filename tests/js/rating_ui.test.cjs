@@ -56,7 +56,7 @@ async function show(responses, overrides = {}) {
 }
 
 test('rows show only the nickname, the score and «ты»; nothing else reaches the page', async () => {
-    const view = await show({'/api/rating': page([row(1, 'Аня', '12'), row(2, 'Ник', '9', true), row(3, 'Боря', '4')],
+    const view = await show({'/api/account/rating': page([row(1, 'Аня', '12'), row(2, 'Ник', '9', true), row(3, 'Боря', '4')],
         {rank: 2, score: '9', listed: true, hidden: false, needs_nickname: false})});
     const text = view.content.textContent;
     assert.match(text, /Аня/); assert.match(text, /Ник · ты/); assert.match(text, /Ты — №2 · 9/);
@@ -66,7 +66,7 @@ test('rows show only the nickname, the score and «ты»; nothing else reaches 
 });
 
 test('a guest without a nickname sees the place and a step to choose a nickname', async () => {
-    const view = await show({'/api/rating': page([row(1, 'Аня', '12')], {rank: 4, score: '3', listed: false, hidden: false, needs_nickname: true})});
+    const view = await show({'/api/account/rating': page([row(1, 'Аня', '12')], {rank: 4, score: '3', listed: false, hidden: false, needs_nickname: true})});
     assert.match(view.content.textContent, /Ты — №4 · 3/);
     assert.match(view.content.textContent, /пока ты не выберешь ник/);
     await view.content.all().find(n => n.tag === 'button' && n.textContent === 'Выбрать ник').click();
@@ -74,7 +74,7 @@ test('a guest without a nickname sees the place and a step to choose a nickname'
 });
 
 test('period and game segments reload the same core with the chosen filters', async () => {
-    const view = await show({'/api/rating': page([row(1, 'Аня', '2')], {rank: 1, score: '2', listed: true, hidden: false, needs_nickname: false})});
+    const view = await show({'/api/account/rating': page([row(1, 'Аня', '2')], {rank: 1, score: '2', listed: true, hidden: false, needs_nickname: false})});
     await view.content.all().find(n => n.tag === 'button' && n.textContent === 'Неделя').click(); await flush();
     await view.content.all().find(n => n.tag === 'button' && n.textContent === 'Фото').click(); await flush();
     const last = new URLSearchParams(view.requests.at(-1).path.split('?')[1]);
@@ -84,7 +84,7 @@ test('period and game segments reload the same core with the chosen filters', as
 test('hiding from the rating posts once with both CSRF headers and reloads', async () => {
     let hidden = false;
     const view = await show({
-        '/api/rating': () => page([row(1, 'Аня', '2')], {rank: 1, score: '2', listed: !hidden, hidden, needs_nickname: false}),
+        '/api/account/rating': () => page([row(1, 'Аня', '2')], {rank: 1, score: '2', listed: !hidden, hidden, needs_nickname: false}),
         '/api/account/rating-visibility:POST': () => { hidden = true; return {hidden: true}; },
     });
     await view.content.all().find(n => n.tag === 'button' && n.textContent === 'Не показывать меня в рейтинге').click(); await flush(); await flush();
@@ -98,7 +98,7 @@ test('hiding from the rating posts once with both CSRF headers and reloads', asy
 
 test('rooms and chats appear as slices only when the player has them', async () => {
     const options = {rooms: [{room_id: 'r1', title: 'Компания'}], chats: [{chat_id: -5, title: 'Чат друзей'}], telegram: true};
-    const view = await show({'/api/rating': page([], {rank: null, score: '0', listed: true, hidden: false, needs_nickname: false}, {options})});
+    const view = await show({'/api/account/rating': page([], {rank: null, score: '0', listed: true, hidden: false, needs_nickname: false}, {options})});
     assert.ok(labels(view.content).includes('Комната')); assert.ok(labels(view.content).includes('Чат'));
     assert.match(view.content.textContent, /Пока нет результатов/);
     await view.content.all().find(n => n.tag === 'button' && n.textContent === 'Комната').click(); await flush();
@@ -107,17 +107,17 @@ test('rooms and chats appear as slices only when the player has them', async () 
 });
 
 test('errors go to the host callback and a stale render is ignored', async () => {
-    const failing = load({'/api/rating': () => { throw new Error('boom'); }});
+    const failing = load({'/api/account/rating': () => { throw new Error('boom'); }});
     const content = el('div'), errors = [];
     await failing.QuizRating.render({content, el, button, note, segmented, format, identity: '', isCurrent: () => true,
         onError: error => errors.push(error.message), onProfile() {}}).catch(error => errors.push(error.message));
     assert.equal(errors.length > 0, true);
-    const stale = await show({'/api/rating': page([row(1, 'Аня', '2')], null)}, {isCurrent: () => false});
+    const stale = await show({'/api/account/rating': page([row(1, 'Аня', '2')], null)}, {isCurrent: () => false});
     assert.doesNotMatch(stale.content.textContent, /Аня/);
 });
 
 test('the host can open one chat slice directly (a chat\'s own Rating tab)', async () => {
-    const {QuizRating, requests} = load({'/api/rating': page([row(1, 'Аня', '7')], {rank: 1, score: '7', listed: true, hidden: false, needs_nickname: false}, {
+    const {QuizRating, requests} = load({'/api/account/rating': page([row(1, 'Аня', '7')], {rank: 1, score: '7', listed: true, hidden: false, needs_nickname: false}, {
         scope: 'chat', options: {rooms: [], chats: [{chat_id: -5, title: 'Чат друзей'}], telegram: true}})});
     QuizRating.prefer({scope: 'chat', chatId: -5});
     const content = el('div');

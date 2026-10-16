@@ -1405,7 +1405,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def global_leaderboard(request: Request, limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0, le=10000)):
         return await store.global_leaderboard(credential(request), limit=limit, offset=offset)
 
-    @app.get('/api/rating')
+    @app.get('/api/account/rating')
     async def account_rating(
         request: Request, scope: str = Query('global'), period: str = Query('all'), game: str = Query('all'),
         room_id: str | None = Query(None, max_length=64), chat_id: int | None = Query(None),

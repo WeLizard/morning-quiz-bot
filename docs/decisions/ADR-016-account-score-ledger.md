@@ -33,7 +33,7 @@
 
 ## Рейтинг (этап 2)
 
-* Одно ядро `application/rating.py: rank(scope, period, game, ...)`; читают его `/api/rating` (гость, пароль и Telegram через `resolve_principal`),
+* Одно ядро `application/rating.py: rank(scope, period, game, ...)`; читают его `/api/account/rating` (гость, пароль и Telegram через `resolve_principal`),
   `/top`, `/globaltop`, `/mystats` бота. Разрезы: `global`, `room`, `chat`, `friends`, `farm`, `alchemy`; период `all`/`month`/`week` —
   скользящие 30 и 7 суток по `created_at` событий (без сбросов и сезонов); игра `all`/`classic`/`photo`.
 * В строке нет идентификаторов: `{rank, display_name, score, is_me}`; `me` — своё место даже у скрытого или безымянного гостя.

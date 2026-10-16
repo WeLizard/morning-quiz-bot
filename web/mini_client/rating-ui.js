@@ -13,7 +13,7 @@
         if (scope.scope === 'room' && scope.roomId) query.set('room_id', scope.roomId);
         if (scope.scope === 'chat' && scope.chatId) query.set('chat_id', scope.chatId);
         if (identity) query.set('identity', identity);
-        return `/api/rating?${query}`;
+        return `/api/account/rating?${query}`;
     }
     async function api(path, options = {}) {
         const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 12000);

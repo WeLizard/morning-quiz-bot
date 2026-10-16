@@ -93,5 +93,9 @@ test('farm header has the core ⚙ instead of ⛶ and ☷', () => {
 });
 
 test('UI rules are referenced for both agents', () => {
-    for (const file of ['AGENTS.md', 'CLAUDE.md']) assert.ok(read(file).includes('docs/design/UI_RULES.md'), `${file} must point at UI_RULES.md`);
+    // CLAUDE.md is local (.gitignore): checked only where it exists; AGENTS.md is tracked and always checked.
+    for (const file of ['AGENTS.md', 'CLAUDE.md']) {
+        if (file === 'CLAUDE.md' && !exists(file)) continue;
+        assert.ok(read(file).includes('docs/design/UI_RULES.md'), `${file} must point at UI_RULES.md`);
+    }
 });

@@ -20,7 +20,7 @@ from storage.models import Account, MiniAppSession, User
 from qw_farm.persistence import DemoDatabase, Unit
 from qw_farm.service import FarmService, Principal
 from qw_farm.domain import FarmError
-from qw_farm.sharing import invite_digest, MAX_ACTIVE_SHARE_INVITES_PER_FARM
+from qw_farm.sharing import invite_digest, MAX_ACTIVE_SHARE_INVITES_PER_FARM, SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL
 from sqlalchemy import func, select
 from tests.test_farm_platform import (
     API, environment, farm_pg_url, receipts,
@@ -108,11 +108,12 @@ def test_emitted_invite_requires_signed_identity_and_two_explicit_neighbor_actio
                 assert len(invite['token']) == 43
                 assert invite['web_url'] == ORIGIN + '/app/farm?invite=' + invite['token']
                 assert invite['mini_app_url'] == 'https://t.me/QuizzyTestBot/play?startapp=farm_' + invite['token']
-                cancelled = await owner.post(API + '/invite/share', params={'identity':'guest'}, headers=HEADERS)
-                cancelled_token = cancelled.json()['token']
-                revoked = await owner.post(API + '/invite/share/revoke?identity=guest', headers=HEADERS,
-                                           json={'token':cancelled_token})
-                assert revoked.status_code == 200 and revoked.json() == {'revoked':True}
+                assert (invite['uses'], invite['max_uses']) == (0, 10)
+                again = await owner.post(API + '/invite/share', params={'identity':'guest'}, headers=HEADERS)
+                assert again.json()['token'] == invite['token']
+                assert (await owner.get(API + '/invite?identity=guest')).json()['link']['uses'] == 0
+                async with env.db.transaction() as session:
+                    assert await session.scalar(select(func.count()).select_from(env.schema['share_invites'])) == 1
                 target, start_param = client_hint(invite, channel)
                 assert target == invite['token']
 
@@ -149,9 +150,9 @@ def test_emitted_invite_requires_signed_identity_and_two_explicit_neighbor_actio
                 foreign_revoke = await recipient.post(API + '/invite/share/revoke?identity=telegram',
                                                       headers=HEADERS,json={'token':target})
                 assert foreign_revoke.status_code == 404
-                cancelled_join = await recipient.post(API + '/invite/join?identity=telegram',headers=HEADERS,
-                                                     json={'token':cancelled_token})
-                assert cancelled_join.status_code == 404
+                unknown_join = await recipient.post(API + '/invite/join?identity=telegram',headers=HEADERS,
+                                                   json={'token':'U' * 43})
+                assert unknown_join.status_code == 404
                 async with env.db.transaction() as session:
                     account_id = str((await session.get(User, uid)).account_id)
                 assert (await recipient.get(API + '/neighbors?identity=telegram')).json()['neighbors'] == []
@@ -181,13 +182,12 @@ def test_emitted_invite_requires_signed_identity_and_two_explicit_neighbor_actio
                 assert malformed.status_code == 422
                 before_owner = (await owner.get(API + '/me?identity=guest')).json()['farm']['coins']
                 before_recipient = (await recipient.get(API + '/me?identity=telegram')).json()['farm']['coins']
-                expired_link = await owner.post(API + '/invite/share?identity=guest', headers=HEADERS)
-                expired_token = expired_link.json()['token']
+                expired_token = 'E' * 43
                 from qw_farm.sharing import invite_digest
+                from uuid import UUID
                 async with env.db.transaction() as session:
-                    await session.execute(env.schema['share_invites'].update().where(
-                        env.schema['share_invites'].c.token_hash == invite_digest(expired_token)
-                    ).values(expires_at=env.now[0]-1))
+                    await session.execute(env.schema['share_invites'].insert().values(
+                        token_hash=invite_digest(expired_token), farm_id=UUID(owner_id), expires_at=env.now[0]-1))
                 expired = await recipient.post(API + '/invite/join?identity=telegram', headers=HEADERS,
                                                json={'token': expired_token})
                 assert expired.status_code == 410
@@ -206,12 +206,20 @@ def test_emitted_invite_requires_signed_identity_and_two_explicit_neighbor_actio
                 replay = await recipient.post(API + '/invite/join?identity=telegram', headers=HEADERS,
                                               json={'token': target})
                 assert replay.status_code == 200 and replay.json()['neighbor_reward_paid'] is False
+                async with env.db.transaction() as session:
+                    row = (await session.execute(select(env.schema['share_invites']).where(
+                        env.schema['share_invites'].c.token_hash == invite_digest(target)))).mappings().one()
+                    assert row['uses'] == 1
+                    await session.execute(env.schema['share_invites'].update().where(
+                        env.schema['share_invites'].c.token_hash == invite_digest(target)).values(max_uses=1))
                 used_by_other = await recipient.post(API + '/invite/join?identity=guest', headers=HEADERS,
                                                      json={'token': target})
                 assert used_by_other.status_code == 409 and used_by_other.json()['code'] == 'invite_used'
                 revoke_used = await owner.post(API + '/invite/share/revoke?identity=guest',headers=HEADERS,
                                                json={'token':target})
-                assert revoke_used.status_code == 409 and revoke_used.json()['code'] == 'invite_used'
+                assert revoke_used.status_code == 200 and revoke_used.json() == {'revoked': True}
+                replacement = (await owner.post(API + '/invite/share?identity=guest', headers=HEADERS)).json()
+                assert replacement['token'] != target and replacement['uses'] == 0
                 visit = await recipient.get(API + '/farms/' + owner_id + '?identity=telegram')
                 assert visit.status_code == 200, visit.text
                 assert visit.json()['farm']['id'] == owner_id
@@ -224,7 +232,7 @@ def test_emitted_invite_requires_signed_identity_and_two_explicit_neighbor_actio
     asyncio.run(run())
 
 
-def test_postgres_share_invite_race_accepts_only_one_recipient(farm_pg_url):
+def test_postgres_share_invite_race_for_the_last_place_accepts_only_one_recipient(farm_pg_url):
     async def run():
         async with environment(farm_pg_url) as env:
             app=create_app(database=env.db,settings=MiniAppSettings(TOKEN,ORIGIN,offline=True,
@@ -245,6 +253,9 @@ def test_postgres_share_invite_race_accepts_only_one_recipient(farm_pg_url):
                 emitted=await owner.post(API+'/invite/share?identity=guest',headers=HEADERS)
                 assert emitted.status_code==200,emitted.text
                 token=emitted.json()['token']
+                async with env.db.transaction() as session:
+                    await session.execute(env.schema['share_invites'].update().where(
+                        env.schema['share_invites'].c.token_hash==invite_digest(token)).values(max_uses=1))
                 async def join(client):
                     return await client.post(API+'/invite/join?identity=guest',headers=HEADERS,json={'token':token})
                 responses=await asyncio.gather(join(first),join(second))
@@ -256,9 +267,9 @@ def test_postgres_share_invite_race_accepts_only_one_recipient(farm_pg_url):
                 neighbors=(await owner.get(API+'/neighbors?identity=guest')).json()['neighbors']
                 assert [(row['id'],row['status']) for row in neighbors]==[(winner,'accepted')]
                 async with env.db.transaction() as session:
-                    row=await session.execute(select(env.schema['share_invites'].c.accepted_by_farm_id).where(
-                        env.schema['share_invites'].c.token_hash==invite_digest(token)))
-                    assert str(row.scalar_one())==winner
+                    uses=env.schema['share_invite_uses']
+                    rows=(await session.execute(select(uses.c.farm_id).where(uses.c.token_hash==invite_digest(token)))).scalars().all()
+                    assert [str(r) for r in rows]==[winner]
                 winner_client=first if winner==first_id else second
                 loser_client=second if winner==first_id else first
                 assert (await winner_client.get(API+'/neighbors?identity=guest')).json()['neighbors'][0]['status']=='accepted'
@@ -267,175 +278,207 @@ def test_postgres_share_invite_race_accepts_only_one_recipient(farm_pg_url):
     asyncio.run(run())
 
 
-def test_demo_service_invite_join_is_atomic_idempotent_and_single_use():
+def test_demo_service_reusable_link_is_atomic_idempotent_and_capped():
     async def run():
         db=DemoDatabase(':memory:')
-        owner_account,recipient_account,other_account,third_account=(uuid4(),uuid4(),uuid4(),uuid4())
+        owner_account,recipient_account,other_account,third_account,fourth_account=(uuid4() for _ in range(5))
         with db.engine.begin() as connection:
-            for account in (owner_account,recipient_account,other_account,third_account):
+            for account in (owner_account,recipient_account,other_account,third_account,fourth_account):
                 connection.execute(db.accounts.insert().values(id=account,name='Player',recovery_hash=uuid4().hex))
         now=[1_700_000_000]
+        def service(unit,account,name='Player'):
+            return FarmService(unit,Principal(str(account),name),clock=lambda:now[0])
+        async def uses(unit,token):
+            return (await unit.share_invite(invite_digest(token)))['uses']
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
+            owner=service(unit,owner_account,'Owner')
             await owner.open()
             owner_id=(await owner.me())['id']
-            token=await owner.create_share_invite()
-            self_token=await owner.create_share_invite()
-        assert len(token)==43
+            assert await owner.share_link_status() is None
+            link=await owner.share_link()
+            token=link['token']
+            assert len(token)==43 and (link['uses'],link['max_uses'])==(0,SHARE_INVITE_MAX_USES)
+            assert (await owner.share_link())['token']==token   # one reusable link, not a token per tap
+            assert (await unit.execute(select(func.count()).select_from(unit.t['share_invites']))).scalar_one()==1
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
-            try:await owner.join_share_invite(self_token)
+            owner=service(unit,owner_account,'Owner')
+            try:await owner.join_share_invite(token)
             except FarmError as error:assert error.code=='self_invite'
             else:raise AssertionError('self invite unexpectedly succeeded')
-            self_digest=invite_digest(self_token)
-            assert (await unit.share_invite(self_digest))['accepted_by_farm_id'] is None
+            assert await uses(unit,token)==0
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
+            recipient=service(unit,recipient_account,'Recipient')
             opened=await recipient.open(token)
             recipient_id=opened['farm']['id']
             assert opened['farm']['invited_by']==owner_id
             recipient_before=(await recipient.me())['coins']
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
+            owner=service(unit,owner_account,'Owner')
             owner_before=(await owner.me())['coins']
             owner_farm=await owner.me()
             owner_farm['blocked'].append(recipient_id)
             await unit.save(owner_farm)
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
+            recipient=service(unit,recipient_account,'Recipient')
             try:await recipient.join_share_invite(token)
             except FarmError as error:assert error.code=='blocked'
             else:raise AssertionError('blocked invitation unexpectedly succeeded')
-            assert (await unit.share_invite(invite_digest(token)))['accepted_by_farm_id'] is None
+            assert await uses(unit,token)==0
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
+            owner=service(unit,owner_account,'Owner')
             owner_farm=await owner.me()
             owner_farm['blocked'].clear()
             owner_farm['neighbors']={str(uuid4()):{'name':'Full','status':'accepted'} for _ in range(100)}
             await unit.save(owner_farm)
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
+            recipient=service(unit,recipient_account,'Recipient')
             try:await recipient.join_share_invite(token)
             except FarmError as error:assert error.code=='neighbors_full'
             else:raise AssertionError('full neighbor list unexpectedly accepted invitation')
-            assert (await unit.share_invite(invite_digest(token)))['accepted_by_farm_id'] is None
+            assert await uses(unit,token)==0
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
+            owner=service(unit,owner_account,'Owner')
             owner_farm=await owner.me()
             owner_farm['neighbors'].clear()
             await unit.save(owner_farm)
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
+            recipient=service(unit,recipient_account,'Recipient')
             result=await recipient.join_share_invite(token)
             assert result['neighbor_reward_paid'] is True
             assert {n['id']:n['status'] for n in result['neighbors']['neighbors']}[owner_id]=='accepted'
             assert (await recipient.me())['coins']==recipient_before+result['neighbors']['reward_per_neighbor']
+            assert await uses(unit,token)==1
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
+            owner=service(unit,owner_account,'Owner')
             assert (await owner.me())['neighbors'][recipient_id]['status']=='accepted'
             assert (await owner.me())['coins']==owner_before+result['neighbors']['reward_per_neighbor']
+            assert (await owner.share_link_status())['uses']==1
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
+            recipient=service(unit,recipient_account,'Recipient')
             replay=await recipient.join_share_invite(token)
-            assert replay['neighbor_reward_paid'] is False
+            assert replay['neighbor_reward_paid'] is False and replay['notice']=='Приглашение уже принято.'
+            assert await uses(unit,token)==1   # a replay does not spend a place
+        # The same link brings more neighbors; reward limits apply as for ordinary neighborhoods.
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
-            try:await owner.revoke_share_invite(token)
-            except FarmError as error:assert error.code=='invite_used'
-            else:raise AssertionError('accepted invitation was revoked')
-        async with db.transaction() as unit:
-            other=FarmService(unit,Principal(str(other_account),'Other'),clock=lambda:now[0])
+            other=service(unit,other_account,'Other')
             await other.open()
-            try:await other.revoke_share_invite(self_token)
+            try:await other.revoke_share_invite(token)
             except FarmError as error:assert error.code=='invite_unknown'
             else:raise AssertionError('foreign invitation was revoked')
-            try:await other.join_share_invite(token)
-            except FarmError as error:assert error.code=='invite_used'
-            else:raise AssertionError('second recipient unexpectedly consumed the invite')
-        async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
-            owner_farm=await owner.me()
-            owner_farm['neighbors'].clear()
-            await unit.save(owner_farm)
-            other=FarmService(unit,Principal(str(other_account),'Other'),clock=lambda:now[0])
             other_farm=await other.me()
             from qw_farm import economy
             other_farm['neighbor_bonus']={'day':economy.moscow_day(now[0]),'today':5,'total':5,'earned':0}
             await unit.save(other_farm)
-            quota_token=await owner.create_share_invite()
         async with db.transaction() as unit:
-            other=FarmService(unit,Principal(str(other_account),'Other'),clock=lambda:now[0])
-            limited=await other.join_share_invite(quota_token)
+            other=service(unit,other_account,'Other')
+            limited=await other.join_share_invite(token)
             assert limited['neighbor_reward_paid'] is False
             assert 'лимит наград' in limited['notice'].lower()
             assert (await other.me())['neighbors'][owner_id]['status']=='accepted'
-            assert (await unit.share_invite(invite_digest(quota_token)))['accepted_by_farm_id'] is not None
+            assert await uses(unit,token)==2
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
-            third=FarmService(unit,Principal(str(third_account),'Third'),clock=lambda:now[0])
+            third=service(unit,third_account,'Third')
             await third.open()
             third_farm=await third.me()
             third_farm['neighbor_bonus']={'day':-1,'today':0,'total':40,'earned':0}
             await unit.save(third_farm)
-            total_limit_token=await owner.create_share_invite()
         async with db.transaction() as unit:
-            third=FarmService(unit,Principal(str(third_account),'Third'),clock=lambda:now[0])
-            limited_total=await third.join_share_invite(total_limit_token)
+            third=service(unit,third_account,'Third')
+            limited_total=await third.join_share_invite(token)
             assert limited_total['neighbor_reward_paid'] is False
             assert (await third.me())['neighbors'][owner_id]['status']=='accepted'
+            assert await uses(unit,token)==3
+            # Full link: the next farm is refused, the owner automatically gets a new link.
+            await unit.execute(unit.t['share_invites'].update().where(
+                unit.t['share_invites'].c.token_hash==invite_digest(token)).values(max_uses=3))
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
-            expired_token=await FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0]).create_share_invite()
-        now[0]+=7*24*60*60+1
+            fourth=service(unit,fourth_account,'Fourth')
+            await fourth.open()
+            try:await fourth.join_share_invite(token)
+            except FarmError as error:assert error.code=='invite_used'
+            else:raise AssertionError('a full link accepted one more neighbor')
+            owner=service(unit,owner_account,'Owner')
+            fresh=await owner.share_link()
+            assert fresh['token']!=token and fresh['uses']==0
         async with db.transaction() as unit:
-            recipient=FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0])
-            try:await recipient.join_share_invite(expired_token)
+            fourth=service(unit,fourth_account,'Fourth')
+            assert (await fourth.join_share_invite(fresh['token']))['neighbors']['neighbors'][0]['id']==owner_id
+        # «Сменить ссылку»: the old link stops working, neighborhoods made through it stay.
+        async with db.transaction() as unit:
+            owner=service(unit,owner_account,'Owner')
+            rotated=await owner.share_link(rotate=True)
+            assert rotated['token']!=fresh['token']
+            assert await owner.revoke_share_invite(rotated['token'])=={'revoked':True}
+            try:await owner.revoke_share_invite(rotated['token'])
+            except FarmError as error:assert error.code=='invite_expired'
+            else:raise AssertionError('a revoked link was revoked twice')
+            assert recipient_id in (await owner.me())['neighbors']
+        async with db.transaction() as unit:
+            recipient=service(unit,recipient_account,'Recipient')
+            for stale in (fresh['token'],rotated['token']):
+                try:await recipient.join_share_invite(stale)
+                except FarmError as error:assert error.code in ('invite_expired','invite_unknown')   # replaced links are pruned
+                else:raise AssertionError('a replaced link still works')
+        # Expiry and pruning.
+        async with db.transaction() as unit:
+            expiring=(await service(unit,owner_account,'Owner').share_link())['token']
+        now[0]+=SHARE_INVITE_TTL+1
+        async with db.transaction() as unit:
+            recipient=service(unit,recipient_account,'Recipient')
+            try:await recipient.join_share_invite(expiring)
             except FarmError as error:assert error.code=='invite_expired'
             else:raise AssertionError('expired invite unexpectedly succeeded')
-            assert (await unit.share_invite(invite_digest(expired_token)))['accepted_by_farm_id'] is None
         async with db.transaction() as unit:
-            owner=FarmService(unit,Principal(str(owner_account),'Owner'),clock=lambda:now[0])
-            await owner.create_share_invite()  # globally prune all expired rows
+            owner=service(unit,owner_account,'Owner')
+            renewed=await owner.share_link()   # also prunes all expired rows with their acceptances
+            assert renewed['token'] not in (token,expiring)
             assert await unit.share_invite(invite_digest(token)) is None
-            assert await unit.share_invite(invite_digest(expired_token)) is None
-            try:await FarmService(unit,Principal(str(recipient_account),'Recipient'),clock=lambda:now[0]).join_share_invite(token)
+            assert await unit.share_invite(invite_digest(expiring)) is None
+            assert (await unit.execute(select(func.count()).select_from(unit.t['share_invite_uses']))).scalar_one()==0
+            try:await service(unit,recipient_account,'Recipient').join_share_invite(token)
             except FarmError as error:assert error.code=='invite_unknown'
             else:raise AssertionError('expired invite survived its retention window')
-            other=FarmService(unit,Principal(str(other_account),'Other'),clock=lambda:now[0])
-            try:await other.join_share_invite('bad-token')
+            try:await service(unit,other_account,'Other').join_share_invite('bad-token')
             except FarmError as error:assert error.code=='invalid_invite'
             else:raise AssertionError('malformed invite unexpectedly succeeded')
         db.engine.dispose()
     asyncio.run(run())
 
 
-def test_demo_share_invite_issuance_is_capped_and_expired_rows_are_pruned():
+def test_demo_link_survives_requests_changes_with_the_secret_and_legacy_rows_still_cap_issuance():
     async def run():
         db=DemoDatabase(':memory:')
-        account=uuid4()
+        account,friend=uuid4(),uuid4()
         with db.engine.begin() as connection:
-            connection.execute(db.accounts.insert().values(id=account,name='Player',recovery_hash=uuid4().hex))
+            for value in (account,friend):
+                connection.execute(db.accounts.insert().values(id=value,name='Player',recovery_hash=uuid4().hex))
         now=[1_700_000_000]
         async with db.transaction() as unit:
             service=FarmService(unit,Principal(str(account),'Player'),clock=lambda:now[0])
+            service.invite_secret='s'*32
             await service.open()
-            tokens=[await service.create_share_invite() for _ in range(MAX_ACTIVE_SHARE_INVITES_PER_FARM)]
-            try:await service.create_share_invite()
-            except FarmError as error:assert error.code=='share_invite_limit' and error.status==429
-            else:raise AssertionError('invite issuance exceeded its active-window quota')
-            count=await unit.execute(select(func.count()).select_from(unit.t['share_invites']))
-            assert count.scalar_one()==MAX_ACTIVE_SHARE_INVITES_PER_FARM
-            assert await service.revoke_share_invite(tokens[0])=={'revoked':True}
-            replacement_for_revoked=await service.create_share_invite()
-            assert len(replacement_for_revoked)==43
-            count=await unit.execute(select(func.count()).select_from(unit.t['share_invites']))
-            assert count.scalar_one()==MAX_ACTIVE_SHARE_INVITES_PER_FARM
-        now[0]+=7*24*60*60+1
+            farm_id=(await service.me())['id']
+            first=(await service.share_link())['token']
+            assert (await service.share_link())['token']==first
+            service.invite_secret='t'*32   # a changed secret cannot rebuild the link: a new one replaces it
+            second=(await service.share_link())['token']
+            assert second!=first
+            assert await unit.share_invite(invite_digest(first)) is None   # closed and pruned at once
         async with db.transaction() as unit:
             service=FarmService(unit,Principal(str(account),'Player'),clock=lambda:now[0])
-            replacement=await service.create_share_invite()
-            assert len(replacement)==43
-            assert await unit.share_invite(invite_digest(tokens[0])) is None
-            assert (await unit.execute(select(func.count()).select_from(unit.t['share_invites']))).scalar_one()==1
+            service.invite_secret='t'*32
+            assert (await service.share_link())['token']==second
+            # Legacy one-use rows from before 0037 still count toward the active ceiling.
+            from uuid import UUID
+            for index in range(MAX_ACTIVE_SHARE_INVITES_PER_FARM-1):
+                await unit.execute(unit.t['share_invites'].insert().values(
+                    token_hash=invite_digest(f'{index:043d}'),farm_id=UUID(farm_id),expires_at=now[0]+60))
+        async with db.transaction() as unit:
+            friend_service=FarmService(unit,Principal(str(friend),'Friend'),clock=lambda:now[0])
+            await friend_service.open()
+            assert (await friend_service.join_share_invite('0'*43))['notice'].startswith('Теперь вы соседи')
+            try:await friend_service.join_share_invite('0'*43)
+            except FarmError:raise AssertionError('a replay of a legacy link must be idempotent')
+            assert (await unit.share_invite(invite_digest('0'*43)))['uses']==1
         db.engine.dispose()
     asyncio.run(run())

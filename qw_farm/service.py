@@ -10,7 +10,8 @@ from .domain import new_farm, apply, project, validate_state, can_visit, FarmErr
 from .catalog import tick, public_catalog, VERSION, level, FUND_LEVEL, INVITE
 from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, progression, trip_games
-from .sharing import new_invite_token, invite_digest, MAX_ACTIVE_SHARE_INVITES_PER_FARM
+from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
+                      SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
 
 @dataclass(frozen=True)
 class Principal:
@@ -44,23 +45,41 @@ class FarmService:
         return dict(farm=project(farm,farm,self.clock()),catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
                     invites=await self._invites(farm),address_form=self.p.address_form)
 
-    async def create_share_invite(self):
-        """Create a seven-day, one-use opaque link; only its digest is persisted."""
+    async def share_link_status(self):
+        """Read-only state of the current reusable link (no token is issued), or None."""
+        farm=await self.me()
+        row=await self.u.share_invite_current(farm['id'],self.clock())
+        return dict(uses=row['uses'],max_uses=row['max_uses'],expires_at=row['expires_at']) if row else None
+
+    async def share_link(self, rotate=False):
+        """The farm's reusable invite link: the same one until it is full, expires or rotate=True replaces it.
+
+        Only the digest is persisted; the token is recomputed from the server secret and the row's nonce.
+        Returns dict(token, uses, max_uses, expires_at).
+        """
         await self.u.lock('account:'+self.p.account_id)
         farm=await self.me()
         await self.u.lock('farm:'+farm['id'])
-        farm=await self.u.get(farm['id'])
-        token=new_invite_token()
         now=self.clock()
-        await self.u.share_invite_create(invite_digest(token),farm['id'],now+7*24*60*60,
-                                         now,MAX_ACTIVE_SHARE_INVITES_PER_FARM)
-        return token
+        secret=invite_secret(getattr(self,'invite_secret',None))
+        row=None if rotate else await self.u.share_invite_current(farm['id'],now)
+        if row is not None:
+            token=link_token(secret,farm['id'],row['nonce'])
+            if invite_digest(token)==row['token_hash']:
+                return dict(token=token,uses=row['uses'],max_uses=row['max_uses'],expires_at=row['expires_at'])
+        # Rotation, or a changed secret that cannot rebuild the link: close the old links, issue a new one.
+        await self.u.share_invite_expire_all(farm['id'],now)
+        nonce=new_invite_nonce()
+        token=link_token(secret,farm['id'],nonce)
+        await self.u.share_invite_create(invite_digest(token),farm['id'],now+SHARE_INVITE_TTL,now,
+                                         MAX_ACTIVE_SHARE_INVITES_PER_FARM,nonce=nonce,max_uses=SHARE_INVITE_MAX_USES)
+        return dict(token=token,uses=0,max_uses=SHARE_INVITE_MAX_USES,expires_at=now+SHARE_INVITE_TTL)
 
     async def _invite_farm(self, code):
         """Resolve a one-use opaque token or a legacy manually-entered UUID."""
         if isinstance(code,str) and re.fullmatch(r'[A-Za-z0-9_-]{43}',code):
             row=await self.u.share_invite(invite_digest(code))
-            return str(row['farm_id']) if row and row['accepted_by_farm_id'] is None and row['expires_at']>self.clock() else None
+            return str(row['farm_id']) if row and row['uses']<row['max_uses'] and row['expires_at']>self.clock() else None
         try:return str(UUID(str(code)))
         except (ValueError,TypeError,AttributeError):return None
 
@@ -105,10 +124,11 @@ class FarmService:
         inviter_id=str(row['farm_id'])
         need(inviter_id!=me['id'],'self_invite','Нельзя стать соседом самому себе.',422)
         need(row['expires_at']>now,'invite_expired','Срок приглашения истёк.',410)
-        if row['accepted_by_farm_id'] is not None:
-            need(str(row['accepted_by_farm_id'])==me['id'],'invite_used','Приглашение уже использовано.',409)
+        if await self.u.share_invite_used_by(digest,me['id']):
             return dict(neighbor_reward_paid=False,notice='Приглашение уже принято.',
                         neighbors=await self.neighbors())
+        need(row['uses']<row['max_uses'],'invite_used',
+             'По этой ссылке уже вступило максимум соседей. Попроси у друга новую.',409)
         await self.u.lock('farm:'+me['id'],'farm:'+inviter_id)
         me=await self.u.get(me['id']); other=await self.u.get(inviter_id)
         need(other is not None,'invite_unknown','Приглашение не найдено.',404)
@@ -134,7 +154,8 @@ class FarmService:
         # Match ordinary accept_neighbor semantics: quota-limited pairs still
         # become neighbours, with the reward left claimable when its limits reset.
         reward_notice,reward_paid=await self._neighbor_reward(me,other,now)
-        need(await self.u.share_invite_accept(digest,me['id'],now),'invite_used','Приглашение уже использовано.',409)
+        need(await self.u.share_invite_accept(digest,me['id'],now),'invite_used',
+             'По этой ссылке уже вступило максимум соседей. Попроси у друга новую.',409)
         me['revision']+=1; validate_state(me); await self.u.save(me)
         await self.u.record(self.p.account_id,'share-invite:'+digest[:32],'accept_neighbor',before,me,now)
         other['revision']+=1; validate_state(other); await self.u.save(other)
@@ -143,7 +164,7 @@ class FarmService:
                     neighbors=await self.neighbors())
 
     async def revoke_share_invite(self, token):
-        """Revoke a pending invitation owned by the current farm."""
+        """Expire a link owned by the current farm; neighborhoods made through it stay."""
         need(isinstance(token,str) and re.fullmatch(r'[A-Za-z0-9_-]{43}',token) is not None,
              'invalid_invite','Некорректная ссылка-приглашение.',422)
         digest=invite_digest(token)
@@ -153,10 +174,8 @@ class FarmService:
         row=await self.u.share_invite(digest)
         need(row is not None and str(row['farm_id'])==me['id'],
              'invite_unknown','Приглашение не найдено.',404)
-        need(row['accepted_by_farm_id'] is None,'invite_used',
-             'Принятое приглашение нельзя отменить.',409)
-        need(await self.u.share_invite_revoke(digest,me['id']),
-             'invite_used','Приглашение уже принято или отменено.',409)
+        need(await self.u.share_invite_revoke(digest,me['id'],self.clock()),
+             'invite_expired','Ссылка уже отменена или истекла.',409)
         return dict(revoked=True)
 
     async def _invites(self, farm):

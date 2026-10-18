@@ -15,7 +15,7 @@ from .domain import FarmError, need
 
 def tables(metadata: sa.MetaData):
     if 'farm_states' in metadata.tables:
-        return {name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites']}
+        return {name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites','share_invite_uses']}
     states=sa.Table('farm_states',metadata,
         sa.Column('id',sa.Uuid,primary_key=True),
         sa.Column('account_id',sa.Uuid,sa.ForeignKey('accounts.id',ondelete='RESTRICT'),nullable=False,unique=True),
@@ -64,12 +64,22 @@ def tables(metadata: sa.MetaData):
         sa.Column('expires_at',sa.Float,nullable=False),
         sa.Column('accepted_by_farm_id',sa.Uuid,sa.ForeignKey('farm_states.id',ondelete='RESTRICT'),nullable=True),
         sa.Column('accepted_at',sa.Float,nullable=True),
+        # 0037: a reusable link. The token is HMAC(secret, farm_id, nonce); legacy rows have no nonce and max_uses=1.
+        # accepted_by_farm_id/accepted_at are legacy (one-use links before 0037); acceptances live in farm_share_invite_uses.
+        sa.Column('nonce',sa.String(32),nullable=True),
+        sa.Column('max_uses',sa.Integer,nullable=False,server_default='1'),
+        sa.Column('uses',sa.Integer,nullable=False,server_default='0'),
         sa.CheckConstraint('(accepted_by_farm_id IS NULL) = (accepted_at IS NULL)',name='ck_farm_share_invites_accept_pair'),
-        sa.CheckConstraint('accepted_by_farm_id IS NULL OR accepted_by_farm_id <> farm_id',name='ck_farm_share_invites_not_self'))
+        sa.CheckConstraint('accepted_by_farm_id IS NULL OR accepted_by_farm_id <> farm_id',name='ck_farm_share_invites_not_self'),
+        sa.CheckConstraint('max_uses >= 1 AND uses >= 0 AND uses <= max_uses',name='ck_farm_share_invites_uses'))
     sa.Index('ix_farm_share_invites_farm',share_invites.c.farm_id)
     sa.Index('ix_farm_share_invites_expires',share_invites.c.expires_at)
+    share_invite_uses=sa.Table('farm_share_invite_uses',metadata,
+        sa.Column('token_hash',sa.String(64),sa.ForeignKey('farm_share_invites.token_hash',ondelete='CASCADE'),primary_key=True),
+        sa.Column('farm_id',sa.Uuid,sa.ForeignKey('farm_states.id',ondelete='RESTRICT'),primary_key=True),
+        sa.Column('accepted_at',sa.Float,nullable=False))
     sa.Index('ix_farm_states_public',states.c.visibility,states.c.name)
-    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites)
+    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses)
 
 
 def unpack(row):
@@ -113,34 +123,55 @@ class Unit:
         result=await self.execute(sa.select(t.c.account_id).where(t.c.id==UUID(str(farm_id))))
         return str(result.scalar_one())
 
-    async def share_invite_create(self, token_hash, farm_id, expires_at, now, maximum):
+    async def share_invite_create(self, token_hash, farm_id, expires_at, now, maximum, *, nonce=None, max_uses=1):
         t=self.t['share_invites']
-        # Expired invitation rows have no valid replay semantics and can be
-        # discarded. Accepted rows remain until their expiry for active-token
-        # idempotency; the per-farm ceiling bounds issuance during that window.
+        # Expired (and revoked, which are expired at revocation) rows have no valid replay
+        # semantics and are discarded with their acceptances; the per-farm ceiling bounds issuance.
         await self.execute(sa.delete(t).where(t.c.expires_at<=now))
         active=await self.execute(sa.select(sa.func.count()).select_from(t).where(
             t.c.farm_id==UUID(str(farm_id)),t.c.expires_at>now))
         need(active.scalar_one()<maximum,'share_invite_limit',
-             'Ты создал(а) слишком много ссылок за последние 7 дней. Попробуй позже.',429)
+             'Ты слишком часто меняешь ссылку. Попробуй позже.',429)
         await self.execute(sa.insert(self.t['share_invites']).values(token_hash=token_hash,
-            farm_id=UUID(str(farm_id)),expires_at=expires_at))
+            farm_id=UUID(str(farm_id)),expires_at=expires_at,nonce=nonce,max_uses=max_uses,uses=0))
+
+    async def share_invite_current(self, farm_id, now):
+        """The farm's newest reusable link that is neither expired nor full."""
+        t=self.t['share_invites']
+        row=(await self.execute(sa.select(t).where(t.c.farm_id==UUID(str(farm_id)),t.c.nonce.is_not(None),
+            t.c.expires_at>now,t.c.uses<t.c.max_uses).order_by(t.c.expires_at.desc()).limit(1))).mappings().first()
+        return dict(row) if row else None
+
+    async def share_invite_expire_all(self, farm_id, now):
+        t=self.t['share_invites']
+        await self.execute(sa.update(t).where(t.c.farm_id==UUID(str(farm_id)),t.c.expires_at>now).values(expires_at=now))
 
     async def share_invite(self, token_hash):
         t=self.t['share_invites']
         row=(await self.execute(sa.select(t).where(t.c.token_hash==token_hash))).mappings().first()
         return dict(row) if row else None
 
+    async def share_invite_used_by(self, token_hash, farm_id):
+        u=self.t['share_invite_uses']
+        row=(await self.execute(sa.select(u.c.token_hash).where(u.c.token_hash==token_hash,
+            u.c.farm_id==UUID(str(farm_id))))).first()
+        return row is not None
+
     async def share_invite_accept(self, token_hash, farm_id, now):
+        """Take one free slot of the link for farm_id; False when the link is already full."""
         t=self.t['share_invites']
         result=await self.execute(sa.update(t).where(t.c.token_hash==token_hash,
-            t.c.accepted_by_farm_id.is_(None)).values(accepted_by_farm_id=UUID(str(farm_id)),accepted_at=now))
-        return result.rowcount==1
+            t.c.uses<t.c.max_uses).values(uses=t.c.uses+1))
+        if result.rowcount!=1:return False
+        await self.execute(sa.insert(self.t['share_invite_uses']).values(token_hash=token_hash,
+            farm_id=UUID(str(farm_id)),accepted_at=now))
+        return True
 
-    async def share_invite_revoke(self, token_hash, farm_id):
+    async def share_invite_revoke(self, token_hash, farm_id, now):
+        """Expire the link now; neighborhoods already made through it stay."""
         t=self.t['share_invites']
-        result=await self.execute(sa.delete(t).where(t.c.token_hash==token_hash,
-            t.c.farm_id==UUID(str(farm_id)),t.c.accepted_by_farm_id.is_(None)))
+        result=await self.execute(sa.update(t).where(t.c.token_hash==token_hash,
+            t.c.farm_id==UUID(str(farm_id)),t.c.expires_at>now).values(expires_at=now))
         return result.rowcount==1
 
     async def save(self, farm, account_id=None):

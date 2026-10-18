@@ -95,6 +95,10 @@ def install_farm(app, database, settings, *, allowed_user_ids=None, clock=time.t
     guest_store=app.state.guest_store
     mini_store=app.state.mini_store
     shared = os.getenv('QW_FARM_SHARED_RATE_ENABLED') == '1'
+    # Reusable invite links are recomputed from this secret; without it each restart issues new links.
+    invite_secret = os.getenv('QW_FARM_INVITE_SECRET', '')
+    if invite_secret and (len(invite_secret) < 32 or invite_secret == settings.bot_token):
+        raise ValueError('QW_FARM_INVITE_SECRET must be at least 32 characters and must not reuse the bot token')
     limiter = None
     if shared:
         quota_settings = RateSettings.from_env()
@@ -127,6 +131,7 @@ def install_farm(app, database, settings, *, allowed_user_ids=None, clock=time.t
                 service=FarmService(Unit(session,schema),Principal(who.account_id,who.display_name,who.channel,who.address_form),
                                     clock=clock,speed=1,question_provider=farm_question_provider)
                 service.telegram_user_id=getattr(who,'telegram_user_id',None)
+                service.invite_secret=invite_secret
                 yield service
         except PrincipalError as error:
             need(False,error.code,error.message,error.status)
@@ -152,9 +157,11 @@ def install_farm(app, database, settings, *, allowed_user_ids=None, clock=time.t
     async def prepare_share(telegram_user_id,invitation):
         share=getattr(app.state,'telegram_share',None)
         if share is None:return None
+        from .sharing import invite_digest
         return await share.prepare(telegram_user_id,result_id='farm-'+invitation['token'][:16],
             title=f"Приглашение на ферму «{invitation['farm_name']}»",description='Открой и подтверди соседство в игре',
-            text=invitation['text'],button_text='Открыть ферму',button_url=invitation['mini_app_url'])
+            text=invitation['text'],button_text='Открыть ферму',button_url=invitation['mini_app_url'],
+            cache_key='farm-invite:'+invite_digest(invitation['token']))
 
     app.include_router(create_router(context,origin=settings.origin,
         bot_username=getattr(settings,'bot_username','') or os.getenv('MINI_APP_BOT_USERNAME',''),

@@ -51,6 +51,7 @@ def test_invite_read_is_safe_and_local_only_uses_public_origin(origin, local_onl
     class Service:
         async def me(self): return {'id': ID, 'name': 'Ира'}
         async def _invites(self, farm): return {'neighbor': {'reward': 550}}
+        async def share_link_status(self): return None
 
     @asynccontextmanager
     async def context(_request): yield Service()
@@ -62,7 +63,7 @@ def test_invite_read_is_safe_and_local_only_uses_public_origin(origin, local_onl
             response=await client.get('/api/farm/v1/invite')
             assert response.status_code==200
             assert response.json()=={'code':ID,'farm_name':'Ира','rewards':{'neighbor':{'reward':550}},
-                                     'local_only':local_only}
+                                     'link':None,'local_only':local_only}
     asyncio.run(run())
 
 
@@ -70,3 +71,17 @@ def test_safe_public_origin_rejects_nonpublic_and_malformed_origins():
     assert safe_public_origin('https://qw.example')=='https://qw.example'
     for origin in ('http://qw.example','https://localhost','https://127.0.0.1','https://qw.example/path'):
         assert safe_public_origin(origin) is None
+
+
+def test_reusable_link_token_is_recomputable_url_safe_and_bound_to_secret_farm_and_nonce():
+    import re
+    from qw_farm.sharing import link_token, invite_secret
+    secret = invite_secret('k' * 32)
+    token = link_token(secret, ID, 'a' * 32)
+    assert token == link_token(secret, ID, 'a' * 32)
+    assert re.fullmatch(r'[A-Za-z0-9_-]{43}', token)
+    assert token != link_token(secret, ID, 'b' * 32)
+    assert token != link_token(invite_secret('m' * 32), ID, 'a' * 32)
+    assert token != link_token(secret, '00000000-0000-4000-8000-000000000002', 'a' * 32)
+    # A short or missing secret never weakens the HMAC key: the per-process random secret is used.
+    assert invite_secret('short') == invite_secret('') and len(invite_secret('')) == 32

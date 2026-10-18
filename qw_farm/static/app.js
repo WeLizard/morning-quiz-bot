@@ -1055,14 +1055,16 @@ function renderSharing(p){
    return;
   }
   const tgMode=inTelegram(),hasLink=!info.local_only;
-  // One link per open panel: every tap used to mint a new one-use token and quickly hit the 7-day limit.
-  // telegram=true also asks the server for a prepared message (native chat picker via shareMessage).
-  let issued=null;
-  const issue=async(telegram=false)=>{
-   if(issued&&(!telegram||issued.telegram))return issued;
-   const value=await request(API+'/invite/share',{method:'POST',data:telegram?{telegram:true}:{}});
-   issued={...value,telegram};return issued;
+  // The server keeps one reusable link per farm (up to max_uses neighbors); every call returns the same link.
+  // {telegram:true} also asks for a prepared message (native chat picker via shareMessage), {rotate:true} replaces the link.
+  const linkLine=el('p',null,'note invite-link-state');linkLine.hidden=true;
+  const showLink=l=>{
+   linkLine.hidden=!l;if(!l)return;
+   const until=new Date(l.expires_at*1000).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+   linkLine.textContent=`По ссылке вступили ${l.uses} из ${l.max_uses} · действует до ${until}`;
   };
+  showLink(info.link);
+  const issue=async(data={})=>{const value=await request(API+'/invite/share',{method:'POST',data});showLink(value);return value;};
   const copyIssued=async(value,label)=>{
    const invitation=await issue(),content=value(invitation);
    try{await navigator.clipboard.writeText(content);toast(label);}
@@ -1078,19 +1080,18 @@ function renderSharing(p){
    }
    draftLink('Приглашение в Telegram','Открыть Telegram',url);
   };
-  note('Отправь приглашение другу. Он подтвердит соседство в игре.',share);
+  note('Отправь приглашение другу. Он подтвердит соседство в игре.',share);share.append(linkLine);
   const shareButton=button('Поделиться ссылкой',safe(async()=>{
    const invitation=await issue();
    const result=await shareLink(invitation,async value=>{await navigator.clipboard.writeText(value);});
    if(result==='copied')toast('Ссылка скопирована.');
    else if(result==='failed')modal('Скопируй ссылку',el('div',invitation.mini_app_url||invitation.web_url||invitation.text,'code'));
-   else if(result==='cancelled'){issued=null;try{await request(API+'/invite/share/revoke',{method:'POST',data:{token:invitation.token}});}catch{}}
   }),tgMode&&hasLink?'secondary wide':'primary wide');
   shareButton.textContent='Поделиться приглашением';
   const mailButton=button('Отправить по почте',safe(async()=>{const invitation=await issue();draftLink('Письмо с приглашением','Открыть письмо',mailtoUrl(invitation));}),'secondary wide');
   const telegramButton=hasLink?button('Выбрать чат в Telegram',safe(async()=>{
    const tg=QW?.tg,native=tgMode&&typeof tg?.shareMessage==='function'&&tg.isVersionAtLeast?.('8.0');
-   const invitation=await issue(native);
+   const invitation=await issue(native?{telegram:true}:{});
    if(native&&invitation.prepared_message_id){
     try{tg.shareMessage(invitation.prepared_message_id,sent=>{if(sent)toast('Приглашение отправлено.');});return;}catch{}
    }
@@ -1103,9 +1104,11 @@ function renderSharing(p){
   const more=el('details',null,'invite-more'),summary=el('summary','Другие способы отправить'),moreActions=el('div',null,'invite-actions');more.append(summary,moreActions);
   if(tgMode&&telegramButton)moreActions.append(shareButton);else if(!tgMode&&telegramButton)moreActions.append(telegramButton);
   moreActions.append(mailButton,button('Скопировать текст приглашения',safe(()=>copyIssued(invitation=>invitation.text,'Скопировано.')),'secondary wide'));
+  const rotate=button('Сменить ссылку',()=>modal('Сменить ссылку?','Старая ссылка перестанет работать. Соседи, которые уже вступили по ней, останутся.',
+   [button('Сменить',safe(async()=>{await issue({rotate:true});$('dialog').close();toast('Ссылка обновлена.');}),'secondary danger')]),'text-button danger');
   const [w,input]=field('Telegram @username');input.placeholder='@имя_соседа';input.autocomplete='off';
   let b=button('Открыть чат',safe(async()=>{const value=input.value.trim().replace(/^@/,'');if(!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(value)){toast('Нужен Telegram @username, не код фермы.',true);return;}const invitation=await issue();telegramDraft('https://t.me/'+value+'?text='+encodeURIComponent(invitation.text));}),'secondary wide');moreActions.append(w,b);
-  note('Игра откроет черновик — сообщение отправишь ты.',moreActions);
+  note('Игра откроет черновик — сообщение отправишь ты.',moreActions);moreActions.append(rotate);
   share.append(more);
  }).catch(e=>note(e.message,share));
 }

@@ -53,8 +53,8 @@ def share_app(prepare_share, telegram_user_id=7):
         async def me(self):
             return {'id': '00000000-0000-4000-8000-000000000001', 'name': 'Ферма Илья'}
 
-        async def create_share_invite(self):
-            return 'T' * 43
+        async def share_link(self, rotate=False):
+            return {'token': 'T' * 43, 'uses': 0, 'max_uses': 10, 'expires_at': 1.0}
 
         async def _invites(self, farm):
             return None
@@ -95,3 +95,29 @@ def test_share_route_without_telegram_identity_keeps_the_plain_link():
 
     result = TestClient(share_app(prepare, telegram_user_id=None)).post('/api/farm/v1/invite/share', json={'telegram': True}).json()
     assert result['prepared_message_id'] is None and result['share_url'].startswith('https://t.me/share/url?')
+
+
+def test_prepared_message_is_reused_until_it_nears_expiration():
+    now = [1000.0]
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={'ok': True, 'result': {'id': f'prep-{len(calls)}', 'expiration_date': 4600}})
+
+    share = TelegramShare(TOKEN, client=httpx.AsyncClient(transport=httpx.MockTransport(handler)), clock=lambda: now[0])
+
+    async def prepare(user_id=42):
+        return await share.prepare(user_id, result_id='x', title='t', text='m', button_text='b',
+                                   button_url='https://t.me/Bot', cache_key='farm-invite:abc')
+
+    async def go():
+        try:
+            first = await prepare()
+            assert await prepare() == first and len(calls) == 1
+            assert await prepare(43) != first and len(calls) == 2   # cached per user
+            now[0] = 4600 - 60                                       # inside the safety margin
+            assert await prepare() == 'prep-3'
+        finally:
+            await share.close()
+    asyncio.run(go())

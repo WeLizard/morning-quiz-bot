@@ -77,20 +77,22 @@ def create_router(context, *, demo=False, origin="", bot_username="", mini_app_s
         async with context(request) as service:
             farm=await service.me()
             return dict(code=farm['id'],farm_name=farm['name'],rewards=await service._invites(farm),
+                        link=await service.share_link_status(),
                         local_only=not bool(safe_public_origin(origin) or bot_username))
     @router.post(API+'/invite/share')
     async def share_invite(request:Request):
         from .sharing import invite_info
         empty=(request.headers.get('content-length','0') in ('0','') and not request.headers.get('content-type'))
         value={} if empty else await body(request,512)
-        need(set(value)<={'recipient','telegram'} and (value.get('recipient') is None or isinstance(value['recipient'],str))
-             and isinstance(value.get('telegram',False),bool),
+        need(set(value)<={'recipient','telegram','rotate'} and (value.get('recipient') is None or isinstance(value['recipient'],str))
+             and isinstance(value.get('telegram',False),bool) and isinstance(value.get('rotate',False),bool),
              'invalid_body','Неверные поля запроса.',422)
         recipient=value.get('recipient') or ''
         async with context(request) as service:
             farm=await service.me()
-            token=await service.create_share_invite()
-            result=invite_info(farm['id'],farm['name'],token=token,origin=origin,bot_username=bot_username,mini_app_short_name=mini_app_short_name,recipient=recipient)
+            link=await service.share_link(rotate=value.get('rotate',False))
+            result=invite_info(farm['id'],farm['name'],token=link['token'],origin=origin,bot_username=bot_username,mini_app_short_name=mini_app_short_name,recipient=recipient)
+            result.update(uses=link['uses'],max_uses=link['max_uses'],expires_at=link['expires_at'])
             result['rewards']=await service._invites(farm)
             telegram_user_id=getattr(service,'telegram_user_id',None)
         # The Bot API call runs after the game transaction; a failure only drops the native chat picker.

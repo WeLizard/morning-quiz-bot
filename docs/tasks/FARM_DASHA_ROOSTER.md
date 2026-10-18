@@ -39,3 +39,38 @@
   UI rules/layout/gaps для доступных экранов.
 - Песочница: реальный цикл Ильи/Ирины после локальных проверок. Production
   и рабочий токен требуют отдельного разрешения.
+
+## Свежие свидетельства — 2026-10-18
+
+Точечным patch в `/home/lizard/mqb-rehearsal` выложен runtime `8516259`;
+публичная проверка выполнялась на <https://quiz.mr-lizard.ru/app/farm>.
+Все восемь runtime-файлов совпали с `HEAD` после нормализации LF. Production
+не менялся, данные игроков песочницы сохранены.
+
+В Chrome отдельно вошла гостем и открыла деревню. Без клика по Даше за 50 секунд
+показалось уведомление о краже двух монет; баланс изменился 250 → 248. Гриша:
+взять и сдать 4 пшеницы, награда 12 монет (248 → 260). После сбора 3 грядок на
+своей ферме Даша: взять и сдать 2 морковки, награда 12 монет (260 → 272).
+После перезагрузки обе карточки показывали «Сегодня выполнено», ошибок консоли
+не было. Повторы и сохранение состояния в PostgreSQL проверены; ручной переход
+на следующий день и сброс цикла в браузере не проверялись.
+
+Проверки: `tests/test_farm_village_quests.py`,
+`tests/test_farm_village_quests_pg.py`, `tests/test_farm_platform.py`,
+`tests/test_farm_http_acceptance.py`, `tests/test_farm_rules.py`,
+`tests/test_farm_market_r8.py`, `tests/test_farm_pukh.py` — 65 passed,
+1 xpassed (устаревший артефакт Пуха); новый Python/PG набор — 9 passed,
+отдельная финальная PG privacy-проверка — 1 passed. JS village — 21 passed,
+boot regression — 2 passed. UI rules/layout — 12 passed, 2 skipped без
+`QW_UI_BASE_URL`; затем `python -B tests/ui/ui_check.py gaps --base
+https://quiz.mr-lizard.ru --only farm` — 12 passed, 0 failed на трёх ширинах.
+Полный Farm JS набор: 137 passed, 13 failed; все 13 совпали с baseline
+`efa2269` в `farm_building_collect`, `farm_neighbor_gift`,
+`farm_project_materials`, `farm_rate_limits` и не исправлялись в рамках этой
+работы. 17 unittest gates и `project_checks` прошли. Независимое полное ревью
+Sol прошло; найденная браузером TDZ-ошибка была исправлена, откат проверен,
+после boot regression runtime `8516259` повторно получил зелёное ревью.
+
+Остаются ручная приёмка с телефона, Telegram/device-проверки и полный public
+release acceptance. Арт Даши и Гриши в игру не интегрирован. Эти свидетельства
+не закрывают выпуск.

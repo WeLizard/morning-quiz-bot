@@ -299,6 +299,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         finally:
             if membership is None and verifier is not None:
                 await verifier.close()
+            if getattr(app.state, 'telegram_share', None) is not None:
+                await app.state.telegram_share.close()
             if owned_db:
                 await database.dispose()
 
@@ -308,6 +310,10 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     app.state.password_store = password_store
     app.state.mini_store = store
     app.state.mini_runtime_enabled = runtime_enabled
+    # Native Telegram chat picker for any game (shareMessage); None offline or without a bot token.
+    from web.telegram_share import TelegramShare
+    app.state.telegram_share = (None if settings.offline or not settings.bot_token
+                                else TelegramShare(settings.bot_token, proxy=settings.telegram_proxy))
     mini_cookie = 'mqb_mini'
     mini_cookie_secure = urlsplit(settings.origin).scheme == 'https'
 

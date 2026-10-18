@@ -35,7 +35,8 @@ async def body(request, maximum=8192):
     except (ValueError,UnicodeError,RecursionError):raise FarmError('invalid_json','Не удалось прочитать запрос.',422)
 
 
-def create_router(context, *, demo=False, origin="", bot_username="", mini_app_short_name="play"):
+def create_router(context, *, demo=False, origin="", bot_username="", mini_app_short_name="play", prepare_share=None):
+    """prepare_share(telegram_user_id, invitation) -> prepared message id or None (Telegram shareMessage)."""
     router=APIRouter()
     @router.get('/app/farm')
     async def index():return FileResponse(STATIC/'index.html',headers={'Content-Security-Policy':CSP,'Cache-Control':'no-store'})
@@ -82,7 +83,8 @@ def create_router(context, *, demo=False, origin="", bot_username="", mini_app_s
         from .sharing import invite_info
         empty=(request.headers.get('content-length','0') in ('0','') and not request.headers.get('content-type'))
         value={} if empty else await body(request,512)
-        need(set(value)<={'recipient'} and (value.get('recipient') is None or isinstance(value['recipient'],str)),
+        need(set(value)<={'recipient','telegram'} and (value.get('recipient') is None or isinstance(value['recipient'],str))
+             and isinstance(value.get('telegram',False),bool),
              'invalid_body','Неверные поля запроса.',422)
         recipient=value.get('recipient') or ''
         async with context(request) as service:
@@ -90,6 +92,11 @@ def create_router(context, *, demo=False, origin="", bot_username="", mini_app_s
             token=await service.create_share_invite()
             result=invite_info(farm['id'],farm['name'],token=token,origin=origin,bot_username=bot_username,mini_app_short_name=mini_app_short_name,recipient=recipient)
             result['rewards']=await service._invites(farm)
+            telegram_user_id=getattr(service,'telegram_user_id',None)
+        # The Bot API call runs after the game transaction; a failure only drops the native chat picker.
+        result['prepared_message_id']=None
+        if value.get('telegram') and prepare_share and telegram_user_id and result['mini_app_url']:
+            result['prepared_message_id']=await prepare_share(telegram_user_id,result)
         return result
     @router.post(API+'/invite/share/revoke')
     async def revoke_share_invite(request:Request):

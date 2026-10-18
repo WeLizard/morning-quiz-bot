@@ -166,10 +166,10 @@ test('Neighbors window: Telegram chat is primary in Telegram, system share elsew
  assert.match(sharing,/actions\.append\(tgMode&&telegramButton\?telegramButton:shareButton\)/);
  assert.match(sharing,/tgMode&&hasLink\?'secondary wide':'primary wide'/);
  assert.match(sharing,/request\(API\+'\/invite'\)\.then\(info=>/);
- assert.match(sharing,/request\(API\+'\/invite\/share',\{method:'POST',data:\{\}\}\)/);
+ assert.match(sharing,/request\(API\+'\/invite\/share',\{method:'POST',data:telegram\?\{telegram:true\}:\{\}\}\)/);
  assert.match(sharing,/if\(info\.local_only\)\{/);
  assert.match(sharing,/Скопировать код фермы/);
- assert.match(sharing,/result==='cancelled'\)try\{await request\(API\+'\/invite\/share\/revoke'/);
+ assert.match(sharing,/result==='cancelled'\)\{issued=null;try\{await request\(API\+'\/invite\/share\/revoke'/);
  assert.match(sharing,/Ссылка скопирована/);assert.match(sharing,/\$\{r\.reward\} монет/);assert.match(sharing,/\$\{r\.bonus\} монет/);
  assert.match(sharing,/i\.level/);assert.match(sharing,/\/invite\/accept/);
  assert.doesNotMatch(sharing,/mailto:[^?]/);   // no address is collected
@@ -196,6 +196,27 @@ test('Viewing neighbors does not issue a token; cancelling system share revokes 
  assert.equal(modals.at(-1)[1].href,'https://t.me/share/url?url=hello');
  await buttons.find(b=>b.textContent==='Отправить по почте').action();
  assert.equal(modals.at(-1)[1].href,'mailto:?body=hello');
+});
+test('Telegram: one prepared message opens the native chat picker; repeated taps reuse one token',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
+ const fn=source.slice(source.indexOf('function renderSharing('),source.indexOf('function quizzyLoginLink('));
+ const calls=[],buttons=[],shared=[],token='B'.repeat(43);
+ const element=(text='')=>({textContent:text,isConnected:true,append(){},replaceChildren(){}});
+ const info={code:ID,farm_name:'Ферма',rewards:null,local_only:false};
+ const tg={shareMessage(id,cb){shared.push(id);cb(true);},isVersionAtLeast:v=>v==='8.0'};
+ const context={API:'/api/farm/v1',S:{invite:null,me:{id:ID}},inTelegram:()=>true,QW:{tg},window:{},
+  el:(tag,text)=>element(text),card:(text)=>element(text),note:()=>{},renderInviteRewards:()=>{},
+  button:(label,action)=>{const b=element(label);b.action=action;buttons.push(b);return b;},
+  field:()=>[element(),element()],copyText:()=>()=>{},safe:fn=>fn,
+  shareLink:async()=> 'shared',mailtoUrl:()=> 'mailto:?body=hello',openTelegram:()=>assert.fail('fallback link'),toast:()=>{},modal:()=>assert.fail('fallback modal'),
+  request:async(url,options)=>{calls.push([url,options]);if(url.endsWith('/invite/share'))return {token,mini_app_url:'https://t.me/QuizzyBot/play?startapp=farm_'+token,share_url:'https://t.me/share/url?url=hello',prepared_message_id:'prep-1'};return info;}};
+ vm.createContext(context);vm.runInContext(fn+'\nObject.assign(globalThis,{renderSharing})',context);
+ context.renderSharing(element());await new Promise(resolve=>setImmediate(resolve));
+ const pick=buttons.find(b=>b.textContent==='Выбрать чат в Telegram');
+ await pick.action();await pick.action();await pick.action();
+ assert.deepEqual(shared,['prep-1','prep-1','prep-1']);
+ const issues=calls.filter(([url])=>url.endsWith('/invite/share'));
+ assert.equal(issues.length,1);assert.deepEqual(JSON.parse(JSON.stringify(issues[0][1].data)),{telegram:true});
 });
 test('Local-only invite shows the farm code without issuing a token',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');

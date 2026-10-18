@@ -124,8 +124,10 @@ def install_farm(app, database, settings, *, allowed_user_ids=None, clock=time.t
                 async def farm_question_provider(current_session):
                     return await _farm_question(current_session)
 
-                yield FarmService(Unit(session,schema),Principal(who.account_id,who.display_name,who.channel,who.address_form),
-                                  clock=clock,speed=1,question_provider=farm_question_provider)
+                service=FarmService(Unit(session,schema),Principal(who.account_id,who.display_name,who.channel,who.address_form),
+                                    clock=clock,speed=1,question_provider=farm_question_provider)
+                service.telegram_user_id=getattr(who,'telegram_user_id',None)
+                yield service
         except PrincipalError as error:
             need(False,error.code,error.message,error.status)
 
@@ -147,9 +149,16 @@ def install_farm(app, database, settings, *, allowed_user_ids=None, clock=time.t
     # Put exact Farm paths before the old /app/{asset} catch-all. Other games'
     # routes and their relative order are not modified.
     before=len(app.router.routes)
+    async def prepare_share(telegram_user_id,invitation):
+        share=getattr(app.state,'telegram_share',None)
+        if share is None:return None
+        return await share.prepare(telegram_user_id,result_id='farm-'+invitation['token'][:16],
+            title=f"Приглашение на ферму «{invitation['farm_name']}»",description='Открой и подтверди соседство в игре',
+            text=invitation['text'],button_text='Открыть ферму',button_url=invitation['mini_app_url'])
+
     app.include_router(create_router(context,origin=settings.origin,
         bot_username=getattr(settings,'bot_username','') or os.getenv('MINI_APP_BOT_USERNAME',''),
-        mini_app_short_name=os.getenv('MINI_APP_SHORT_NAME','play')))
+        mini_app_short_name=os.getenv('MINI_APP_SHORT_NAME','play'),prepare_share=prepare_share))
     added=app.router.routes[before:]
     app.router.routes[:]=added+app.router.routes[:before]
     install_boundary(app,settings.origin, shared=shared)

@@ -1055,7 +1055,14 @@ function renderSharing(p){
    return;
   }
   const tgMode=inTelegram(),hasLink=!info.local_only;
-  const issue=async()=>await request(API+'/invite/share',{method:'POST',data:{}});
+  // One link per open panel: every tap used to mint a new one-use token and quickly hit the 7-day limit.
+  // telegram=true also asks the server for a prepared message (native chat picker via shareMessage).
+  let issued=null;
+  const issue=async(telegram=false)=>{
+   if(issued&&(!telegram||issued.telegram))return issued;
+   const value=await request(API+'/invite/share',{method:'POST',data:telegram?{telegram:true}:{}});
+   issued={...value,telegram};return issued;
+  };
   const copyIssued=async(value,label)=>{
    const invitation=await issue(),content=value(invitation);
    try{await navigator.clipboard.writeText(content);toast(label);}
@@ -1077,11 +1084,18 @@ function renderSharing(p){
    const result=await shareLink(invitation,async value=>{await navigator.clipboard.writeText(value);});
    if(result==='copied')toast('Ссылка скопирована.');
    else if(result==='failed')modal('Скопируй ссылку',el('div',invitation.mini_app_url||invitation.web_url||invitation.text,'code'));
-   else if(result==='cancelled')try{await request(API+'/invite/share/revoke',{method:'POST',data:{token:invitation.token}});}catch{}
+   else if(result==='cancelled'){issued=null;try{await request(API+'/invite/share/revoke',{method:'POST',data:{token:invitation.token}});}catch{}}
   }),tgMode&&hasLink?'secondary wide':'primary wide');
   shareButton.textContent='Поделиться приглашением';
   const mailButton=button('Отправить по почте',safe(async()=>{const invitation=await issue();draftLink('Письмо с приглашением','Открыть письмо',mailtoUrl(invitation));}),'secondary wide');
-  const telegramButton=hasLink?button('Выбрать чат в Telegram',safe(async()=>{const invitation=await issue();telegramDraft(invitation.share_url);}),tgMode?'primary wide':'secondary wide'):null;
+  const telegramButton=hasLink?button('Выбрать чат в Telegram',safe(async()=>{
+   const tg=QW?.tg,native=tgMode&&typeof tg?.shareMessage==='function'&&tg.isVersionAtLeast?.('8.0');
+   const invitation=await issue(native);
+   if(native&&invitation.prepared_message_id){
+    try{tg.shareMessage(invitation.prepared_message_id,sent=>{if(sent)toast('Приглашение отправлено.');});return;}catch{}
+   }
+   telegramDraft(invitation.share_url);
+  }),tgMode?'primary wide':'secondary wide'):null;
   const actions=el('div',null,'invite-actions');
   actions.append(tgMode&&telegramButton?telegramButton:shareButton);
   if(hasLink)actions.append(button('Скопировать ссылку',safe(()=>copyIssued(invitation=>invitation.mini_app_url||invitation.web_url,'Ссылка скопирована.')),'secondary wide'));

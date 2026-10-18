@@ -527,14 +527,14 @@ def test_postgres_migration_creates_the_village_table_and_refuses_to_drop_data(f
         scripts = ScriptDirectory.from_config(Config('alembic.ini'))
         migration = scripts.get_revision('20261010_0027').module
         assert migration.down_revision == '20261009_0026' and scripts.get_revision('20261010_0028').down_revision == '20261010_0027'
-        async with isolated_database(farm_pg_url) as (db, _):
+        async with isolated_database(farm_pg_url) as (db, schema):
             async with db.engine.begin() as connection:
                 def roundtrip(sync):
                     sync.execute(text('DROP TABLE farm_village'))
                     with monkeypatch.context() as patch:
                         patch.setattr(migration, 'op', Operations(MigrationContext.configure(sync)))
                         migration.upgrade()
-                    columns = {c['name']: c for c in inspect(sync).get_columns('farm_village')}
+                    columns = {c['name']: c for c in inspect(sync).get_columns('farm_village', schema=schema)}
                     assert set(columns) == {'season', 'total', 'goal', 'created_at'}
                     sync.execute(text("INSERT INTO farm_village (season, goal, created_at) VALUES (1, 100, 0)"))
                     assert sync.scalar(text('SELECT total FROM farm_village')) == 0
@@ -546,8 +546,8 @@ def test_postgres_migration_creates_the_village_table_and_refuses_to_drop_data(f
                     with monkeypatch.context() as patch:
                         patch.setattr(migration, 'op', Operations(MigrationContext.configure(sync)))
                         migration.downgrade()
-                        assert 'farm_village' not in inspect(sync).get_table_names()
+                        assert not inspect(sync).has_table('farm_village', schema=schema)
                         migration.upgrade()
-                    assert 'farm_village' in inspect(sync).get_table_names()
+                    assert inspect(sync).has_table('farm_village', schema=schema)
                 await connection.run_sync(roundtrip)
     asyncio.run(run())

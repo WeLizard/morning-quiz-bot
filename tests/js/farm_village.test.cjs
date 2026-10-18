@@ -38,6 +38,50 @@ function setup(){
 test('entering village from guest routes to own farm and invalidates older requests',()=>{
  const h=setup();h.ctx.selectTab('village');assert.equal(h.S.farm,h.S.me);assert.equal(h.S.tab,'village');assert.equal(h.ctx.farmViewEpoch,5);assert.ok(h.calls.includes('scene'));assert.equal(h.bodyClasses.has('panel-open'),false);assert.equal(h.bodyClasses.has('panel-collapsed'),true);const world=AC(h);assert.equal(world.children.filter(n=>n.dataset.villageNpc&&n.attrs['aria-pressed']==='true').length,0);
 });
+test('Dasha and rooster are visible residents with take and deliver actions',async()=>{
+ const h=setup();h.S.catalog.market.village_quests={'Лиса Даша':{item:'carrot',qty:2,coins:12,xp:4,title:'Морковка для тайника'},'Петух Гриша':{item:'wheat',qty:4,coins:12,xp:4,title:'Завтрак перед рассветом'}};
+ h.S.me.village_errands={quests:{}};h.S.me.inventory.carrot=2;h.S.me.inventory.wheat=4;
+ h.ctx.selectTab('village');
+ assert.deepEqual(AC(h).children.filter(n=>n.dataset.villageNpc).map(n=>n.dataset.villageNpc).slice(-2),['Лиса Даша','Петух Гриша']);
+ h.ctx.chooseVillageResident('Лиса Даша');const panel=new Node('div');h.ctx.renderVillageResident(panel);
+ const take=panel.querySelectorAll('*').find(n=>n.textContent==='Взять задание');assert.ok(take);await take.onclick();
+ assert.equal(h.calls.at(-1)[0],'village_quest');assert.equal(h.calls.at(-1)[1].npc,'Лиса Даша');
+ h.S.busy=false;h.S.me.village_errands.quests['Лиса Даша']='active';const active=new Node('div');h.ctx.renderVillageResident(active);
+ const deliver=active.querySelectorAll('*').find(n=>n.textContent==='Сдать задание');assert.ok(deliver);assert.equal(deliver.disabled,false);await deliver.onclick();
+ assert.equal(h.calls.at(-1)[1].action,'deliver');
+ h.S.busy=false;h.ctx.chooseVillageResident('Петух Гриша');const rooster=new Node('div');h.ctx.renderVillageResident(rooster);
+ assert.ok(rooster.querySelectorAll('*').some(n=>n.textContent==='Взять задание'));
+});
+test('presence uses one server lease, Dasha tap talks before walking, and leaving clears it',async()=>{
+ const h=setup(),requests=[],listeners={},timers=[];let releaseEnter;
+ h.S.catalog.market.village_quests={'Лиса Даша':{item:'carrot',qty:2,coins:12,xp:4,title:'Морковка для тайника'}};
+ h.ctx.crypto={randomUUID:()=> '11111111-1111-4111-8111-111111111111'};
+ h.ctx.API='/api/farm/v1';
+ h.ctx.document.hidden=false;h.ctx.document.addEventListener=(name,fn)=>listeners[name]=fn;
+ h.ctx.setInterval=fn=>{timers.push(fn);return 1;};h.ctx.clearInterval=id=>timers.push(`clear:${id}`);
+ h.ctx.request=(path,options)=>{requests.push({path,...options});return options.data.action==='enter'?new Promise(resolve=>releaseEnter=resolve):Promise.resolve({stolen:0});};
+ h.ctx.selectTab('village');assert.equal(requests[0].data.action,'enter');
+ const fox=AC(h).children.find(n=>n.dataset.villageNpc==='Лиса Даша');fox.onclick({detail:1});
+ assert.equal(requests.length,1,'tap waits for pending enter before talk');
+ releaseEnter({stolen:0});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests[1]?.data.action,'talk',JSON.stringify({requests,session:vm.runInContext('villageSession',h.ctx),pending:vm.runInContext('villageTalkPending',h.ctx),tab:h.S.tab}));assert.deepEqual(Object.keys(requests[1].data).sort(),['action','session']);
+ timers[0]();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests.length,2,'talked visit does not keep pulsing');
+ h.ctx.exitVillage();assert.equal(requests.at(-1).data.action,'leave');assert.ok(timers.includes('clear:1'));
+});
+test('hidden tab stops presence and resuming creates a fresh session',async()=>{
+ const h=setup(),actions=[],listeners={};let id=0;
+ h.ctx.crypto={randomUUID:()=>`11111111-1111-4111-8111-${String(++id).padStart(12,'0')}`};
+ h.ctx.API='/api/farm/v1';h.ctx.document.hidden=false;h.ctx.document.addEventListener=(name,fn)=>(listeners[name]||=[]).push(fn);
+ h.ctx.setInterval=()=>1;h.ctx.clearInterval=()=>{};
+ h.ctx.request=async(path,{data})=>{actions.push(data);return {stolen:0};};
+ h.ctx.selectTab('village');h.nodes.get('village-scene').classList.toggle=()=>{};await new Promise(resolve=>setImmediate(resolve));
+ h.ctx.document.hidden=true;listeners.visibilitychange.forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(actions.at(-1).action,'leave');
+ h.ctx.document.hidden=false;listeners.visibilitychange.forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(actions.at(-1).action,'enter');assert.notEqual(actions[0].session,actions.at(-1).session);
+ h.ctx.exitVillage();
+});
 test('Farm return card shows its in-app caption and routes from a neighbor or Village',()=>{
  const h=setup(),start=source.indexOf('function addDestinationCard('),end=source.indexOf('\naddDestinationCard(',start),cards=[];
  const ctx={button:(text,run,cls)=>{const n=new Node('button');n.onclick=run;n.className=cls;return n;},headerCardArt:()=>new Node('svg'),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},$:()=>({before:n=>cards.push(n)})};
@@ -118,11 +162,11 @@ test('placing town hall decor returns to the farm before entering placement mode
  vm.runInContext(source.slice(start,end)+'\nthis.beginPlacement=beginPlacement',h.ctx);const spec={id:'flowerbed',w:1,h:1};h.ctx.beginPlacement(spec);
  assert.equal(h.S.tab,'orders');assert.equal(h.pause.at(-1),false);assert.equal(h.S.placing.spec,spec);assert.equal(h.nodes.get('farm-canvas').inert,false);
 });
-test('debt shortcut opens town hall services and all nine resident positions exist',()=>{
+test('debt shortcut opens town hall services and all eleven resident positions exist',()=>{
  const h=setup();h.S.farm=h.S.me;h.ctx.eco=()=>({debt:50});
  const start=source.indexOf('function hudDebt()'),end=source.indexOf('\n',start);
  vm.runInContext(source.slice(start,end)+'\nthis.hudDebt=hudDebt;this.spotCount=Object.keys(VILLAGE_SPOTS).length',h.ctx);
- h.ctx.hudDebt().onclick();assert.equal(h.S.tab,'village');assert.equal(h.bodyClasses.has('panel-open'),true);assert.equal(h.title.focused,true);assert.equal(h.ctx.spotCount,9);
+ h.ctx.hudDebt().onclick();assert.equal(h.S.tab,'village');assert.equal(h.bodyClasses.has('panel-open'),true);assert.equal(h.title.focused,true);assert.equal(h.ctx.spotCount,11);
 });
 
 test('world keeps 44px targets without overlap at phone and desktop widths; walking and HUD exist',()=>{

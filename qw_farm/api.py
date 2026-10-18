@@ -117,6 +117,14 @@ def create_router(context, *, demo=False, origin="", bot_username="", mini_app_s
     async def ledger(request:Request):
         async with context(request) as service:result=await service.history()
         return result
+    @router.post(API+'/village/presence')
+    async def village_presence(request:Request):
+        value=await body(request,512)
+        need(isinstance(value,dict) and set(value)=={'action','session'},
+             'invalid_body','Неверные поля присутствия.',422)
+        async with context(request) as service:
+            return await service.village_presence(value['action'],value['session'])
+
     @router.post(API+'/commands')
     async def command(request:Request):
         value=await body(request)

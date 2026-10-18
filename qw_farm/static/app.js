@@ -54,17 +54,19 @@ const VILLAGE_VOICES={
  'Суслик Игорь':['Запасы сами себя не соберут! Проверим, что сегодня на складе?','Вот это надёжный поставщик! С тобой моя кладовая не пустует.','Я припас для тебя добрые слова. А для кладовой — ещё одну просьбу!'],
  'Неведома Зверушка':['Из-за кустов кто-то любопытно смотрит на твой урожай…','Зверушка узнаёт тебя и смело выходит на площадь.','Зверушка радостно машет лапкой: ты теперь свой!'],
  'Медведь Пух':['Утро только началось, а мне уже мало бодрости! Найдётся у тебя что-нибудь на заряд?','С твоими зарядами я за день успеваю втрое больше! Давай ещё баночку-другую?','Для тебя у бочки всегда тёплое место. А для моей кружки — ещё один заказ!']
+ ,'Лиса Даша':['Ой, это у тебя выпало? Я как раз искала морковку для своего тайника.','Ты меня поймал! Лучше принеси морковку сам — всё честно.','Карман проверил? Шучу. Почти.']
+ ,'Петух Гриша':['Ку-ка-ре-ку! До рассвета нужен завтрак для всей площади.','Спасибо за зерно! Завтра снова разбужу деревню.','Порядок в деревне начинается с хорошего утра!']
 };
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
 let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null;
-const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6]};
+const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Гриша':[49.0,32.0]};
 // The world is 2400x1800 art units (village.svg, painted with the farm's own building code). Positions above are percentages of the world;
 // each resident stands at the door of their own house. VILLAGE_C is the back corner of the plaza.
 const VILLAGE_C=[1200,716],VILLAGE_START=[42,77.3],VILLAGE_GATE=[50,83.1],VILLAGE_HALL=[50.0,51.1];
 let villagePos=[...VILLAGE_START],villageWalkToken=0,villageDragged=false,villageMini=null;
 // Living village: idle thought, stroll offset in px (x, y) per resident. Motion is pure CSS, no timers.
-const VILLAGE_LIFE={'Филиныч':['📚',52,26],'Агата':['🍞',-50,-25],'Почтальон Ёж':['✉️',52,-26],'Механик Крот':['🔧',-50,-25],'Кошка Кая':['🐟',-48,-10],'Кошка Соня':['💤',44,22],'Суслик Игорь':['🌰',-44,22],'Неведома Зверушка':['❓',48,24],'Медведь Пух':['🥤',46,-22]};
+const VILLAGE_LIFE={'Филиныч':['📚',52,26],'Агата':['🍞',-50,-25],'Почтальон Ёж':['✉️',52,-26],'Механик Крот':['🔧',-50,-25],'Кошка Кая':['🐟',-48,-10],'Кошка Соня':['💤',44,22],'Суслик Игорь':['🌰',-44,22],'Неведома Зверушка':['❓',48,24],'Медведь Пух':['🥤',46,-22],'Лиса Даша':['🪙',-40,18],'Петух Гриша':['🌾',36,-12]};
 // Chimney tops (smoke puffs) exported from the same render as village.svg.
 const VILLAGE_SMOKE=[[649,454],[904,592],[1032,636],[1760,704],[723,757],[1582,751],[1400,862],[1732,851],[590,952],[1954,995],[1573,1051],[747,1106],[2072,1048],[434,1224],[1134,1274],[803,1328],[1881,281]];
 // Night lights in village.svg coordinates (2400x1800): a/b = left/right wall windows, r = round window, c = clock, l = lamp head, p = lamp light pool.
@@ -386,10 +388,10 @@ function renderRail(){
  syncNav();
  if(mobile)requestAnimationFrame(()=>{const active=rail.querySelector('.active');if(active)rail.scrollTo({left:Math.max(0,active.offsetLeft-(rail.clientWidth-active.offsetWidth)/2),behavior:'smooth'});});
 }
-function selectTab(id){farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');}else showPanel();renderRail();renderPanel();}
+function selectTab(id){const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
 function exitVillage(){villageSheet=null;selectTab('orders');closePanel();}
 function returnToFarm(){if(villageVisible())exitVillage();else backHome();}
-function resetVillageView(){villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkToken++;syncVillageScene();villageCenter(villagePos,false);}
+function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkToken++;syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
 function openVillageTownHall(section=null){if(!villageVisible())selectTab('village');villageResident=null;villageSheet='townhall';showPanel();renderPanel();const title=$('panel-head').querySelector('h2');if(title){title.tabIndex=-1;title.focus({preventScroll:true});}if(section){const details=[...$('panel-content').querySelectorAll('.village-services')].find(n=>n.dataset.villageService===section);if(details){details.open=true;details.scrollIntoView({block:'nearest'});}}}
 function syncScenePause(){scene.setPaused(!!S.fieldGame||villageVisible());}
 function villageVisible(){return !!S.me&&S.tab==='village';}
@@ -1394,11 +1396,34 @@ function decorShop(p,e){
  for(const r of eC.reward_decor){const b=S.catalog.buildings[r.id],has=e.unlocked.includes(r.id),c=card(b.name,has?'Открыто: размещается бесплатно':'Ещё не получено','discovery');note(r.source,c);if(has)c.append(button('Разместить',()=>beginPlacement(b),'secondary wide'));p.append(c);}
 }
 // Living village uses existing personal orders and the shared seasonal fund only.
+// The two new errands are separate from the three legacy order slots.
+let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
+function villagePresenceStop(){
+ const session=villageSession;villageSession=null;villageEnterPending=null;villageTalkPending=false;if(villagePulseTimer)clearInterval(villagePulseTimer);villagePulseTimer=null;
+ if(session)request(API+'/village/presence',{method:'POST',data:{action:'leave',session}}).catch(()=>{});
+}
+async function villagePresencePulse(action='pulse'){
+ const session=villageSession;if(!session||S.tab!=='village'||document.hidden||action==='pulse'&&villageTalkPending)return;
+ try{const r=await request(API+'/village/presence',{method:'POST',data:{action,session}});if(session!==villageSession)return;
+  if(r.stolen){const fox=$('village-scene')?.querySelector('[data-village-npc="Лиса Даша"]');if(fox){const world=fox.closest('.village-world');fox.style.setProperty('--steal-x',`${(villagePos[0]-VILLAGE_SPOTS['Лиса Даша'][0])*(world?.offsetWidth||1600)/100}px`);fox.style.setProperty('--steal-y',`${(villagePos[1]-VILLAGE_SPOTS['Лиса Даша'][1])*(world?.offsetHeight||1200)/100}px`);fox.classList.add('is-stealing');setTimeout(()=>fox.classList.remove('is-stealing'),1800);}toast(r.notice);await refresh({render:false});}
+ }catch(e){if(e.sessionEnded)return;}
+}
+function villagePresenceStart(){
+ if(!S.me||document.hidden||villageSession||typeof crypto==='undefined')return;
+ villageSession=crypto.randomUUID();villageEnterPending=villagePresencePulse('enter');
+ villagePulseTimer=setInterval(()=>villagePresencePulse(),10000);
+ if(!villagePresenceBound){villagePresenceBound=true;document.addEventListener('visibilitychange',()=>{if(document.hidden)villagePresenceStop();else if(S.tab==='village')villagePresenceStart();});}
+}
+function villagePresenceTalk(){if(!villageSession||villageTalkPending)return;villageTalkPending=true;Promise.resolve(villageEnterPending).then(()=>villagePresencePulse('talk'));}
+function villageQuest(npc){return S.catalog?.market?.village_quests?.[npc]||null;}
+function villageQuestPhase(npc){return S.me?.village_errands?.quests?.[npc]||'available';}
+function villageNames(){return [...Object.keys(S.catalog.market.tastes),...Object.keys(S.catalog.market.village_quests||{})];}
+async function villageQuestAction(npc,action){return command('village_quest',{npc,action});}
 function villageStage(){const v=S.village;if(!eco()?.fund_open||!v)return null;const ratio=Math.max(0,v.total/Math.max(1,v.goal));return ratio>=1?3:ratio>=.6?2:ratio>=.25?1:0;}
 function villageReady(o){return !!o.needs&&!!enough(o.needs);}
 function villageOrders(npc){return (S.me?.orders||[]).filter(o=>o.npc===npc);}
 async function deliverVillageOrder(id){const o=villageOrders(villageResident).find(o=>o.id===id);if(!o||!enough(o.needs)||S.busy)return false;return command('order',{order:o.id});}
-function chooseVillageResident(npc){if(!Object.hasOwn(S.catalog.market.tastes,npc))return;villageResident=npc;villageSheet='resident';syncVillageScene();showPanel();renderPanel();$('panel-content').querySelector('[data-village-focus=resident]')?.focus({preventScroll:true});}
+function chooseVillageResident(npc){if(!villageNames().includes(npc))return;if(npc==='Лиса Даша')villagePresenceTalk();villageResident=npc;villageSheet='resident';syncVillageScene();showPanel();renderPanel();$('panel-content').querySelector('[data-village-focus=resident]')?.focus({preventScroll:true});}
 // Camera: native scrolling of the scene container, smooth only on request and never under reduced motion.
 function villageCenter(pct,smooth){const r=$('village-scene');if(!r||!r.scrollWidth)return;const o={left:Math.max(0,pct[0]/100*r.scrollWidth-r.clientWidth/2),top:Math.max(0,pct[1]/100*r.scrollHeight-r.clientHeight/2),behavior:smooth&&!villageReduced()?'smooth':'auto'};if(r.scrollTo)r.scrollTo(o);else{r.scrollLeft=o.left;r.scrollTop=o.top;}}
 function villageFrame(){const r=$('village-scene');if(!villageMini?.frame||!r||!r.scrollWidth)return;const f=villageMini.frame;f.style.left=`${(r.scrollLeft/r.scrollWidth*100).toFixed(2)}%`;f.style.top=`${(r.scrollTop/r.scrollHeight*100).toFixed(2)}%`;f.style.width=`${Math.min(100,r.clientWidth/r.scrollWidth*100).toFixed(2)}%`;f.style.height=`${Math.min(100,r.clientHeight/r.scrollHeight*100).toFixed(2)}%`;}
@@ -1470,7 +1495,7 @@ function syncVillageScene(){
  const visible=villageVisible(),entering=visible&&root.hidden===true;root.hidden=!visible;hud.hidden=!visible;document.body.classList.toggle('village-open',visible);$('farm-canvas').inert=visible;if(!visible){villageResident=null;villageSheet=null;}syncScenePause();if(!visible)return;
  villageBindWorld(root);if(entering)villageCenter(villagePos,false);
  if(!villageVisBound&&document.addEventListener){villageVisBound=true;document.addEventListener('visibilitychange',()=>$('village-scene')?.classList?.toggle('village-paused',document.hidden));}
- const names=Object.keys(S.catalog.market.tastes),stage=villageStage(),sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)])])]);if(sig===villageSceneSignature)return;villageSceneSignature=sig;
+ const names=villageNames(),stage=villageStage(),sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)]),villageQuestPhase(n)])]);if(sig===villageSceneSignature)return;villageSceneSignature=sig;
  root.setAttribute('aria-label',(stage===null?(eco()?.fund_open?'Деревня. Данные праздника обновляются.':`Деревня. Сезонный фонд откроется с ${ECON().fund_level} уровня.`):`Деревня. ${['Начало подготовки праздника','Флажки к празднику','Цветы к празднику','Площадь готова к празднику'][stage]}.`)+' Прокручивай карту, нажимай на землю, чтобы идти, или выбирай жителей кнопками.');
  const focused=document.activeElement?.dataset?.villageNpc||document.activeElement?.dataset?.villageTownhall;
  // The world (image, lights, effects, player) is built once; only the actors layer changes with game state.
@@ -1478,12 +1503,12 @@ function syncVillageScene(){
  const world=villageWorldEl,actors=world.children.find?world.children.find(n=>n.className==='village-actors'):world.querySelector('.village-actors'),parts=[];
  const festival=el('div',null,`village-festival stage-${stage===null?'locked':stage}`);festival.setAttribute('aria-hidden','true');festival.append(el('span',null,'village-flags'),el('span',null,'village-flowers'),el('span',null,'village-lights'),el('span',null,'village-balloons'));
  const badge=el('div',null,'village-stage-badge');if(stage===null)badge.append(el('b',eco()?.fund_open?'Праздник: ждём данные':`Праздник с ${ECON().fund_level} ур.`));else{badge.append(el('b',`Праздник ${stage+1}/4`),el('small',VILLAGE_STAGES[stage]));const pips=el('span',null,'village-pips');for(let i=0;i<4;i++)pips.append(el('i',null,i<=stage?'on':''));badge.append(pips);}festival.append(badge);parts.push(festival);
- for(const npc of names){const spot=VILLAGE_SPOTS[npc];if(!spot)continue;const life=VILLAGE_LIFE[npc]||['💭',12,4],idx=names.indexOf(npc),orders=villageOrders(npc),ready=orders.some(villageReady),selected=villageSheet==='resident'&&npc===villageResident;
-  const b=button(null,e=>villageGo([spot[0],spot[1]+1.6],()=>chooseVillageResident(npc),e),'village-npc va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;villageVars(b,{'--wx':`${life[1]}px`,'--wy':`${life[2]}px`,'--face':life[1]<0?'-1':'1','--d':`${(idx*2.1)%9}s`,'--cycle':`${16+idx*1.7}s`,'--td':`${idx*3.1%13}s`});b.dataset.villageNpc=npc;b.dataset.edge=spot[0]<8?'left':'';b.setAttribute('aria-pressed',String(selected));b.setAttribute('aria-controls','panel-content');b.setAttribute('aria-label',`${npc}${orders.length?` · есть просьба${ready?', можно доставить':''}`:''}`);
-  const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(icon(AVATARS[npc]||'owl'));b.append(walker);
+ for(const npc of names){const spot=VILLAGE_SPOTS[npc];if(!spot)continue;const life=VILLAGE_LIFE[npc]||['💭',12,4],idx=names.indexOf(npc),orders=villageOrders(npc),quest=villageQuest(npc),ready=orders.some(villageReady)||!!(quest&&villageQuestPhase(npc)==='active'&&enough({[quest.item]:quest.qty})),selected=villageSheet==='resident'&&npc===villageResident;
+  const b=button(null,e=>{if(npc==='Лиса Даша')villagePresenceTalk();villageGo([spot[0],spot[1]+1.6],()=>chooseVillageResident(npc),e);},'village-npc va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;villageVars(b,{'--wx':`${life[1]}px`,'--wy':`${life[2]}px`,'--face':life[1]<0?'-1':'1','--d':`${(idx*2.1)%9}s`,'--cycle':`${16+idx*1.7}s`,'--td':`${idx*3.1%13}s`});b.dataset.villageNpc=npc;b.dataset.edge=spot[0]<8?'left':'';b.setAttribute('aria-pressed',String(selected));b.setAttribute('aria-controls','panel-content');b.setAttribute('aria-label',`${npc}${orders.length?` · есть просьба${ready?', можно доставить':''}`:''}`);
+  const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(villageQuest(npc)?el('span',npc==='Лиса Даша'?'🦊':'🐓','village-visitor-face'):icon(AVATARS[npc]||'owl'));b.append(walker);
   if(!orders.length&&!selected){const thought=el('span',life[0],'village-thought');thought.setAttribute('aria-hidden','true');b.append(thought);}
-  if(selected){const label=el('span',null,'village-npc-name'),max=Math.max(1,(S.catalog.market.rep_points?.length||4)-1),lv=Math.min(max,repInfo(npc).lv);label.append(el('b',npc),el('i','♥'.repeat(lv)+'♡'.repeat(max-lv),'village-hearts'));b.append(label);}
-  if(orders.length){const need=Object.keys(orders[0].needs||{})[0],mark=el('span',null,`village-order${ready?' is-ready':''}`);mark.setAttribute('aria-hidden','true');if(need)mark.append(icon(need));mark.append(el('b',orders.length>1?`×${orders.length}`:(ready?'✓':'!')));b.append(mark);}
+  if(selected){const label=el('span',null,'village-npc-name');label.append(el('b',npc));if(!quest){const max=Math.max(1,(S.catalog.market.rep_points?.length||4)-1),lv=Math.min(max,repInfo(npc).lv);label.append(el('i','♥'.repeat(lv)+'♡'.repeat(max-lv),'village-hearts'));}b.append(label);}
+  if(orders.length||villageQuest(npc)&&villageQuestPhase(npc)!=='done'){const need=orders.length?Object.keys(orders[0].needs||{})[0]:villageQuest(npc).item,mark=el('span',null,`village-order${ready?' is-ready':''}`);mark.setAttribute('aria-hidden','true');if(need)mark.append(icon(need));mark.append(el('b',orders.length>1?`×${orders.length}`:(ready?'✓':'!')));b.append(mark);}
   parts.push(b);}
  const hall=button(null,e=>villageGo([VILLAGE_HALL[0],VILLAGE_HALL[1]+3.6],()=>openVillageTownHall(),e),'village-townhall');hall.style.left=`${VILLAGE_HALL[0]}%`;hall.style.top=`${VILLAGE_HALL[1]}%`;hall.dataset.villageTownhall='townhall';hall.setAttribute('aria-label','Ратуша: фонд, содержание и украшения');hall.setAttribute('aria-controls','panel-content');hall.setAttribute('aria-pressed',String(villageSheet==='townhall'));hall.append(icon('friends'),el('span','Ратуша'));parts.push(hall);
  actors.replaceChildren(...parts);villageObserve(world);
@@ -1498,6 +1523,20 @@ function syncVillageScene(){
  hud.replaceChildren(sky,back,mini);villageFrame();
 }
 function renderVillageResident(p){
+ const spec=villageQuest(villageResident);
+ if(spec){
+  const npc=villageResident,phase=villageQuestPhase(npc),c=card(npc,'ЖИТЕЛЬ ДЕРЕВНИ');c.classList.add('village-resident');c.tabIndex=-1;c.dataset.villageFocus='resident';
+  c.append(el('p',VILLAGE_VOICES[npc]?.[phase==='done'?1:0]||'', 'village-dialogue'));
+  if(npc==='Лиса Даша')note('Если не заговорить с Дашей, она может стащить пару монет. Не чаще раза в сутки.',c);
+  p.append(c);
+  const q=card(spec.title,phase==='done'?'Сегодня выполнено':phase==='active'?'Задание взято':'Новое задание','orders');
+  q.append(goods({[spec.item]:spec.qty},false));
+  const reward=el('span',`+${fmt(spec.coins)} мон. · +${fmt(spec.xp)} опыта`,'reward');q.append(reward);
+  if(phase==='available')q.append(button('Взять задание',()=>villageQuestAction(npc,'take'),'primary'));
+  else if(phase==='active')q.append(button('Сдать задание',()=>villageQuestAction(npc,'deliver'),'primary',!enough({[spec.item]:spec.qty})));
+  else note('Новая просьба появится завтра.',q);
+  p.append(q);return;
+ }
  const npc=villageResident,r=repInfo(npc),c=card(npc,'ЖИТЕЛЬ ДЕРЕВНИ');c.classList.add('village-resident');c.tabIndex=-1;c.dataset.villageFocus='resident';
  const voices=VILLAGE_VOICES[npc]||['Рады видеть тебя на площади.'];c.append(el('p',voiceFor(voices[Math.min(2,r.lv)]||voices[0]),'village-dialogue'),repBar(npc),el('h3','Любимые товары','subheading'),goods(Object.fromEntries(S.catalog.market.tastes[npc].map(id=>[id,1])),false));p.append(c);
  const orders=villageOrders(npc);p.append(el('h3','Просьбы сегодня','subheading'));if(!orders.length){note('Сейчас просьб нет. Загляни позже: новые заказы появляются на общей доске.',p);return;}

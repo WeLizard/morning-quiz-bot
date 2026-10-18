@@ -208,6 +208,7 @@ SCHEMAS={
  'feed':{'object'},'collect_animal':{'object'},'buy_animal':{'object','animal'},
  'build':{'type','x','y'},'move':{'object','x','y','revision'},'rotate':{'object','revision'},'demolish':{'object','revision'},'upgrade':{'object','revision'},
  'rescue':set(),'expand':set(),'sell':{'item','qty'},'order':{'order'},'skip_order':{'order'},'quest':{'quest'},
+ 'village_quest':{'npc','action'},
  'settings':{'name','visibility','allow_help','allow_gifts','allow_pranks','allow_trade'},
  'request_neighbor':set(),'accept_neighbor':set(),'claim_neighbor_reward':set(),'remove_neighbor':set(),'block':set(),'unblock':set(),
  'help':{'object','revision'},'prank':set(),'clear_prank':set(),'gift':{'item','qty'},
@@ -378,6 +379,9 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         else:
             need(order['skip_at']<=now,'skip_wait','Подожди немного перед заменой заказа.');text='На доске новый заказ.'
         slot=order['slot'];me['orders'][slot]=make_order(me,slot,now)
+    elif kind=='village_quest':
+        from . import village_quests
+        text=village_quests.act(me,data['npc'],data['action'],now)
     elif kind=='quest':
         q=find(QUESTS,data['quest'])
         need(q['id'] not in me['claimed_quests'],'already_claimed','Награда уже получена.')
@@ -475,6 +479,8 @@ def validate_state(farm):
     minigames.validate(farm)
     progression.validate(farm)
     economy.validate(farm)
+    from . import village_quests
+    village_quests.validate(farm)
     need(type(farm['coins']) is int and 0<=farm['coins']<=10**12,'invalid_balance','Некорректное состояние баланса.',500)
     need(0<=farm['starter_credit']<=farm['coins'],'invalid_credit','Некорректное состояние средств.',500)
     need(farm['xp']>=0 and is_land_size(farm['size']),'invalid_state','Некорректное состояние фермы.',500)
@@ -494,6 +500,8 @@ def project(farm, visitor, now):
     need(can_visit(visitor,farm),'private_farm','Ферма недоступна.',404)
     if own:
         result=deepcopy(farm)
+        from . import village_quests
+        result['village_errands']=village_quests.public(farm,now)
         from . import minigames
         result['minigames']=minigames.public(farm,now)
         result['home_projects']=projects.owner_state(farm)

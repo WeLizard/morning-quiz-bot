@@ -70,7 +70,11 @@ QUESTS=[
  dict(id='q9',name='Ферма, которая дружит',text='Помоги соседям пять раз. Благодарность остаётся в журнале.',stat='helps',goal=5,coins=0,xp=45),
  dict(id='q10',name='Мастер хозяйства',text='Выполни двадцать пять заказов и оставь себе время на отдых.',stat='orders',goal=25,coins=400,xp=100),
 ]
-NPCS=[('Филиныч','Для вечернего чаепития'),('Агата','На маленький деревенский праздник'),('Почтальон Ёж','В корзинку для дальней дороги'),('Механик Крот','Обед мастерской'),('Кошка Кая','К чаю и мурлыканью'),('Кошка Соня','Для сладкой дремоты на печке'),('Суслик Игорь','В запас на долгую зиму'),('Неведома Зверушка','Угощение для загадочного гостя'),('Медведь Пух','Для бодрости перед работой')]   # new residents go to the END: old indexes stay
+NPCS=[('Филиныч','Для вечернего чаепития'),('Агата','На маленький деревенский праздник'),('Почтальон Ёж','В корзинку для дальней дороги'),('Механик Крот','Обед мастерской'),('Кошка Кая','К чаю и мурлыканью'),('Кошка Соня','Для сладкой дремоты на печке'),('Суслик Игорь','В запас на долгую зиму'),('Неведома Зверушка','Угощение для загадочного гостя'),('Медведь Пух','Для бодрости перед работой')]   # Frozen legacy order pool: rng % len(NPCS) must stay stable.
+VILLAGE_QUESTS={
+ 'Лиса Даша':dict(item='carrot',qty=2,coins=12,xp=4,title='Морковка для тайника'),
+ 'Петух Гриша':dict(item='wheat',qty=4,coins=12,xp=4,title='Завтрак перед рассветом'),
+}
 
 # Expansion r2. Stable IDs; existing crops/recipes retain their original values.
 for row in [
@@ -509,6 +513,7 @@ SIGNATURE_PCT=70
 MARKET=dict(
  rep_names=REP_NAMES,rep_points=REP_POINTS,rep_bonus=REP_BONUS,special_level=REP_SPECIAL_LEVEL,special_bonus=20,
  tastes={k:list(v) for k,v in NPC_TASTES.items()},
+ village_quests=VILLAGE_QUESTS,
  caravan=dict(level=10,min_hours=12,max_hours=24,cooldown_hours=24,premium=45,xp_div=5,decor_chance=15,
               decor=['flowerbed','bench','lantern','scarecrow','basket'],value_share=12,rep_points=3),
  contracts=dict(count=3,level=2,streak_step=4,streak_max=5,tz_offset=10800),

@@ -58,6 +58,8 @@ def upgrade_state(farm):
     for key in ('automation', 'forages', 'fishing_trips', 'machine_runs', 'secrets'):
         farm['stats'].setdefault(key, 0)
     market.upgrade_market(farm)
+    from . import village_quests
+    village_quests.state(farm)
     farm['schema_version'] = 2
     farm['catalog'] = VERSION
     return farm

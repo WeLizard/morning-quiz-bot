@@ -896,3 +896,4 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 }
 @media(min-width:1024px){.header-destinations .forest-door[data-label]::after{font-size:13px}}
 html.qw-desktop .header-destinations .forest-door[data-label]::after{font-size:13px}
+.village-npc.is-stealing .village-walker{animation:none;transform:translate(var(--steal-x,0),var(--steal-y,0));transition:transform 1.2s ease-in-out}

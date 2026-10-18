@@ -227,7 +227,7 @@ class FarmService:
             await self.u.save(farm)
             # Market housekeeping (a caravan arriving, the daily contracts rolling over) changes no balance:
             # it is saved, but only real work leaves a receipt in the economic ledger.
-            quiet={'market','events','revision','economy'}
+            quiet={'market','events','revision','economy','village_errands'}
             if any(farm.get(k)!=baseline.get(k) for k in set(farm)|set(baseline) if k not in quiet):
                 # Stable per-version economic receipt for automatically completed work.
                 key='auto:'+str(farm['revision'])
@@ -279,6 +279,29 @@ class FarmService:
     async def history(self):
         me=await self.me()
         return dict(entries=await self.u.history(me['id']))
+
+    async def village_presence(self, action, session):
+        """Persist one visible village lease; only an earned theft enters the ledger."""
+        from . import village_quests
+        need(isinstance(action,str) and action in {'enter','pulse','talk','leave'} and isinstance(session,str),
+             'invalid_command','Некорректное присутствие.',422)
+        try: session=str(UUID(session))
+        except (ValueError, TypeError, AttributeError):
+            raise FarmError('invalid_command','Некорректное присутствие.',422)
+        me=await self.me()
+        await self.u.lock('farm:'+me['id'])
+        me=await self.u.get(me['id'])
+        before=deepcopy(me)
+        now=self.clock()
+        stolen=village_quests.presence(me,action,session,now)
+        if me!=before:
+            me['revision']+=1
+            validate_state(me)
+            await self.u.save(me)
+            if stolen:
+                await self.u.record(self.p.account_id,'village-theft:'+str(now),'village_theft',before,me,now)
+        return dict(stolen=stolen,notice=(f'Лиса Даша стащила {stolen} мон. из кармана!' if stolen else ''),
+                    server_time=now,coins=me['coins'],revision=me['revision'])
 
     async def command(self,key,kind,data,target_id=None):
         need(isinstance(key,str) and re.fullmatch(r'[a-zA-Z0-9_:-]{8,64}',key),'invalid_key','Нет идентификатора команды.',422)

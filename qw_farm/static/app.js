@@ -60,6 +60,7 @@ const VILLAGE_VOICES={
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
 let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null;
+let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
 const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Гриша':[49.0,32.0]};
 // The world is 2400x1800 art units (village.svg, painted with the farm's own building code). Positions above are percentages of the world;
 // each resident stands at the door of their own house. VILLAGE_C is the back corner of the plaza.
@@ -1397,7 +1398,6 @@ function decorShop(p,e){
 }
 // Living village uses existing personal orders and the shared seasonal fund only.
 // The two new errands are separate from the three legacy order slots.
-let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
 function villagePresenceStop(){
  const session=villageSession;villageSession=null;villageEnterPending=null;villageTalkPending=false;if(villagePulseTimer)clearInterval(villagePulseTimer);villagePulseTimer=null;
  if(session)request(API+'/village/presence',{method:'POST',data:{action:'leave',session}}).catch(()=>{});

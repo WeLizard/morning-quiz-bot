@@ -14,3 +14,12 @@ test('farm app.js declares no top-level const/let after the boot await', () => {
     .filter(([, line]) => /^(const|let)\s/.test(line));
   assert.deepEqual(late.map(([n, line]) => `${n}: ${line.slice(0, 60)}`), []);
 });
+
+test('village presence state is initialized before the first boot render', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../qw_farm/static/app.js'), 'utf8');
+  const state = source.indexOf('let villageSession=null');
+  const boot = source.indexOf("try{S.config=await request(API+'/config')");
+  const reset = source.indexOf('function resetVillageView()');
+  assert.ok(state > 0 && state < reset && reset < boot,
+    'presence state must exist before boot can call resetVillageView');
+});

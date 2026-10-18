@@ -139,6 +139,9 @@ class FarmService:
         if already:
             need(own_edge and other_edge and own_edge.get('status')=='accepted' and other_edge.get('status')=='accepted',
                  'invite_state','Сначала разреши текущее приглашение или удали существующее соседство.',409)
+            # A neighbor who taps the shared link again takes no place out of the link's limit;
+            # an unpaid old neighborhood is claimed with the gift button.
+            return dict(neighbor_reward_paid=False,notice='Вы уже соседи.',neighbors=await self.neighbors())
         else:
             need(len(me['neighbors'])<100 and len(other['neighbors'])<100,
                  'neighbors_full','Список соседей заполнен.',409)

@@ -403,6 +403,10 @@ def test_demo_service_reusable_link_is_atomic_idempotent_and_capped():
         async with db.transaction() as unit:
             fourth=service(unit,fourth_account,'Fourth')
             assert (await fourth.join_share_invite(fresh['token']))['neighbors']['neighbors'][0]['id']==owner_id
+            # An existing neighbor tapping the shared link takes no place out of its limit.
+            again=await service(unit,recipient_account,'Recipient').join_share_invite(fresh['token'])
+            assert again['notice']=='Вы уже соседи.' and again['neighbor_reward_paid'] is False
+            assert await uses(unit,fresh['token'])==1
         # «Сменить ссылку»: the old link stops working, neighborhoods made through it stay.
         async with db.transaction() as unit:
             owner=service(unit,owner_account,'Owner')

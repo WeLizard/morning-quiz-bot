@@ -1009,12 +1009,16 @@ function showPanel(){document.body.classList.add('panel-open');document.body.cla
 function copyText(text,label='Скопировано.'){return safe(async()=>{try{await navigator.clipboard.writeText(text);toast(label);}catch{modal('Скопируй текст',el('div',text,'code'));}});}
 function renderInviteRewards(parent,r){
  if(!r)return;
- let c=card('Награда за приглашение','Монеты за настоящих соседей','friends');
- note(`Друг получит ${r.bonus} монет сразу. Ты получишь ${r.reward} монет, когда он достигнет ${r.level} уровня.`,c);
- let limits=el('details',null,'invite-rules');limits.append(el('summary','Правила и лимиты'),el('p',`Одна награда за ферму. Не больше ${r.per_day} в день и ${r.total_limit} всего. Сегодня доступно: ${r.today_left}. Получено: ${r.total} (${r.earned} монет).`));c.append(limits);
+ // One card for both rewards: inviting a friend and a new neighborhood (rules for both under one «Правила и лимиты»).
+ let c=card('Награды за соседей','Монеты за приглашения и соседство','friends');
+ note(`Приглашение: друг получит ${r.bonus} монет сразу, а ты — ${r.reward} монет, когда он достигнет ${r.level} уровня.`,c);
+ if(r.neighbor)note(`Новое соседство: вы оба получите по ${r.neighbor.reward} монет автоматически.`,c);
  const words={rewarded:'награда получена',ready:'награда ждёт свободного места в дневном лимите',growing:'растёт'};
  for(const i of r.invited)c.append(el('p',`${i.name} · уровень ${Math.min(i.level,i.goal)} из ${i.goal} · ${words[i.status]||i.status}`,'note'));
  if(!r.invited.length)note('Пока никто не пришёл по твоему приглашению.',c);
+ let limits=el('details',null,'invite-rules');limits.append(el('summary','Правила и лимиты'),el('p',`Приглашения: одна награда за ферму. Не больше ${r.per_day} в день и ${r.total_limit} всего. Сегодня доступно: ${r.today_left}. Получено: ${r.total} (${r.earned} монет).`));
+ if(r.neighbor)limits.append(el('p',`Соседство: один раз для пары. Не больше ${r.neighbor.per_day} в день и ${r.neighbor.total_limit} всего. Сегодня доступно: ${r.neighbor.today_left}. Получено: ${r.neighbor.total} (${r.neighbor.earned} монет). За старое неоплаченное соседство подарок можно забрать по кнопке у соседа.`));
+ c.append(limits);
  if(r.can_enter_code){
   const form=el('form'),[w,input]=field('Тебя пригласили? Введи код друга');input.placeholder='Код фермы';input.autocomplete='off';
   const b=button('Получить бонус',()=>{},'secondary wide');b.type='submit';form.append(w,b);
@@ -1023,7 +1027,6 @@ function renderInviteRewards(parent,r){
   c.append(form);
  }
  parent.replaceChildren(c);
- if(r.neighbor){let n=card('Награда за новое соседство','Обоим игрокам','friends');note(`За новое соседство каждый получает по ${r.neighbor.reward} монет автоматически. За старое неоплаченное соседство подарок можно забрать по кнопке у соседа.`,n);let rules=el('details',null,'invite-rules');rules.append(el('summary','Правила и лимиты'),el('p',`Один раз для пары. Не больше ${r.neighbor.per_day} в день и ${r.neighbor.total_limit} всего. Сегодня доступно: ${r.neighbor.today_left}. Получено: ${r.neighbor.total} (${r.neighbor.earned} монет).`));n.append(rules);parent.append(n);}
 }
 async function acceptSharedInvite(token){
  const done=await request(API+'/invite/join',{method:'POST',data:{token}});

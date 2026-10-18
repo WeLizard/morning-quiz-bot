@@ -37,7 +37,8 @@ export function clearInvite(){
 export function openTelegram(link){
   const u=new URL(link);if(u.protocol!=='https:'||u.hostname!=='t.me')throw new Error('Недопустимая ссылка Telegram.');
   const tg=window.Telegram?.WebApp;
-  if(tg?.initData&&typeof tg.openTelegramLink==='function')tg.openTelegramLink(link);
+  // Same Telegram check as the shell (QW.tg): after /app → /app/farm the SDK may lose initData, and window.open is a silent no-op in Telegram Desktop.
+  if((tg?.initData||window.QW?.tg)&&typeof tg?.openTelegramLink==='function')tg.openTelegramLink(link);
   else window.open(link,'_blank','noopener,noreferrer');
 }
 export function shareData(info){

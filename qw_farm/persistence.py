@@ -15,7 +15,9 @@ from .domain import FarmError, need
 
 def tables(metadata: sa.MetaData):
     if 'farm_states' in metadata.tables:
-        return {name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites','share_invite_uses']}
+        result={name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites','share_invite_uses']}
+        result['wagers']=metadata.tables.get('farm_wager_rounds')
+        return result
     states=sa.Table('farm_states',metadata,
         sa.Column('id',sa.Uuid,primary_key=True),
         sa.Column('account_id',sa.Uuid,sa.ForeignKey('accounts.id',ondelete='RESTRICT'),nullable=False,unique=True),
@@ -79,7 +81,25 @@ def tables(metadata: sa.MetaData):
         sa.Column('farm_id',sa.Uuid,sa.ForeignKey('farm_states.id',ondelete='RESTRICT'),primary_key=True),
         sa.Column('accepted_at',sa.Float,nullable=False))
     sa.Index('ix_farm_states_public',states.c.visibility,states.c.name)
-    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses)
+    wagers=sa.Table('farm_wager_rounds',metadata,
+        sa.Column('id',sa.Uuid,primary_key=True),
+        sa.Column('account_id',sa.Uuid,sa.ForeignKey('accounts.id',ondelete='RESTRICT'),nullable=False),
+        sa.Column('farm_id',sa.Uuid,sa.ForeignKey('farm_states.id',ondelete='RESTRICT'),nullable=False),
+        sa.Column('stake',sa.Integer,nullable=False),sa.Column('payout',sa.Integer,nullable=False),
+        sa.Column('rules_version',sa.Integer,nullable=False),sa.Column('created_at',sa.Float,nullable=False),
+        sa.Column('expires_at',sa.Float,nullable=False),sa.Column('winning_cup',sa.SmallInteger,nullable=False),
+        sa.Column('default_cup',sa.SmallInteger,nullable=False),sa.Column('chosen_cup',sa.SmallInteger),
+        sa.Column('settled_at',sa.Float),sa.Column('won',sa.Boolean),
+        sa.Column('pending_payout',sa.Integer,nullable=False,server_default='0'),
+        sa.CheckConstraint('(stake=10 AND payout=27) OR (stake=20 AND payout=54) OR (stake=50 AND payout=135)',name='ck_farm_wager_amounts'),
+        sa.CheckConstraint('rules_version > 0 AND expires_at > created_at',name='ck_farm_wager_timing'),
+        sa.CheckConstraint('winning_cup BETWEEN 0 AND 2 AND default_cup BETWEEN 0 AND 2 AND (chosen_cup IS NULL OR chosen_cup BETWEEN 0 AND 2)',name='ck_farm_wager_cups'),
+        sa.CheckConstraint('(chosen_cup IS NULL AND settled_at IS NULL AND won IS NULL) OR (chosen_cup IS NOT NULL AND settled_at IS NOT NULL AND won IS NOT NULL AND won = (chosen_cup = winning_cup))',name='ck_farm_wager_phase'),
+        sa.CheckConstraint('pending_payout BETWEEN 0 AND 135 AND (pending_payout=0 OR (settled_at IS NOT NULL AND won IS TRUE))',name='ck_farm_wager_pending_payout'))
+    sa.Index('uq_farm_wager_active_account',wagers.c.account_id,unique=True,
+             postgresql_where=wagers.c.settled_at.is_(None),sqlite_where=wagers.c.settled_at.is_(None))
+    sa.Index('ix_farm_wager_daily',wagers.c.account_id,wagers.c.created_at)
+    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses,wagers=wagers)
 
 
 def unpack(row):

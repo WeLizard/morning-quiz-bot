@@ -68,6 +68,7 @@ MERGE_POLICY = {
     ('farm_states', 'account_id'): 'special',
     ('farm_receipts', 'account_id'): 'special',
     ('farm_ledger', 'actor_account_id'): 'history',
+    ('farm_wager_rounds', 'account_id'): 'special',
     ('problem_reports', 'account_id'): 'history',
 }
 
@@ -450,6 +451,20 @@ class AccountMergeService:
             return
         t = unit.t
         states, receipts = t['states'], t['receipts']
+        wagers = t.get('wagers')
+        if wagers is not None:
+            active = await session.scalar(select(exists().where(
+                wagers.c.account_id.in_([main.id, secondary.id]), wagers.c.settled_at.is_(None))))
+            pending = await session.scalar(select(exists().where(
+                wagers.c.account_id.in_([main.id, secondary.id]), wagers.c.pending_payout > 0)))
+            if active or pending:
+                message = ('Заверши раунд с Дашей и открой ферму, затем повтори объединение.' if active else
+                           'Освободи место для отложенной выплаты Даши, затем повтори объединение.')
+                raise MiniAppError(409, message,
+                                   code='merge_wager_unsettled')
+            # Preserve every settled record and its original farm reference across either merge shape.
+            await session.execute(update(wagers).where(wagers.c.account_id == secondary.id)
+                                  .values(account_id=main.id))
         theirs = await unit.by_account(secondary.id)
         mine = await unit.by_account(main.id)
         if theirs is None:

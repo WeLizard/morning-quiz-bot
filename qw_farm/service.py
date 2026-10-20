@@ -12,6 +12,7 @@ from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, progression, trip_games
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
+from . import wagers
 
 @dataclass(frozen=True)
 class Principal:
@@ -42,7 +43,10 @@ class FarmService:
             try:farm=await self._attach_invite(farm,invite)
             except FarmError:pass  # a stale/foreign/late link never blocks opening the farm
         await self._settle(farm,own=True)
-        return dict(farm=project(farm,farm,self.clock()),catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
+        await wagers.expire(self.u,farm,self.p.account_id,self.clock())
+        await wagers.claim_pending(self.u,farm,self.p.account_id,self.clock())
+        projection=project(farm,farm,self.clock());projection['wager']=await wagers.projection(self.u,farm,self.p.account_id,self.clock())
+        return dict(farm=projection,catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
                     invites=await self._invites(farm),address_form=self.p.address_form)
 
     async def share_link_status(self):
@@ -267,9 +271,13 @@ class FarmService:
         farm=me if target_id==me['id'] else await self.u.get(target_id)
         need(farm is not None and can_visit(me,farm),'not_found','Ферма недоступна.',404)
         await self._settle(me,own=True)
+        await wagers.expire(self.u,me,self.p.account_id,self.clock())
+        await wagers.claim_pending(self.u,me,self.p.account_id,self.clock())
         if farm is not me:
             await self._settle(farm,await self.u.owner_account(farm['id']))
-        return dict(farm=project(farm,me,self.clock()),speed=self.speed,village=await self._village(me) if farm is me else None,
+        projected=project(farm,me,self.clock())
+        if farm is me:projected['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
+        return dict(farm=projected,speed=self.speed,village=await self._village(me) if farm is me else None,
                     invites=await self._invites(me) if farm is me else None,
                     address_form=self.p.address_form)
 
@@ -335,12 +343,24 @@ class FarmService:
             target_id=str(UUID(str(target_id or me['id'])))
         except (ValueError,TypeError,AttributeError):
             raise FarmError('not_found','Ферма не найдена.',404)
+        if kind in {'wager_start','wager_choose'}:
+            need(target_id==me['id'],'not_owner','Это не твоя ферма.',403)
         # UUID spelling must not create two different advisory locks for the
         # same row (uppercase/lowercase or alternate UUID notation).
         fingerprint=sha256(json.dumps([kind,target_id,data],sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
         cached=await self.u.receipt(self.p.account_id,key)
         if cached:
             need(cached['fingerprint']==fingerprint,'key_reused','Этот номер уже относится к другому действию.')
+            if kind in {'wager_start','wager_choose'}:
+                await self.u.lock('farm:'+me['id'])
+                me=await self.u.get(me['id'])
+                need(target_id==me['id'],'not_owner','Это не твоя ферма.',403)
+                await self._settle(me,own=True)
+                await wagers.expire(self.u,me,self.p.account_id,self.clock())
+                await wagers.claim_pending(self.u,me,self.p.account_id,self.clock())
+                refreshed=deepcopy(cached['result'])
+                refreshed['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
+                return refreshed
             # Receipt contains only the actor's acknowledgement, no secret
             # snapshot from a farm whose permissions could have since changed.
             return deepcopy(cached['result'])
@@ -350,12 +370,18 @@ class FarmService:
         need(other is not None,'not_found','Ферма не найдена.',404)
         # Materialize past paid work BEFORE the new command, in the same transaction.
         await self._settle(me,own=True)
+        await wagers.expire(self.u,me,self.p.account_id,self.clock())
+        await wagers.claim_pending(self.u,me,self.p.account_id,self.clock())
         if other is not me:
             await self._settle(other,await self.u.owner_account(other['id']))
         before=deepcopy(me);before_other=deepcopy(other)
         now=self.clock()
         mini_kind=kind in {'minigame_start','minigame_answer'}
-        if mini_kind:
+        wager_kind=kind in {'wager_start','wager_choose'}
+        if wager_kind:
+            need(other is me,'not_owner','Это не твоя ферма.',403)
+            notice,ledger_kind=await wagers.command(self.u,me,self.p.account_id,kind,data,now)
+        elif mini_kind:
             need(other is me,'not_owner','Это не твоя ферма.',403)
             question=None
             if kind=='minigame_start':
@@ -386,12 +412,17 @@ class FarmService:
             await self.u.village_add(economy.season_of(now),sent,now)
         me['revision']+=1
         validate_state(me);await self.u.save(me)
-        await self.u.record(self.p.account_id,key,kind,before,me,now)
+        await self.u.record(self.p.account_id,key,ledger_kind if wager_kind else kind,before,me,now)
         if me['id']!=other['id'] and other!=before_other:
             other['revision']+=1;validate_state(other);await self.u.save(other)
             await self.u.record(self.p.account_id,key,kind,before_other,other,now)
+        await wagers.claim_pending(self.u,me,self.p.account_id,now)
         result=dict(command_id=key,notice=notice,server_time=now,revision=me['revision'])
         if mini_kind:result['minigames']=minigames.public(me,now)
+        if wager_kind:result['wager']=await wagers.projection(self.u,me,self.p.account_id,now)
         if neighbor_reward_paid:result['neighbor_reward_paid']=True
-        await self.u.remember(self.p.account_id,key,fingerprint,result,now)
+        # Wager projections may reveal a settled result to the live owner response;
+        # receipts are replay acknowledgements and must never persist either cup.
+        receipt_result={k:v for k,v in result.items() if k!='wager'} if wager_kind else result
+        await self.u.remember(self.p.account_id,key,fingerprint,receipt_result,now)
         return result

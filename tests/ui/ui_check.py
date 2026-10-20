@@ -4,6 +4,7 @@
     python tests/ui/ui_check.py errors              # automatic error reports: capture, limits, sanitising, breadcrumbs, toast (no server)
     python tests/ui/ui_check.py gaps-selftest       # the button-gap scanner catches glued buttons (no server)
     python tests/ui/ui_check.py gaps --base URL     # real screens of a running app: glued buttons, tap height
+    python tests/ui/ui_check.py dasha --base URL    # real guest game view at 320/390/desktop, with screenshots
 
 Prints "SKIP: ..." and exits 0 when no browser is available (Playwright Chromium, Edge or Chrome).
 Wrapped by tests/js/ui_layout.test.cjs so it runs with the common `node --test tests/js/*.test.cjs` set.
@@ -437,6 +438,90 @@ def run_gaps(pw_browser, base, only=None):
     return c, report
 
 
+def run_dasha(pw_browser, base, screenshots):
+    """Real server-backed Dasha view at phone and desktop widths; only creates a guest session."""
+    c = Checks()
+    screenshots.mkdir(parents=True, exist_ok=True)
+    context = pw_browser.new_context(viewport={'width': 390, 'height': 844})
+    page = context.new_page()
+    command_posts = []
+    page_errors = []
+    page.on('pageerror', lambda error: page_errors.append(str(error)))
+    page.on('request', lambda request: command_posts.append(request.url) if request.method == 'POST' and '/api/farm/v1/commands' in request.url else None)
+    try:
+        page.goto(base + '/app', wait_until='load', timeout=30000)
+        guest = page.evaluate("""async () => {
+            const response = await fetch('/api/guest/start', {method:'POST', credentials:'same-origin', headers:{'X-Guest-CSRF':'1'}});
+            return {ok:response.ok, status:response.status};
+        }""")
+        c.ok(guest['ok'], f'test guest created (HTTP {guest["status"]})')
+        if not guest['ok']:
+            context.close()
+            return c
+
+        for width, height in ((320, 640), (390, 844), (1280, 800)):
+            page.set_viewport_size({'width': width, 'height': height})
+            try:
+                page.goto(base + '/app/farm?identity=guest', wait_until='load', timeout=30000)
+                direct_village = page.locator('[data-tab="village"]')
+                if direct_village.is_visible():
+                    direct_village.click()
+                else:
+                    page.locator('[data-tab="more"]').click()
+                    page.locator('[data-more-tab="village"]').click()
+                fox = page.locator('[data-village-npc="Лиса Даша"]').first
+                fox.wait_for(state='visible', timeout=15000)
+                fox.click()
+                play = page.locator('#panel-content [data-open-dasha="true"]')
+                play.wait_for(state='visible', timeout=15000)
+                play.click()
+                view = page.locator('#dasha-game-view')
+                view.wait_for(state='visible', timeout=10000)
+                page.wait_for_selector('#dasha-game-view .dasha-round-status', state='visible', timeout=10000)
+
+                c.ok(view.is_visible(), f'dasha@{width}: game is a visible in-shell view')
+                c.ok(page.locator('[data-qw-gear]').is_visible(), f'dasha@{width}: shell settings menu remains accessible')
+                page.locator('[data-qw-gear]').click()
+                menu_open = page.locator('.qw-menu.qw-open').is_visible()
+                c.ok(menu_open, f'dasha@{width}: settings menu opens over game')
+                if menu_open:
+                    page.locator('[data-qw-gear]').click()
+                dimensions = page.evaluate("""() => ({
+                    viewport: innerWidth,
+                    document: document.documentElement.scrollWidth,
+                    body: document.body.scrollWidth,
+                    view: document.querySelector('#dasha-game-view').scrollWidth,
+                    viewClient: document.querySelector('#dasha-game-view').clientWidth
+                })""")
+                c.ok(dimensions['document'] <= width + 1 and dimensions['body'] <= width + 1 and dimensions['view'] <= dimensions['viewClient'] + 1,
+                     f'dasha@{width}: no horizontal overflow ({dimensions})')
+                locked = page.locator('#dasha-game-view .dasha-round-status').inner_text()
+                c.ok('3 уровня' in locked, f'dasha@{width}: level-locked test guest sees human-readable reason ({locked!r})')
+                c.ok(page.locator('#dasha-game-view [data-role="action"]').is_disabled(), f'dasha@{width}: locked guest cannot start a wager')
+
+                result = page.evaluate(SCANNER, [MIN_GAP, MIN_TAP])
+                if width < 768:
+                    result['issues'] += page.evaluate(ZONE_SCANNER, [47, 48])
+                report_path = screenshots / f'dasha-{width}.png'
+                page.screenshot(path=str(report_path), full_page=True)
+                for issue in result['issues']:
+                    if issue['kind'] == 'gap':
+                        detail = f'{issue["a"]} ↔ {issue["b"]} gap {issue["gap"]}px'
+                    elif issue['kind'] == 'height':
+                        detail = f'{issue["a"]} height {issue["height"]}px'
+                    else:
+                        detail = f'{issue["a"]} at y={issue["y"]}px is inside {issue["kind"]} zone'
+                    c.ok(False, f'dasha@{width}: {issue["kind"]}: {detail}')
+                c.ok(True, f'dasha@{width}: button gaps/tap targets scanned; screenshot {report_path}')
+            except Exception as error:  # noqa: BLE001 - report each viewport independently
+                c.ok(False, f'dasha@{width}: scenario failed ({str(error).splitlines()[0]})')
+        c.ok(not command_posts, f'no farm command or wager was submitted ({command_posts})')
+        c.ok(not page_errors, f'no browser page errors ({page_errors})')
+    finally:
+        context.close()
+    return c
+
+
 ERRORS_ROUTE = r'/problem-reports/errors'
 MANUAL_ROUTE = r'/problem-reports(\?|$)'
 
@@ -678,13 +763,13 @@ def main(argv):
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print('SKIP: python playwright is not installed')
-        return 0
+        print('FAIL: python playwright is not installed' if command == 'dasha' else 'SKIP: python playwright is not installed')
+        return 1 if command == 'dasha' else 0
     with sync_playwright() as playwright:
         pw_browser = browser(playwright)
         if pw_browser is None:
-            print('SKIP: no Chromium, Edge or Chrome for Playwright')
-            return 0
+            print('FAIL: no Chromium, Edge or Chrome for Playwright' if command == 'dasha' else 'SKIP: no Chromium, Edge or Chrome for Playwright')
+            return 1 if command == 'dasha' else 0
         try:
             if command == 'nav':
                 checks = run_nav(pw_browser)
@@ -707,6 +792,13 @@ def main(argv):
                 checks, report = run_gaps(pw_browser, base, only)
                 if '--json' in argv:
                     print(json.dumps(report, ensure_ascii=False))
+            elif command == 'dasha':
+                base = argv[argv.index('--base') + 1].rstrip('/') if '--base' in argv else None
+                if not base:
+                    print('FAIL: dasha needs --base URL of a running app')
+                    return 1
+                screenshots = Path(argv[argv.index('--screenshots') + 1]) if '--screenshots' in argv else ROOT / '.local' / 'dasha-integration-20261020' / 'ui'
+                checks = run_dasha(pw_browser, base, screenshots)
             else:
                 print(f'unknown command {command}')
                 return 2

@@ -1,4 +1,5 @@
 import './address.js';
+import {mountDashaGame,dashaReasonText} from './dasha-game.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame,yieldQty,growthPermille} from './tractor_game.js';
@@ -59,7 +60,7 @@ const VILLAGE_VOICES={
 };
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
-let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null;
+let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false;
 let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
 const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Олег':[49.0,32.0]};
 // The world is 2400x1800 art units (village.svg, painted with the farm's own building code). Positions above are percentages of the world;
@@ -294,7 +295,7 @@ async function refresh({render=true}={}){
  if(id&&id!==identity){try{farm=(await request(API+'/farms/'+id)).farm;}catch(e){if(!current())return false;if([403,404].includes(e.status))lostAccess=true;else throw e;}}
  if(!current())return false;
  const beforeScene=sceneSnapshot(),beforeHUD=hudSnapshot(),beforeSeeds=seedsSnapshot();
- S.form=me.address_form||'n';S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;
+ S.form=me.address_form||'n';S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();
  queueNeighborGifts(S.me);
  if(lostAccess){farmViewEpoch++;S.tab='neighbors';toast(gf('Хозяин закрыл доступ. Ты вернулся на свою ферму.','Хозяин закрыл доступ. Ты вернулась на свою ферму.','Доступ закрыт владельцем. Открыта твоя ферма.'));}
  if(beforeScene!==sceneSnapshot())scene.set(S.farm,S.catalog);
@@ -325,10 +326,10 @@ function schedulePendingRetry(e){
 }
 async function sendPending(){
  if(!S.me||!S.pending||S.pending.actor!==S.me.id||S.busy)return false;clearTimeout(pendingRetryTimer);pendingRetryTimer=null;S.busy=true;connection('Сохраняем действие…');document.body.classList.add('is-saving');
- let payload=S.pending;
+ let payload=S.pending,rejectedWagerRoundId=null;
  try{let r=await request(API+'/commands',{method:'POST',data:payload});rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;if(!S.me)return true;if(!r.neighbor_reward_paid)toast(r.notice);await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});return true;}
- catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
- finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();if(S.me&&!S.pending&&!S.placing)renderPanel();}
+ catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
+ finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
 }
 // After a real 429 the game recovers by itself: wait out Retry-After, then replay the unconfirmed command with the SAME id
 // (the server is idempotent) or just refresh the screen. No reload is needed.
@@ -360,7 +361,7 @@ function showLogin(message=''){
  if(S.pending)savePending();
  clearTimeout(pendingRetryTimer);pendingRetryTimer=null;pendingRetryAttempt=0;
  clearTimeout(rateRecoveryTimer);rateRecoveryTimer=null;rateRecoveryAttempt=0;
- farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
+ if(dashaGameOpen)closeDashaGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
  S.fieldGame?.close();cancelPlacement();if($('dialog').open)$('dialog').close();closePanel();
  toastList.length=0;renderToasts();connection(message||'Войди через QuizzyWizzy',true);
  document.body.classList.add('farm-login');$('game').hidden=true;$('login').hidden=false;const parent=$('login');parent.replaceChildren();let c=el('div',null,'login-card'),img=el('img',null,'login-hero');img.src='/app/farm-card-v2.webp';img.alt='Филиныч с урожаем на своей ферме';c.append(img);
@@ -391,7 +392,7 @@ function renderRail(){
  syncNav();
  if(mobile)requestAnimationFrame(()=>{const active=rail.querySelector('.active');if(active)rail.scrollTo({left:Math.max(0,active.offsetLeft-(rail.clientWidth-active.offsetWidth)/2),behavior:'smooth'});});
 }
-function selectTab(id){const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
+function selectTab(id){if(dashaGameOpen)closeDashaGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
 function exitVillage(){villageSheet=null;selectTab('orders');closePanel();}
 function returnToFarm(){if(villageVisible())exitVillage();else backHome();}
 function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkToken++;syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
@@ -1039,6 +1040,16 @@ function renderSecrets(p){
  }
 }
 function renderMore(p){heading('Все разделы','ПОД РУКОЙ, НО НЕ ПЕРЕД ГЛАЗАМИ');let grid=el('div',null,'more-grid');for(let [id,ico,title]of tabs){let b=button(null,()=>selectTab(id),'more-item');b.append(icon(ico),el('span',title));b.dataset.moreTab=id;grid.append(b);}p.append(grid,button('Список всех объектов',()=>selectTab('objects'),'secondary wide'));}
+function closeDashaGame(){if(!dashaGameOpen)return true;dashaGameOpen=false;document.body.classList.remove('dasha-game-open');dashaGame?.destroy();dashaGame=null;navPop('dasha-wager');requestAnimationFrame(()=>document.querySelector('[data-open-dasha]')?.focus({preventScroll:true}));return true;}
+async function openDashaGame(){
+ if(!own()||!S.me)return;
+ if(!S.me.wager){try{await refresh({render:false});}catch(e){toast(e.message,true);return;}}
+ if(!S.me?.wager){toast('Игра Даши пока недоступна. Обнови ферму.',true);return;}
+ const host=$('dasha-game-view');if(dashaGameOpen){dashaGame?.render();return;}
+ dashaGameOpen=true;document.body.classList.add('dasha-game-open');
+ dashaGame=mountDashaGame(host,{getState:()=>({wager:S.me?.wager,coins:S.me?.coins}),command,isCommandPending:()=>!!S.pending||S.busy,onBack:closeDashaGame});navPush('dasha-wager',closeDashaGame);
+ try{await refresh({render:false});}catch(e){toast(e.message,true);}finally{dashaGame?.render();}
+}
 function closePanel(){if(villageVisible()){const returnTo=villageSheet==='townhall'?'townhall':villageResident;villageSheet=null;S.lastRenderedVillageSheet=null;syncVillageScene();const world=$('village-scene');[...world.querySelectorAll('[data-village-npc],[data-village-townhall]')].find(n=>n.dataset.villageNpc===returnTo||n.dataset.villageTownhall===returnTo)?.focus({preventScroll:true});}document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');requestAnimationFrame(()=>scene.resize());}
 function showPanel(){document.body.classList.add('panel-open');document.body.classList.remove('panel-collapsed');requestAnimationFrame(()=>scene.resize());}
 function copyText(text,label='Скопировано.'){return safe(async()=>{try{await navigator.clipboard.writeText(text);toast(label);}catch{modal('Скопируй текст',el('div',text,'code'));}});}
@@ -1217,7 +1228,7 @@ async function retryConnection(){
  else if(S.pending)await sendPending();else await refresh();
 }
 document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){if(!S.placing?.committing)cancelPlacement();closePanel();}
+ if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
  if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||e.ctrlKey||e.metaKey||e.altKey||$('dialog').open)return;
  if(e.key.toLowerCase()==='f'){e.preventDefault();toggleFullscreen();}
  if(e.key.toLowerCase()==='h'){e.preventDefault();toggleImmersive();}
@@ -1577,12 +1588,18 @@ function syncVillageScene(){
  const frame=el('i',null,'vm-frame'),me=dot('vm-mark vm-player',villagePos);mini.append(frame);villageMini={frame,player:me};
  hud.replaceChildren(sky,back,mini);villageFrame();
 }
+function appendDashaAction(parent){
+ const w=S.me?.wager;if(!own())return;
+ const b=button('Играть с Дашей',openDashaGame,'qw-btn primary wide');b.dataset.openDasha='true';parent.append(b);
+ if(!w)note('Загружаем условия игры…',parent);else if(!w.active&&!w.eligible)note(dashaReasonText(w.reason),parent);
+ else if(w?.active)note('Твой раунд сохранён. Можно продолжить в любой момент.',parent);
+}
 function renderVillageResident(p){
  const spec=villageQuest(villageResident);
  if(spec){
   const npc=villageResident,phase=villageQuestPhase(npc),c=card(npc,'ЖИТЕЛЬ ДЕРЕВНИ');c.classList.add('village-resident');c.tabIndex=-1;c.dataset.villageFocus='resident';
   c.append(el('p',VILLAGE_VOICES[npc]?.[phase==='done'?1:0]||'', 'village-dialogue'));
-  if(npc==='Лиса Даша')note('Если не заговорить с Дашей, она может стащить пару монет. Не чаще раза в сутки.',c);
+  if(npc==='Лиса Даша'){note('Если не заговорить с Дашей, она может стащить пару монет. Не чаще раза в сутки.',c);appendDashaAction(c);}
   p.append(c);
   const q=card(spec.title,phase==='done'?'Сегодня выполнено':phase==='active'?'Задание взято':'Новое задание','orders');
   q.append(goods({[spec.item]:spec.qty},false));
@@ -1593,7 +1610,7 @@ function renderVillageResident(p){
   p.append(q);return;
  }
  const npc=villageResident,r=repInfo(npc),c=card(npc,'ЖИТЕЛЬ ДЕРЕВНИ');c.classList.add('village-resident');c.tabIndex=-1;c.dataset.villageFocus='resident';
- const voices=VILLAGE_VOICES[npc]||['Рады видеть тебя на площади.'];c.append(el('p',voiceFor(voices[Math.min(2,r.lv)]||voices[0]),'village-dialogue'),repBar(npc),el('h3','Любимые товары','subheading'),goods(Object.fromEntries(S.catalog.market.tastes[npc].map(id=>[id,1])),false));p.append(c);
+ const voices=VILLAGE_VOICES[npc]||['Рады видеть тебя на площади.'];c.append(el('p',voiceFor(voices[Math.min(2,r.lv)]||voices[0]),'village-dialogue'),repBar(npc),el('h3','Любимые товары','subheading'),goods(Object.fromEntries(S.catalog.market.tastes[npc].map(id=>[id,1])),false));if(npc==='Лиса Даша')appendDashaAction(c);p.append(c);
  const orders=villageOrders(npc);p.append(el('h3','Просьбы сегодня','subheading'));if(!orders.length){note('Сейчас просьб нет. Загляни позже: новые заказы появляются на общей доске.',p);return;}
  for(const o of orders){const order=card(o.title,o.special?'Особая просьба':'Заказ с доски','orders'),coins=Math.floor(o.coins*(100+r.bonus)/100),xp=Math.floor(o.xp*(100+r.bonus)/100);order.append(goods(o.needs));const action=button('Доставить',()=>deliverVillageOrder(o.id),'primary',!enough(o.needs));action.dataset.villageFocus=`order:${o.id}`;const footer=el('div',null,'card-footer');footer.append(el('span',`+${fmt(coins)} мон. · +${fmt(xp)} опыта`,'reward'),action);order.append(footer);if(!enough(o.needs))note('Недостающие товары можно вырастить или приготовить на ферме.',order);p.append(order);}
 }

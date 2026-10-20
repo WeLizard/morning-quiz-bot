@@ -20,7 +20,7 @@ function setup(){
  const nodes=new Map(),area=new Node('section'),calls=[],pause=[],bodyClasses=new Set();
  const S={me:{id:'own',is_owner:true,orders:[{id:'one',npc:'Филиныч',title:'Чай',needs:{tea:2},coins:100,xp:10}],inventory:{tea:2},market:{}},farm:{id:'guest'},tab:'orders',catalog:{market:{tastes:{'Филиныч':['tea'],'Агата':['bread']}}},village:null};
  nodes.set('farm-canvas',new Node('canvas'));nodes.set('panel-content',new Node('div'));nodes.set('panel-head',new Node('div'));const sheetFocus=new Node('section'),title=new Node('h2');nodes.get('panel-content').querySelector=()=>sheetFocus;nodes.get('panel-head').querySelector=()=>title;
- const ctx={S,AVATARS:{},document:{activeElement:null,body:{classList:{toggle:(k,v)=>v?bodyClasses.add(k):bodyClasses.delete(k),add:k=>bodyClasses.add(k),remove:k=>bodyClasses.delete(k),contains:k=>bodyClasses.has(k)}},querySelector:()=>area},
+ const ctx={S,AVATARS:{},own:()=>S.me?.is_owner===true,openDashaGame:()=>calls.push('open-dasha'),dashaReasonText:reason=>({level:'Игра открывается с 3 уровня.',daily_limit:'Лимит ставок 200 монет в день исчерпан.',pending_payout:'Выигрыш ожидает места на балансе.',earned_balance:'Для ставки нужны заработанные монеты.',wallet_limit:'Баланс монет достиг предела.',active:'Раунд уже начат — выбери стаканчик.'}[reason]||'Игра сейчас недоступна.'),document:{activeElement:null,body:{classList:{toggle:(k,v)=>v?bodyClasses.add(k):bodyClasses.delete(k),add:k=>bodyClasses.add(k),remove:k=>bodyClasses.delete(k),contains:k=>bodyClasses.has(k)}},querySelector:()=>area},
  $:id=>nodes.get(id),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},icon:()=>new Node('svg'),
  button:(text,fn,cls,disabled)=>{const n=new Node('button');n.textContent=text;n.onclick=fn;n.disabled=disabled;return n;},
  scene:{setPaused:v=>pause.push(v),set:()=>calls.push('scene'),selected:'x',resize(){}},farmViewEpoch:4,requestAnimationFrame:fn=>fn(),
@@ -32,7 +32,7 @@ function setup(){
  showPanel(){bodyClasses.add('panel-open');bodyClasses.delete('panel-collapsed');},renderPanel(){ctx.syncVillageScene();},renderRail(){},updateHUD(){},renderSeeds(){},meter:()=>new Node('div'),heading(){},fundCard(){},upkeepCard(){},decorShop(){},openFund:false};
  // Register dynamically created scene exactly as a browser's getElementById would.
  area.append=n=>nodes.set(n.id,n);
- vm.createContext(ctx);vm.runInContext(declarations+block+'\n'+source.slice(source.indexOf('function selectTab(id)'),source.indexOf('let seedCardVisible'))+'\n'+source.slice(source.indexOf('function closePanel()'),source.indexOf('function showPanel()'))+'\nObject.assign(globalThis,{closePanel,exitVillage,returnToFarm,resetVillageView,openVillageTownHall,villageStage,villageOrders,deliverVillageOrder,chooseVillageResident,syncVillageScene,renderVillageResident,selectTab,syncScenePause})',ctx);
+  vm.createContext(ctx);vm.runInContext(declarations+block+'\n'+source.slice(source.indexOf('function selectTab(id)'),source.indexOf('let seedCardVisible'))+'\n'+source.slice(source.indexOf('function closePanel()'),source.indexOf('function showPanel()'))+'\nObject.assign(globalThis,{closePanel,exitVillage,returnToFarm,resetVillageView,openVillageTownHall,villageStage,villageOrders,deliverVillageOrder,chooseVillageResident,syncVillageScene,renderVillageResident,appendDashaAction,selectTab,syncScenePause})',ctx);
  return {ctx,S,nodes,calls,pause,bodyClasses,sheetFocus,title};
 }
 test('entering village from guest routes to own farm and invalidates older requests',()=>{
@@ -44,6 +44,7 @@ test('Dasha and rooster are visible residents with take and deliver actions',asy
  h.ctx.selectTab('village');
  assert.deepEqual(AC(h).children.filter(n=>n.dataset.villageNpc).map(n=>n.dataset.villageNpc).slice(-2),['Лиса Даша','Петух Олег']);
  h.ctx.chooseVillageResident('Лиса Даша');const panel=new Node('div');h.ctx.renderVillageResident(panel);
+ assert.ok(panel.querySelectorAll('*').some(n=>n.textContent==='Играть с Дашей'));
  const take=panel.querySelectorAll('*').find(n=>n.textContent==='Взять задание');assert.ok(take);await take.onclick();
  assert.equal(h.calls.at(-1)[0],'village_quest');assert.equal(h.calls.at(-1)[1].npc,'Лиса Даша');
  h.S.busy=false;h.S.me.village_errands.quests['Лиса Даша']='active';const active=new Node('div');h.ctx.renderVillageResident(active);
@@ -51,6 +52,13 @@ test('Dasha and rooster are visible residents with take and deliver actions',asy
  assert.equal(h.calls.at(-1)[1].action,'deliver');
  h.S.busy=false;h.ctx.chooseVillageResident('Петух Олег');const rooster=new Node('div');h.ctx.renderVillageResident(rooster);
  assert.ok(rooster.querySelectorAll('*').some(n=>n.textContent==='Взять задание'));
+});
+test('Dasha game action remains available for an active wager and calls the game handler',()=>{
+ const h=setup();
+ h.S.me.village_errands={quests:{}};h.S.me.wager={eligible:false,reason:'active',active:{id:'round-1',stake:10,payout:27}};
+ const panel=new Node('div');h.ctx.appendDashaAction(panel);
+ const play=panel.querySelectorAll('*').find(n=>n.textContent==='Играть с Дашей');assert.ok(play);play.onclick();
+ assert.ok(h.calls.includes('open-dasha'),'existing active round opens even when new-round eligibility is false');
 });
 test('presence uses one server lease, Dasha tap talks before walking, and leaving clears it',async()=>{
  const h=setup(),requests=[],listeners={},timers=[];let releaseEnter;

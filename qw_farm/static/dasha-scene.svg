@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" role="img" aria-label="Лиса Даша у деревенского прилавка">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#e9f0d5"/><stop offset="1" stop-color="#f8e6ba"/></linearGradient>
+    <linearGradient id="table" x2="0" y2="1"><stop stop-color="#b97f51"/><stop offset="1" stop-color="#81573f"/></linearGradient>
+    <linearGradient id="fox" x2="0" y2="1"><stop stop-color="#ed9b58"/><stop offset="1" stop-color="#c96f43"/></linearGradient>
+    <pattern id="cloth" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M0 17h34M17 0v34" fill="none" stroke="#d5e1b6" stroke-width="2" opacity=".45"/><circle cx="17" cy="17" r="3" fill="#e8c772"/></pattern>
+  </defs>
+  <rect width="1000" height="650" fill="url(#sky)"/>
+  <circle cx="818" cy="103" r="69" fill="#ffe5a5" opacity=".72"/>
+  <path d="M0 305Q160 230 340 274T700 244T1000 275V452H0Z" fill="#c9dbb2"/>
+  <path d="M0 351Q180 305 330 344T650 315T1000 337V480H0Z" fill="#aac68f"/>
+  <!-- distant houses: soft isometric walls and roofs -->
+  <g opacity=".85">
+    <path d="m82 258 82-34 72 33-82 37Z" fill="#b9856d"/><path d="m82 258 72 36v78l-72-32Z" fill="#e7d3ae"/><path d="m154 294 82-37v82l-82 33Z" fill="#d2ba94"/><path d="m70 257 94-52 83 47-12 12-71-36-83 43Z" fill="#a67861"/><path d="m174 303 30-13v39l-30 12Z" fill="#7b9d83"/>
+    <path d="m710 220 86-40 89 43-86 40Z" fill="#ae8266"/><path d="m710 220 89 43v105l-89-44Z" fill="#eee0ba"/><path d="m799 263 86-40v104l-86 41Z" fill="#d5c29c"/><path d="m699 221 96-61 104 58-14 14-89-43-86 48Z" fill="#a46d57"/><path d="m739 263 27 12v40l-27-13Z" fill="#9ab69b"/><path d="m833 269 25-12v45l-25 11Z" fill="#8ba58e"/>
+  </g>
+  <!-- shrubs, flowers, village path -->
+  <path d="M0 408q154-58 324-18 173-45 314-10 209-47 362 17V516H0Z" fill="#8fb580"/>
+  <path d="M586 371q102-14 196 20 108 40 218 31v122H507q29-105 79-173Z" fill="#c6ae83" opacity=".55"/>
+  <g fill="#6d9a71"><circle cx="43" cy="377" r="29"/><circle cx="73" cy="360" r="34"/><circle cx="109" cy="383" r="27"/><circle cx="392" cy="379" r="28"/><circle cx="419" cy="361" r="33"/><circle cx="458" cy="384" r="31"/><circle cx="914" cy="382" r="30"/><circle cx="947" cy="362" r="36"/><circle cx="984" cy="385" r="32"/></g>
+  <g fill="#a9c891"><circle cx="34" cy="366" r="17"/><circle cx="91" cy="354" r="20"/><circle cx="405" cy="360" r="18"/><circle cx="446" cy="372" r="17"/><circle cx="953" cy="350" r="18"/></g>
+  <g fill="#f7e1a4"><circle cx="116" cy="409" r="3"/><circle cx="129" cy="398" r="3"/><circle cx="485" cy="410" r="3"/><circle cx="499" cy="402" r="3"/><circle cx="887" cy="418" r="3"/></g>
+  <!-- striped awning and supporting posts -->
+  <path d="M311 106 956 106 1000 198 355 198Z" fill="#7e9c76"/>
+  <path d="M311 106 956 106 1000 198 355 198Z" fill="url(#cloth)" opacity=".53"/>
+  <path d="m311 106 645 0 13 26H324Z" fill="#fff2cf"/>
+  <path d="M355 198q27 24 54 0 28 24 56 0 27 24 54 0 28 24 56 0 27 24 54 0 28 24 56 0 27 24 54 0 28 24 56 0 27 24 54 0 28 24 56 0 27 24 54 0 28 24 56 0" fill="none" stroke="#fff3d2" stroke-width="20" stroke-linecap="round"/>
+  <path d="M365 204v251M963 202v256" stroke="#8e694c" stroke-width="14" stroke-linecap="round"/>
+  <path d="M365 204v251M963 202v256" stroke="#d5a574" stroke-width="4" opacity=".5"/>
+  <!-- Dasha's curled tail behind body -->
+  <path d="M166 488Q14 474 45 359q16-60 92-44-66 46-38 82 21 21 66-18Z" fill="#d97849" stroke="#9c543c" stroke-width="5"/>
+  <path d="M53 350q33-47 84-35-48 33-46 69-31 7-49-14Z" fill="#fff0d5"/>
+  <path d="M70 384q19 11 38 2" fill="none" stroke="#a8654c" stroke-width="3"/>
+  <!-- fox body / apron -->
+  <path d="M175 371Q248 342 323 375l21 118H150Z" fill="url(#fox)" stroke="#98563d" stroke-width="5"/>
+  <path d="M197 385q51 35 107 0l10 111H184Z" fill="#f4e8c5" stroke="#ad805e" stroke-width="3"/>
+  <path d="m198 403 54 23 55-24M207 459q46 22 91 0" fill="none" stroke="#8eac7b" stroke-width="6" stroke-linecap="round"/>
+  <path d="M162 404q-33 8-34 54l25 13 35-44M315 414q34 5 45 42l-19 18-46-38" fill="#db824b" stroke="#9a573d" stroke-width="4"/>
+  <!-- ears and face -->
+  <path d="M154 251 151 157q7-30 30-11l38 52 72-4 39-52q22-18 30 14l-2 109Z" fill="#d57a47" stroke="#92543d" stroke-width="5"/>
+  <path d="m168 179 5 57 38-20Zm172 1-40 39 42 18Z" fill="#efb28b"/>
+  <path d="M164 230q-18 47-4 87 18 51 91 66 74-15 93-68 14-42-5-87-38-47-87-43-58-4-88 45Z" fill="url(#fox)" stroke="#98563d" stroke-width="5"/>
+  <path d="M163 277q34 8 55 36l34 57q-53 0-80-35-22-25-9-58Zm178 0q-33 9-55 36l-34 57q57 1 81-36 18-25 8-57Z" fill="#fff1d9"/>
+  <path d="M207 262q12-13 25 0M275 262q13-13 25 0" fill="none" stroke="#603f35" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="219" cy="273" rx="4" ry="6" fill="#4b3831"/><ellipse cx="288" cy="273" rx="4" ry="6" fill="#4b3831"/>
+  <ellipse cx="187" cy="301" rx="13" ry="8" fill="#d9826f" opacity=".5"/><ellipse cx="315" cy="301" rx="13" ry="8" fill="#d9826f" opacity=".5"/>
+  <path d="m238 319 14 12 14-12q-13-10-28 0Z" fill="#5d3e37"/><path d="M251 331q-1 15-15 17m16-17q2 15 17 17" fill="none" stroke="#7d4b3d" stroke-width="3" stroke-linecap="round"/>
+  <!-- neckerchief -->
+  <path d="M197 375q53 26 109-2l-45 40-25-4Z" fill="#688e7a" stroke="#476c5b" stroke-width="3"/><path d="m254 404 13 72-33-15 1-52Z" fill="#779c86" stroke="#476c5b" stroke-width="3"/><circle cx="252" cy="407" r="9" fill="#a6bc91"/>
+  <!-- hands rest on counter -->
+  <ellipse cx="148" cy="473" rx="25" ry="13" fill="#d7834e" stroke="#98563d" stroke-width="3"/><ellipse cx="347" cy="475" rx="25" ry="13" fill="#d7834e" stroke="#98563d" stroke-width="3"/>
+  <!-- wooden countertop: isometric edge -->
+  <path d="M0 473 1000 473 1000 526 0 526Z" fill="#bd8c5f" stroke="#7a5941" stroke-width="5"/>
+  <path d="M0 483 1000 483M0 514 1000 514" stroke="#dfaf72" stroke-width="3" opacity=".62"/>
+  <path d="M0 527h1000v123H0Z" fill="url(#table)"/>
+  <path d="M0 560q246 8 502-1t498 4M0 610q259-8 511 1t489-2" fill="none" stroke="#d5a270" stroke-width="5" opacity=".45"/>
+  <path d="M52 526v124M345 526v124M695 526v124M956 526v124" stroke="#75503c" stroke-width="5" opacity=".35"/>
+  <!-- small painted emblem on counter -->
+  <path d="M122 558q22-12 44 0v48q-22 14-44 0Z" fill="#e8c98d" stroke="#815b43" stroke-width="3"/><path d="m132 584 10 11 15-20" fill="none" stroke="#668862" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#f6d890" opacity=".85"><circle cx="375" cy="579" r="3"/><circle cx="391" cy="591" r="2"/><circle cx="918" cy="581" r="3"/></g>
+</svg>

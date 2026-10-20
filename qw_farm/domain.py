@@ -204,7 +204,8 @@ def new_farm(farm_id, name, now):
 # Per-command schemas reject client-supplied rewards, prices or ready_at.
 SCHEMAS={
  'plant':{'object','crop','revision'},'dig_up':{'object','revision'},'harvest':{'object','revision'},'collect_all':set(),
- 'queue':{'object','recipe'},'collect':{'object','job'},'cancel_job':{'object','job'},'forget_recipe':{'object'},
+ 'queue':{'object','recipe'},'collect':{'object','job'},'cancel_job':{'object','job'},
+ 'cancel_job_and_forget_recipe':{'object','job'},'forget_recipe':{'object'},
  'feed':{'object'},'collect_animal':{'object'},'buy_animal':{'object','animal'},
  'build':{'type','x','y'},'move':{'object','x','y','revision'},'rotate':{'object','revision'},'demolish':{'object','revision'},'upgrade':{'object','revision'},
  'rescue':set(),'expand':set(),'sell':{'item','qty'},'order':{'order'},'skip_order':{'order'},'quest':{'quest'},
@@ -276,9 +277,18 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(bool(obj.get('last_recipe')),'no_recipe','В этой мастерской нет запомненного рецепта.')
         rid=obj.pop('last_recipe');obj['revision']+=1
         text=f'Рецепт «{RECIPES[rid]["name"] if rid in RECIPES else rid}» забыт: помощники будут только забирать готовое.'
-    elif kind=='cancel_job':
+    elif kind in {'cancel_job','cancel_job_and_forget_recipe'}:
         from . import undo
-        text=undo.cancel_job(me,obj,find(obj.get('jobs',[]),data['job']),now)
+        if kind=='cancel_job_and_forget_recipe':
+            need(obj['type'] in expansion.WORKSHOP_TYPES,'wrong_object','Забыть рецепт можно только в мастерской.')
+        job=find(obj.get('jobs',[]),data['job'])
+        if kind=='cancel_job_and_forget_recipe':
+            need(bool(obj.get('last_recipe')),'no_recipe','В этой мастерской нет запомненного рецепта.')
+            need(obj['last_recipe']==job.get('recipe'),'recipe_changed','Запомненный рецепт изменился. Обнови мастерскую перед отменой.')
+        text=undo.cancel_job(me,obj,job,now)
+        if kind=='cancel_job_and_forget_recipe':
+            obj.pop('last_recipe')
+            text+=' Рецепт забыт: помощники будут только забирать готовое.'
     elif kind=='collect':
         job=find(obj.get('jobs',[]),data['job'])
         need(job['ready_at']<=now,'not_ready','Продукция ещё не готова.')

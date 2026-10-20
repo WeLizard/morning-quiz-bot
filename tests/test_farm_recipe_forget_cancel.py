@@ -1,6 +1,12 @@
 """forget_recipe and cancelling a running workshop batch (undo.py canon: 60 s window, then half, no XP)."""
+import asyncio
+
+import pytest
+
 from tests.test_farm_automation_r7 import T0, add_building, cmd, err, farm, hire_and_start, obj
+from tests.test_farm_market_r8 import MemoryUnit
 from qw_farm.expansion import settle
+from qw_farm.service import FarmService, Principal
 from qw_farm.undo import LATE_REFUND_PCT, UNDO_WINDOW, job_refund
 
 
@@ -107,3 +113,69 @@ def test_cancel_ready_batch_is_refused():
     a = queue_flour(st, recipe='oil')
     assert err(st, 'cancel_job', {'object': 'm', 'job': a['id']}, a['ready_at']) == 'job_done'
     assert len(obj(st, 'm')['jobs']) == 1
+
+
+@pytest.mark.parametrize('elapsed,refunded', [(UNDO_WINDOW, 2), (UNDO_WINDOW + 1, 1)])
+def test_atomic_cancel_forget_preserves_refund_and_no_xp(elapsed, refunded):
+    st = farm()
+    mill = add_building(st, 'mill', 'm', 0, 0)
+    st['inventory'] = {'sunflower': 2}
+    batch = queue_flour(st, recipe='oil')
+    xp, rev = st['xp'], mill['revision']
+    text = cmd(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, T0 + elapsed)
+    assert mill['jobs'] == [] and 'last_recipe' not in mill
+    assert mill['revision'] == rev + 1
+    assert st['inventory'] == {'sunflower': refunded} and st['xp'] == xp
+    assert 'Рецепт забыт' in text
+
+
+@pytest.mark.parametrize('remembered,error', [(None, 'no_recipe'), ('oil', 'recipe_changed')])
+def test_atomic_cancel_requires_matching_remembered_recipe_before_mutation(remembered, error):
+    st = farm()
+    mill = add_building(st, 'mill', 'm', 0, 0)
+    st['inventory'] = {'wheat': 2}
+    batch = queue_flour(st)
+    if remembered is None:
+        mill.pop('last_recipe')
+    else:
+        mill['last_recipe'] = remembered
+    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, T0 + 1) == error
+    assert mill.get('last_recipe') == remembered
+    assert mill['jobs'] == [batch] and st['inventory'] == {'wheat': 0}
+
+
+def test_atomic_cancel_errors_leave_batch_and_recipe_unchanged():
+    st = farm()
+    add_building(st, 'mill', 'm', 0, 0)
+    st['inventory'] = {'wheat': 2}
+    batch = queue_flour(st)
+    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': 'missing'}) == 'not_found'
+    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm'}) == 'invalid_command'
+    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, batch['ready_at']) == 'job_done'
+    st['objects'].append(dict(id='r', type='road', x=6, y=0, w=1, h=1, revision=0))
+    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'r', 'job': 'missing'}) == 'wrong_object'
+
+
+def test_atomic_cancel_through_service_does_not_let_artisan_requeue_refund():
+    async def run():
+        st = farm()
+        mill = add_building(st, 'mill', 'm', 0, 0)
+        st['inventory'] = {'wheat': 2}
+        batch = queue_flour(st)
+        hire_and_start(st, 'beaver_artisan', 'day')
+        clock = [T0 + 10]
+        unit = MemoryUnit('acc', st)
+        service = FarmService(unit, Principal('acc', 'Игрок'), clock=lambda: clock[0])
+        data = {'object': 'm', 'job': batch['id']}
+        result = await service.command('cancel-forget-0001', 'cancel_job_and_forget_recipe', data)
+        assert mill['jobs'] == [] and 'last_recipe' not in mill
+        assert st['inventory'] == {'wheat': 2}
+        clock[0] = T0 + 7200
+        await service.view()  # a later request settles all due assistant work
+        assert mill['jobs'] == [] and st['inventory'] == {'wheat': 2}
+        assert st['helpers']['beaver_artisan']['shift']['done'] == 0
+        assert await service.command('cancel-forget-0001', 'cancel_job_and_forget_recipe', data) == result
+        assert st['inventory'] == {'wheat': 2}  # replay must not refund twice
+        assert sum(kind == 'cancel_job_and_forget_recipe' for _, kind in unit.records) == 1
+
+    asyncio.run(run())

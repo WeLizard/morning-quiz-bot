@@ -539,10 +539,10 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .vp-body{position:absolute;left:7px;bottom:6px;width:16px;height:19px;box-sizing:border-box;border-radius:7px 7px 4px 4px;background:#4e8fc0;border:2px solid #fff}
 .vp-head{position:absolute;left:9px;bottom:23px;width:12px;height:12px;box-sizing:border-box;border-radius:50%;background:#f1cfa6;border:1.5px solid #fff}
 .vp-hat{position:absolute;left:3px;bottom:31px;width:24px;height:8px;box-sizing:border-box;border-radius:50%;background:#e1c36a;border:1.5px solid #8d7550}
-.village-gate{position:absolute;transform:none;box-sizing:border-box;width:132px;height:48px;margin:-24px 0 0 -66px;padding:6px 12px;background:#fff8dcf0;border:2px solid #e0c98c;border-radius:14px;font:700 12px/1.15 system-ui;color:#5b4a2a;box-shadow:0 3px 9px #5a4a2a40;z-index:3}
-.village-gate:hover{background:#fffbe9;box-shadow:0 4px 12px #5a4a2a55}
+.village-gate{position:absolute;transform:translate(-50%,-50%);box-sizing:border-box;min-width:44px;min-height:44px;margin:0;padding:0;background:transparent;border:0;border-radius:8px;cursor:pointer;z-index:3}
+.village-gate:hover{background:#fff4d940;box-shadow:inset 0 0 0 2px #775937a8}
 .village-gate:focus-visible{outline:3px solid #79975b;outline-offset:2px}
-:root[data-farm-theme=night] .village-gate{background:var(--float);border-color:var(--line);color:var(--ink)}
+:root[data-farm-theme=night] .village-gate:hover{background:#fff4d938}
 /* place signs, construction sites and daily guests: static layer, centred with margins (no transforms) */
 .village-places{position:absolute;inset:0;pointer-events:none;z-index:3}
 .village-places>button{pointer-events:auto}

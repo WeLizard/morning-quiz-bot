@@ -8,38 +8,40 @@ const code=source.slice(source.indexOf('const INV_CATS='),source.indexOf('functi
 const c={Object,String,Number};vm.createContext(c);
 vm.runInContext(code+'\nObject.assign(globalThis,{invNorm,invEntries,invCategory,invWorkshop,invCounts,invCatChips,invShopChips,invNormalizeState,invFilter})',c);
 const cat={
- items:{wheat:{name:'Пшеница',kind:'crop'},egg:{name:'Яйцо',kind:'product'},bread:{name:'Хлеб',kind:'product'},cake:{name:'Ёлочный торт',kind:'product'},pie:{name:'Пирог',kind:'product'},log:{name:'Бревно',kind:'forest'},carp:{name:'Карась',kind:'fish'},odd:{name:'Нечто',kind:'weird'}},
+ items:{wheat:{name:'Пшеница',kind:'crop'},egg:{name:'Яйцо',kind:'product'},bread:{name:'Хлеб',kind:'product'},cake:{name:'Ёлочный торт',kind:'product'},pie:{name:'Пирог',kind:'product'},feed:{name:'Зерносмесь',kind:'product'},log:{name:'Бревно',kind:'forest'},carp:{name:'Карась',kind:'fish'},odd:{name:'Нечто',kind:'weird'}},
  animals:{chicken:{outputs:{egg:2}}},
- recipes:{bread:{building:'bakery',outputs:{bread:1}},cake:{building:'bakery',outputs:{cake:1}},pie2:{building:'oven',outputs:{pie:1}},pie:{building:'bakery',outputs:{pie:1}}},
- buildings:{bakery:{name:'Пекарня'},oven:{name:'Печь'}},
+ recipes:{bread:{building:'bakery',outputs:{bread:1}},cake:{building:'bakery',outputs:{cake:1}},pie2:{building:'oven',outputs:{pie:1}},pie:{building:'bakery',outputs:{pie:1}},feed:{building:'mill',outputs:{feed:1}},feed2:{building:'mill',outputs:{feed:2}},mixedfeed:{building:'feedmill',outputs:{feed:1}}},
+ buildings:{bakery:{name:'Пекарня'},oven:{name:'Печь'},mill:{name:'Мельница'},feedmill:{name:'Кормоцех'}},
 };
-const inv={wheat:3,egg:2,bread:1,cake:4,pie:1,log:5,carp:2,odd:1,gone:0};
+const inv={wheat:3,egg:2,bread:1,cake:4,pie:1,feed:2,log:5,carp:2,odd:1,gone:0};
 const E=c.invEntries(inv),ids=r=>r.map(x=>x[0]);
 test('Normalisation is case-insensitive and folds yo to ye',()=>{
  assert.equal(c.invNorm('  ЁлОчный '),'елочный');assert.equal(c.invNorm(null),'');
  assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'ЕЛОЧНЫЙ',cat:'all',shop:'all'},cat))),JSON.stringify(['cake']));
  assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'ёлочный',cat:'all',shop:'all'},cat))),JSON.stringify(['cake']));
 });
-test('Entries skip zero quantities',()=>{assert.ok(!ids(E).includes('gone'));assert.equal(E.length,8);});
+test('Entries skip zero quantities',()=>{assert.ok(!ids(E).includes('gone'));assert.equal(E.length,9);});
 test('Category: kind, animal outputs override product, unknown kind goes to other',()=>{
  assert.equal(c.invCategory('wheat',cat),'crop');assert.equal(c.invCategory('egg',cat),'animal');assert.equal(c.invCategory('bread',cat),'product');
  assert.equal(c.invCategory('log',cat),'forest');assert.equal(c.invCategory('carp',cat),'fish');assert.equal(c.invCategory('odd',cat),'other');
 });
-test('Workshop is the first recipe producing the item',()=>{
- assert.equal(c.invWorkshop('pie',cat),'oven');assert.equal(c.invWorkshop('bread',cat),'bakery');assert.equal(c.invWorkshop('wheat',cat),'');
+test('Workshop lists each distinct workshop producing the item',()=>{
+ assert.deepEqual([...c.invWorkshop('pie',cat)],['oven','bakery']);assert.deepEqual([...c.invWorkshop('feed',cat)],['mill','feedmill']);assert.deepEqual([...c.invWorkshop('bread',cat)],['bakery']);assert.deepEqual([...c.invWorkshop('wheat',cat)],[]);
 });
 test('Counts and chips show only non-empty groups',()=>{
  const n=c.invCounts(E,cat);
- assert.equal(n.all,8);assert.deepEqual({...n.cats},{crop:1,animal:1,product:3,forest:1,fish:1,other:1});
- assert.deepEqual({...n.shops},{bakery:2,oven:1});
+ assert.equal(n.all,9);assert.deepEqual({...n.cats},{crop:1,animal:1,product:4,forest:1,fish:1,other:1});
+ assert.deepEqual({...n.shops},{bakery:3,oven:1,mill:1,feedmill:1});
  assert.equal(JSON.stringify(c.invCatChips(c.invCounts([['wheat',1]],cat))),JSON.stringify([['crop','Урожай',1]]));
- assert.equal(JSON.stringify(c.invShopChips(n,cat)),JSON.stringify([['bakery','Пекарня',2],['oven','Печь',1]]));
+ assert.equal(JSON.stringify(c.invShopChips(n,cat)),JSON.stringify([['bakery','Пекарня',3],['feedmill','Кормоцех',1],['mill','Мельница',1],['oven','Печь',1]]));
 });
 test('Filters combine category, workshop and search',()=>{
  assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'',cat:'animal',shop:'all'},cat))),JSON.stringify(['egg']));
  assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'',cat:'product',shop:'oven'},cat))),JSON.stringify(['pie']));
- assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'',cat:'product',shop:'all'},cat))),JSON.stringify(['bread','cake','pie']));
- assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'пир',cat:'product',shop:'bakery'},cat))),JSON.stringify([]));
+ assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'',cat:'product',shop:'mill'},cat))),JSON.stringify(['feed']));
+ assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'',cat:'product',shop:'feedmill'},cat))),JSON.stringify(['feed']));
+ assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'',cat:'product',shop:'all'},cat))),JSON.stringify(['bread','cake','pie','feed']));
+ assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'пир',cat:'product',shop:'bakery'},cat))),JSON.stringify(['pie']));
  assert.equal(JSON.stringify(ids(c.invFilter(E,{q:'яйц',cat:'product',shop:'all'},cat))),JSON.stringify([]));
  assert.equal(c.invFilter(E,{q:'zzz',cat:'all',shop:'all'},cat).length,0);
 });

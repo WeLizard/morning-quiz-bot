@@ -39,17 +39,17 @@ test('entering village from guest routes to own farm and invalidates older reque
  const h=setup();h.ctx.selectTab('village');assert.equal(h.S.farm,h.S.me);assert.equal(h.S.tab,'village');assert.equal(h.ctx.farmViewEpoch,5);assert.ok(h.calls.includes('scene'));assert.equal(h.bodyClasses.has('panel-open'),false);assert.equal(h.bodyClasses.has('panel-collapsed'),true);const world=AC(h);assert.equal(world.children.filter(n=>n.dataset.villageNpc&&n.attrs['aria-pressed']==='true').length,0);
 });
 test('Dasha and rooster are visible residents with take and deliver actions',async()=>{
- const h=setup();h.S.catalog.market.village_quests={'Лиса Даша':{item:'carrot',qty:2,coins:12,xp:4,title:'Морковка для тайника'},'Петух Гриша':{item:'wheat',qty:4,coins:12,xp:4,title:'Завтрак перед рассветом'}};
+ const h=setup();h.S.catalog.market.village_quests={'Лиса Даша':{item:'carrot',qty:2,coins:12,xp:4,title:'Морковка для тайника'},'Петух Олег':{item:'wheat',qty:4,coins:12,xp:4,title:'Завтрак перед рассветом'}};
  h.S.me.village_errands={quests:{}};h.S.me.inventory.carrot=2;h.S.me.inventory.wheat=4;
  h.ctx.selectTab('village');
- assert.deepEqual(AC(h).children.filter(n=>n.dataset.villageNpc).map(n=>n.dataset.villageNpc).slice(-2),['Лиса Даша','Петух Гриша']);
+ assert.deepEqual(AC(h).children.filter(n=>n.dataset.villageNpc).map(n=>n.dataset.villageNpc).slice(-2),['Лиса Даша','Петух Олег']);
  h.ctx.chooseVillageResident('Лиса Даша');const panel=new Node('div');h.ctx.renderVillageResident(panel);
  const take=panel.querySelectorAll('*').find(n=>n.textContent==='Взять задание');assert.ok(take);await take.onclick();
  assert.equal(h.calls.at(-1)[0],'village_quest');assert.equal(h.calls.at(-1)[1].npc,'Лиса Даша');
  h.S.busy=false;h.S.me.village_errands.quests['Лиса Даша']='active';const active=new Node('div');h.ctx.renderVillageResident(active);
  const deliver=active.querySelectorAll('*').find(n=>n.textContent==='Сдать задание');assert.ok(deliver);assert.equal(deliver.disabled,false);await deliver.onclick();
  assert.equal(h.calls.at(-1)[1].action,'deliver');
- h.S.busy=false;h.ctx.chooseVillageResident('Петух Гриша');const rooster=new Node('div');h.ctx.renderVillageResident(rooster);
+ h.S.busy=false;h.ctx.chooseVillageResident('Петух Олег');const rooster=new Node('div');h.ctx.renderVillageResident(rooster);
  assert.ok(rooster.querySelectorAll('*').some(n=>n.textContent==='Взять задание'));
 });
 test('presence uses one server lease, Dasha tap talks before walking, and leaving clears it',async()=>{
@@ -170,10 +170,10 @@ test('debt shortcut opens town hall services and all eleven resident positions e
 });
 
 test('world keeps 44px targets without overlap at phone and desktop widths; walking and HUD exist',()=>{
- const h=setup();const positions=Object.values(vm.runInContext('VILLAGE_SPOTS',h.ctx)),hallPos=vm.runInContext('VILLAGE_HALL',h.ctx),gatePos=vm.runInContext('VILLAGE_GATE',h.ctx);
+ const h=setup();const positions=Object.values(vm.runInContext('VILLAGE_SPOTS',h.ctx)),hallPos=vm.runInContext('VILLAGE_HALL',h.ctx),board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
  for(const availableWidth of [320,360,390,430,1280,1920]){
   const width=Math.min(3200,Math.max(1600,availableWidth*2.5)),height=width*.75;
-  const targets=positions.map(([x,y])=>({x:x*width/100,y:y*height/100,w:48,h:48}));targets.push({x:hallPos[0]/100*width,y:hallPos[1]/100*height,w:62,h:44});targets.push({x:gatePos[0]/100*width,y:gatePos[1]/100*height,w:96,h:48});
+  const targets=positions.map(([x,y])=>({x:x*width/100,y:y*height/100,w:48,h:48}));targets.push({x:hallPos[0]/100*width,y:hallPos[1]/100*height,w:62,h:44});targets.push({x:board[0]/100*width,y:board[1]/100*height,w:board[2]/100*width,h:board[3]/100*height});
   for(const t of targets){assert.ok(t.x-t.w/2>=0&&t.x+t.w/2<=width);assert.ok(t.y-t.h/2>=0&&t.y+t.h/2<=height);assert.ok(t.w>=44&&t.h>=44);}
   for(let i=0;i<targets.length;i++)for(let j=i+1;j<targets.length;j++){const a=targets[i],b=targets[j];assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2||Math.abs(a.y-b.y)>=(a.h+b.h)/2,`targets ${i}/${j} overlap at ${availableWidth}`);}
  }
@@ -182,6 +182,16 @@ test('world keeps 44px targets without overlap at phone and desktop widths; walk
  const hud=h.nodes.get('village-hud');assert.ok(hud.children.find(n=>n.dataset.villageMinimap),'minimap');assert.equal(hud.hidden,false);
  h.S.tab='orders';h.ctx.syncVillageScene();assert.equal(hud.hidden,true);
  const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');assert.match(css,/prefers-reduced-motion:no-preference\)\{\s*\.village-walker\{animation/);
+});
+test('drawn farm sign is the only native exit target and keyboard activation uses the existing route',()=>{
+ const h=setup();h.S.tab='village';h.ctx.syncVillageScene();
+ const world=h.nodes.get('village-scene').children[0],gates=world.children.filter(n=>n.dataset.villageGate),gate=gates[0],board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
+ assert.equal(gates.length,1);assert.equal(gate.tagName,'button');assert.equal(gate.attrs['aria-label'],'На ферму: ворота деревни');assert.equal(gate.children.length,0,'SVG supplies the visible sign text');
+ assert.equal(gate.style.left,`${board[0]}%`);assert.equal(gate.style.top,`${board[1]}%`);assert.equal(gate.style.width,`${board[2]}%`);assert.equal(gate.style.height,`${board[3]}%`);
+ const left=(board[0]-board[2]/2)*24,right=(board[0]+board[2]/2)*24,top=(board[1]-board[3]/2)*18,bottom=(board[1]+board[3]/2)*18;
+ for(const [x,y] of [[1159,1403],[1275,1346],[1275,1404],[1159,1460]])assert.ok(x>=left&&x<=right&&y>=top&&y<=bottom,'painted board sits inside its hit area');
+ const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');assert.match(css,/\.village-gate\{[^}]*min-width:44px;min-height:44px/);assert.match(css,/\.village-gate\{[^}]*background:transparent/);assert.match(css,/\.village-gate:focus-visible\{/);
+ gate.onclick({detail:0});assert.equal(h.S.tab,'orders');
 });
 test('keyboard activation opens a resident at once, mouse click walks first and then opens',()=>{
  const h=setup();h.S.tab='village';h.ctx.syncVillageScene();
@@ -193,9 +203,9 @@ test('keyboard activation opens a resident at once, mouse click walks first and 
 test('daily guests follow the date only, differ from each other, and place signs never cover residents',()=>{
  const h=setup();const today=vm.runInContext('villageVisitorsToday',h.ctx);
  for(let d=0;d<30;d++){const t=Date.UTC(2026,9,1+d,9),a=today(t),b=today(t+5*3600e3);assert.deepEqual(a.map(x=>x.v[0]),b.map(x=>x.v[0]),'same Moscow day, same guests');assert.notEqual(a[0].v[0],a[1].v[0]);assert.notDeepEqual(a[0].spot,a[1].spot);}
- const spots=Object.values(vm.runInContext('VILLAGE_SPOTS',h.ctx)).map(([x,y])=>({x,y,w:48,h:48}));const places=vm.runInContext('VILLAGE_PLACES',h.ctx).map(p=>({x:p[3],y:p[4],w:44,h:44}));const guests=vm.runInContext('VILLAGE_VISITOR_SPOTS',h.ctx).map(([x,y])=>({x,y,w:48,h:48}));const hall=vm.runInContext('VILLAGE_HALL',h.ctx),gate=vm.runInContext('VILLAGE_GATE',h.ctx);
- const all=[...spots,...places,...guests,{x:hall[0],y:hall[1],w:62,h:44},{x:gate[0],y:gate[1],w:132,h:48}];
- for(const width of [1600,3200]){const height=width*.75,T=all.map(t=>({x:t.x*width/100,y:t.y*height/100,w:t.w,h:t.h}));
+ const spots=Object.values(vm.runInContext('VILLAGE_SPOTS',h.ctx)).map(([x,y])=>({x,y,w:48,h:48}));const places=vm.runInContext('VILLAGE_PLACES',h.ctx).map(p=>({x:p[3],y:p[4],w:44,h:44}));const guests=vm.runInContext('VILLAGE_VISITOR_SPOTS',h.ctx).map(([x,y])=>({x,y,w:48,h:48}));const hall=vm.runInContext('VILLAGE_HALL',h.ctx),board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
+ const all=[...spots,...places,...guests,{x:hall[0],y:hall[1],w:62,h:44}];
+ for(const width of [1600,3200]){const height=width*.75,T=all.map(t=>({x:t.x*width/100,y:t.y*height/100,w:t.w,h:t.h}));T.push({x:board[0]*width/100,y:board[1]*height/100,w:board[2]*width/100,h:board[3]*height/100});
   for(let i=0;i<T.length;i++)for(let j=i+1;j<T.length;j++){const a=T[i],b=T[j];assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2||Math.abs(a.y-b.y)>=(a.h+b.h)/2,`targets ${i}/${j} overlap at ${width}`);}}
 });
 test('easter-egg guests are extra, rare, deterministic and complete',()=>{

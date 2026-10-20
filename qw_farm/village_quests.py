@@ -4,13 +4,32 @@ from .domain import need, inventory, pay, event
 from . import progression
 
 QUESTS = VILLAGE_QUESTS
+LEGACY_NPC_NAMES = {'Петух Гриша': 'Петух Олег'}
 GRACE = 45
 LEASE = 25
 COOLDOWN = 86400
 
 
 def state(farm):
-    return farm.setdefault('village_errands', dict(quests={}, presence=None, theft_next_at=0, theft_total=0))
+    s = farm.setdefault('village_errands', dict(quests={}, presence=None, theft_next_at=0, theft_total=0))
+    quests = s['quests']
+    if 'Петух Гриша' in quests:
+        old = quests['Петух Гриша']
+        has_current = 'Петух Олег' in quests
+        current = quests.get('Петух Олег')
+        for q in ((old, current) if has_current else (old,)):
+            need(type(q) is dict and type(q.get('day')) is int and
+                 q.get('phase') in {'available', 'active', 'done'},
+                 'invalid_village', 'Некорректное состояние деревни.', 500)
+        if not has_current:
+            quests['Петух Олег'] = old
+        else:
+            # A completed day outranks an active duplicate on that day. An
+            # active quest from a later day remains deliverable after a rename.
+            quests['Петух Олег'] = max((old, current),
+                                      key=lambda q: (q['phase'] != 'available', q['day'], q['phase'] == 'done'))
+        del quests['Петух Гриша']
+    return s
 
 
 def public(farm, now):
@@ -39,12 +58,16 @@ def validate(farm):
 
 
 def quest(farm, npc, now):
-    need(isinstance(npc,str) and npc in QUESTS, 'unknown_resident', 'Житель не найден.', 422)
+    need(isinstance(npc,str), 'unknown_resident', 'Житель не найден.', 422)
+    npc = LEGACY_NPC_NAMES.get(npc, npc)
+    need(npc in QUESTS, 'unknown_resident', 'Житель не найден.', 422)
     day = int((tick(now) + 10800) // 86400)
     return state(farm)['quests'].setdefault(npc, dict(day=day, phase='available'))
 
 
 def act(farm, npc, action, now):
+    need(isinstance(npc,str), 'unknown_resident', 'Житель не найден.', 422)
+    npc = LEGACY_NPC_NAMES.get(npc, npc)
     q = quest(farm, npc, now)
     day = int((tick(now) + 10800) // 86400)
     if q['day'] != day and q['phase'] != 'active':

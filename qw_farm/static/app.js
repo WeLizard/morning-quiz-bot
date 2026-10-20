@@ -55,19 +55,21 @@ const VILLAGE_VOICES={
  'Неведома Зверушка':['Из-за кустов кто-то любопытно смотрит на твой урожай…','Зверушка узнаёт тебя и смело выходит на площадь.','Зверушка радостно машет лапкой: ты теперь свой!'],
  'Медведь Пух':['Утро только началось, а мне уже мало бодрости! Найдётся у тебя что-нибудь на заряд?','С твоими зарядами я за день успеваю втрое больше! Давай ещё баночку-другую?','Для тебя у бочки всегда тёплое место. А для моей кружки — ещё один заказ!']
  ,'Лиса Даша':['Ой, это у тебя выпало? Я как раз искала морковку для своего тайника.','Ты меня поймал! Лучше принеси морковку сам — всё честно.','Карман проверил? Шучу. Почти.']
- ,'Петух Гриша':['Ку-ка-ре-ку! До рассвета нужен завтрак для всей площади.','Спасибо за зерно! Завтра снова разбужу деревню.','Порядок в деревне начинается с хорошего утра!']
+ ,'Петух Олег':['Ку-ка-ре-ку! До рассвета нужен завтрак для всей площади.','Спасибо за зерно! Завтра снова разбужу деревню.','Порядок в деревне начинается с хорошего утра!']
 };
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
 let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null;
 let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
-const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Гриша':[49.0,32.0]};
+const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Олег':[49.0,32.0]};
 // The world is 2400x1800 art units (village.svg, painted with the farm's own building code). Positions above are percentages of the world;
 // each resident stands at the door of their own house. VILLAGE_C is the back corner of the plaza.
 const VILLAGE_C=[1200,716],VILLAGE_START=[42,77.3],VILLAGE_GATE=[50,83.1],VILLAGE_HALL=[50.0,51.1];
+// Bounds of the drawn "На ферму" board in village.svg, as percentages of its 2400×1800 viewBox.
+const VILLAGE_GATE_BOARD=[50.7,77.95,4.9,6.4];
 let villagePos=[...VILLAGE_START],villageWalkToken=0,villageDragged=false,villageMini=null;
 // Living village: idle thought, stroll offset in px (x, y) per resident. Motion is pure CSS, no timers.
-const VILLAGE_LIFE={'Филиныч':['📚',52,26],'Агата':['🍞',-50,-25],'Почтальон Ёж':['✉️',52,-26],'Механик Крот':['🔧',-50,-25],'Кошка Кая':['🐟',-48,-10],'Кошка Соня':['💤',44,22],'Суслик Игорь':['🌰',-44,22],'Неведома Зверушка':['❓',48,24],'Медведь Пух':['🥤',46,-22],'Лиса Даша':['🪙',-40,18],'Петух Гриша':['🌾',36,-12]};
+const VILLAGE_LIFE={'Филиныч':['📚',52,26],'Агата':['🍞',-50,-25],'Почтальон Ёж':['✉️',52,-26],'Механик Крот':['🔧',-50,-25],'Кошка Кая':['🐟',-48,-10],'Кошка Соня':['💤',44,22],'Суслик Игорь':['🌰',-44,22],'Неведома Зверушка':['❓',48,24],'Медведь Пух':['🥤',46,-22],'Лиса Даша':['🪙',-40,18],'Петух Олег':['🌾',36,-12]};
 // Chimney tops (smoke puffs) exported from the same render as village.svg.
 const VILLAGE_SMOKE=[[649,454],[904,592],[1032,636],[1760,704],[723,757],[1582,751],[1400,862],[1732,851],[590,952],[1954,995],[1573,1051],[747,1106],[2072,1048],[434,1224],[1134,1274],[803,1328],[1881,281]];
 // Night lights in village.svg coordinates (2400x1800): a/b = left/right wall windows, r = round window, c = clock, l = lamp head, p = lamp light pool.
@@ -615,13 +617,13 @@ const invHas=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
 function invNorm(s){return String(s??'').toLowerCase().replace(/ё/g,'е').trim();}
 function invEntries(inv){return Object.entries(inv||{}).filter(([,q])=>q>0);}
 function invCategory(id,cat){if(Object.values(cat?.animals||{}).some(a=>invHas(a?.outputs,id)))return 'animal';const k=cat?.items?.[id]?.kind;return['crop','product','forest','fish'].includes(k)?k:'other';}
-function invWorkshop(id,cat){const r=Object.values(cat?.recipes||{}).find(r=>invHas(r?.outputs,id));return r?r.building:'';}
+function invWorkshop(id,cat){return [...new Set(Object.values(cat?.recipes||{}).filter(r=>invHas(r?.outputs,id)).map(r=>r.building).filter(Boolean))];}
 function invShopName(key,cat){return key==='_'?'Без мастерской':cat?.buildings?.[key]?.name||key;}
-function invCounts(entries,cat){const c={all:entries.length,cats:{},shops:{}};for(const [id] of entries){const k=invCategory(id,cat);c.cats[k]=(c.cats[k]||0)+1;if(k==='product'){const w=invWorkshop(id,cat)||'_';c.shops[w]=(c.shops[w]||0)+1;}}return c;}
+function invCounts(entries,cat){const c={all:entries.length,cats:{},shops:{}};for(const [id] of entries){const k=invCategory(id,cat);c.cats[k]=(c.cats[k]||0)+1;if(k==='product'){const shops=invWorkshop(id,cat);for(const w of shops.length?shops:['_'])c.shops[w]=(c.shops[w]||0)+1;}}return c;}
 function invCatChips(counts){return INV_CATS.filter(([id])=>counts.cats[id]>0).map(([id,name])=>[id,name,counts.cats[id]]);}
 function invShopChips(counts,cat){return Object.entries(counts.shops).map(([id,n])=>[id,invShopName(id,cat),n]).sort((a,b)=>b[2]-a[2]||a[1].localeCompare(b[1],'ru'));}
 function invNormalizeState(st,counts){if(st.cat!=='all'&&!counts.cats[st.cat])st.cat='all';if(st.cat!=='product'||(st.shop!=='all'&&!counts.shops[st.shop]))st.shop='all';return st;}
-function invFilter(entries,st,cat){const q=invNorm(st.q);return entries.filter(([id])=>{const k=invCategory(id,cat);if(st.cat!=='all'&&k!==st.cat)return false;if(st.cat==='product'&&st.shop!=='all'&&(invWorkshop(id,cat)||'_')!==st.shop)return false;return !q||invNorm(cat?.items?.[id]?.name||id).includes(q);});}
+function invFilter(entries,st,cat){const q=invNorm(st.q);return entries.filter(([id])=>{const k=invCategory(id,cat);if(st.cat!=='all'&&k!==st.cat)return false;if(st.cat==='product'&&st.shop!=='all'&&!(invWorkshop(id,cat).length?invWorkshop(id,cat):['_']).includes(st.shop))return false;return !q||invNorm(cat?.items?.[id]?.name||id).includes(q);});}
 function renderInventory(p){heading('Склад и лавка',gf('ВСЁ, ЧТО ТЫ ВЫРАСТИЛ','ВСЁ, ЧТО ТЫ ВЫРАСТИЛА','ВСЁ, ЧТО ВЫРОСЛО НА ТВОЕЙ ФЕРМЕ'));note(barnBonus()?`Урожай не портится, а склад не требует расширений. Продажа жителям: цена +${barnBonus()}% благодаря улучшенному складу.`:'Урожай не портится, а склад не требует расширений. Улучшенный склад (в его панели) повышает цену продажи.',p);renderProjectInventoryShelf(p);
  const entries=invEntries(S.me.inventory);
  if(!entries.length)p.append(el('p','Пусто. Зато на грядках начинается новая история.','empty'));else invMount(p,entries);
@@ -909,7 +911,7 @@ function jobRefund(j){const full=j.starts_at>now()||undoFull(j.starts_at),r={};f
 function confirmCancelJob(o,j){
  const rf=jobRefund(j),name=S.catalog.recipes[j.recipe]?.name||'Партия',list=Object.entries(rf.items).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');
  const text=rf.full?`Ингредиенты вернутся полностью${list?': '+list:''}.`+(j.starts_at>now()?'':` Это ещё можно отменить без потерь, если подтвердить до истечения срока (ещё ${Math.max(0,undoLeft(j.starts_at))} с).`):`Партия остановится, продукции и опыта не будет. `+(list?`Вернётся половина ингредиентов: ${list}.`:'Ничего не вернётся.');
- const cancel=async(forget)=>{$('dialog').close();const ok=await command('cancel_job',{object:o.id,job:j.id});if(!forget)return;if(!ok||!await command('forget_recipe',{object:o.id}))toast('Рецепт не забыт — нажми «Забыть рецепт», когда партия отменится.');};
+ const cancel=async(forget)=>{$('dialog').close();await command(forget?'cancel_job_and_forget_recipe':'cancel_job',{object:o.id,job:j.id});};
  const tail=o.last_recipe===j.recipe?' Помощник-мастер поставит этот рецепт заново, если не забыть его.':'';
  modal(`Отменить: ${name}?`,text+tail,[button('Отменить партию',safe(()=>cancel(false)),'primary')].concat(o.last_recipe===j.recipe?[button('Отменить и забыть рецепт',safe(()=>cancel(true)),'secondary')]:[]));
 }
@@ -1537,7 +1539,7 @@ function villageBuildWorld(){
  VILLAGE_LIGHTS.forEach(([x,y,k])=>night.append(villageAt(el('i',null,`vn-light vn-${k}`),x,y)));
  VILLAGE_FLIES.forEach(([x,y],i)=>{const n=villageAt(el('i',null,'vn-fly va'),x,y);villageVars(n,{'--d':`${i*1.3}s`,'--fx':`${i%2?-30:26}px`,'--fy':`${i%3?-22:16}px`});night.append(n);});
  const actors=el('div',null,'village-actors');
- const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE[0]}%`;gate.style.top=`${VILLAGE_GATE[1]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','Выход на ферму: ворота деревни');gate.append(el('span','Выход на ферму'));
+ const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE_BOARD[0]}%`;gate.style.top=`${VILLAGE_GATE_BOARD[1]}%`;gate.style.width=`${VILLAGE_GATE_BOARD[2]}%`;gate.style.height=`${VILLAGE_GATE_BOARD[3]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','На ферму: ворота деревни');gate.title='На ферму';
  const player=el('div',null,'village-player');player.setAttribute('aria-hidden','true');player.style.left=`${villagePos[0]}%`;player.style.top=`${villagePos[1]}%`;player.dataset.face='right';player.append(el('i',null,'vp-shadow'),el('i',null,'vp-body'),el('i',null,'vp-head'),el('i',null,'vp-hat'));
  world.append(sun,villageFx(),night,villageWaterWheel(),actors,villagePlaces(),gate,player);
  return world;

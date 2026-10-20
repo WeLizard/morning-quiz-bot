@@ -61,6 +61,66 @@ def test_active_quest_survives_day_boundary_but_completed_quest_resets_next_day(
     run(state, 'Лиса Даша', 'take', later + 86400)
 
 
+def test_legacy_rooster_active_quest_survives_upgrade_and_old_client_delivery():
+    state = farm()
+    state['village_errands']['quests'] = {'Петух Гриша': {'day': 0, 'phase': 'active'}}
+    state['inventory']['wheat'] = 4
+    coins, xp = state['coins'], state['xp']
+    upgrade_state(state)
+    upgrade_state(state)
+    assert state['village_errands']['quests'] == {'Петух Олег': {'day': 0, 'phase': 'active'}}
+    assert village_quests.public(state, 1000)['quests'] == {'Петух Олег': 'active'}
+    run(state, 'Петух Гриша', 'deliver', 1000)
+    assert state['coins'] == coins + 12 and state['xp'] > xp
+    assert state['village_errands']['quests']['Петух Олег']['phase'] == 'done'
+    validate_state(state)
+
+
+def test_legacy_rooster_done_quest_cannot_pay_twice_same_day():
+    state = farm()
+    day = (1000 + 10800) // 86400
+    state['village_errands']['quests'] = {'Петух Гриша': {'day': day, 'phase': 'done'}}
+    state['inventory']['wheat'] = 4
+    coins, xp = state['coins'], state['xp']
+    assert village_quests.public(state, 1000)['quests'] == {'Петух Олег': 'done'}
+    for npc, action in (('Петух Олег', 'take'), ('Петух Гриша', 'deliver')):
+        with pytest.raises(FarmError) as exc:
+            run(state, npc, action, 1000)
+        assert exc.value.code == 'quest_phase'
+    assert state['coins'] == coins and state['xp'] == xp
+    assert village_quests.public(state, 1000 + 86400)['quests']['Петух Олег'] == 'available'
+    run(state, 'Петух Гриша', 'take', 1000 + 86400)
+    assert state['village_errands']['quests']['Петух Олег']['phase'] == 'active'
+    validate_state(state)
+
+
+@pytest.mark.parametrize('old,current,expected', [
+    ({'day': 1, 'phase': 'active'}, {'day': 2, 'phase': 'done'}, {'day': 2, 'phase': 'done'}),
+    ({'day': 2, 'phase': 'active'}, {'day': 1, 'phase': 'done'}, {'day': 2, 'phase': 'active'}),
+    ({'day': 2, 'phase': 'active'}, {'day': 2, 'phase': 'done'}, {'day': 2, 'phase': 'done'}),
+    ({'day': 1, 'phase': 'active'}, {'day': 2, 'phase': 'available'}, {'day': 1, 'phase': 'active'}),
+])
+def test_legacy_rooster_collision_preserves_progress_without_duplicate_reward(old, current, expected):
+    state = farm()
+    state['village_errands']['quests'] = {'Петух Гриша': old, 'Петух Олег': current}
+    coins, xp = state['coins'], state['xp']
+    upgrade_state(state)
+    assert state['village_errands']['quests'] == {'Петух Олег': expected}
+    assert state['coins'] == coins and state['xp'] == xp
+    validate_state(state)
+
+
+def test_legacy_rooster_collision_rejects_invalid_progress():
+    state = farm()
+    state['village_errands']['quests'] = {
+        'Петух Гриша': {'day': 'today', 'phase': 'done'},
+        'Петух Олег': {'day': 1, 'phase': 'active'},
+    }
+    with pytest.raises(FarmError) as exc:
+        upgrade_state(state)
+    assert exc.value.code == 'invalid_village'
+
+
 def test_theft_requires_live_uninterrupted_presence_and_has_daily_cooldown():
     state = farm()
     session = str(uuid4())

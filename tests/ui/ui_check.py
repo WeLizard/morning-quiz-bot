@@ -463,12 +463,22 @@ def run_dasha(pw_browser, base, screenshots):
             page.set_viewport_size({'width': width, 'height': height})
             try:
                 page.goto(base + '/app/farm?identity=guest', wait_until='load', timeout=30000)
+                # The farm route hydrates the account before rendering its rail. Wait for
+                # a real navigation target instead of interpreting the empty rail as desktop.
+                page.wait_for_function("""() => ['village', 'more'].some(id => {
+                    const button = document.querySelector(`[data-tab="${id}"]`);
+                    return button && button.getClientRects().length > 0 && getComputedStyle(button).visibility !== 'hidden';
+                })""", timeout=30000)
                 direct_village = page.locator('[data-tab="village"]')
                 if direct_village.is_visible():
                     direct_village.click()
                 else:
-                    page.locator('[data-tab="more"]').click()
-                    page.locator('[data-more-tab="village"]').click()
+                    more = page.locator('[data-tab="more"]')
+                    more.wait_for(state='visible', timeout=5000)
+                    more.click()
+                    village_option = page.locator('[data-more-tab="village"]')
+                    village_option.wait_for(state='visible', timeout=10000)
+                    village_option.click()
                 fox = page.locator('[data-village-npc="Лиса Даша"]').first
                 fox.wait_for(state='visible', timeout=15000)
                 fox.click()
@@ -485,7 +495,10 @@ def run_dasha(pw_browser, base, screenshots):
                 menu_open = page.locator('.qw-menu.qw-open').is_visible()
                 c.ok(menu_open, f'dasha@{width}: settings menu opens over game')
                 if menu_open:
-                    page.locator('[data-qw-gear]').click()
+                    # The modal scrim intentionally intercepts pointer events, including
+                    # clicks on the gear underneath it. Escape is the shell's supported close action.
+                    page.keyboard.press('Escape')
+                    page.locator('.qw-menu.qw-open').wait_for(state='hidden', timeout=5000)
                 dimensions = page.evaluate("""() => ({
                     viewport: innerWidth,
                     document: document.documentElement.scrollWidth,
@@ -499,11 +512,36 @@ def run_dasha(pw_browser, base, screenshots):
                 c.ok('3 уровня' in locked, f'dasha@{width}: level-locked test guest sees human-readable reason ({locked!r})')
                 c.ok(page.locator('#dasha-game-view [data-role="action"]').is_disabled(), f'dasha@{width}: locked guest cannot start a wager')
 
+                if width <= 600:
+                    order = page.evaluate("""() => {
+                        const view = document.querySelector('#dasha-game-view');
+                        const rect = selector => {
+                            const r = view.querySelector(selector).getBoundingClientRect();
+                            return {top:r.top, bottom:r.bottom};
+                        };
+                        return {stage:rect('.dasha-stage-card'), side:rect('.dasha-side'),
+                            wager:rect('.dasha-wager'), intro:rect('.dasha-intro')};
+                    }""")
+                    c.ok(order['stage']['top'] < order['side']['top'],
+                         f'dasha@{width}: scene precedes the stakes panel ({order})')
+                    c.ok(order['wager']['top'] < order['intro']['top'],
+                         f'dasha@{width}: stakes panel is first directly below the scene ({order})')
+
                 result = page.evaluate(SCANNER, [MIN_GAP, MIN_TAP])
                 if width < 768:
                     result['issues'] += page.evaluate(ZONE_SCANNER, [47, 48])
                 report_path = screenshots / f'dasha-{width}.png'
-                page.screenshot(path=str(report_path), full_page=True)
+                page.screenshot(path=str(report_path))
+                if width <= 600:
+                    stakes = page.locator('#dasha-game-view .dasha-wager')
+                    stakes.scroll_into_view_if_needed()
+                    c.ok(stakes.is_visible() and page.locator('#dasha-game-view .dasha-stakes').is_visible(),
+                         f'dasha@{width}: stakes and choices visible in the game scroll area')
+                    scrolled = page.evaluate(SCANNER, [MIN_GAP, MIN_TAP])
+                    scrolled['issues'] += page.evaluate(ZONE_SCANNER, [47, 48])
+                    result['issues'] += scrolled['issues']
+                    stakes_report = screenshots / f'dasha-{width}-stakes.png'
+                    page.screenshot(path=str(stakes_report))
                 for issue in result['issues']:
                     if issue['kind'] == 'gap':
                         detail = f'{issue["a"]} ↔ {issue["b"]} gap {issue["gap"]}px'
@@ -512,9 +550,25 @@ def run_dasha(pw_browser, base, screenshots):
                     else:
                         detail = f'{issue["a"]} at y={issue["y"]}px is inside {issue["kind"]} zone'
                     c.ok(False, f'dasha@{width}: {issue["kind"]}: {detail}')
-                c.ok(True, f'dasha@{width}: button gaps/tap targets scanned; screenshot {report_path}')
+                c.ok(True, f'dasha@{width}: button gaps/tap targets scanned; screenshots {report_path}' +
+                     (f' and {stakes_report}' if width <= 600 else ''))
             except Exception as error:  # noqa: BLE001 - report each viewport independently
-                c.ok(False, f'dasha@{width}: scenario failed ({str(error).splitlines()[0]})')
+                diagnostic = screenshots / f'dasha-{width}-failure.txt'
+                body = ''
+                try:
+                    body = page.locator('body').inner_text(timeout=3000)[:2000]
+                except Exception as body_error:  # noqa: BLE001 - retain the original failure
+                    body = f'<unable to read page body: {body_error}>'
+                try:
+                    page.screenshot(path=str(screenshots / f'dasha-{width}-failure.png'), full_page=True, timeout=10000)
+                except Exception as screenshot_error:  # noqa: BLE001 - diagnostic capture is best effort
+                    body += f'\n<screenshot failed: {screenshot_error}>'
+                diagnostic.write_text(
+                    f'width={width}\nerror:\n{error}\n\nbody (first 2000 chars):\n{body}\n\n'
+                    f'page errors:\n{page_errors}\ncommand posts:\n{command_posts}\n',
+                    encoding='utf-8',
+                )
+                c.ok(False, f'dasha@{width}: scenario failed; full diagnostics {diagnostic}')
         c.ok(not command_posts, f'no farm command or wager was submitted ({command_posts})')
         c.ok(not page_errors, f'no browser page errors ({page_errors})')
     finally:

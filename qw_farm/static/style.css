@@ -913,14 +913,14 @@ body.dasha-game-open .header-destinations{display:none!important}
 #dasha-game-view .dasha-logo-carrot{width:100%;height:100%}
 #dasha-game-view .dasha-coin{display:grid;place-items:center;width:26px;height:26px;border:2px solid #9e7136;border-radius:50%;background:radial-gradient(circle,#ffe3a0 0 48%,#e5b759 50%);color:#996934;font-size:0}
 #dasha-game-view .dasha-stake{min-height:48px;border:1.5px solid #c6d3b7;border-radius:12px;background:#f5f5e6;color:#345945;font-size:var(--qw-fs-control);font-weight:800}
-#dasha-game-view .dasha-stake.selected{background:#dcebbd;border-color:#72946c;box-shadow:inset 0 0 0 1px #72946c}
+#dasha-game-view .dasha-stake.dasha-selected{background:#dcebbd;border-color:#72946c;box-shadow:inset 0 0 0 1px #72946c}
 #dasha-game-view .dasha-stake:disabled{opacity:.6}
 #dasha-game-view .dasha-stake:focus-visible,#dasha-game-view .dasha-back:focus-visible,#dasha-game-view .dasha-cup:focus-visible{outline:3px solid #ac753d;outline-offset:3px}
 #dasha-game-view .dasha-cup{min-height:44px}
-#dasha-game-view .dasha-cup.chosen{filter:drop-shadow(0 0 8px #e9bc5d)}
+#dasha-game-view .dasha-cup.dasha-chosen{filter:drop-shadow(0 0 8px #e9bc5d)}
 #dasha-game-view .dasha-cup:disabled{opacity:1}
 #dasha-game-view .dasha-primary{min-height:52px}
 #dasha-game-view .dasha-stage-card,#dasha-game-view .dasha-card{min-width:0}
-@media(max-width:600px){body.dasha-game-open .workspace{padding-bottom:0}#dasha-game-view .dasha-page{padding-bottom:calc(16px + var(--qw-safe-bottom))}#dasha-game-view .dasha-stage-card{order:2}#dasha-game-view .dasha-wager{order:1}}
+@media(max-width:600px){body.dasha-game-open .workspace{padding-bottom:0}#dasha-game-view .dasha-page{padding-bottom:calc(16px + var(--qw-safe-bottom))}#dasha-game-view .dasha-stage-card{order:0}#dasha-game-view .dasha-side{order:1}#dasha-game-view .dasha-wager{order:0}#dasha-game-view .dasha-intro{order:1}#dasha-game-view .dasha-foot-note{order:2}}
 @media(max-width:359px){#dasha-game-view .dasha-page{padding-left:calc(12px + var(--qw-safe-left));padding-right:calc(12px + var(--qw-safe-right))}#dasha-game-view .dasha-masthead{gap:8px}#dasha-game-view .dasha-brand-mark{width:40px;height:40px}#dasha-game-view .dasha-masthead h1{font-size:22px}}
 @media(prefers-reduced-motion:reduce){#dasha-game-view *,#dasha-game-view *::before,#dasha-game-view *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}

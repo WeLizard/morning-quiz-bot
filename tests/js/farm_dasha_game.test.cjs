@@ -10,9 +10,39 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const source=read('qw_farm/static/dasha-game.js').replace(/export /g,'');
 const context={Number,Array,Object,Math,Boolean,Set,Map,Intl};
 vm.createContext(context);
-vm.runInContext(`${source}\nglobalThis.api={dashaViewState,dashaReasonText,choiceFailureKeepsRound,dashaPayoutDisplay};`,context);
+vm.runInContext(`${source}\nglobalThis.api={dashaViewState,dashaReasonText,choiceFailureKeepsRound,dashaPayoutDisplay,mountDashaGame};`,context);
 const view=context.api.dashaViewState;
 const makeWager=overrides=>({rules:{stakes:[10,20,50],multiplier:2.7,payouts:{'10':27,'20':54,'50':135}},earned_balance:80,eligible:true,reason:null,daily_staked:30,remaining_stake:170,active:null,last_result:null,...overrides});
+
+class FakeClassList{
+ constructor(){this.values=new Set();}
+ add(...names){for(const name of names)this.values.add(name);}
+ remove(...names){for(const name of names)this.values.delete(name);}
+ contains(name){return this.values.has(name);}
+}
+class FakeNode{
+ constructor(){this.classList=new FakeClassList();this.dataset={};this.attrs={};this.children=[];this.listeners={};this.disabled=false;this.textContent='';}
+ addEventListener(name,callback){(this.listeners[name]??=[]).push(callback);}
+ emit(name,event={}){for(const callback of this.listeners[name]||[])callback(event);}
+ setAttribute(name,value){this.attrs[name]=String(value);}
+ getAttribute(name){return this.attrs[name]??null;}
+ removeAttribute(name){delete this.attrs[name];}
+ replaceChildren(...children){this.children=children;}
+ focus(){}
+}
+function fakeGameHost(){
+ const nodes={
+  '.dasha-stakes':new FakeNode(),'[data-role="balance"]':new FakeNode(),
+  '[data-role="payout"]':new FakeNode(),'[data-role="status"]':new FakeNode(),
+  '.dasha-speech':new FakeNode(),'[data-role="action"]':new FakeNode(),
+  '.dasha-carrot':new FakeNode(),'.dasha-curtain':new FakeNode(),'.dasha-back':new FakeNode()
+ };
+ const cups=[0,1,2].map(()=>new FakeNode());
+ const host=new FakeNode();host.querySelector=selector=>nodes[selector]||null;
+ host.querySelectorAll=selector=>selector==='.dasha-cup'?cups:[];
+ host.replaceChildren=()=>{};
+ return {host,nodes,cups};
+}
 
 test('start eligibility uses only the server wager projection and stake limits',()=>{
  const w=makeWager();
@@ -98,6 +128,55 @@ test('accepted scene assets are local, responsive and isolated from the farm sty
  assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
  assert.match(scene,/<svg\b/);
  assert.doesNotMatch(scene,/<image\b|data:image/i);
+});
+
+test('cup, carrot and curtain state classes match CSS through shuffle and settled reveal',async()=>{
+ const css=read('qw_farm/static/dasha-game.css');
+ assert.match(css,/\.dasha-stake\.dasha-selected\b/);
+ assert.match(css,/\.dasha-cup\.dasha-lift\b/);
+ assert.match(css,/\.dasha-cup\.dasha-peek\b/);
+ assert.match(css,/\.dasha-cup\.dasha-chosen\b/);
+ assert.match(css,/\.dasha-carrot\.dasha-visible\b/);
+ assert.match(css,/\.dasha-curtain\.dasha-closed\b/);
+
+ context.document={createElement:()=>new FakeNode()};
+ context.matchMedia=()=>({matches:true});
+ context.setTimeout=setTimeout;
+ const {host,nodes,cups}=fakeGameHost();
+ const state={coins:1000,wager:makeWager()};
+ let settleStart,settleChoice;
+ const calls=[];
+ const command=(kind,data)=>{
+  calls.push([kind,data]);
+  return new Promise(resolve=>{if(kind==='wager_start')settleStart=resolve;else if(kind==='wager_choose')settleChoice=resolve;});
+ };
+ context.api.mountDashaGame(host,{getState:()=>state,command,onBack(){}});
+ const action=nodes['[data-role="action"]'],carrot=nodes['.dasha-carrot'],curtain=nodes['.dasha-curtain'];
+ assert.equal(nodes['.dasha-stakes'].children[0].className,'dasha-stake dasha-selected','the selected stake gets its matching CSS state');
+ assert.equal(action.getAttribute('aria-label'),null);
+
+ action.emit('click');
+ assert.equal(calls[0][0],'wager_start');
+ state.wager.active={id:'round-visual',stake:10,payout:27,expires_at:600,rules_version:1};
+ settleStart(true);
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(curtain.classList.contains('dasha-closed'),true,'server-started shuffle closes the curtain before a choice is enabled');
+ assert.equal(carrot.classList.contains('dasha-visible'),false,'carrot stays hidden during shuffle');
+ await new Promise(resolve=>setTimeout(resolve,450));
+ assert.equal(curtain.classList.contains('dasha-closed'),false,'curtain opens only after shuffle');
+ assert.equal(cups.every(cup=>!cup.disabled),true,'cups become selectable after the shuffle');
+
+ cups[0].emit('click');
+ assert.equal(calls[1][0],'wager_choose');
+ state.wager.active=null;
+ state.wager.last_result={id:'round-visual',stake:10,payout:27,chosen_cup:0,winning_cup:0,won:true,settled_at:601,pending_payout:0};
+ settleChoice(true);
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(carrot.classList.contains('dasha-visible'),true,'server-settled result reveals the carrot');
+ assert.equal(cups.every(cup=>cup.classList.contains('dasha-lift')),true,'all cups lift on the settled result');
+ assert.equal(cups[0].classList.contains('dasha-chosen'),true,'the selected cup gets its matching CSS state');
+ assert.equal(action.textContent,'Ещё раунд');
+ assert.equal(action.getAttribute('aria-label'),null,'the stale choose label is removed after settlement');
 });
 
 test('the game returns to its village action and keyboard Escape cannot also close its panel',()=>{

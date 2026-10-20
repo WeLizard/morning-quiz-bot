@@ -29,7 +29,7 @@ function setLightingMode(value){
  updateFarmLighting();
 }
 const $=id=>document.getElementById(id);
-const S={form:'n',me:null,farm:null,catalog:null,tab:'orders',seed:'wheat',selected:null,config:null,speed:1,busy:false,pending:null,placing:null,find:{category:'all',ready:false},lastRun:null};
+const S={form:'n',me:null,farm:null,catalog:null,tab:'orders',seed:'wheat',selected:null,config:null,speed:1,busy:false,pending:null,placing:null,find:{category:'all',ready:false},inv:{q:'',cat:'all',shop:'all'},lastRun:null};
 function lastRunKey(id){return `qw-farm.lastRun.${id}`;}
 function loadLastRun(id){try{const v=JSON.parse(localStorage.getItem(lastRunKey(id))||'null');return v&&typeof v==='object'&&['tractor','harvester'].includes(v.machine)?v:null;}catch{return null;}}
 function rememberMachineCommand(payload){
@@ -610,13 +610,38 @@ function renderOrders(p){heading('Доска заказов','ДЕЛА НА СЕ
  let quests=S.catalog.quests.filter(q=>!S.me.claimed_quests.includes(q.id)).slice(0,3);
  if(!quests.length)note('Все цели этой главы закрыты. Твоя ферма теперь живёт своей жизнью.',p);
  for(let q of quests){let n=S.me.stats[q.stat],c=card(q.name,`${Math.min(n,q.goal)} / ${q.goal}`);note(q.text,c);c.append(meter(n,q.goal));let row=el('div',null,'card-footer');row.append(el('span',`${q.coins?`+${q.coins} монет · `:''}+${q.xp} XP`,'reward'),button('Забрать',()=>command('quest',{quest:q.id}),'secondary small',n<q.goal));c.append(row);p.append(c);}}
+const INV_CATS=[['crop','Урожай'],['animal','От животных'],['product','Изделия'],['forest','Лес'],['fish','Рыба'],['other','Прочее']];
+const invHas=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
+function invNorm(s){return String(s??'').toLowerCase().replace(/ё/g,'е').trim();}
+function invEntries(inv){return Object.entries(inv||{}).filter(([,q])=>q>0);}
+function invCategory(id,cat){if(Object.values(cat?.animals||{}).some(a=>invHas(a?.outputs,id)))return 'animal';const k=cat?.items?.[id]?.kind;return['crop','product','forest','fish'].includes(k)?k:'other';}
+function invWorkshop(id,cat){const r=Object.values(cat?.recipes||{}).find(r=>invHas(r?.outputs,id));return r?r.building:'';}
+function invShopName(key,cat){return key==='_'?'Без мастерской':cat?.buildings?.[key]?.name||key;}
+function invCounts(entries,cat){const c={all:entries.length,cats:{},shops:{}};for(const [id] of entries){const k=invCategory(id,cat);c.cats[k]=(c.cats[k]||0)+1;if(k==='product'){const w=invWorkshop(id,cat)||'_';c.shops[w]=(c.shops[w]||0)+1;}}return c;}
+function invCatChips(counts){return INV_CATS.filter(([id])=>counts.cats[id]>0).map(([id,name])=>[id,name,counts.cats[id]]);}
+function invShopChips(counts,cat){return Object.entries(counts.shops).map(([id,n])=>[id,invShopName(id,cat),n]).sort((a,b)=>b[2]-a[2]||a[1].localeCompare(b[1],'ru'));}
+function invNormalizeState(st,counts){if(st.cat!=='all'&&!counts.cats[st.cat])st.cat='all';if(st.cat!=='product'||(st.shop!=='all'&&!counts.shops[st.shop]))st.shop='all';return st;}
+function invFilter(entries,st,cat){const q=invNorm(st.q);return entries.filter(([id])=>{const k=invCategory(id,cat);if(st.cat!=='all'&&k!==st.cat)return false;if(st.cat==='product'&&st.shop!=='all'&&(invWorkshop(id,cat)||'_')!==st.shop)return false;return !q||invNorm(cat?.items?.[id]?.name||id).includes(q);});}
 function renderInventory(p){heading('Склад и лавка',gf('ВСЁ, ЧТО ТЫ ВЫРАСТИЛ','ВСЁ, ЧТО ТЫ ВЫРАСТИЛА','ВСЁ, ЧТО ВЫРОСЛО НА ТВОЕЙ ФЕРМЕ'));note(barnBonus()?`Урожай не портится, а склад не требует расширений. Продажа жителям: цена +${barnBonus()}% благодаря улучшенному складу.`:'Урожай не портится, а склад не требует расширений. Улучшенный склад (в его панели) повышает цену продажи.',p);renderProjectInventoryShelf(p);
- for(let [id,qty]of Object.entries(S.me.inventory).filter(([,q])=>q>0)){let row=el('div',null,'item-row'),txt=el('div',null,'item-copy'),actions=el('div',null,'row-actions');txt.append(el('strong',`${itemName(id)} ×${fmt(qty)}`),el('small',`${Math.floor(S.catalog.items[id].price*(100+barnBonus())/100)} монет за штуку`));actions.append(button('−1',()=>command('sell',{item:id,qty:1}),'secondary small'),button('Ещё',()=>itemDialog(id,qty),'light small'));row.append(icon(id),txt,actions);p.append(row);}
- if(!Object.values(S.me.inventory).some(q=>q>0))p.append(el('p','Пусто. Зато на грядках начинается новая история.','empty'));
+ const entries=invEntries(S.me.inventory);
+ if(!entries.length)p.append(el('p','Пусто. Зато на грядках начинается новая история.','empty'));else invMount(p,entries);
  p.append(el('h3','Моя соседская лавка','subheading'));note('После трёх заказов можно выставлять товары принятым соседям. Комиссия сделки — 3%, минимум 1 монета. Стартовые монеты на рынке не тратятся.',p);
  if(!S.me.listings.length)note('Нажми «Ещё» у товара, чтобы выставить его.',p);
  for(let lot of S.me.listings){let c=card(itemName(lot.item),`${lot.qty} шт. × ${lot.unit_price} мон.` ,lot.item);c.append(button('Вернуть на склад',()=>command('cancel_listing',{listing:lot.id}),'secondary small'));p.append(c);}
  p.append(button('Нужны семена на новый старт?',()=>command('rescue'),'text-button'));}
+function invRow(id,qty){let row=el('div',null,'item-row'),txt=el('div',null,'item-copy'),actions=el('div',null,'row-actions');txt.append(el('strong',`${itemName(id)} ×${fmt(qty)}`),el('small',`${Math.floor(S.catalog.items[id].price*(100+barnBonus())/100)} монет за штуку`));actions.append(button('−1',()=>command('sell',{item:id,qty:1}),'secondary small'),button('Ещё',()=>itemDialog(id,qty),'light small'));row.append(icon(id),txt,actions);return row;}
+function invPaintList(list,rows){list.replaceChildren(...(rows.length?rows.map(([id,q])=>invRow(id,q)):[el('p','Ничего не нашлось','note')]));}
+function invBar(label,chips,cur,pick){const g=el('div',null,'find-filters inv-filters');g.setAttribute('role','group');g.setAttribute('aria-label',label);for(const [id,name,n] of chips){const b=el('button');b.type='button';b.setAttribute('aria-pressed',String(cur===id));b.append(el('span',name),el('span',String(n),'count'));b.onclick=()=>pick(id);g.append(b);}return g;}
+function invMount(p,entries){const st=S.inv,counts=invCounts(entries,S.catalog);invNormalizeState(st,counts);
+ const sw=el('div',null,'inv-search'),input=el('input'),clr=button('×',()=>{st.q='';input.value='';clr.hidden=true;paintList();input.focus();},'inv-clear'),filters=el('div'),list=el('div',null,'inv-list');
+ input.type='search';input.value=st.q;input.placeholder='Найти на складе';input.setAttribute('aria-label','Найти на складе');input.autocomplete='off';input.enterKeyHint='search';clr.hidden=!st.q;clr.setAttribute('aria-label','Очистить поиск');sw.append(input,clr);
+ const paintList=()=>invPaintList(list,invFilter(entries,st,S.catalog));
+ const paintFilters=()=>{const cats=invCatChips(counts),bars=[];if(cats.length>1)bars.push(invBar('Категория',[['all','Все',counts.all],...cats],st.cat,id=>{st.cat=id;st.shop='all';repaint(0);}));
+  if(st.cat==='product'){const shops=invShopChips(counts,S.catalog);if(shops.length>1)bars.push(invBar('Мастерская',[['all','Все изделия',counts.cats.product],...shops],st.shop,id=>{st.shop=id;repaint(1);}));}
+  filters.replaceChildren(...bars);};
+ const repaint=level=>{paintFilters();paintList();filters.children[level]?.querySelector('[aria-pressed="true"]')?.focus({preventScroll:true});};
+ input.oninput=()=>{st.q=input.value;clr.hidden=!st.q;paintList();};
+ paintFilters();paintList();p.append(sw,filters,list);}
 function itemDialog(id,qty){let w=el('div'),[qwrap,q]=field('Количество','number',Math.min(5,qty));q.min=1;q.max=Math.min(999,qty);let [pwrap,price]=field('Цена в соседской лавке за штуку','number',S.catalog.items[id].price);price.min=S.catalog.items[id].price;price.max=price.min*2;w.append(el('p',`В наличии ${qty}. Продажа жителям: ${Math.floor(S.catalog.items[id].price*(100+barnBonus())/100)} монет за штуку (за 1 шт.).`),qwrap,pwrap);
  modal(itemName(id),w,[button('Продать',safe(async()=>{if(await command('sell',{item:id,qty:Number(q.value)}))$('dialog').close();}),'primary'),button('В лавку',safe(async()=>{if(await command('list',{item:id,qty:Number(q.value),unit_price:Number(price.value)}))$('dialog').close();}),'secondary',S.me.stats.orders<3)]);}
 function landExpansion(p){
@@ -689,10 +714,10 @@ function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){
   let animal=Object.values(S.catalog.animals).find(a=>a.building===o.type);
   if(animal){let c=card(animal.name,'Кормление запускает одну порцию. Животные не голодают и не умирают.',Object.keys(animal.outputs)[0]);if(!o.animal)c.append(button(`Поселить за ${animal.cost} монет`,()=>command('buy_animal',{object:o.id,animal:animal.id}),'primary wide',S.me.coins<animal.cost));else if(o.animal_job){c.append(el('p','Продукция будет готова через:','note'),timer(o.animal_job.ready_at),goods(o.animal_job.outputs,false),button('Забрать продукцию',()=>command('collect_animal',{object:o.id}),'primary wide',o.animal_job.ready_at>now()));}else{let bt=batchOf(animal,o);c.append(goods(bt.inputs),el('p',`Одна порция: ${duration(bt.seconds)} → ${Object.entries(bt.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ')}`,'note'),button('Накормить',()=>command('feed',{object:o.id}),'primary wide',!enough(bt.inputs)));}p.append(c);upgradeCard(o,p);}
   const recipes=Object.values(S.catalog.recipes).filter(r=>r.building===o.type);
-  if(recipes.length){note(`Мастерская ${lvlOf(o)} уровня · ${o.jobs.length} / ${slotsOf(o)} мест занято`,p);if(o.last_recipe&&S.catalog.recipes[o.last_recipe])note(`Запомнен рецепт «${S.catalog.recipes[o.last_recipe].name}»: помощник-мастер и «Повторить партии» ставят его заново.`,p);
+  if(recipes.length){note(`Мастерская ${lvlOf(o)} уровня · ${o.jobs.length} / ${slotsOf(o)} мест занято`,p);if(o.last_recipe&&S.catalog.recipes[o.last_recipe]){note(`Запомнен рецепт «${S.catalog.recipes[o.last_recipe].name}»: помощник-мастер и «Повторить партии» ставят его заново. Ручная постановка в очередь запоминает рецепт снова.`,p);p.append(button('Забыть рецепт',()=>command('forget_recipe',{object:o.id}),'light small forget-recipe'));}
    const readyCount=o.jobs.filter(j=>j.ready_at<=now()).length;
    if(readyCount>=2)p.append(button(`Забрать всё готовое · ${readyCount}`,()=>command('collect_building',{object:o.id}),'primary wide'));
-   for(let j of o.jobs){let row=el('div',null,'queue-job'),ready=j.ready_at<=now();row.append(button(ready?'Забрать':'Отменить',()=>command(ready?'collect':'cancel_job',{object:o.id,job:j.id}),ready?'primary small':'light small',!ready&&j.starts_at<=now()),el('strong',S.catalog.recipes[j.recipe]?.name||'Продукция'));let s=el('small');s.append(j.starts_at>now()?el('span','В очереди · '):el('span',''),timer(j.ready_at));row.append(s);p.append(row);}
+   for(let j of o.jobs){let row=el('div',null,'queue-job'),ready=j.ready_at<=now();row.append(button(ready?'Забрать':'Отменить',()=>ready?command('collect',{object:o.id,job:j.id}):(j.starts_at>now()&&o.last_recipe!==j.recipe)?command('cancel_job',{object:o.id,job:j.id}):confirmCancelJob(o,j),ready?'primary small':'light small'),el('strong',S.catalog.recipes[j.recipe]?.name||'Продукция'));let s=el('small');s.append(j.starts_at>now()?el('span','В очереди · '):el('span',''),timer(j.ready_at));row.append(s);p.append(row);}
    for(let r of recipes){let c=card(r.name,null,Object.keys(r.outputs)[0]);c.append(goods(r.inputs));let out=Object.entries(r.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');c.append(el('p',`→ ${out} · ${duration(r.seconds*speedOf(o))}`,'recipe-time'));c.append(button(r.level>S.me.level?`Нужен ${r.level} уровень`:'В очередь',()=>command('queue',{object:o.id,recipe:r.id}),'secondary wide',r.level>S.me.level||!enough(r.inputs)||o.jobs.length>=slotsOf(o)));p.append(c);}
    upgradeCard(o,p);
   }
@@ -880,6 +905,14 @@ function tripTaken(trip){
 function undoLeft(since){return Math.ceil(since+undoRules().window-now());}
 function undoFull(since){return now()<=since+undoRules().window;}
 function digRefund(c){const cost=cropCost(c);return undoFull(c.planted_at)?cost:Math.floor(cost*undoRules().late_refund_pct/100);}
+function jobRefund(j){const full=j.starts_at>now()||undoFull(j.starts_at),r={};for(let [k,q] of Object.entries(j.inputs||{})){const v=full?q:Math.floor(q*undoRules().late_refund_pct/100);if(v>0)r[k]=v;}return {items:r,full};}
+function confirmCancelJob(o,j){
+ const rf=jobRefund(j),name=S.catalog.recipes[j.recipe]?.name||'Партия',list=Object.entries(rf.items).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');
+ const text=rf.full?`Ингредиенты вернутся полностью${list?': '+list:''}.`+(j.starts_at>now()?'':` Это ещё можно отменить без потерь, если подтвердить до истечения срока (ещё ${Math.max(0,undoLeft(j.starts_at))} с).`):`Партия остановится, продукции и опыта не будет. `+(list?`Вернётся половина ингредиентов: ${list}.`:'Ничего не вернётся.');
+ const cancel=async(forget)=>{$('dialog').close();const ok=await command('cancel_job',{object:o.id,job:j.id});if(!forget)return;if(!ok||!await command('forget_recipe',{object:o.id}))toast('Рецепт не забыт — нажми «Забыть рецепт», когда партия отменится.');};
+ const tail=o.last_recipe===j.recipe?' Помощник-мастер поставит этот рецепт заново, если не забыть его.':'';
+ modal(`Отменить: ${name}?`,text+tail,[button('Отменить партию',safe(()=>cancel(false)),'primary')].concat(o.last_recipe===j.recipe?[button('Отменить и забыть рецепт',safe(()=>cancel(true)),'secondary')]:[]));
+}
 function confirmDigUp(o){
  const c=o.crop;if(!c)return;
  const full=undoFull(c.planted_at),sum=digRefund(c);

@@ -9,7 +9,7 @@ function client(nowValue){
  const c={S,now:()=>nowValue.t,Math,Number,Object};
  vm.createContext(c);
  const code=source.slice(source.indexOf('function undoRules()'),source.indexOf('function confirmDigUp('))+source.slice(source.indexOf('function tripUndoLabel('),source.indexOf('function confirmTripReturn('));
- vm.runInContext(code+'\nObject.assign(globalThis,{undoFull,digRefund,tripUndoLabel,tripEarlyLoot,tripTaken,cropCost})',c);
+ vm.runInContext(code+'\nObject.assign(globalThis,{undoFull,digRefund,jobRefund,tripUndoLabel,tripEarlyLoot,tripTaken,cropCost})',c);
  return c;
 }
 test('Dig-up refund: full in the first 60 s (inclusive), half rounded down later; old plantings use the catalog price',()=>{
@@ -25,4 +25,12 @@ test('Early return: label switches after a minute; loot is floor(output * share 
  t.t=5000+3600;assert.deepEqual({...c.tripEarlyLoot(trip)},{hazelnut:1,mushroom:1});
  t.t=5000+7199;assert.deepEqual({...c.tripEarlyLoot(trip)},{hazelnut:2,mushroom:1,blackberry:1});
  assert.deepEqual({...c.tripTaken({route:'old_grove'}).items},{bread:1});assert.equal(c.tripTaken({route:'old_grove'}).coins,14);
+});
+test('Batch cancel preview: queued = full, running = full for 60 s from starts_at then floor(half), zero positions dropped',()=>{
+ const t={t:1000},c=client(t),job={starts_at:1000,inputs:{a:1,b:5,c:2}};
+ assert.deepEqual({...c.jobRefund(job).items},{a:1,b:5,c:2});assert.equal(c.jobRefund(job).full,true);
+ t.t=1060;assert.equal(c.jobRefund(job).full,true);
+ t.t=1061;let r=c.jobRefund(job);assert.equal(r.full,false);assert.deepEqual({...r.items},{b:2,c:1});
+ assert.deepEqual({...c.jobRefund({starts_at:1000,inputs:{a:1}}).items},{},'a single unit returns nothing');
+ t.t=5000;r=c.jobRefund({starts_at:9000,inputs:{a:1}});assert.equal(r.full,true,'still waiting in the queue: free at any time');assert.deepEqual({...r.items},{a:1});
 });

@@ -2,6 +2,11 @@
 
 * Digging up a planting: the seed price is refunded in full during the first ``UNDO_WINDOW`` seconds after planting
   (protection from a mis-tap), and by ``LATE_REFUND_PCT`` percent later. No XP, no harvest; the bed is free at once.
+* Cancelling a workshop batch (same canon as digging up). A ready batch cannot be cancelled (collect it). A batch still waiting in
+  the queue (``starts_at > now``) is returned in full at any time. A running batch is returned in full during the first
+  ``UNDO_WINDOW`` seconds after ``starts_at`` (the window counts from the start, not from queueing), later ``LATE_REFUND_PCT`` percent
+  of every ingredient (floor, zero positions are not returned); no XP and no products. Following batches restart from ``now``.
+  The remembered ``last_recipe`` (artisans, «repeat batches») is untouched; ``forget_recipe`` clears it.
 * Returning from a woodland trip or fishing early: during the first ``UNDO_WINDOW`` seconds the trip is cancelled and everything taken
   (coins for the route, goods taken along) is returned in full; later the player comes back early with
   ``floor(output * elapsed_share * LATE_LOOT_PCT / 100)`` of every item, no XP, no secret, and what was taken is not returned.
@@ -10,7 +15,7 @@ The starter gift is restored together with the refund (``gift`` is the part of t
 never turns the one-time gift into freely spendable coins.
 """
 from domain.address import g as address_g
-from .catalog import CROPS, ROUTES, ITEMS, trip_kind
+from .catalog import CROPS, ROUTES, ITEMS, RECIPES, trip_kind
 from .domain import need, inventory, event
 
 UNDO_WINDOW = 60
@@ -57,6 +62,36 @@ def dig_up(farm, obj, now):
     if full:
         return f'{name}: посадка отменена, семена возвращены полностью: +{refund} монет.'
     return f'{name}: выкопано. Вернулась половина цены семян: +{refund} монет, опыта нет.'
+
+
+def job_refund(job, now):
+    """(ingredients refunded, full?) for cancelling this batch right now (it must not be ready)."""
+    inputs = job['inputs']
+    if job['starts_at'] > now or now - job['starts_at'] <= UNDO_WINDOW:
+        return dict(inputs), True
+    return {k: q * LATE_REFUND_PCT // 100 for k, q in inputs.items() if q * LATE_REFUND_PCT // 100 > 0}, False
+
+
+def cancel_job(farm, obj, job, now):
+    need(job['ready_at'] > now, 'job_done', 'Партия уже готова — забери её.')
+    refund, full = job_refund(job, now)
+    inventory(farm, refund)
+    obj['jobs'].remove(job)
+    end = now
+    for j in obj['jobs']:  # the queue is sequential: what follows starts no earlier than now
+        if j['starts_at'] > now:
+            j['starts_at'] = max(now, end)
+            j['ready_at'] = j['starts_at'] + j['seconds']
+        end = j['ready_at']
+    obj['revision'] += 1
+    recipe = RECIPES.get(job.get('recipe'))
+    name = recipe['name'] if recipe else 'Партия'
+    if full:
+        return f'{name}: партия отменена, ингредиенты возвращены полностью.'
+    if not refund:
+        return f'{name}: остановлено. Ничего не вернулось, опыта нет.'
+    back = ', '.join(f'{ITEMS[k]["name"] if k in ITEMS else k} ×{q}' for k, q in refund.items())
+    return f'{name}: остановлено. Вернулась половина ингредиентов: {back}, опыта нет.'
 
 
 def trip_taken(trip):

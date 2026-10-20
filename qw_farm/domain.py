@@ -204,7 +204,7 @@ def new_farm(farm_id, name, now):
 # Per-command schemas reject client-supplied rewards, prices or ready_at.
 SCHEMAS={
  'plant':{'object','crop','revision'},'dig_up':{'object','revision'},'harvest':{'object','revision'},'collect_all':set(),
- 'queue':{'object','recipe'},'collect':{'object','job'},'cancel_job':{'object','job'},
+ 'queue':{'object','recipe'},'collect':{'object','job'},'cancel_job':{'object','job'},'forget_recipe':{'object'},
  'feed':{'object'},'collect_animal':{'object'},'buy_animal':{'object','animal'},
  'build':{'type','x','y'},'move':{'object','x','y','revision'},'rotate':{'object','revision'},'demolish':{'object','revision'},'upgrade':{'object','revision'},
  'rescue':set(),'expand':set(),'sell':{'item','qty'},'order':{'order'},'skip_order':{'order'},'quest':{'quest'},
@@ -270,22 +270,20 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         obj['jobs'].append(expansion.make_job(obj,r,now,speed,command_id,me))
         obj['last_recipe']=r['id']  # remembered for the artisans and «повторить партии»
         obj['revision']+=1;text='Производство поставлено в очередь.'
-    elif kind in {'collect','cancel_job'}:
+    elif kind=='forget_recipe':
+        from . import expansion as ex
+        need(obj['type'] in ex.WORKSHOP_TYPES,'wrong_object','Забыть рецепт можно только в мастерской.')
+        need(bool(obj.get('last_recipe')),'no_recipe','В этой мастерской нет запомненного рецепта.')
+        rid=obj.pop('last_recipe');obj['revision']+=1
+        text=f'Рецепт «{RECIPES[rid]["name"] if rid in RECIPES else rid}» забыт: помощники будут только забирать готовое.'
+    elif kind=='cancel_job':
+        from . import undo
+        text=undo.cancel_job(me,obj,find(obj.get('jobs',[]),data['job']),now)
+    elif kind=='collect':
         job=find(obj.get('jobs',[]),data['job'])
-        if kind=='collect':
-            need(job['ready_at']<=now,'not_ready','Продукция ещё не готова.')
-            inventory(me,job['outputs']);expansion.market.count_outputs(me,job['outputs']);progression.grant_xp(me,job['xp'],'craft',now,True,RECIPES[job['recipe']]['seconds'] if job.get('recipe') in RECIPES else None);me['stats']['crafts']+=1;text='Готовая продукция на складе.'
-        else:
-            need(job['starts_at']>now,'already_started','Можно отменить только ещё не начатую работу.')
-            inventory(me,job['inputs']);text='Ингредиенты возвращены.'
-        obj['jobs'].remove(job)
-        if kind=='cancel_job':
-            end=now
-            for j in obj['jobs']:
-                if j['starts_at']>now:
-                    j['starts_at']=max(now,end);j['ready_at']=j['starts_at']+j['seconds']
-                end=j['ready_at']
-        obj['revision']+=1
+        need(job['ready_at']<=now,'not_ready','Продукция ещё не готова.')
+        inventory(me,job['outputs']);expansion.market.count_outputs(me,job['outputs']);progression.grant_xp(me,job['xp'],'craft',now,True,RECIPES[job['recipe']]['seconds'] if job.get('recipe') in RECIPES else None);me['stats']['crafts']+=1;text='Готовая продукция на складе.'
+        obj['jobs'].remove(job);obj['revision']+=1
     elif kind=='buy_animal':
         a=named(ANIMALS,data['animal'])
         need(obj['type']==a['building'] and not obj.get('animal'),'animal_exists','Этот домик уже занят или не подходит.')

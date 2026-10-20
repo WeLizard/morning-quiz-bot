@@ -56,11 +56,11 @@ Produces: Dasha card action and nested game view with existing Back/nav.
 
 ### Task 3: Integration acceptance and sandbox
 
-- [ ] Run scoped PG/HTTP/JS, project checks and required complete dev gate; distinguish foreign pre-existing failures.
-- [ ] Review full diff independently; stage only own files, preserve original foreign hashes.
-- [ ] Deploy pinned code + migration only to sandbox with code/data backups and explicit rollback constraints.
-- [ ] Verify real browser start/choose/reload/back, console, UI gaps and public service health.
-- [ ] Record actual results in canonical spec; commit/push without PR under prior authorization.
+- [x] Run scoped PG/HTTP/JS, project checks and required complete dev gate; distinguish foreign pre-existing failures.
+- [x] Review full diff independently; stage only own files, preserve original foreign hashes.
+- [x] Deploy pinned code + migration only to sandbox with code/data backups and explicit rollback constraints.
+- [x] Verify real browser start/choose/reload/back, console, UI gaps and public service health.
+- [x] Record actual results in canonical spec; commit feature and acceptance without PR.
 
 ### Task 4: Next game preview
 

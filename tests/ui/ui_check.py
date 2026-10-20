@@ -492,6 +492,7 @@ def run_dasha(pw_browser, base, screenshots):
                 c.ok(view.is_visible(), f'dasha@{width}: game is a visible in-shell view')
                 c.ok(page.locator('[data-qw-gear]').is_visible(), f'dasha@{width}: shell settings menu remains accessible')
                 page.locator('[data-qw-gear]').click()
+                page.locator('.qw-menu').wait_for(state='visible', timeout=5000)
                 menu_open = page.locator('.qw-menu.qw-open').is_visible()
                 c.ok(menu_open, f'dasha@{width}: settings menu opens over game')
                 if menu_open:

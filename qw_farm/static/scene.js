@@ -25,6 +25,8 @@ const PLANT_LOD_SCALE=0;
 const MIN_SCALE=.25,MAX_SCALE=2,CACHE_MARGIN=.18,MAIN_MAX_PIXELS=4e6,CACHE_MAX_PIXELS=6e6;
 const KEY_PAN={ArrowLeft:[1,0],KeyA:[1,0],ArrowRight:[-1,0],KeyD:[-1,0],ArrowUp:[0,1],KeyW:[0,1],ArrowDown:[0,-1],KeyS:[0,-1]};
 const KEY_SPEED=560;
+export const SWAN_FEED_SECONDS=7;
+const SWAN_SHORE_ANGLE=.25;   // radians from the lake centre: the right bank, just below the arbor
 // Per-farm salt: the same farm always gets the same wood, different farms get different ones.
 const farmSalt=id=>{let h=7;for(const ch of String(id??''))h=(h*31+ch.charCodeAt(0))%9973;return h+1};
 
@@ -609,8 +611,18 @@ export class FarmScene {
    // Tipping over to feed: only the tail end shows, in the same ripple as the swimming pose (duck_swim draws its own ripple).
    if(dive){this.ellipse(x,y,11,2.8,'#b6d3cf');this.ellipse(x,y-2.6,6,4,'#ada186');this.poly([{x:x-2.4,y:y-4.6},{x:x+2.4,y:y-4.6},{x:x+.6,y:y-11}],'#3f4a40');this.ellipse(x,y-.5,7.6,1.5,'#c3dcd7');this.ellipse(x,y+.6,9,1.2,'#eef7f080')}
    else sprite('duck_swim',x,y,face(dx));}
-  if(((t%120)+120)%120<80){const u=t*.07+2,x=p.x+70+Math.cos(u)*50,y=p.y-8+Math.sin(u)*14,dir=face(-Math.sin(u));
-   for(const k of [0,1]){const ox=k*34*dir*-1,oy=k*7;this.ellipse(x+ox,y+oy+3,19,4,'#a8cfc6a0');sprite('swan',x+ox,y+oy,dir)}}
+  const feeding=this.swanFeedState(t),fed=!feeding&&this.swansFed();
+  if(feeding||fed||((t%120)+120)%120<80){const u=t*.07+2;let x=p.x+70+Math.cos(u)*50,y=p.y-8+Math.sin(u)*14,dir=face(-Math.sin(u)),near=0;
+   // Fed by the player: the pair swims to the bank nearest the farm, dips for the grain, then drifts back into its lap.
+   // While the server cooldown runs (farm.swans.next_at) they stay by that bank, content: the fed state survives a reload.
+   const s=this.swanShore(p);
+   if(feeding){const w=feeding.w,x0=x;if(w>.05)dir=face(s.x-x0||1);x+=(s.x-x0)*w;y+=(s.y-y)*w;near=w}
+   else if(fed){const v=t*.3;x=s.x-s.dir*6+Math.cos(v)*10;y=s.y+Math.sin(v)*3;dir=s.dir;near=1}
+   if(feeding||fed)this.swanGrain(s,feeding?feeding.eaten:1,t,feeding?feeding.e:99);
+   for(const k of [0,1]){const ox=k*(-34+14*near)*dir,oy=k*(7+5*near),dip=feeding&&feeding.eating&&this.motion?Math.sin(t*2.4+k*2.1):-1;
+    this.ellipse(x+ox,y+oy+3,19,4,'#a8cfc6a0');if(dip>.35)this.swanDip(x+ox,y+oy,dir);else sprite('swan',x+ox,y+oy,dir)}
+   if(feeding&&feeding.e>SWAN_FEED_SECONDS-2.4)this.swanSparkle(x,y,dir,(feeding.e-(SWAN_FEED_SECONDS-2.4))/2.4);
+   else if(fed&&this.motion){const ph=(t%7)/7;if(ph<.3)this.swanSparkle(x,y,dir,ph/.3,1)}}
 
  }
  // The swan-geese cross the sky above everything else (after the trees), so nothing on the ground ever covers them.
@@ -638,6 +650,35 @@ export class FarmScene {
   const p=P(x,y),cx=this.pondCenter().x,cy=this.pondCenter().y,rx=this.lakeSize().rx+40,ry=this.lakeSize().ry+12;
   for(const [dx,dy] of [[0,0],[-18,0],[18,0],[0,-20],[-16,-20],[16,-20],[0,-40],[-17,-40],[17,-40],[0,-60]]){const u=(p.x+dx*s-cx)/rx,v=(p.y+dy*s-cy)/ry;if(u*u+v*v<=1)return true}
   return false}
+ // «Покормить лебедей»: a purely visual reaction to a successful server command. The server owns cost, XP and limits.
+ feedSwans(){if(!this.motion)return;this.swanFeedAt=this.time||0;this.dirty=true}
+ // The swans come to the bank that faces the farm path (right, just below the arbor; clear of the pier bay above):
+ // the lake outline point nearest SWAN_SHORE_ANGLE. They swim at 0.76 of its radius; the grain floats at 0.92, just ahead of their beaks.
+ swanShore(p=this.pondCenter()){const pts=this.lakeShape(),off=a=>Math.abs(Math.atan2(Math.sin(a-SWAN_SHORE_ANGLE),Math.cos(a-SWAN_SHORE_ANGLE)));
+  let i=0;for(let j=1;j<pts.length;j++)if(off(pts[j].a)<off(pts[i].a))i=j;
+  const swim=this.lakeEdge(i,p.x,p.y,.76),grain=this.lakeEdge(i,p.x,p.y,.92);return{x:swim.x,y:swim.y,gx:grain.x,gy:grain.y,dir:grain.x>=swim.x?1:-1}}
+ // Fed today and still within the server cooldown: from the owner projection (farm.swans), never from client state.
+ swansFed(){const w=this.farm?.swans;return !!(w&&w.unlocked!==false&&w.next_at>this.now())}
+ // Grain on the water by the bank: golden husked grains in two tones with tiny rings; ``eaten`` 0..1 thins them out.
+ swanGrain(s,eaten,t,e){const left=Math.round(12*(1-eaten));if(!left)return;const c=this.c;
+  const G=[[-6,-3,.4],[0,3,-.5],[5,-4,.9],[11,1,.2],[-3,7,-1],[7,7,.6],[15,-3,-.3],[2,-8,1.2],[-8,3,-.8],[12,6,.9],[18,2,.1],[9,-7,-1.1]];
+  for(let i=0;i<left;i++){const [dx,dy,r]=G[i],x=s.gx+dx*s.dir,y=s.gy+dy+(this.motion?Math.sin(t*1.7+i)*.5:0);
+   if(e<1.2){c.save();c.globalAlpha=Math.max(0,1-e/1.2)*.8;c.strokeStyle='#eef7f0';c.lineWidth=.8;c.beginPath();c.ellipse(x,y+.6,2+e*5,.8+e*1.8,0,0,Math.PI*2);c.stroke();c.restore()}
+   this.ellipse(x,y+1.2,3.4,1,'#8fb8b080');c.save();c.translate(x,y);c.rotate(r);this.ellipse(0,0,3,1.6,i%3?'#e4b746':'#cf9a35');this.line(-2.4,0,2.4,0,'#b8862f',.6);this.ellipse(.9,-.5,1.1,.6,'#f8e29a');c.restore()}}
+ // A swan dabbling: same body, wing and tail as the swimming sprite, the neck arched forward with the head under water.
+ swanDip(x,y,dir){const c=this.c;c.save();c.translate(x,y);c.scale(dir,1);
+  this.ellipse(0,1,20,6,'#b6d3cf');this.ellipse(0,0,15,4.5,'#d4e6e2');
+  this.ellipse(-3,-6.5,14,7.6,'#f5f3ee');this.poly([{x:-15,y:-9},{x:-21,y:-15},{x:-13,y:-5}],'#ece9e2');
+  c.beginPath();c.moveTo(7,-9);c.bezierCurveTo(13,-16,19,-11,17.5,-1.5);c.strokeStyle='#f7f5f0';c.lineWidth=5;c.lineCap='round';c.stroke();
+  this.ellipse(-5,-7.5,7,4,'#e9e6df');this.ellipse(17.5,-.2,5,1.7,'#c3dcd7');
+  c.strokeStyle='#eef7f0';c.lineWidth=.9;c.beginPath();c.ellipse(17.5,.4,7.5,2.2,0,0,Math.PI*2);c.stroke();c.restore()}
+ // A small four-point sparkle over the pair (after a meal, and now and then while they are full). Painted with the lights.
+ swanSparkle(x,y,dir,ph,count=3){const paint=()=>{const c=this.c;for(let i=0;i<count;i++){const k=Math.max(0,Math.min(1,ph*1.3-i*.15)),a=Math.sin(k*Math.PI);if(a<=0)continue;
+   const sx=x+(-10+i*13)*dir,sy=y-30-i*5-k*12,r=1.8+a*1.8;c.save();c.globalAlpha=a*.95;
+   this.poly([{x:sx,y:sy-r*1.8},{x:sx+r*.45,y:sy-r*.45},{x:sx+r*1.8,y:sy},{x:sx+r*.45,y:sy+r*.45},{x:sx,y:sy+r*1.8},{x:sx-r*.45,y:sy+r*.45},{x:sx-r*1.8,y:sy},{x:sx-r*.45,y:sy-r*.45}],'#fff3b0','#e7c35a',.6);c.restore()}};
+  if(this.lightMarkers)this.lightMarkers.push({kind:'fn',fn:paint});else paint()}
+ swanFeedState(t){const s=this.swanFeedAt;if(s==null)return null;const e=t-s;if(e>=SWAN_FEED_SECONDS||e<0){if(e>=SWAN_FEED_SECONDS)this.swanFeedAt=null;return null}
+  const k=Math.min(1,e/2,(SWAN_FEED_SECONDS-e)/2);return{w:k*k*(3-2*k),eating:e>=2&&e<SWAN_FEED_SECONDS-2,e,eaten:Math.max(0,Math.min(1,(e-2)/(SWAN_FEED_SECONDS-4)))}}
  pondCenter(){const G=this.grid();return{x:-36*G+10,y:18*G+140}}
  tree(x,y,s=1){if(this.treeBlocked(x,y,s))return;this.treeSprite(x,y,s)}
  treeSprite(x,y,s=1,withShadow=true){let p=P(x,y),c=this.c;c.save();c.translate(p.x,p.y);c.scale(s,s);if(withShadow)this.shadow(0,0,19,8);this.line(0,0,0,-40,'#9e8a60',4);this.ellipse(0,-40,20,28,'#71976d');this.ellipse(-7,-48,15,22,'#82a77a');this.ellipse(6,-40,15,22,'#7da073');this.ellipse(-4,-56,11,14,'#96b183');c.restore()}

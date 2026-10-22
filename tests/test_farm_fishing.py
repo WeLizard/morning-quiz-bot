@@ -244,3 +244,35 @@ def test_fishing_http_postgres_replay_and_stale_collect(farm_pg_url, identity):
             assert await raw_farm(env, p) == collected
             assert not await receipts(env, p.account_id, 'pg-fishing-stale')
     asyncio.run(run())
+
+
+def test_fishing_minigame_postgres_play_once_with_receipts(farm_pg_url):
+    """trip_play over HTTP + PostgreSQL: the server replays the v2 log once; a replay of the same key changes nothing."""
+    from tests.test_farm_trip_games import play_fish, end_s
+
+    async def run():
+        async with environment(farm_pg_url) as env, player(env, 'guest') as p:
+            async with env.db.transaction() as session:
+                state = fishing_farm(fid=p.farm_id)
+                state['inventory']['bread'] = 2
+                validate_state(state)
+                await Unit(session, env.schema).save(state)
+            await accepted(p, 'start_trip', {'route': 'pond_bank', 'guide': ''}, key='pg-fish-game-start')
+            started = await raw_farm(env, p)
+            trip = started['trips'][0]
+            plan = trip['game']['plan']
+            assert plan['v'] == 2 and trip['game']['state'] == 'open'
+            log = play_fish(plan, bait='bread')
+            env.now[0] = trip['started_at'] + end_s(plan, log)
+            first = await accepted(p, 'trip_play', {'trip': trip['id'], 'log': log}, key='pg-fish-game-play')
+            played = await raw_farm(env, p)
+            game = played['trips'][0]['game']
+            assert game['state'] == 'done' and game['q'] > 1000 and len(game['catch']) == 4
+            assert played['inventory']['bread'] == 1 and sum(r['n'] for r in played['fish_journal'].values()) == 4
+            assert await accepted(p, 'trip_play', {'trip': trip['id'], 'log': log}, key='pg-fish-game-play') == first
+            assert await raw_farm(env, p) == played
+            again = await command(p, 'trip_play', {'trip': trip['id'], 'log': log}, key='pg-fish-game-again')
+            assert again.status_code == 409 and again.json()['code'] == 'already_played'
+            assert await raw_farm(env, p) == played
+            assert len(await receipts(env, p.account_id, 'pg-fish-game-play')) == 1
+    asyncio.run(run())

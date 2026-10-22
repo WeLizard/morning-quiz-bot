@@ -12,11 +12,13 @@
  "inputs": {
   "scripts/art/village/gate.js": "7b7a7a1f5f7f6db9",
   "scripts/art/village/svg_ctx.js": "1f0006e48e7b3506",
+  "scripts/art/village/walk.js": "2f8b62d68b3999c5",
+  "scripts/art/village/player.js": "bcd5e9e6d8f689b7",
   "qw_farm/static/scene_buildings.js": "5ed07215099fdc4b",
-  "qw_farm/static/scene.js": "1f28a2f33ddbe063",
+  "qw_farm/static/scene.js": "4782a3e0ccab46a2",
   "qw_farm/static/scene_expansion.js": "7473fa6cdf1de9ff",
   "qw_farm/static/scene_map.js": "8f910b470e431e7d",
-  "scripts/art/village/village.js": "49eb640bcf7300cc",
+  "scripts/art/village/village.js": "15ad70ead09a9024",
   "scripts/art/village/common.js": "0d3fc65983694e63"
  }
 }

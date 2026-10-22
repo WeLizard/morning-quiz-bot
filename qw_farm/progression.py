@@ -29,7 +29,7 @@ POOL_CAP_PCT = 150    # M2: pool cap
 TIRED_PCT = 10        # M3: daily full-rate allowance of short-source XP
 TIRED_NUM, TIRED_DEN = 1, 4  # M3: multiplier of the excess
 SHORT_SECONDS = {'harvest': 1800, 'craft': 120}   # source -> "shorter than" threshold (catalog seconds)
-SOURCES = ('harvest', 'craft', 'animal', 'build', 'expand', 'order', 'quest', 'caravan', 'contract', 'trip', 'secret', 'field', 'oleg')
+SOURCES = ('harvest', 'craft', 'animal', 'build', 'expand', 'order', 'quest', 'caravan', 'contract', 'trip', 'secret', 'field', 'oleg', 'swans')
 
 
 def pace(lv):

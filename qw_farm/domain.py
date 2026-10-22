@@ -519,6 +519,8 @@ def project(farm, visitor, now):
         from . import minigames, oleg, expansion as _ex
         result['minigames']=minigames.public(farm,now)
         result['oleg_game']=oleg.public(farm,now)
+        from . import swans
+        result['swans']=swans.public(farm,now)
         result['home_projects']=projects.owner_state(farm)
         for o in result['objects']:
             if o['type'] in _ex.WORKSHOP_TYPES:o.setdefault('recipes_memory',[])

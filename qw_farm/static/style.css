@@ -537,11 +537,11 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .vm-npc.has-order{width:11px;height:11px;background:#f6c752;border:2px solid #fff;box-shadow:0 0 0 1.5px #c78a2e}
 .vm-player{width:10px;height:10px;background:#3b8fd6;border:2px solid #fff;box-shadow:0 0 0 1.5px #1c5b96;transition-property:left,top;transition-timing-function:linear;z-index:2}
 .vm-frame{position:absolute;box-sizing:border-box;border:2px solid #fff;box-shadow:0 0 0 1px #3b5b45;border-radius:3px;pointer-events:none;background:#ffffff22}
-.village-player{position:absolute;width:30px;height:44px;transform:translate(-50%,-88%);z-index:4;pointer-events:none;transition-property:left,top;transition-timing-function:linear}
-.vp-shadow{position:absolute;left:2px;right:2px;bottom:0;height:9px;border-radius:50%;background:#2c4a3035}
-.vp-body{position:absolute;left:7px;bottom:6px;width:16px;height:19px;box-sizing:border-box;border-radius:7px 7px 4px 4px;background:#4e8fc0;border:2px solid #fff}
-.vp-head{position:absolute;left:9px;bottom:23px;width:12px;height:12px;box-sizing:border-box;border-radius:50%;background:#f1cfa6;border:1.5px solid #fff}
-.vp-hat{position:absolute;left:3px;bottom:31px;width:24px;height:8px;box-sizing:border-box;border-radius:50%;background:#e1c36a;border:1.5px solid #8d7550}
+.village-player{position:absolute;width:39px;height:60px;transform:translate(-50%,-92.3%);z-index:4;pointer-events:none;transition-property:left,top;transition-timing-function:linear}
+/* The player's figure (VILLAGE_PLAYER_SVG): feet on the position point, mirrored when walking left; one frame at a time. */
+.village-player .vp-art{display:block;width:100%;height:100%;overflow:visible}
+.village-player[data-face=left] .vp-art{transform:scaleX(-1)}
+.vp-stepA,.vp-stepB{display:none}
 .village-gate{position:absolute;transform:translate(-50%,-50%);box-sizing:border-box;min-width:44px;min-height:44px;margin:0;padding:0;background:transparent;border:0;border-radius:8px;cursor:pointer;z-index:6;-webkit-tap-highlight-color:transparent;pointer-events:none}
 /* The sign itself is the control and never leaves its posts: the global button:hover lift would replace the centring transform. */
 .village-gate:hover:not(:disabled),.village-gate:active{transform:translate(-50%,-50%);filter:none}
@@ -581,8 +581,9 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 :root[data-farm-theme=night] :is(.village-place,.village-site){background:var(--float);border-color:var(--line);color:var(--ink)}
 @media(max-width:480px){.village-minimap{width:112px;right:8px;bottom:8px}}
 @media(prefers-reduced-motion:no-preference){
- .is-walking .vp-body{animation:vp-step .28s ease-in-out infinite alternate}
- @keyframes vp-step{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+ .is-walking .vp-stand{display:none}
+ .is-walking :is(.vp-stepA,.vp-stepB){display:inline;animation:vp-frame .36s steps(1,end) infinite}.is-walking .vp-stepB{animation-delay:-.18s}
+ @keyframes vp-frame{0%{opacity:1}50%{opacity:0}}
  .is-walking{animation:vp-hop .28s ease-in-out infinite alternate}
  @keyframes vp-hop{from{margin-top:0}to{margin-top:-3px}}
 }
@@ -878,6 +879,26 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 @media(max-width:520px){.tg-controls{flex-wrap:wrap}.tg-big{flex-basis:100%;min-height:68px}.tg-controls .fg-act:not(.tg-big){flex:1 1 40%}}
 @media(prefers-reduced-motion:reduce){.tg-overlay *{transition:none!important}}
 :root[data-farm-theme=night] .tg-big{background:var(--green);color:var(--accent-ink)}
+/* fishing v2: the big button is held to reel (no text selection or callout on a long press); it turns warm when the line is red */
+.tg-big{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;transition:background .12s,transform .08s}
+.tg-big.tg-hold{transform:scale(.985);box-shadow:inset 0 3px 0 #0002}
+.tg-big.tg-hot,:root[data-farm-theme=night] .tg-big.tg-hot{background:#c9632f;border-color:#a44d22;color:#fff}
+.tg-intro{text-align:left}.tg-intro h2{text-align:center}.tg-intro p{margin:6px 0;font-size:14px}
+.tg-sky{font-weight:700;color:var(--green2)}:root[data-farm-theme=night] .tg-sky{color:var(--ink)}
+.tg-label{margin:10px 0 4px!important;font-size:12px!important;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tg-baits{flex-wrap:wrap;--qw-game-accent-fill:var(--green);--qw-game-accent-ink:#fff;--qw-game-muted:var(--ink);--qw-game-line:var(--line)}
+:root[data-farm-theme=night] .tg-baits{--qw-game-accent-ink:var(--accent-ink)}.tg-baits>button{min-height:44px;padding:4px 8px;font-size:13px}.tg-baits>button:disabled{opacity:.45}
+.tg-intro .qw-btn-stack{margin-top:12px}.tg-intro .qw-btn-stack .wide{margin-top:0}
+.tg-catch{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:4px;font-weight:650}
+.tg-catch li.rare{color:#9a6a12}:root[data-farm-theme=night] .tg-catch li.rare{color:#f1cf75}
+.tg-new{font-size:12px;font-weight:700;color:var(--green2);margin-left:4px}
+/* «Журнал улова» card of the lake panel */
+.fish-journal{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:8px 0 0;padding:0;list-style:none}
+.fish-journal li{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:12px;font-size:13px;line-height:1.3}
+.fish-journal li svg{flex:0 0 36px;width:36px;height:36px}
+.fish-journal li.unknown svg{filter:grayscale(1) brightness(.45);opacity:.5}
+.fish-journal li.rare{border-color:#e0b850}
+.fish-journal b{display:block;font-size:13px}.fish-journal small{font-size:12px;color:var(--muted)}
 /* header buttons (fullscreen / menu) must not touch on narrow phones */
 @media(max-width:420px){.topbar>.header-actions,.header-actions{gap:6px}}
 

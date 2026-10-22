@@ -4,7 +4,7 @@ import {mountOlegGame} from './oleg-game.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame,yieldQty,growthPermille} from './tractor_game.js';
-import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality} from './trip_game.js';
+import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js';
 import {CLASS_LABEL,LONG_HINT,seedStats,sortSeeds,planMachine,planRepeat,planTap,remember} from './farm_runs.js';
 import {parseInvite,parseInviteHint,incomingInvite,clearInvite,openTelegram,shareLink,mailtoUrl} from './invite.js';
 // The Telegram bridge (SDK, safe-area, fullscreen, BackButton, header colors) is the shared shell: window.QW from /app/shell/qw-shell.js.
@@ -73,6 +73,12 @@ const VILLAGE_C=[1200,716],VILLAGE_START=[42,77.3],VILLAGE_GATE=[50,83.1],VILLAG
 // (CSS shows one); only the board's own shape (.vg-hit, 4 units of margin) takes taps. Box: centre x, y, width, height in % of the world.
 const VILLAGE_GATE_BOARD=[50.021,80.167,3.625,4.333];
 const VILLAGE_GATE_SIGN='<svg class="vg-sign" viewBox="1157 1404 87 78" aria-hidden="true" focusable="false"><g class="vg-day"><defs><linearGradient id="vgd0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="26"><stop offset="0" stop-color="#f1dfb2"/><stop offset="1" stop-color="#dcc08c"/></linearGradient></defs><path d="M3 3L75 3L78 7L78 25L75 29L3 29L0 25L0 7Z" fill="#a58559" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="url(#vgd0)" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="none" stroke="#8d6c45" stroke-width="1.5" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 3.5L73 3.5" fill="none" stroke="#fff3cf" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 22.5L73 22.5" fill="none" stroke="#bd9a64" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 5A1.1 1.1 0 1 0 5.6 5A1.1 1.1 0 1 0 3.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 5A1.1 1.1 0 1 0 74.6 5A1.1 1.1 0 1 0 72.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 21A1.1 1.1 0 1 0 5.6 21A1.1 1.1 0 1 0 3.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 21A1.1 1.1 0 1 0 74.6 21A1.1 1.1 0 1 0 72.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><text x="33.6" y="19.56" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#fff0c6" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><text x="33" y="18.76" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#4d3c27" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><path d="M64 9L72 17" fill="none" stroke="#4d3c27" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M66.8 17L72 17L72 11.8" fill="none" stroke="#4d3c27" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/></g><g class="vg-night"><defs><linearGradient id="vgn0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="26"><stop offset="0" stop-color="#dcc48f"/><stop offset="1" stop-color="#c3a676"/></linearGradient></defs><path d="M3 3L75 3L78 7L78 25L75 29L3 29L0 25L0 7Z" fill="#7d6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="url(#vgn0)" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="none" stroke="#8d6c45" stroke-width="1.5" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 3.5L73 3.5" fill="none" stroke="#fff3cf" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 22.5L73 22.5" fill="none" stroke="#bd9a64" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 5A1.1 1.1 0 1 0 5.6 5A1.1 1.1 0 1 0 3.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 5A1.1 1.1 0 1 0 74.6 5A1.1 1.1 0 1 0 72.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 21A1.1 1.1 0 1 0 5.6 21A1.1 1.1 0 1 0 3.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 21A1.1 1.1 0 1 0 74.6 21A1.1 1.1 0 1 0 72.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><text x="33.6" y="19.56" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#fff0c6" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><text x="33" y="18.76" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#2f2617" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><path d="M64 9L72 17" fill="none" stroke="#2f2617" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M66.8 17L72 17L72 11.8" fill="none" stroke="#2f2617" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/></g><path class="vg-hit" d="M1157.15 1447.32L1243.15 1404.32L1243.15 1438.32L1157.15 1481.32Z" fill="transparent"/></svg>';
+// The player's figure (scripts/art/village/player.js, generated: rebuild with build_village.py, copy out/player.svg): frames
+// vp-stand / vp-stepA / vp-stepB facing right; style.css shows one and mirrors it for data-face=left.
+const VILLAGE_PLAYER_SVG='<svg class="vp-art" viewBox="-17 -48 34 52" aria-hidden="true" focusable="false"><g class="vp-stand"><path d="M-8 0.6A9.5 3 0 1 0 11 0.6A9.5 3 0 1 0 -8 0.6Z" fill="#41623530"/><path d="M-1.6 -9L-2.8 -1.4" fill="none" stroke="#7fa3c4" stroke-width="4.2" stroke-linecap="round"/><path d="M-5.3 -1A2.9 1.7 0 1 0 0.5 -1A2.9 1.7 0 1 0 -5.3 -1Z" fill="#6f5a46"/><path d="M-4.6 -18.5L-6.6 -11.5" fill="none" stroke="#efdcb4" stroke-width="3.3" stroke-linecap="round"/><path d="M-8.5 -11A1.9 1.9 0 1 0 -4.7 -11A1.9 1.9 0 1 0 -8.5 -11Z" fill="#f3d3b0"/><path d="M-6.8 -17A6.8 6.6 0 1 0 6.8 -17A6.8 6.6 0 1 0 -6.8 -17Z" fill="#efdcb4"/><path d="M-7.4 -12.2A7.4 6.8 0 1 0 7.4 -12.2A7.4 6.8 0 1 0 -7.4 -12.2Z" fill="#7fa3c4"/><path d="M-4.4 -19.6L4.4 -19.6L4.8 -12L-4.8 -12Z" fill="#8fb2cf"/><path d="M-3.6 -19.4L-4.6 -22" fill="none" stroke="#6d90b0" stroke-width="1.4" stroke-linecap="round"/><path d="M3.6 -19.4L4.6 -22" fill="none" stroke="#6d90b0" stroke-width="1.4" stroke-linecap="round"/><path d="M-3.4 -18.2A0.8 0.8 0 1 0 -1.8 -18.2A0.8 0.8 0 1 0 -3.4 -18.2Z" fill="#e8d9a8"/><path d="M1.8 -18.2A0.8 0.8 0 1 0 3.4 -18.2A0.8 0.8 0 1 0 1.8 -18.2Z" fill="#e8d9a8"/><path d="M1.6 -9L2.8 -1.4" fill="none" stroke="#7fa3c4" stroke-width="4.2" stroke-linecap="round"/><path d="M0.5 -1A2.9 1.7 0 1 0 6.3 -1A2.9 1.7 0 1 0 0.5 -1Z" fill="#6f5a46"/><path d="M4.6 -18.5L6.6 -11.5" fill="none" stroke="#efdcb4" stroke-width="3.3" stroke-linecap="round"/><path d="M4.7 -11A1.9 1.9 0 1 0 8.5 -11A1.9 1.9 0 1 0 4.7 -11Z" fill="#f3d3b0"/><path d="M-6 -27A6.6 6.6 0 1 0 7.2 -27A6.6 6.6 0 1 0 -6 -27Z" fill="#f3d3b0"/><path d="M-7 -28.6A3.2 3.4 0 1 0 -0.6 -28.6A3.2 3.4 0 1 0 -7 -28.6Z" fill="#a8724a"/><path d="M2.2 -25.4A1.7 1.1 0 1 0 5.6 -25.4A1.7 1.1 0 1 0 2.2 -25.4Z" fill="#efb4a0"/><path d="M2.4 -27.8A0.9 1.15 0 1 0 4.2 -27.8A0.9 1.15 0 1 0 2.4 -27.8Z" fill="#3d4a3f"/><path d="M-10 -31A10.6 2.6 0 1 0 11.2 -31A10.6 2.6 0 1 0 -10 -31Z" fill="#cfae58"/><path d="M-10 -31.6A10.6 3 0 1 0 11.2 -31.6A10.6 3 0 1 0 -10 -31.6Z" fill="#e3c56f"/><path d="M-5 -32.4A5.6 1.5 0 1 0 6.2 -32.4A5.6 1.5 0 1 0 -5 -32.4Z" fill="#c98a5a"/><path d="M-5.2 -35A5.8 4 0 1 0 6.4 -35A5.8 4 0 1 0 -5.2 -35Z" fill="#ecd283"/><path d="M-3.4 -35.8A2.2 1.2 0 1 0 1 -35.8A2.2 1.2 0 1 0 -3.4 -35.8Z" fill="#f4e2a4"/></g><g class="vp-stepA"><path d="M-8 0.6A9.5 3 0 1 0 11 0.6A9.5 3 0 1 0 -8 0.6Z" fill="#41623530"/><path d="M-1.6 -9.8L-5.2 -3" fill="none" stroke="#7fa3c4" stroke-width="4.2" stroke-linecap="round"/><path d="M-7.7 -2.6A2.9 1.7 0 1 0 -1.9 -2.6A2.9 1.7 0 1 0 -7.7 -2.6Z" fill="#6f5a46"/><path d="M-4.6 -19.3L-3.4 -12.3" fill="none" stroke="#efdcb4" stroke-width="3.3" stroke-linecap="round"/><path d="M-5.3 -11.8A1.9 1.9 0 1 0 -1.5 -11.8A1.9 1.9 0 1 0 -5.3 -11.8Z" fill="#f3d3b0"/><path d="M-6.8 -17.8A6.8 6.6 0 1 0 6.8 -17.8A6.8 6.6 0 1 0 -6.8 -17.8Z" fill="#efdcb4"/><path d="M-7.4 -13A7.4 6.8 0 1 0 7.4 -13A7.4 6.8 0 1 0 -7.4 -13Z" fill="#7fa3c4"/><path d="M-4.4 -20.4L4.4 -20.4L4.8 -12.8L-4.8 -12.8Z" fill="#8fb2cf"/><path d="M-3.6 -20.2L-4.6 -22.8" fill="none" stroke="#6d90b0" stroke-width="1.4" stroke-linecap="round"/><path d="M3.6 -20.2L4.6 -22.8" fill="none" stroke="#6d90b0" stroke-width="1.4" stroke-linecap="round"/><path d="M-3.4 -19A0.8 0.8 0 1 0 -1.8 -19A0.8 0.8 0 1 0 -3.4 -19Z" fill="#e8d9a8"/><path d="M1.8 -19A0.8 0.8 0 1 0 3.4 -19A0.8 0.8 0 1 0 1.8 -19Z" fill="#e8d9a8"/><path d="M1.6 -9.8L5.6 -1.4" fill="none" stroke="#7fa3c4" stroke-width="4.2" stroke-linecap="round"/><path d="M3.3 -1A2.9 1.7 0 1 0 9.1 -1A2.9 1.7 0 1 0 3.3 -1Z" fill="#6f5a46"/><path d="M4.6 -19.3L8.4 -12.3" fill="none" stroke="#efdcb4" stroke-width="3.3" stroke-linecap="round"/><path d="M6.5 -11.8A1.9 1.9 0 1 0 10.3 -11.8A1.9 1.9 0 1 0 6.5 -11.8Z" fill="#f3d3b0"/><path d="M-6 -27.8A6.6 6.6 0 1 0 7.2 -27.8A6.6 6.6 0 1 0 -6 -27.8Z" fill="#f3d3b0"/><path d="M-7 -29.4A3.2 3.4 0 1 0 -0.6 -29.4A3.2 3.4 0 1 0 -7 -29.4Z" fill="#a8724a"/><path d="M2.2 -26.2A1.7 1.1 0 1 0 5.6 -26.2A1.7 1.1 0 1 0 2.2 -26.2Z" fill="#efb4a0"/><path d="M2.4 -28.6A0.9 1.15 0 1 0 4.2 -28.6A0.9 1.15 0 1 0 2.4 -28.6Z" fill="#3d4a3f"/><path d="M-10 -31.8A10.6 2.6 0 1 0 11.2 -31.8A10.6 2.6 0 1 0 -10 -31.8Z" fill="#cfae58"/><path d="M-10 -32.4A10.6 3 0 1 0 11.2 -32.4A10.6 3 0 1 0 -10 -32.4Z" fill="#e3c56f"/><path d="M-5 -33.2A5.6 1.5 0 1 0 6.2 -33.2A5.6 1.5 0 1 0 -5 -33.2Z" fill="#c98a5a"/><path d="M-5.2 -35.8A5.8 4 0 1 0 6.4 -35.8A5.8 4 0 1 0 -5.2 -35.8Z" fill="#ecd283"/><path d="M-3.4 -36.6A2.2 1.2 0 1 0 1 -36.6A2.2 1.2 0 1 0 -3.4 -36.6Z" fill="#f4e2a4"/></g><g class="vp-stepB"><path d="M-8 0.6A9.5 3 0 1 0 11 0.6A9.5 3 0 1 0 -8 0.6Z" fill="#41623530"/><path d="M-1.6 -9L-1.2 -1.4" fill="none" stroke="#7fa3c4" stroke-width="4.2" stroke-linecap="round"/><path d="M-3.7 -1A2.9 1.7 0 1 0 2.1 -1A2.9 1.7 0 1 0 -3.7 -1Z" fill="#6f5a46"/><path d="M-4.6 -18.5L-8.2 -11.5" fill="none" stroke="#efdcb4" stroke-width="3.3" stroke-linecap="round"/><path d="M-10.1 -11A1.9 1.9 0 1 0 -6.3 -11A1.9 1.9 0 1 0 -10.1 -11Z" fill="#f3d3b0"/><path d="M-6.8 -17A6.8 6.6 0 1 0 6.8 -17A6.8 6.6 0 1 0 -6.8 -17Z" fill="#efdcb4"/><path d="M-7.4 -12.2A7.4 6.8 0 1 0 7.4 -12.2A7.4 6.8 0 1 0 -7.4 -12.2Z" fill="#7fa3c4"/><path d="M-4.4 -19.6L4.4 -19.6L4.8 -12L-4.8 -12Z" fill="#8fb2cf"/><path d="M-3.6 -19.4L-4.6 -22" fill="none" stroke="#6d90b0" stroke-width="1.4" stroke-linecap="round"/><path d="M3.6 -19.4L4.6 -22" fill="none" stroke="#6d90b0" stroke-width="1.4" stroke-linecap="round"/><path d="M-3.4 -18.2A0.8 0.8 0 1 0 -1.8 -18.2A0.8 0.8 0 1 0 -3.4 -18.2Z" fill="#e8d9a8"/><path d="M1.8 -18.2A0.8 0.8 0 1 0 3.4 -18.2A0.8 0.8 0 1 0 1.8 -18.2Z" fill="#e8d9a8"/><path d="M1.6 -9L1.6 -2.6" fill="none" stroke="#7fa3c4" stroke-width="4.2" stroke-linecap="round"/><path d="M-0.7 -2.2A2.9 1.7 0 1 0 5.1 -2.2A2.9 1.7 0 1 0 -0.7 -2.2Z" fill="#6f5a46"/><path d="M4.6 -18.5L4.2 -11.5" fill="none" stroke="#efdcb4" stroke-width="3.3" stroke-linecap="round"/><path d="M2.3 -11A1.9 1.9 0 1 0 6.1 -11A1.9 1.9 0 1 0 2.3 -11Z" fill="#f3d3b0"/><path d="M-6 -27A6.6 6.6 0 1 0 7.2 -27A6.6 6.6 0 1 0 -6 -27Z" fill="#f3d3b0"/><path d="M-7 -28.6A3.2 3.4 0 1 0 -0.6 -28.6A3.2 3.4 0 1 0 -7 -28.6Z" fill="#a8724a"/><path d="M2.2 -25.4A1.7 1.1 0 1 0 5.6 -25.4A1.7 1.1 0 1 0 2.2 -25.4Z" fill="#efb4a0"/><path d="M2.4 -27.8A0.9 1.15 0 1 0 4.2 -27.8A0.9 1.15 0 1 0 2.4 -27.8Z" fill="#3d4a3f"/><path d="M-10 -31A10.6 2.6 0 1 0 11.2 -31A10.6 2.6 0 1 0 -10 -31Z" fill="#cfae58"/><path d="M-10 -31.6A10.6 3 0 1 0 11.2 -31.6A10.6 3 0 1 0 -10 -31.6Z" fill="#e3c56f"/><path d="M-5 -32.4A5.6 1.5 0 1 0 6.2 -32.4A5.6 1.5 0 1 0 -5 -32.4Z" fill="#c98a5a"/><path d="M-5.2 -35A5.8 4 0 1 0 6.4 -35A5.8 4 0 1 0 -5.2 -35Z" fill="#ecd283"/><path d="M-3.4 -35.8A2.2 1.2 0 1 0 1 -35.8A2.2 1.2 0 1 0 -3.4 -35.8Z" fill="#f4e2a4"/></g></svg>';
+// Walk graph of the village (generated: manifest.walk of scripts/art/village/build_village.py, format in its README):
+// n = node x,y pairs and z = walkable quads in world units (2400x1800), e = node index pairs, a = approach node per target.
+const VILLAGE_WALK={n:[77,365,2323,365,1920,427,1922,428,1874,452,287,471,2113,471,2060,497,498,576,1902,576,1218,602,1176,605,709,681,1691,681,1408,698,1390,707,1533,760,1056,767,919,787,586,813,510,814,609,825,547,832,595,832,1016,835,1384,835,656,848,989,848,489,861,1068,861,946,870,1042,874,1279,888,1502,891,480,892,1499,892,476,898,485,900,986,900,884,901,988,901,1305,901,1516,901,1174,914,1226,914,1331,914,750,922,1308,925,937,927,1147,927,1253,927,1358,927,963,940,1437,940,1095,953,1200,953,1305,953,1411,953,1279,966,1042,980,1147,980,1358,980,1200,985,1179,995,1209,1002,1200,1006,797,1012,1586,1015,809,1017,1147,1032,1231,1043,1895,1044,1174,1045,1745,1055,1194,1056,1200,1059,1186,1060,358,1067,1706,1074,1077,1094,1334,1094,645,1099,1770,1107,1010,1109,674,1114,1029,1118,1814,1129,533,1155,1253,1164,1235,1173,884,1190,1323,1217,1639,1217,2007,1225,323,1260,744,1260,2156,1300,1656,1325,2095,1331,919,1348,112,1366,959,1368,1057,1374,1797,1383,1937,1383,1008,1391,1007,1392,1013,1395,42,1401,2358,1401,830,1433,1200,1474,1186,1481,1340,1559,1551,1664,1762,1769],e:[0,5,1,6,2,3,3,4,3,7,5,8,6,7,7,9,8,12,9,13,10,11,10,14,12,18,13,16,14,15,14,16,16,25,17,18,18,24,19,21,19,22,20,22,21,23,21,26,22,28,24,27,25,35,27,30,27,31,28,34,29,31,31,40,32,41,33,35,34,36,35,42,36,37,36,77,38,40,39,46,39,48,40,48,41,45,41,50,42,53,43,49,44,50,45,47,45,51,48,52,49,54,49,55,50,55,50,56,51,56,51,57,52,59,52,68,53,57,53,67,54,59,54,60,55,60,56,58,56,61,57,61,59,69,60,63,61,70,62,63,63,65,64,65,65,69,66,68,67,78,68,81,69,72,70,75,70,80,71,82,72,74,72,79,73,78,74,75,74,76,77,87,78,82,79,85,79,89,81,84,81,87,82,86,83,85,85,90,86,92,86,93,87,94,87,95,88,89,89,91,90,95,93,96,94,100,95,99,96,98,96,109,97,103,98,104,99,101,100,108,101,106,101,110,102,107,103,104,105,106,106,107,107,112,111,112,112,113,113,114,114,115],a:{"gate":111,"hall":62,"place:board":47,"place:library":15,"place:market":38,"place:pier":20,"place:post":46,"place:workshop":71,"start":105,"visitor:0":102,"visitor:1":76,"visitor:2":37,"visitor:3":84,"Агата":33,"Кошка Кая":23,"Кошка Соня":80,"Лиса Даша":97,"Медведь Пух":110,"Механик Крот":73,"Неведома Зверушка":4,"Петух Олег":11,"Почтальон Ёж":66,"Суслик Игорь":83,"Филиныч":17},z:[[33,308,1025,804,954,839,-37,343],[2367,308,2437,343,1446,839,1376,804],[919,927,989,962,33,1440,-37,1405],[1481,927,2437,1405,2367,1440,1411,962],[1130,1032,1200,1067,814,1260,744,1225],[393,1050,1858,1783,1788,1818,323,1085],[1235,594,1516,734,1481,752,1200,611],[1902,401,2042,471,2007,488,1867,418],[603,804,744,874,709,892,568,822],[1130,1103,1340,1208,1305,1225,1095,1120],[1411,1067,1446,1085,1270,1173,1235,1155],[1762,1138,1797,1155,1586,1260,1551,1243],[1200,716,1551,892,1200,1067,849,892],[600,592,754,669,684,704,530,627]]};
 // River-mill water wheel (overshot): it stands in the plane of the mill's long wall (iso 1:-0.5, the axle painted in village.svg runs
 // into that wall) with its hub on the axle end (731.7, 555) and its lower paddles in the race. The flume ends at the wheel's
 // top on the tower side; its water arcs over the top and lands on the far paddles, so the top turns away from the flume
@@ -96,7 +102,7 @@ const VILLAGE_WHEEL_SVG=(()=>{
  +'<path d="M13.6 -28.2C9 -33.5 0 -34 -5.5 -28.5" fill="none" stroke="#bfe0de" stroke-width="3" stroke-linecap="round" opacity=".9"/><path d="M12 -29.6C8 -32.4 1 -32.8 -3.6 -29.8" fill="none" stroke="#f1f9f7" stroke-width=".9" stroke-linecap="round"/>'
  +'<circle cx="-8.4" cy="-24.6" r="1.1" fill="#d7eae6"/><circle cx="-6.6" cy="-21.4" r=".85" fill="#d7eae6"/></g></g></svg>';
 })();
-let villagePos=[...VILLAGE_START],villageWalkToken=0,villageDragged=false,villageMini=null;
+const VILLAGE_SPEED=260,VILLAGE_MAX_WALK=7;let villageWalkRaf=0,villageWalkPlayer=null;let villagePos=[...VILLAGE_START],villageWalkToken=0,villageDragged=false,villageMini=null;
 // Living village: idle thought, stroll offset in px (x, y) per resident. Motion is pure CSS, no timers.
 const VILLAGE_LIFE={'Филиныч':['📚',52,26],'Агата':['🍞',-50,-25],'Почтальон Ёж':['✉️',52,-26],'Механик Крот':['🔧',-50,-25],'Кошка Кая':['🐟',-48,-10],'Кошка Соня':['💤',44,22],'Суслик Игорь':['🌰',-44,22],'Неведома Зверушка':['❓',48,24],'Медведь Пух':['🥤',46,-22],'Лиса Даша':['🪙',-40,18],'Петух Олег':['🌾',36,-12]};
 // Chimney tops (smoke puffs) exported from the same render as village.svg.
@@ -307,7 +313,7 @@ function readySnapshot(){
   (S.me?.fields||[]).map(f=>[due(f.crop?.ready_at),due(f.run?.done_at),due(f.run?.expires_at)]),
   due(S.me?.economy_status?.feast_until),
   S.tab==='village'?Math.max(0,Math.ceil(((S.me?.economy_status?.season_ends_at||t)-t)/86400)):null,
-  due(S.me?.market?.caravan_next_at),
+  due(S.me?.market?.caravan_next_at),due(S.me?.swans?.next_at),
   Object.values(S.me?.minigames||{}).map(game=>[due(game.available_at),game.active?due(game.active.expires_at):false]),
   Math.floor((t+10800)/86400)
  ]);
@@ -423,7 +429,7 @@ function renderRail(){
 function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
 function exitVillage(){villageSheet=null;selectTab('orders');closePanel();}
 function returnToFarm(){if(villageVisible())exitVillage();else backHome();}
-function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkToken++;syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
+function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkStop();syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
 function openVillageTownHall(section=null){if(!villageVisible())selectTab('village');villageResident=null;villageSheet='townhall';showPanel();renderPanel();const title=$('panel-head').querySelector('h2');if(title){title.tabIndex=-1;title.focus({preventScroll:true});}if(section){const details=[...$('panel-content').querySelectorAll('.village-services')].find(n=>n.dataset.villageService===section);if(details){details.open=true;details.scrollIntoView({block:'nearest'});}}}
 function syncScenePause(){scene.setPaused(!!S.fieldGame||villageVisible());}
 function villageVisible(){return !!S.me&&S.tab==='village';}
@@ -1012,7 +1018,40 @@ function renderArbor(p){
 function renderLake(p){
  heading('Озеро','ТИХАЯ ВОДА, ХОРОШИЙ УЛОВ');
  note('Рыбачить можно прямо с берега. Причал строится у Филиныча: собери материалы проекта в складе и заверши этап в доме.',p);
+ renderSwans(p);
  renderTrips(p,'fishing');
+ renderFishJournal(p);
+}
+// «Журнал улова» (FARM_TRIP_MINIGAMES.md §10.5): owner-only, written by the server when a played fishing game lands fish.
+// Rare fish live only here: they are never items and never sold.
+function renderFishJournal(p){
+ const f2=S.catalog?.trip_games?.fish2;if(!f2||!S.me)return;
+ const j=S.me.fish_journal||{},ids=Object.keys(f2.species),got=ids.filter(id=>j[id]);
+ const place=id=>{const rid=Object.keys(f2.routes).find(r=>f2.routes[r].rare===id);return S.catalog.routes[rid]?.name||'';};
+ const c=card('Журнал улова',`Поймано видов: ${got.length} из ${ids.length}`,'journal'),list=el('ul',null,'fish-journal');
+ for(const id of ids){
+  const sp=f2.species[id],row=j[id],li=el('li',null,`${row?'':'unknown'} ${sp.rare?'rare':''}`.trim()),text=el('div');
+  text.append(el('b',row||!sp.rare?sp.name:'Редкая рыба'),el('small',row?`${row.n} шт. · лучшая ${tripGrams(row.g)}`:sp.rare?`${place(id)} · на точный заброс`:'ещё не ловилась'));
+  li.append(icon(id),text);list.append(li);
+ }
+ c.append(el('p','Рыбачь сам, чтобы пополнить журнал: улов игры записывается сюда.','note'),list);p.append(c);
+}
+// Feeding the lake swans: the server owns cost, XP, the daily limit and the cooldown (S.me.swans); the scene only reacts.
+function swanFeedBlock(w,t,have){
+ if(!w.unlocked)return `Откроется с ${w.level} уровня`;
+ if(w.left<=0)return 'Сегодня лебеди сыты. Приходи завтра.';
+ if(w.next_at>t)return 'wait';
+ return have?'':'Не хватает зерна';
+}
+function renderSwans(p){
+ const w=S.me?.swans;if(!w)return;
+ const block=swanFeedBlock(w,now(),stock(w.item)>=w.cost),c=card('Лебеди',`Сегодня можно покормить: ${w.left} из ${w.daily_limit} · +${w.xp} опыта`,'swan');
+ c.append(el('p','Лебеди подплывают к берегу за зерном.','note'),goods({[w.item]:w.cost}));
+ const stack=el('div',null,'qw-btn-stack');
+ stack.append(button('Покормить лебедей',()=>command('feed_swans').then(ok=>{if(ok)scene.feedSwans?.();return ok;}),'qw-btn primary wide',!!block||S.busy));
+ if(block==='wait'){const hint=el('p','Лебеди ещё доедают · ','qw-btn-hint');hint.append(timer(w.next_at));stack.append(hint);}
+ else if(block)stack.append(el('p',block,'qw-btn-hint'));
+ c.append(stack);p.append(c);
 }
 function renderTrips(p,category){
  const fishing=category==='fishing';
@@ -1547,20 +1586,47 @@ function chooseVillageResident(npc){if(!villageNames().includes(npc))return;if(n
 // Camera: native scrolling of the scene container, smooth only on request and never under reduced motion.
 function villageCenter(pct,smooth){const r=$('village-scene');if(!r||!r.scrollWidth)return;const o={left:Math.max(0,pct[0]/100*r.scrollWidth-r.clientWidth/2),top:Math.max(0,pct[1]/100*r.scrollHeight-r.clientHeight/2),behavior:smooth&&!villageReduced()?'smooth':'auto'};if(r.scrollTo)r.scrollTo(o);else{r.scrollLeft=o.left;r.scrollTop=o.top;}}
 function villageFrame(){const r=$('village-scene');if(!villageMini?.frame||!r||!r.scrollWidth)return;const f=villageMini.frame;f.style.left=`${(r.scrollLeft/r.scrollWidth*100).toFixed(2)}%`;f.style.top=`${(r.scrollTop/r.scrollHeight*100).toFixed(2)}%`;f.style.width=`${Math.min(100,r.clientWidth/r.scrollWidth*100).toFixed(2)}%`;f.style.height=`${Math.min(100,r.clientHeight/r.scrollHeight*100).toFixed(2)}%`;}
-// Walk: one CSS transition on the player, duration from distance. done() runs on arrival (or at once for keyboard/instant/reduced motion).
-function villageWalk(target,done,instant=false){
- const world=$('village-scene')?.children?.[0],player=world?.querySelector?.('.village-player');
- if(!world||!player){villagePos=[...target];done?.();return;}
- const w=world.offsetWidth||1300,h=world.offsetHeight||975,dx=(target[0]-villagePos[0])*w/100,dy=(target[1]-villagePos[1])*h/100,dur=instant||villageReduced()?0:Math.min(7,Math.max(.35,Math.hypot(dx,dy)/170)),token=++villageWalkToken;
- villagePos=[...target];player.style.transitionDuration=`${dur}s`;player.style.left=`${target[0]}%`;player.style.top=`${target[1]}%`;
- if(dx)player.dataset.face=dx<0?'left':'right';player.classList.toggle('is-walking',dur>0);
- if(villageMini?.player){villageMini.player.style.transitionDuration=`${dur}s`;villageMini.player.style.left=`${target[0]}%`;villageMini.player.style.top=`${target[1]}%`;}
- villageCenter(target,dur>0);
- const finish=()=>{if(token!==villageWalkToken)return;player.classList.remove('is-walking');done?.();};
- if(dur>0&&typeof setTimeout==='function')setTimeout(finish,dur*1000+40);else finish();
+// Walk graph helpers (pure, world units 2400x1800). Snap a point to the nearest point of any edge (README algorithm).
+function villageSnap(W,x,y){let best=null;const n=W.n,e=W.e;for(let k=0;k<e.length;k+=2){const ax=n[2*e[k]],ay=n[2*e[k]+1],bx=n[2*e[k+1]],by=n[2*e[k+1]+1],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1))),qx=ax+t*dx,qy=ay+t*dy,d=Math.hypot(x-qx,y-qy);if(!best||d<best.d)best={k:k/2,a:e[k],b:e[k+1],t,x:qx,y:qy,d};}return best;}
+// A* over graph nodes plus temporary start/end nodes on their edges; returns the polyline [[x,y],...] (first = snapped start, last = snapped goal). `to` may be {node:i} for an approach node.
+function villagePlan(W,from,to){
+ const N=W.n.length/2,P=i=>i===N?[S.x,S.y]:i===N+1?[T.x,T.y]:[W.n[2*i],W.n[2*i+1]],at=(p,k)=>p.node!==undefined?{x:W.n[2*p.node],y:W.n[2*p.node+1],a:p.node,b:p.node,k}:villageSnap(W,p[0],p[1]);
+ if(!W._adj){W._adj=Array.from({length:N},()=>[]);for(let k=0;k<W.e.length;k+=2){const a=W.e[k],b=W.e[k+1],l=Math.hypot(W.n[2*a]-W.n[2*b],W.n[2*a+1]-W.n[2*b+1]);W._adj[a].push([b,l]);W._adj[b].push([a,l]);}}
+ const S=at(from,-1),T=at(to,-2),extra=new Map(),link=(i,j)=>{const p=P(i),q=P(j),l=Math.hypot(p[0]-q[0],p[1]-q[1]);for(const [u,v] of [[i,j],[j,i]]){if(!extra.has(u))extra.set(u,[]);extra.get(u).push([v,l]);}};
+ for(const a of new Set([S.a,S.b]))link(N,a);for(const a of new Set([T.a,T.b]))link(N+1,a);
+ if(S.k===T.k)link(N,N+1);
+ const nb=i=>i>=N?extra.get(i)||[]:W._adj[i].concat(extra.get(i)||[]),g=new Map([[N,0]]),prev=new Map(),open=[N],done=new Set(),h=i=>{const p=P(i);return Math.hypot(p[0]-T.x,p[1]-T.y);},f=new Map([[N,h(N)]]);
+ while(open.length){let bi=0;for(let i=1;i<open.length;i++)if(f.get(open[i])<f.get(open[bi]))bi=i;const u=open.splice(bi,1)[0];if(u===N+1)break;if(done.has(u))continue;done.add(u);for(const [v,l] of nb(u)){if(done.has(v))continue;const c=g.get(u)+l;if(!g.has(v)||c<g.get(v)){g.set(v,c);prev.set(v,u);f.set(v,c+h(v));if(!open.includes(v))open.push(v);}}}
+ if(!prev.has(N+1))return [[S.x,S.y]];
+ const pts=[];for(let i=N+1;i!==undefined;i=prev.get(i))pts.unshift(P(i));
+ return pts.filter((p,i)=>!i||p[0]!==pts[i-1][0]||p[1]!==pts[i-1][1]);
 }
-// Mouse click walks there first; keyboard / scripted click (detail 0) jumps and opens at once.
-function villageGo(target,open,e){if(!e||!e.detail){villageWalk(target,open,true);return;}villageWalk(target,open);}
+// Walk: constant speed along the planned polyline, one requestAnimationFrame chain (cancelled on re-plan and on leaving the village).
+function villageWalkStop(){villageWalkToken++;if(villageWalkRaf&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(villageWalkRaf);villageWalkRaf=0;villageWalkPlayer?.classList?.remove('is-walking');villageWalkPlayer=null;}
+function villageWalk(target,done,instant=false,key){
+ const world=$('village-scene')?.children?.[0],player=world?.querySelector?.('.village-player');
+ villageWalkStop();
+ if(!world||!player){villagePos=[...target];done?.();return;}
+ const W=VILLAGE_WALK,token=villageWalkToken,node=W.a[key],pts=villagePlan(W,[villagePos[0]*24,villagePos[1]*18],node!==undefined?{node}:[target[0]*24,target[1]*18]);
+ const put=(x,y)=>{villagePos=[x/24,y/18];for(const n of [player,villageMini?.player]){if(!n)continue;n.style.transitionDuration='0s';n.style.left=`${villagePos[0]}%`;n.style.top=`${villagePos[1]}%`;}};
+ const last=pts[pts.length-1],cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+ const len=cum[cum.length-1];
+ if(instant||villageReduced()||len<1||typeof requestAnimationFrame!=='function'){put(last[0],last[1]);villageCenter(villagePos,false);done?.();return;}
+ const speed=Math.max(VILLAGE_SPEED,len/VILLAGE_MAX_WALK);let seg=1,t0=null;
+ villageWalkPlayer=player;player.classList.add('is-walking');put(pts[0][0],pts[0][1]);
+ const face=i=>{const dx=pts[i][0]-pts[i-1][0];if(Math.abs(dx)>.5)player.dataset.face=dx<0?'left':'right';};face(1);
+ const frame=ts=>{
+  if(token!==villageWalkToken)return;villageWalkRaf=0;
+  if(t0===null)t0=ts;const d=Math.min(len,(ts-t0)/1000*speed);
+  while(seg<pts.length-1&&cum[seg]<d){seg++;face(seg);}
+  const a=pts[seg-1],b=pts[seg],l=cum[seg]-cum[seg-1]||1,k=Math.min(1,Math.max(0,(d-cum[seg-1])/l));put(a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k);villageCenter(villagePos,false);
+  if(d>=len){player.classList.remove('is-walking');villageWalkPlayer=null;done?.();return;}
+  villageWalkRaf=requestAnimationFrame(frame);
+ };
+ villageWalkRaf=requestAnimationFrame(frame);
+}
+// Mouse click walks there first; keyboard / scripted click (detail 0) jumps and opens at once. The button's data attribute names its graph approach point.
+function villageGo(target,open,e){const d=e?.currentTarget?.dataset||{},key=d.villageNpc||(d.villagePlace?'place:'+d.villagePlace:d.villageSpot!==undefined?'visitor:'+d.villageSpot:d.villageGate?'gate':d.villageTownhall?'hall':undefined);if(!e||!e.detail){villageWalk(target,open,true,key);return;}villageWalk(target,open,false,key);}
 function villageBindWorld(root){
  if(!root.addEventListener||root.dataset.villageBound)return;root.dataset.villageBound='1';let drag=null;
  root.addEventListener('pointerdown',e=>{villageDragged=false;if(e.pointerType!=='mouse'||e.button!==0)return;drag={x:e.clientX,y:e.clientY,l:root.scrollLeft,t:root.scrollTop};});
@@ -1592,7 +1658,7 @@ function villagePlaces(){
  const layer=el('div',null,'village-places');
  for(const [id,label,ic,x,y,tab] of VILLAGE_PLACES){const b=button(null,e=>villageGo([x,y+2.4],()=>selectTab(tab),e),'village-place');b.style.left=`${x}%`;b.style.top=`${y}%`;b.dataset.villagePlace=id;b.setAttribute('aria-label',label);b.title=label;b.append(icon(ic));layer.append(b);}
  for(const [label,x,y] of VILLAGE_SITES){const t=el('span',`Скоро · ${label}`,'village-site');t.setAttribute('aria-hidden','true');t.style.left=`${x}%`;t.style.top=`${y}%`;layer.append(t);}
- villageVisitorsToday().forEach(({v,spot},i)=>{const [id,name,face]=v,b=button(null,e=>villageGo([spot[0],spot[1]+1.6],()=>openVillageVisitor(id),e),'village-visitor va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;b.dataset.villageVisitor=id;b.setAttribute('aria-label',`${name}: гость деревни`);villageVars(b,{'--wx':`${i?-40:40}px`,'--wy':`${i?20:-20}px`,'--d':`${i*3}s`,'--cycle':`${19+i*4}s`,'--td':`${2+i*5}s`});
+ villageVisitorsToday().forEach(({v,spot},i)=>{const [id,name,face]=v,b=button(null,e=>villageGo([spot[0],spot[1]+1.6],()=>openVillageVisitor(id),e),'village-visitor va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;b.dataset.villageVisitor=id;b.dataset.villageSpot=String(VILLAGE_VISITOR_SPOTS.indexOf(spot));b.setAttribute('aria-label',`${name}: гость деревни`);villageVars(b,{'--wx':`${i?-40:40}px`,'--wy':`${i?20:-20}px`,'--d':`${i*3}s`,'--cycle':`${19+i*4}s`,'--td':`${2+i*5}s`});
   const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(el('span',face,'village-visitor-face'));b.append(walker);const say=el('span','💬','village-thought');say.setAttribute('aria-hidden','true');b.append(say);layer.append(b);});
  return layer;
 }
@@ -1605,14 +1671,14 @@ function villageBuildWorld(){
  VILLAGE_FLIES.forEach(([x,y],i)=>{const n=villageAt(el('i',null,'vn-fly va'),x,y);villageVars(n,{'--d':`${i*1.3}s`,'--fx':`${i%2?-30:26}px`,'--fy':`${i%3?-22:16}px`});night.append(n);});
  const actors=el('div',null,'village-actors');
  const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE_BOARD[0]}%`;gate.style.top=`${VILLAGE_GATE_BOARD[1]}%`;gate.style.width=`${VILLAGE_GATE_BOARD[2]}%`;gate.style.height=`${VILLAGE_GATE_BOARD[3]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','На ферму: ворота деревни');gate.title='На ферму';gate.innerHTML=VILLAGE_GATE_SIGN;
- const player=el('div',null,'village-player');player.setAttribute('aria-hidden','true');player.style.left=`${villagePos[0]}%`;player.style.top=`${villagePos[1]}%`;player.dataset.face='right';player.append(el('i',null,'vp-shadow'),el('i',null,'vp-body'),el('i',null,'vp-head'),el('i',null,'vp-hat'));
+ const player=el('div',null,'village-player');player.setAttribute('aria-hidden','true');player.style.left=`${villagePos[0]}%`;player.style.top=`${villagePos[1]}%`;player.dataset.face='right';player.innerHTML=VILLAGE_PLAYER_SVG;
  world.append(sun,villageFx(),night,villageWaterWheel(),actors,villagePlaces(),gate,player);
  return world;
 }
 function syncVillageScene(){
  let root=$('village-scene');if(!root){root=el('section',null,'village-scene');root.id='village-scene';root.setAttribute('aria-label','Деревенская площадь');root.tabIndex=0;document.querySelector('.scene-area').append(root);}
  let hud=$('village-hud');if(!hud){hud=el('div',null,'village-hud');hud.id='village-hud';document.querySelector('.scene-area').append(hud);}
- const visible=villageVisible(),entering=visible&&root.hidden===true;root.hidden=!visible;hud.hidden=!visible;document.body.classList.toggle('village-open',visible);$('farm-canvas').inert=visible;if(!visible){villageResident=null;villageSheet=null;}syncScenePause();if(!visible)return;
+ const visible=villageVisible(),entering=visible&&root.hidden===true;root.hidden=!visible;hud.hidden=!visible;document.body.classList.toggle('village-open',visible);$('farm-canvas').inert=visible;if(!visible){villageWalkStop();villageResident=null;villageSheet=null;}syncScenePause();if(!visible)return;
  villageBindWorld(root);if(entering)villageCenter(villagePos,false);
  if(!villageVisBound&&document.addEventListener){villageVisBound=true;document.addEventListener('visibilitychange',()=>$('village-scene')?.classList?.toggle('village-paused',document.hidden));}
  const names=villageNames(),stage=villageStage(),sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)]),villageQuestPhase(n)])]);if(sig===villageSceneSignature)return;villageSceneSignature=sig;
@@ -1792,6 +1858,7 @@ function launchTripGame(trip){
  const id=trip.id;
  S.fieldGame={};syncScenePause();
  try{S.fieldGame=openTripGame({trip,route:S.catalog.routes[trip.route],rules:S.catalog.trip_games,serverNow:now,itemName,timeText,
+  inventory:{...(S.me.inventory||{})},journal:{...(S.me.fish_journal||{})},
   onFinish:log=>command('trip_play',{trip:id,log}),
   tripNow:()=>(S.me.trips||[]).find(t=>t.id===id)||null,
   onClose:()=>{S.fieldGame=null;syncScenePause();navPop('minigame');if(['forest','lake'].includes(S.tab))renderPanel();}});

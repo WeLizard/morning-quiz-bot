@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import market, progression, economy, fields, projects, trip_games
+from . import market, progression, economy, fields, projects, trip_games, swans
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -37,6 +37,7 @@ SCHEMAS.update(market.SCHEMAS)  # r8: caravan_fill, contract_claim
 SCHEMAS.update(fields.SCHEMAS)  # r9 stage 15: buy_field, buy_machine, upgrade_machine, field_start, field_finish
 SCHEMAS.update(projects.SCHEMAS)
 SCHEMAS.update(trip_games.SCHEMAS)  # trip minigames: trip_play
+SCHEMAS.update(swans.SCHEMAS)  # lake swans: feed_swans
 
 
 def upgrade_state(farm):
@@ -58,6 +59,8 @@ def upgrade_state(farm):
     for key in ('automation', 'forages', 'fishing_trips', 'machine_runs', 'secrets'):
         farm['stats'].setdefault(key, 0)
     market.upgrade_market(farm)
+    swans.state(farm)
+    trip_games.upgrade(farm)    # open v1 fishing games -> v2 plan (FARM_TRIP_MINIGAMES.md 10.6)
     from . import village_quests
     village_quests.state(farm)
     for obj in farm.get('objects', []):
@@ -696,6 +699,8 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
             discover(farm, trip['secret'], now)
         farm['trips'].remove(trip)
         text = ('Улов отправлен на склад: ' if fishing else 'Лесная корзина разобрана: ') + ', '.join(f'{ITEMS[k]["name"]} ×{q}' for k, q in outputs.items()) + '.'
+    elif kind == 'feed_swans':
+        text = swans.feed(farm, now)
     elif kind == 'trip_play':
         text = trip_games.apply_play(farm, data, now)
     elif kind == 'abort_trip':
@@ -719,6 +724,7 @@ def validate_expansion(farm):
     market.validate_market(farm)
     fields.validate(farm)
     trip_games.validate(farm)
+    swans.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),
          'invalid_team', 'Некорректный состав команды.', 500)

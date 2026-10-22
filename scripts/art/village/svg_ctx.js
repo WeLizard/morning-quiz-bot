@@ -48,6 +48,13 @@ export class SvgCtx {
   // named groups, so a layer can show or animate parts of the drawing (class names only: no inline styles under the CSP)
   group(cls) { this.out.push(`<g class="${esc(cls)}">`) }
   end() { this.out.push('</g>') }
+  // a group whose content is cut away inside the polygons ([{x, y}] in the current space): a nearer house over a festival roof
+  groupClipOut(polys, R = 1e4) {
+    const id = `${this.prefix}${this.ids++}`, m = this.st.m, at = p => [m[0]*p.x+m[2]*p.y+m[4], m[1]*p.x+m[3]*p.y+m[5]];
+    const d = `M${-R} ${-R}H${R}V${R}H${-R}Z` + polys.map(q => 'M' + q.map(p => at(p).map(n).join(' ')).join('L') + 'Z').join('');
+    this.defs.push({id, svg: () => `<clipPath id="${id}" clipPathUnits="userSpaceOnUse"><path d="${d}" clip-rule="evenodd"/></clipPath>`});
+    this.out.push(`<g clip-path="url(#${id})">`);
+  }
   createLinearGradient(x0, y0, x1, y1) {
     const id = `${this.prefix}${this.ids++}`, stops = [];
     const g = {id, addColorStop: (o, c) => stops.push(`<stop offset="${n(o)}" stop-color="${c}"/>`)};

@@ -3,7 +3,7 @@
    Nothing here can change goods, timestamps or balances: it only reads the farm snapshot. */
 export const TW=36,TH=18;
 export const iso=(x,y,z=0)=>({x:(x-y)*TW,y:(x+y)*TH-z});
-export const CATEGORIES=[['plots','Грядки','#a9885b'],['animals','Животные','#e0a23f'],['workshops','Мастерские','#5f8fb8'],['decor','Декор','#86b363'],['other','Дом и склад','#b5675b']];
+export const CATEGORIES=[['plots','Грядки','#a9885b'],['orchard','Сад','#6f9a55'],['animals','Животные','#e0a23f'],['workshops','Мастерские','#5f8fb8'],['decor','Декор','#86b363'],['other','Дом и склад','#b5675b']];
 export const CATEGORY_COLOR=Object.fromEntries(CATEGORIES.map(([id,,color])=>[id,color]));
 
 /** Visible rectangle in world (isometric pixel) coordinates; `margin` is in screen pixels. */
@@ -16,6 +16,7 @@ export function objectBounds(o){
  const cx=((o.x+o.w/2)-(o.y+o.h/2))*TW,cy=((o.x+o.w/2)+(o.y+o.h/2))*TH;
  if(o.type==='road')return {x0:cx-38,x1:cx+38,y0:cy-20,y1:cy+20};
  if(o.type==='plot')return {x0:cx-46,x1:cx+46,y0:cy-66,y1:cy+28};
+ if(o.type==='tree')return {x0:cx-70,x1:cx+70,y0:cy-150,y1:cy+34};   // a crown taller than a bed, wider than a bush
  const half=(o.w+o.h)*TW/2+34;
  return {x0:cx-half,x1:cx+half,y0:cy-200,y1:cy+(o.w+o.h)*TH/2+56};
 }
@@ -125,7 +126,7 @@ export function placeHint(a,size,box,gap=8){
 }
 
 /* ---- what a building is for, generated from the catalog ---- */
-const PURPOSE_LEAD={mill:'Мелет урожай в муку и масло.',feedmill:'Готовит корм для животных.',bakery:'Печёт хлеб и сладкое.',kitchen:'Готовит блюда и варенье.',dairy:'Перерабатывает молочное.',loom:'Вяжет, набивает подушки и плетёт букеты.',spinnery:'Прядёт шерсть, пух и лён.',weavery:'Ткёт полотно, сукно и пледы.'};
+const PURPOSE_LEAD={mill:'Мелет урожай в муку и масло.',feedmill:'Готовит корм для животных.',bakery:'Печёт хлеб и сладкое.',kitchen:'Готовит блюда и варенье.',dairy:'Перерабатывает молочное.',loom:'Вяжет, набивает подушки и плетёт букеты.',spinnery:'Прядёт шерсть, пух и лён.',weavery:'Ткёт полотно, сукно и пледы.',dryer:'Сушит фрукты и делает пастилу.',cellar:'Выдерживает напитки и закуски «Ноль градусов»: градус только в названии.'};
 const uniq=a=>[...new Set(a)];
 const short=(a,max)=>a.slice(0,max).join(', ')+(a.length>max?' и др.':'');
 /** Up to two short lines: what the building makes, from what, and who or what needs it. [] for decor and plain houses. */
@@ -162,6 +163,7 @@ function animalBuildingSet(catalog){
 /** plots | animals | workshops | decor | other (house, barn). */
 export function categoryOf(o,catalog){
  if(o.type==='plot')return 'plots';
+ if(o.type==='tree')return 'orchard';
  if(o.type==='house'||o.type==='barn')return 'other';
  if(catalog?.buildings?.[o.type]?.decor)return 'decor';
  if(o.animal||animalBuildingSet(catalog).has(o.type))return 'animals';
@@ -171,6 +173,7 @@ export function categoryOf(o,catalog){
 export function readyInfo(o,t,catalog){
  const cat=categoryOf(o,catalog);
  if(cat==='decor'||cat==='other')return {state:'none',at:0};
+ if(cat==='orchard'){const f=o.fruit;if(!f)return {state:'idle',at:0};return f.ready_at<=t?{state:'ready',at:0}:{state:'busy',at:f.ready_at};}
  if(cat==='plots'){
   if(!o.crop)return {state:'idle',at:0};
   return o.crop.ready_at<=t?{state:'ready',at:0}:{state:'busy',at:o.crop.ready_at};

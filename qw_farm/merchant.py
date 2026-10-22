@@ -24,7 +24,7 @@ The client sends only the visit id, the slot number and the quantity; item, pric
 from hashlib import sha256
 import math
 
-from .catalog import ITEMS, CURIOS, CURIO_SERIES, SCROLL_RECIPES, RECIPES, EXOTIC_CROPS, DYES, MERCHANT, ORCHARD_ROWS, ORCHARD_WIRED, income_ref, level, tick
+from .catalog import ITEMS, CURIOS, CURIO_SERIES, SCROLL_RECIPES, RECIPES, EXOTIC_CROPS, DYES, MERCHANT, ORCHARD_ROWS, ORCHARD_WIRED, TREE_VOUCHER_DISCOUNT_PCT, income_ref, level, tick
 from .domain import need, inventory, pay
 from . import economy, festivals
 
@@ -138,8 +138,10 @@ def _entries():
                          limit=MERCHANT['limits']['curio'], cheap=False, series=c['series'], series_name=c['series_name'],
                          note=f'Диковинка серии «{c["series_name"]}». Один раз на ферму.'))
     for gid, name, kind, lv, k in ORCHARD_ROWS:
+        note = ('Меняет облик посаженного дерева. Урожай и место в саду прежние.' if kind == 'graft'
+                else f'Скидка {TREE_VOUCHER_DISCOUNT_PCT}% на саженец. Сажается во вкладке «Сад».')
         rows.append(dict(id=gid, kind=kind, item=gid, name=name, qty=1, min_level=lv, price=_k_price(k, lv), limit=MERCHANT['limits'][kind],
-                         cheap=False, wired=False, note='Ждёт сад.'))
+                         cheap=False, wired=ORCHARD_WIRED, note=note))
     return {r['id']: r for r in rows}
 
 
@@ -169,6 +171,8 @@ def _picks(day, avoid):
     # slot 0 is the cheap seed pack of a beginner; the other seed/dye slots never take a cheap pack, so a neighbouring visit always has a fresh one
     plan = [(('exotic_seed',), True), (('exotic_seed', 'dye'), False), (('scroll',), False), (('curio',), False), (('curio',), False),
             (('exotic_seed', 'dye', 'scroll'), False)]
+    if ORCHARD_WIRED and _h('magpie-orchard', day) % 2 == 0:    # every other visit the last slot carries something for the garden
+        plan[5] = (('graft', 'voucher'), False)
     used, out = set(), []
     for slot, (kinds, cheap) in enumerate(plan):
         pool = [e for e in _pool(kinds, series if kinds == ('curio',) else None) if e['cheap'] == cheap]
@@ -307,6 +311,9 @@ def buy(farm, data, now):
     if e['kind'] == 'scroll':
         need(e['recipe'] not in m['scrolls'], 'already_owned', 'Этот рецепт ты уже знаешь.')
     need(bought + qty <= e['limit'], 'limit_reached', 'На этот визит больше не продам.')
+    if e['kind'] == 'graft':
+        from . import orchard
+        need(orchard.can_buy_graft(farm, e['item']), 'no_tree', 'Прививка нужна для посаженного дерева: сначала посади его.')
     cost = e['price'] * qty
     pay(farm, cost)
     _enter(farm, visit)
@@ -377,7 +384,9 @@ def owner_view(farm, now):
         left = s['limit'] - bought.get(str(s['slot']), 0)
         owned = (s['kind'] == 'curio' and s['id'] in m['curios']) or (s['kind'] == 'scroll' and s['id'][7:] in m['scrolls'])
         s['left'] = max(0, left)
+        from . import orchard
         s['status'] = ('soon' if not s['wired'] else 'owned' if owned else 'locked' if lv < s['min_level'] else 'sold' if left <= 0
+                       else 'notree' if s['kind'] == 'graft' and not orchard.can_buy_graft(farm, s['id'])
                        else 'poor' if farm['coins'] < s['price'] else 'ok')
     sold = m['sold_value'] if live else 0
     view.update(bought=dict(bought), sold_value=sold, cap=cap(farm), curios=list(m['curios']), scrolls=list(m['scrolls']))

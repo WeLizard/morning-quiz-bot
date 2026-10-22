@@ -5,6 +5,11 @@ export const PREF_KEYS={decor:'qw-farm.festival-decor',scares:'qw-farm.festival-
 const KIND_LABEL={decor:'Декор',decor_big:'Крупный декор',wall:'На забор',roof:'На крышу',path:'Вдоль дорожки',village:'Для площади',mascot:'Маскот',tree_decor:'Декоративное дерево',voucher:'Талон сада',graft:'Прививка',scroll:'Свиток',curio:'Диковинка',keepsake:'Памятный предмет'};
 const SELLER_LABEL={agata:'Шатёр Агаты',sonya:'Лавка Сони',magpie:'Тележка Сороки',host:'Лавка хозяина праздника'};
 const SELLER_ORDER=['agata','sonya','magpie','host'];
+// Icons of festival items. An item without its own symbol in icons.svg borrows a neutral symbol of the same kind from the first
+// festival (nothing renders blank). When the artist draws icons.svg#<id>, delete the line here (tests/js/farm_festivals.test.cjs checks it).
+export const ICON_FALLBACK={
+};
+export function iconId(id){return Object.prototype.hasOwnProperty.call(ICON_FALLBACK,id)?ICON_FALLBACK[id]:id;}
 
 function readPref(key,store){try{return (store||globalThis.localStorage).getItem(key);}catch{return null;}}
 // Decorations are shown by default; the player may hide them (device setting, like the lighting mode).

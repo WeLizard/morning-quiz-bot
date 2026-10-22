@@ -71,7 +71,7 @@ def base_upkeep(farm):
     per_plot = plot_upkeep(size)
     total = 0
     for obj in farm['objects']:
-        if obj['type'] == 'plot':
+        if obj['type'] in ('plot', 'tree'):   # a tree stands on land like a bed: «земля под деревом»
             total += per_plot
             continue
         spec = BUILDINGS.get(obj['type'])

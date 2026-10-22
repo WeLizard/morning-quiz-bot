@@ -11,20 +11,28 @@
  "note": "Hashes of scripts/art/village/build_village.py output = qw_farm/static/village.svg as installed. Refresh on purpose after an approved art change.",
  "inputs": {
   "scripts/art/village/gate.js": "7b7a7a1f5f7f6db9",
-  "scripts/art/village/svg_ctx.js": "67cd8a033c05a735",
+  "scripts/art/village/svg_ctx.js": "fb1801443a6289cf",
   "scripts/art/village/walk.js": "2f8b62d68b3999c5",
   "scripts/art/village/player.js": "bcd5e9e6d8f689b7",
-  "scripts/art/village/fest_posidelki.js": "2ec9cfb7d4a9dad1",
+  "scripts/art/village/fest_posidelki.js": "d7747d2c8a6d5740",
+  "scripts/art/village/fest_kit.js": "6f64347d06d04925",
+  "scripts/art/village/fest_snow.js": "181752fd82afb0f4",
+  "scripts/art/village/fest_newyear.js": "e4584f31df4b5a13",
+  "scripts/art/village/fest_maslenitsa.js": "91b546736d999845",
+  "scripts/art/village/fest_flowers.js": "225257d3a178d362",
   "scripts/art/village/merchant.js": "c890c30c4bb04366",
-  "qw_farm/static/scene_buildings.js": "cec16883dd1de987",
-  "qw_farm/static/scene.js": "a6b73547e4a75b5a",
+  "qw_farm/static/scene_buildings.js": "a43f1b0e3c36f5a6",
+  "qw_farm/static/scene.js": "b5db33210ef6ba52",
   "qw_farm/static/scene_expansion.js": "7473fa6cdf1de9ff",
-  "qw_farm/static/scene_map.js": "68dbaaf64d6d9e97",
-  "scripts/art/village/village.js": "4bb38696b66c2462",
-  "scripts/art/village/common.js": "0d3fc65983694e63"
+  "qw_farm/static/scene_map.js": "3b3098f6663e0f12",
+  "scripts/art/village/village.js": "ec7f1743b7d87343",
+  "scripts/art/village/common.js": "3ba377144e786cca"
  },
  "fest_sha256": {
-  "posidelki": "5ed29158fdf12fb0e17d6b96358428637dff1d298ed87c2b481be90ff463d6b6"
+  "posidelki": "5ed29158fdf12fb0e17d6b96358428637dff1d298ed87c2b481be90ff463d6b6",
+  "new_year": "f2754af2b28084bd81b771c1315ac17d8848363eb982634d326ef9d1c5145775",
+  "maslenitsa": "0d2b2baf9267bfbc5031741ea482c9d65ec65ba8253ef0f70e0b1ddbec335725",
+  "spring_flowers": "93d99c0d1c2eb962c7df92673c12ffb8db8ead48b9d6aec51b9f9cf855748cf7"
  },
  "merchant_sha256": "ba41bfafff67ec8d0f3780478ea81b37c14262686e871c89f12e66397633f27c"
 }

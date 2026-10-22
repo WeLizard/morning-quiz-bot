@@ -145,7 +145,7 @@ test('app.js wiring: cart tap target on the art box, flag sync, sheet, seed list
  assert.match(app,/syncVillageFest\(\);syncMerchantFlag\(\);syncVillageMerchant\(\)/,'the flag is set before the art layers are filled');
  assert.match(app,/villageSheet==='merchant'/);
  assert.match(app,/MERCH\.renderShop\(p,merchantView\(\),merchantHelpers\(\)\)/);
- assert.equal((app.match(/sortSeeds\(Object\.values\(S\.catalog\.crops\)\.filter\(c=>!c\.exotic\),/g)||[]).length,3,'all three seed lists skip foreign crops');
+ assert.equal((app.match(/sortSeeds\(Object\.values\(S\.catalog\.crops\)\.filter\(c=>!c\.exotic&&!c\.orchard\),/g)||[]).length,3,'all three seed lists skip foreign crops and the orchard fruit (it grows on trees)');
  assert.match(app,/r\.scroll&&!\(S\.me\?\.merchant\?\.scrolls\|\|\[\]\)\.includes\(r\.scroll\)\)return 1e6/);
  assert.match(app,/b\.curio&&!\(S\.me\.merchant\?\.curios\|\|\[\]\)\.includes\(b\.id\)\)continue/,'unowned curios are not in the build list');
  const walkAnchors=app.match(/a:\{[^}]*\}/)[0];

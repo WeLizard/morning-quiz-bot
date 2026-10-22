@@ -5,8 +5,7 @@
 //   vf-decor  — plaids, yarn baskets, the samovar, knitted-flag garlands, chimney smoke (under the night tint);
 //   vf-day    — warm light in the windows by day («свет в окнах раньше вечера»);
 //   vf-night  — windows, samovar and garland glow above the night tint.
-import {FarmScene} from '/static/scene.js';
-import {SvgCtx} from './svg_ctx.js';
+import {festKit} from './fest_kit.js';
 
 // farm palette: muted reds, sage, mustard and cream of the farm's roofs, awnings and fabrics
 const PLAIDS = [['#c97a6a', '#efe0c4', '#9b5a4c'], ['#8fae86', '#f1e6cc', '#6f8f68'], ['#d9b25e', '#f4e8c8', '#b08a3c']];
@@ -16,53 +15,19 @@ const YARN = ['#c97a6a', '#e7a8b5', '#8fae86', '#d9b25e', '#7fa3c4', '#c3b0de'];
 export function posidelki(V) {
   // V: {B, P(x,y,z), matrix:[a,b,c,d,e,f] farm px -> world units, windows:[[kind,px,py,w,h]], chimneys:[[px,py]],
   //     fences:[[x1,y1,x2,y2]], bridges:[[x0,y0,x1,y1]], benches:[[x,y,axis]], lamps:[[x,y]], spots:{name:[x,y]}, free(x,y)}
-  const {B, P} = V, c = new SvgCtx('vf'), s = Object.create(FarmScene.prototype);
-  s.c = c; s.time = 0; s.motion = false; s.inStatic = true; s.shadowLevel = 0;
-  const problems = [];
-  const pt = (x, y, z = 0) => P(x, y, z);
-  // occlusion: a point of the layer (tile x, y, height z) is hidden when a taller object standing in front of it covers it
-  // on screen. The layer is drawn over the art, so such points must not get decor.
-  const hull = pts => { pts = [...pts].sort((p, q) => p.x - q.x || p.y - q.y); const cr = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-    const lo = [], up = []; for (const p of pts) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p) }
-    for (const p of [...pts].reverse()) { while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p) }
-    return lo.slice(0, -1).concat(up.slice(0, -1)) };
-  const tall = V.tall.map(({r: [x0, y0, x1, y1], h}) => ({front: x1 + y1, h: hull([[x0, y0], [x1, y0], [x1, y1], [x0, y1]].flatMap(([x, y]) => [pt(x, y, 0), pt(x, y, h)]))}));
-  const inHull = (h, p) => h.every((a, i) => { const b = h[(i + 1) % h.length]; return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) >= 0 });
-  const hidden = (x, y, z) => { const q = pt(x, y, z); return tall.some(o => o.front > x + y + .05 && inHull(o.h, q)) };
-  const visible = (x, y, z, what) => { if (hidden(x, y, z)) { problems.push(`posidelki: ${what} hidden behind a building`); return false } return true };
-  const quad = (pts, fill) => s.poly(pts.map(([x, y, z]) => pt(x, y, z)), fill);
+  const K = festKit(V, 'posidelki'), {B, c, s, pt, quad, hidden, visible, problems, plaid} = K;
 
   // ---------- decor: under the night tint ----------
   c.group('vf-decor');
-  // plaid hanging over a rail in the plane of a fence segment (a..b along it), top at z, with stripes and a fringe
-  const plaid = (ax, ay, bx, by, z, drop, [base, light, dark], flip = false) => {
-    const L = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / L, uy = (by - ay) / L, nx = -uy * .06 * (flip ? -1 : 1), ny = ux * .06 * (flip ? -1 : 1);
-    const at = (u, zz, o = 0) => [ax + ux * u + nx * o, ay + uy * u + ny * o, zz];
-    quad([at(0, z, -1), at(L, z, -1), at(L, z), at(0, z)], dark);                     // fold over the rail
-    quad([at(0, z), at(L, z), at(L, z - drop), at(0, z - drop)], base);                // the hanging cloth
-    for (const f of [.28, .7]) quad([at(L * f - .03, z), at(L * f + .03, z), at(L * f + .03, z - drop), at(L * f - .03, z - drop)], light);
-    for (const f of [.35, .72]) quad([at(0, z - drop * f + .9), at(L, z - drop * f + .9), at(L, z - drop * f - .9), at(0, z - drop * f - .9)], light);
-    for (let u = .04; u < L; u += .09) { const p = pt(...at(u, z - drop)); s.line(p.x, p.y, p.x, p.y + 2.6, dark, .9) }
-  };
   // two plaids on fences by the houses, one on the bridge rail, two on plaza benches
   // the two garden fences nearest the plaza (by the residents' houses, not the field fences), straight along x, in view
-  const [cx, cy] = [(V.plaza[0] + V.plaza[2]) / 2, (V.plaza[1] + V.plaza[3]) / 2];
-  const fences = V.fences.filter(f => Math.abs(f[1] - f[3]) < .01 && Math.abs(f[2] - f[0]) >= 1.6 && !hidden((f[0] + f[2]) / 2, f[1], 6))
-    .sort((a, b) => Math.hypot((a[0] + a[2]) / 2 - cx, a[1] - cy) - Math.hypot((b[0] + b[2]) / 2 - cx, b[1] - cy)).slice(0, 2);
+  const fences = K.gardenFences(2);
   if (fences.length < 2) problems.push('posidelki: fewer than two fences for plaids');
   fences.forEach((f, k) => { const a = Math.min(f[0], f[2]), L = Math.abs(f[2] - f[0]), w = Math.min(.85, L * .45);
     plaid(a + (L - w) / 2, f[1], a + (L + w) / 2, f[1], 11, 9 - k, PLAIDS[k]) });
   const br = V.bridges[0];
   if (br && visible(br[0] + 2, br[3] - .05, 16, 'bridge plaid')) plaid(br[0] + 1.6, br[3] - .05, br[0] + 2.4, br[3] - .05, 21, 9, PLAIDS[2]); else problems.push('posidelki: no bridge');
-  for (const [k, [x, y, axis]] of V.benches.slice(0, 2).entries()) {
-    const [base, light, dark] = PLAIDS[(k + 1) % 3];
-    if (axis === 'x') { quad([[x - .22, y - .12, 8.6], [x + .1, y - .12, 8.6], [x + .1, y + .12, 8.6], [x - .22, y + .12, 8.6]], base);
-      quad([[x - .22, y + .12, 8.6], [x + .1, y + .12, 8.6], [x + .1, y + .12, 3], [x - .22, y + .12, 3]], dark);
-      quad([[x - .08, y - .12, 8.7], [x - .03, y - .12, 8.7], [x - .03, y + .12, 3], [x - .08, y + .12, 3]], light) }
-    else { quad([[x - .12, y - .2, 8.6], [x + .12, y - .2, 8.6], [x + .12, y + .12, 8.6], [x - .12, y + .12, 8.6]], base);
-      quad([[x + .12, y - .2, 8.6], [x + .12, y + .12, 8.6], [x + .12, y + .12, 3], [x + .12, y - .2, 3]], dark);
-      quad([[x - .12, y - .05, 8.7], [x + .12, y - .05, 8.7], [x + .12, y - .01, 3], [x + .12, y - .01, 8.7]], light) }
-  }
+  for (const [k, b] of V.benches.slice(0, 2).entries()) K.benchPlaid(b, PLAIDS[(k + 1) % 3]);
   // yarn baskets with knitting by three residents' doors
   const basket = (x, y, k) => {
     if (!V.free(x, y)) problems.push(`posidelki: basket on an object at ${x},${y}`);
@@ -101,56 +66,23 @@ export function posidelki(V) {
   const plate = pt(tx - .2, ty + .1, 11.4); s.ellipse(plate.x, plate.y, 6, 2.6, '#f4ede0');
   for (const [dx, dy] of [[-2, -1], [2, -.5], [0, -2.4]]) { s.ellipse(plate.x + dx, plate.y + dy, 2.4, 1.4, '#c98a4a'); s.ellipse(plate.x + dx, plate.y + dy, 1, .6, '#f4ede0') }
   // knitted-flag garlands between the plaza's front lamps (front edges only: nothing stands in front of them)
-  const garland = (a, b, k) => {
-    const A = pt(a[0], a[1], 44), Bp = pt(b[0], b[1], 44), L = Math.hypot(Bp.x - A.x, Bp.y - A.y), sag = L * .1;
-    const at = t => ({x: A.x + (Bp.x - A.x) * t, y: A.y + (Bp.y - A.y) * t + 4 * sag * t * (1 - t)});
-    c.beginPath(); c.moveTo(A.x, A.y); c.quadraticCurveTo((A.x + Bp.x) / 2, (A.y + Bp.y) / 2 + 2 * sag, Bp.x, Bp.y);
-    c.strokeStyle = '#8a6c4c'; c.lineWidth = 1; c.stroke();
-    const n = Math.max(4, Math.round(L / 15));
-    for (let i = 1; i < n; i++) {
-      const p = at(i / n), q = at(i / n + .4 / n), col = FLAGS[(i + k * 2) % FLAGS.length];
-      s.poly([p, q, {x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 + 10}], col);
-      s.line(p.x + 1, p.y + 2.5, q.x - 1, q.y + 2.5, '#ffffff4d', .8); s.line(p.x + 2.4, p.y + 5.3, q.x - 2.4, q.y + 5.3, '#ffffff4d', .8);   // knit rows
-    }
+  const knitted = k => (p, q, i) => {
+    s.poly([p, q, {x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 + 10}], FLAGS[(i + k * 2) % FLAGS.length]);
+    s.line(p.x + 1, p.y + 2.5, q.x - 1, q.y + 2.5, '#ffffff4d', .8); s.line(p.x + 2.4, p.y + 5.3, q.x - 2.4, q.y + 5.3, '#ffffff4d', .8);   // knit rows
   };
-  // pairs of lamps by the plaza, 4–11 tiles apart, whose garland nothing stands in front of; the longest two without a shared lamp
-  const near = V.lamps.filter(([x, y]) => x > V.plaza[0] - 3 && x < V.plaza[2] + 3 && y > V.plaza[1] - 3 && y < V.plaza[3] + 3);
-  const pairs = [];
-  for (let i = 0; i < near.length; i++) for (let j = i + 1; j < near.length; j++) {
-    const [a, b] = [near[i], near[j]], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    if (d < 4 || d > 11) continue;
-    let ok = true;
-    for (let t = .02; t < 1 && ok; t += .04) { const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t; if (hidden(x, y, 44 - 30 * t * (1 - t))) ok = false }
-    if (ok) pairs.push([d, a, b]);
-  }
-  pairs.sort((p, q) => q[0] - p[0] || p[1][0] - q[1][0] || p[1][1] - q[1][1]);
-  const used = new Set(), chosen = [];
-  for (const [, a, b] of pairs) { if (chosen.length >= 2 || used.has(a) || used.has(b)) continue; chosen.push([a, b]); used.add(a); used.add(b) }
-  if (!chosen.length) problems.push('posidelki: no clear place for a garland');
-  chosen.forEach(([a, b], k) => garland(a, b, k));
-  // cosy smoke: three soft puffs over every chimney (the game animates vf-s1..3 rising, unless motion is reduced)
-  for (let i = 1; i <= 3; i++) {
-    c.group(`vf-smoke vf-s${i}`);
-    for (const [x, y] of V.chimneys) s.ellipse(x + i * 1.5, y - 6 - i * 9, 3 + i * 1.6, 2.4 + i * 1.2, 'rgba(250,246,234,.5)');
-    c.end();
-  }
+  K.lampPairs(2).forEach(([a, b], k) => K.garland(a, b, knitted(k)));
+  K.smoke();
   c.end();
 
   // ---------- windows: warm by day, lit at night ----------
-  const glass = ([kind, X, Y, w, h], grow = 0) => {   // the glass parallelogram of a window in its wall plane
-    const ax = (kind === 'a' ? 18 : -18) * w, ay = 9 * w, hh = h / 2 + grow;
-    return [{x: X - ax - grow, y: Y - ay - hh}, {x: X + ax + grow, y: Y + ay - hh}, {x: X + ax + grow, y: Y + ay + hh}, {x: X - ax - grow, y: Y - ay + hh}];
-  };
   c.group('vf-day');
-  for (const w of V.windows) s.poly(glass(w), 'rgba(255,214,130,.5)');
+  K.windowsDay();
   c.end();
   c.group('vf-night');
-  for (const w of V.windows) { s.poly(glass(w, 3), 'rgba(255,200,95,.22)'); s.poly(glass(w), 'rgba(255,226,160,.85)') }
+  K.windowsNight();
   const sv = pt(tx - .06, ty - .04, 20); s.ellipse(sv.x, sv.y, 22, 14, 'rgba(255,200,95,.22)'); s.ellipse(sv.x, sv.y, 9, 7, 'rgba(255,220,140,.35)');
   c.end();
 
-  const m = V.matrix.map(v => +v.toFixed(4)).join(' ');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1800" class="vf-art" aria-hidden="true" focusable="false">` +
-    `<g transform="matrix(${m})">${c.svg()}</g></svg>`;
+  const svg = K.wrap();
   return {svg, problems};
 }

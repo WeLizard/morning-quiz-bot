@@ -8,6 +8,9 @@ import {paintGate,boardSvg} from './gate.js';
 import {buildWalk} from './walk.js';
 import {playerSvg} from './player.js';
 import {posidelki} from './fest_posidelki.js';
+import {newYear} from './fest_newyear.js';
+import {maslenitsa} from './fest_maslenitsa.js';
+import {springFlowers} from './fest_flowers.js';
 import {merchantCart,magpieSvg} from './merchant.js';
 
 export async function render(opts={}){
@@ -123,11 +126,12 @@ function hall(){const x0=14.4,y0=14.4,x1=17.8,y1=17.8,Hh=44;claim(14.2,14.2,19.6
 }
 function board(x,y){B.L(s,x,y-.3,0,x,y-.3,26,'#8a6c4c',2.2);B.L(s,x,y+.3,0,x,y+.3,26,'#8a6c4c',2.2);B.Q(s,'#a98260',[x,y-.4,12,x,y+.4,12,x,y+.4,26,x,y-.4,26]);
  for(const [dy,dz,c] of [[-.2,15,'#f6f0de'],[.05,19,'#f2e3b5'],[.25,14,'#f6f0de']])B.Q(s,c,[x+.01,y+dy-.1,dz,x+.01,y+dy+.1,dz,x+.01,y+dy+.1,dz+8,x+.01,y+dy-.1,dz+8]);B.Q(s,'#8a6c4c',[x-.05,y-.45,26,x+.12,y-.45,26,x+.12,y+.45,26,x-.05,y+.45,26])}
-function well(x,y){anchor(x,y,'well');claim(x-.5,y-.5,x+.5,y+.5,'well',24);add(x+y+.5,()=>{const p=P(x,y);s.shadow(p.x,p.y,24,10);B.cyl(s,x,y,.42,0,14,'#c9bea2','#ddd3b8');B.cyl(s,x,y,.3,13.5,14,'#7fb0ac');
+const WELLS=[],STALL_BOXES=[];
+function well(x,y){WELLS.push([x,y]);anchor(x,y,'well');claim(x-.5,y-.5,x+.5,y+.5,'well',24);add(x+y+.5,()=>{const p=P(x,y);s.shadow(p.x,p.y,24,10);B.cyl(s,x,y,.42,0,14,'#c9bea2','#ddd3b8');B.cyl(s,x,y,.3,13.5,14,'#7fb0ac');
  for(const d of [-1,1]){const q=P(x+d*.3,y-d*.3);s.line(q.x,q.y-12,q.x,q.y-40,'#9e8a60',3)}
  const a=P(x-.45,y+.45,40),b=P(x+.45,y-.45,40),tp=P(x,y,52);s.poly([{x:a.x-4,y:a.y+2},{x:tp.x,y:tp.y},{x:b.x+4,y:b.y+2},{x:b.x+4,y:b.y+6},{x:tp.x,y:tp.y+4},{x:a.x-4,y:a.y+6}],'#8aa98f');s.poly([{x:a.x-4,y:a.y+2},{x:tp.x,y:tp.y},{x:tp.x,y:tp.y+4},{x:a.x-4,y:a.y+6}],'#9db89f');
  const c=P(x,y,30);s.line(c.x-10,c.y,c.x+10,c.y,'#7a6046',2);s.line(c.x,c.y,c.x,c.y+8,'#8b7a60',.8);s.poly([{x:c.x-3,y:c.y+8},{x:c.x+3,y:c.y+8},{x:c.x+2.5,y:c.y+13},{x:c.x-2.5,y:c.y+13}],'#a98763')})}
-function stall(x,y,c1,goods){anchor(x,y,'stall');anchor(x+1.4,y+1,'stall');claim(x,y,x+1.4,y+1,'stall',34);add(x+y+2.4,()=>{const x1=x+1.4,y1=y+1;B.shadowAt(s,x,y,x1,y1,40,16);
+function stall(x,y,c1,goods){STALL_BOXES.push([x,y,x+1.4,y+1]);anchor(x,y,'stall');anchor(x+1.4,y+1,'stall');claim(x,y,x+1.4,y+1,'stall',34);add(x+y+2.4,()=>{const x1=x+1.4,y1=y+1;B.shadowAt(s,x,y,x1,y1,40,16);
  for(const [a,b] of [[x+.06,y+.06],[x1-.06,y+.06]])B.L(s,a,b,0,a,b,30,'#9c7d58',2.2);
  B.fullBox(s,'#c9a672',x,y+.35,x1,y1,0,11,'#d8b886');B.boards(s,'y',y1,x,x1,0,11,4,'rgba(80,55,30,.25)');
  goods.forEach((g,i)=>{const q=P(x+.3+i*.42,y+.68,11);s.ellipse(q.x,q.y-2,5,3,g);s.ellipse(q.x-1,q.y-3,2.4,1.6,'#ffffff55')});
@@ -142,7 +146,8 @@ function log(x,y){anchor(x,y,'log');add(x+y,()=>{const p=P(x,y);s.ellipse(p.x+4,
 function stumpSmall(x,y){anchor(x,y,'stump');add(x+y,()=>{B.cyl(s,x,y,.2,0,9,'#9c7a58','#d9bd8a');const p=P(x,y,9);s.ellipse(p.x,p.y,4,2,'#c4a36e')})}
 function boulder(x,y){anchor(x,y,'boulder');add(x+y,()=>{const p=P(x,y);s.ellipse(p.x+5,p.y+3,22,7,'#7d806e30');s.poly([{x:p.x-18,y:p.y+2},{x:p.x-14,y:p.y-14},{x:p.x-2,y:p.y-22},{x:p.x+12,y:p.y-18},{x:p.x+19,y:p.y-4},{x:p.x+14,y:p.y+4},{x:p.x,y:p.y+7}],'#a9ab9a');s.poly([{x:p.x+12,y:p.y-18},{x:p.x+19,y:p.y-4},{x:p.x+14,y:p.y+4},{x:p.x+6,y:p.y-6}],'#999b8a');s.poly([{x:p.x-14,y:p.y-14},{x:p.x-2,y:p.y-22},{x:p.x+4,y:p.y-12},{x:p.x-8,y:p.y-8}],'#bfc1b0');s.ellipse(p.x-6,p.y-18,6,2.4,'#86ad70')})}
 function mushrooms(x,y){anchor(x,y,'mushrooms');add(x+y,()=>{const p=P(x,y);for(const [dx,dy,k] of [[-4,0,1],[4,2,.8],[1,-3,.7]]){s.line(p.x+dx,p.y+dy,p.x+dx,p.y+dy-5*k,'#f3ead0',2*k);s.ellipse(p.x+dx,p.y+dy-6*k,4.5*k,3*k,'#c9604f');s.ellipse(p.x+dx-1,p.y+dy-7*k,1,.8,'#f6e9d8')}})}
-function bush(x,y,berry){anchor(x,y,'bush');add(x+y,()=>{const p=P(x,y);s.ellipse(p.x+3,p.y+2,12,4.5,'#6f8e5a30');s.ellipse(p.x-5,p.y-3,7,6,'#78a269');s.ellipse(p.x+4,p.y-4,6.5,5.5,'#86b074');s.ellipse(p.x-1,p.y-8,5.5,5,'#8fbb7c');if(berry){s.ellipse(p.x+5,p.y-6,1.3,1.3,'#d46f6a');s.ellipse(p.x-3,p.y-4,1.2,1.2,'#d46f6a')}})}
+const BUSHES=[];
+function bush(x,y,berry){BUSHES.push([x,y]);anchor(x,y,'bush');add(x+y,()=>{const p=P(x,y);s.ellipse(p.x+3,p.y+2,12,4.5,'#6f8e5a30');s.ellipse(p.x-5,p.y-3,7,6,'#78a269');s.ellipse(p.x+4,p.y-4,6.5,5.5,'#86b074');s.ellipse(p.x-1,p.y-8,5.5,5,'#8fbb7c');if(berry){s.ellipse(p.x+5,p.y-6,1.3,1.3,'#d46f6a');s.ellipse(p.x-3,p.y-4,1.2,1.2,'#d46f6a')}})}
 function flowers(x,y){anchor(x,y,'flowers');add(x+y,()=>{const p=P(x,y),cols=['#e7a8b5','#f1dc8a','#c3b0de','#f4f1e6'];for(let i=0;i<6;i++){const fx=p.x+(i-2.5)*4.3,fy=p.y+((i*5)%4)-1,h=6+((i*3)%4);s.line(fx,fy,fx,fy-h,'#7ea468',1);s.ellipse(fx,fy-h-1,2.1,1.8,cols[(i+Math.floor(x))%4]);s.ellipse(fx,fy-h-1,.8,.7,'#d9a93d')}})}
 function rock(x,y){anchor(x,y,'rock');add(x+y,()=>{const p=P(x,y);s.ellipse(p.x+3,p.y+2,10,3.6,'#7d806e30');s.ellipse(p.x,p.y-1,8.5,4.4,'#9c9e8e');s.ellipse(p.x-1,p.y-4,7,5,'#b1b3a2');s.ellipse(p.x-2,p.y-5.5,3,1.6,'#cfd1c0')})}
 function fence(x1,y1,x2,y2){FENCES.push([x1,y1,x2,y2]);const n=Math.max(1,Math.round(Math.hypot(x2-x1,y2-y1)/1.2));for(let i=0;i<n;i++){const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n],b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n];add(Math.max(a[0],b[0])+Math.max(a[1],b[1])-.05,()=>B.rail(s,a[0],a[1],b[0],b[1],10,'#b79f72'))}}
@@ -349,8 +354,10 @@ for(let i=0;i<2600;i++){const x=-70+rnd()*190,y=-70+rnd()*190,[sx,sy]=scr(P(x,y)
 for(let i=0;i<420;i++){const x=-30+rnd()*100,y=-30+rnd()*100;if(!okTree(x,y,.4))continue;const r=rnd();r<.4?bush(x,y,r<.12):r<.8?flowers(x,y):rock(x,y)}
 
 groundTiles();
+const GROUND_PX=ctx.getImageData(0,0,W,H).data;   // the bare ground, before anything stands on it (festival snow: bare())
 fieldsDraw();gardensDraw();for(const [x,y,w,h] of PADS2){s.poly([P(x,y),P(x+w,y),P(x+w,y+h),P(x,y+h)],'#cbb894');s.poly([P(x,y),P(x+w,y),P(x+w,y+h),P(x,y+h)],null,'#b5a17a',1.2)}for(const [x,y] of PADS){s.poly([P(x,y),P(x+3,y),P(x+3,y+2.6),P(x,y+2.6)],'#ddd3ad');s.poly([P(x,y),P(x+3,y),P(x+3,y+2.6),P(x,y+2.6)],null,'#c5ba93',1.5)}riverDraw();pondDraw();
 items.sort((a,b)=>a.key-b.key);for(const it of items)it.fn();
+const FULL_PX=ctx.getImageData(0,0,W,H).data;     // everything painted, before the edge shade
 // soft edge of the world: forest shade toward the frame, matching the page background at the very edge
 ctx.save();ctx.setTransform(1,0,0,1,0,0);
 const edgeG=(ax,ay,bx,by)=>{const g=ctx.createLinearGradient(ax,ay,bx,by);g.addColorStop(0,'rgba(104,136,92,.6)');g.addColorStop(.45,'rgba(104,136,92,.22)');g.addColorStop(1,'rgba(104,136,92,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)};
@@ -396,6 +403,23 @@ meta.walk_blockers={occupied:occupied.filter(r=>r.tag!=='spot'&&r.tag!=='tree').
 meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windows:s.win,chimneys:s.smk,fences:FENCES,bridges:BRIDGES,
  benches:BENCHES.filter(b=>isPlaza(b[0],b[1])),lamps:LAMPS,spots:SPOT,free:(x,y)=>free(x,y,.05),samovar:[20.3,18.9],plaza:PLAZA,
  tall:occupied.filter(r=>r.h>=20).map(r=>({r:[r[0],r[1],r[2],r[3]],h:r.h}))})};
+{const festV={B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windows:s.win,chimneys:s.smk,fences:FENCES,bridges:BRIDGES,
+  benches:BENCHES.filter(b=>isPlaza(b[0],b[1])),lamps:LAMPS,spots:SPOT,free:(x,y)=>free(x,y,.05),plaza:PLAZA,roofs:s.roofs,chimneys3d:s.chim,doors:s.doors,
+  // ground for the winter layers: bare(x,y) = what is painted over the ground tile there (nothing, a shadow, something:
+  // a house, tree, fence, field, water), kind(x,y) = what the ground is; trees [x,y,scale,pine] and bushes for their snow caps
+  // 0 = bare, 1 = only a shadow lies there (the pixel is the ground darkened towards the farm's shadow #416235), 2 = something
+  bare:(x,y)=>{const [sx,sy]=scr(P(x,y));if(sx<0||sy<0||sx>=W||sy>=H)return 2;const i=(sy*W+sx)*4,g=[GROUND_PX[i],GROUND_PX[i+1],GROUND_PX[i+2]],f=[FULL_PX[i],FULL_PX[i+1],FULL_PX[i+2]];
+   if(Math.abs(g[0]-f[0])+Math.abs(g[1]-f[1])+Math.abs(g[2]-f[2])<6)return 0;
+   const sc=[65,98,53],dv=g.map((v,k)=>sc[k]-v),L=dv.reduce((a,v)=>a+v*v,0)||1,t=f.reduce((a,v,k)=>a+(v-g[k])*dv[k],0)/L;
+   const off=Math.hypot(...f.map((v,k)=>v-(g[k]+t*dv[k])));return t>0&&t<.35&&off<6?1:2},
+  kind:(x,y)=>{if(isPlaza(x,y))return 'plaza';if(isRoad(x,y))return 'road';const tx=Math.floor(x),ty=Math.floor(y),fx=x-tx,fy=y-ty;
+   return isLane(tx,ty)&&fx>.18&&fx<.82&&fy>.18&&fy<.82?'lane':'grass'},
+  trees:trees.map(t=>[t[0],t[1],t[2],t[4]==='pine']),bushes:BUSHES,
+  edge:(x,y)=>{const [sx,sy]=scr(P(x,y));return Math.max(0,Math.min(1,sx/170,(W-sx)/170,sy/150,(H-sy)/150))},   // 0 at the frame .. 1 past the edge shade
+  wells:WELLS,clear:(x,y,z,r)=>clearOfButtons(T2W(x,y,z),r),walk:(()=>{const n=meta.walk.nodes,e=meta.walk.edges,t=i=>toTile(n[2*i],n[2*i+1]),out=[];for(let i=0;i<e.length;i+=2)out.push([...t(e[i]),...t(e[i+1])]);return out})(),avoid:opts.badge?[[opts.badge[0]/.75,opts.badge[1]/.75,opts.badge[2]/.75,opts.badge[3]/.75].map((v,i)=>i%2?(v-OY)/K:(v-OX)/K)]:[],ground:(x,y)=>!inWater(x,y)&&(!isRoad(x,y)||isPlaza(x,y)),stalls:STALL_BOXES,
+  // trees stand in front of things too: crowns as tall boxes
+  tall:occupied.filter(r=>r.h>=20).map(r=>({r:[r[0],r[1],r[2],r[3]],h:r.h})).concat(trees.map(t=>({r:[t[0]-.3,t[1]-.3,t[0]+.3,t[1]+.3],h:80*t[2]})))};
+ meta.fest.new_year=newYear(festV);meta.fest.maslenitsa=maslenitsa(festV);meta.fest.spring_flowers=springFlowers(festV)}
 {const corners=[];for(const [x,y] of [[CART[0],CART[1]],[CART[2],CART[1]],[CART[2],CART[3]],[CART[0],CART[3]]])for(const z of [0,64])corners.push(scr(P(x,y,z)).map(v=>v*.75));
  const xs=corners.map(c=>c[0]),ys=corners.map(c=>c[1]);
  meta.merchant={svg:merchantCart({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],box:CART}),figure:magpieSvg(),

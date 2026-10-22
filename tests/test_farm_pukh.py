@@ -33,7 +33,7 @@ def test_catalog_validates_and_pukh_is_appended_last():
     validate()
     assert NPCS[-1] == (PUKH, 'Для бодрости перед работой')
     assert [n for n, _ in NPCS][:8] == ['Филиныч', 'Агата', 'Почтальон Ёж', 'Механик Крот', 'Кошка Кая', 'Кошка Соня', 'Суслик Игорь', 'Неведома Зверушка']
-    assert NPC_TASTES[PUKH] == ('berry_charge', 'honey_charge', 'forest_charge', 'honey', 'gingerbread')
+    assert NPC_TASTES[PUKH] == ('berry_charge', 'honey_charge', 'forest_charge', 'honey', 'gingerbread', 'mead_zero')   # mead_zero: the orchard cellar (FARM_ORCHARD.md section 5)
     assert set(NPC_SIGNATURE[PUKH]) == set(CHARGES) and SIGNATURE_PCT == 70
     assert public_catalog()['market']['tastes'][PUKH] == list(NPC_TASTES[PUKH]) and MARKET['tastes'][PUKH]
 

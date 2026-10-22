@@ -143,7 +143,8 @@ def test_stock_is_six_deterministic_slots_with_the_value_law_prices():
         if s['kind'] in ('exotic_seed', 'scroll', 'curio'):
             expect = EXOTIC_BY_SEED[s['item']]['pack_price'] if s['kind'] == 'exotic_seed' else -(-{'scroll': 25}.get(s['kind'], CURIOS.get(s['id'], {}).get('k', 0)) * income_ref(s['min_level']) // 100)
             assert s['price'] == expect
-        assert s['id'] not in M.ORCHARD_IDS, 'grafts and vouchers wait for the orchard'
+        if s['kind'] in ('graft', 'voucher'):   # the orchard exists now: the garden goods ride in the last slot of some visits
+            assert s['id'] in M.ORCHARD_IDS and s['slot'] == 5 and s['wired'] and s['price'] == M._k_price(MERCHANT['orchard_k'][s['id']], s['min_level'])
     assert all(s['limit'] == MERCHANT['limits'][s['kind']] for s in slots)
 
 
@@ -496,10 +497,11 @@ def test_dyeing_recipes_follow_dyed_linen_and_work_in_the_tailor_with_a_dye():
     assert code(f, 'queue', {'object': 'tl', 'recipe': 'indigo_linen'}) == 'missing_goods'
 
 
-def test_orchard_hooks_are_defined_bound_and_not_wired():
+def test_orchard_hooks_are_defined_bound_and_wired():
     for g in M.ORCHARD_IDS:
-        assert ITEMS[g]['bound'] and ITEMS[g]['wired'] is False and ITEMS[g]['orchard'] is True
-    assert M.ORCHARD_IDS and not any(s['id'] in M.ORCHARD_IDS for d in range(VISIT, VISIT + 200) if M.visit_on(d) for s in M.stock(M.visit_on(d)))
+        assert ITEMS[g]['bound'] and ITEMS[g]['wired'] is True and ITEMS[g]['orchard'] is True
+    offered = {s['id'] for d in range(VISIT, VISIT + 200) if M.visit_on(d) for s in M.stock(M.visit_on(d)) if s['id'] in M.ORCHARD_IDS}
+    assert offered == set(M.ORCHARD_IDS), 'every graft and the voucher are offered on some visit'
     magpie_lots = [g for fid in festivals.FESTIVALS for g in festivals.content(fid)['goods'] if g['seller'] == 'magpie']
     assert magpie_lots, 'the fair lots of the festival engine are reused, not duplicated here'
     assert not [e for e in M.ENTRIES if e.startswith('fest_')]

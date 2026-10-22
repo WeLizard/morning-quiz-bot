@@ -994,7 +994,132 @@ function weavery(s,o){
   clothRoll(s,rx+.02,ry+.06,6.2,.36,.085,'#a9a3b8','#cfcadb');clothRoll(s,rx+.02,ry+.24,6.2,.36,.085,'#c98f8f','#f1d6d0');
   clothRoll(s,rx+.02,ry+.15,11.6,.36,.085,'#e8dfe9','#fbf7fb');
   return g.H+g.R+16}
-const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop};
+/* ---------- fruit orchard (docs/tasks/FARM_ORCHARD.md): dryer (Сушильня), cellar (Погребок «Ноль градусов»), birdhouse ---------- */
+/* Open timber drying shed: lattice back walls, mesh trays of fruit, garlands of apple rings under the eave, a sun on the gable and a
+   little wind fan on the ridge that turns while a batch dries (still with reduced motion). A lamp under the eave lights the night shift. */
+function dryer(s,o){
+  const work=o.jobs?.length>0,t=s.time||0,mo=s.motion!==false,wood='#a37d55',x0=o.x+.2,x1=o.x+1.5,y0=o.y+.18,y1=o.y+1.02,H=28;
+  const g=gparams({x0,y0,x1,y1,H,zE:H,col:'#dcc394',roof:'#a8735a',axis:'y',prof:GABLE,R:18,ov:.13,trim:'#e6cfa4',courses:4},{});
+  ground(s,o.x+.02,o.y+.02,o.x+o.w-.02,o.y+o.h-.02,'rgba(222,200,150,.42)');
+  shadowAt(s,x0,y0,x1,y1,50,19);
+  top(s,'#cdb083',x0,y0,x1,y1,2);wallY(s,'#a98a60',y1,x0,x1,0,2,2);wallX(s,'#94764f',x1,y0,y1,0,2,2);
+  for(let k=1;k<6;k++){const x=x0+(x1-x0)*k/6;L(s,x,y0,2,x,y1,2,'rgba(110,80,45,.22)',.8)}
+  // lattice of slats on the two back walls: air passes through
+  for(let k=0;k<=9;k++){const x=x0+(x1-x0)*k/9;L(s,x,y0,2,x,y0,H,'rgba(150,112,72,.62)',1.3)}
+  for(let k=0;k<=6;k++){const y=y0+(y1-y0)*k/6;L(s,x0,y,2,x0,y,H,'rgba(128,96,62,.58)',1.3)}
+  for(const z of [11,20]){L(s,x0,y0,z,x1,y0,z,'rgba(150,112,72,.7)',1.1);L(s,x0,y0,z,x0,y1,z,'rgba(128,96,62,.66)',1.1)}
+  L(s,x0,y0,2,x0,y0,H,wood,3);
+  // the rack: back legs, three mesh trays (apricot halves, apple rings, plums and cherries), front legs
+  const rx0=x0+.16,rx1=x1-.2,ry0=y0+.22,ry1=y0+.58;
+  for(const x of [rx0,rx1])L(s,x,ry0,2,x,ry0,25,sh(wood,-.12),1.6);
+  const trays=[[7,['#e8963a','#f2b45a']],[14,['#ecd9a6','#e2c88e']],[21,['#5a3f6a','#8f1c32']]];
+  for(const [z,cols] of trays){
+    top(s,'#d9c59a',rx0,ry0,rx1,ry1,z);wallY(s,'#b39a6c',ry1,rx0,rx1,z-1.4,z,z);wallX(s,'#9c8460',rx1,ry0,ry1,z-1.4,z,z);
+    for(let k=1;k<8;k++){const x=rx0+(rx1-rx0)*k/8;L(s,x,ry0,z,x,ry1,z,'rgba(120,92,58,.35)',.6)}
+    for(let k=1;k<3;k++){const y=ry0+(ry1-ry0)*k/3;L(s,rx0,y,z,rx1,y,z,'rgba(120,92,58,.35)',.6)}
+    for(let i=0;i<6;i++)for(let j=0;j<2;j++){const x=rx0+.1+i*(rx1-rx0-.18)/5,y=ry0+.1+j*.17,col=cols[(i+j)%2];
+      E(s,x,y,z+1,2.5,1.4,col);if(col==='#ecd9a6'||col==='#e2c88e')E(s,x,y,z+1.2,.9,.5,'#b9965e');else E(s,x-.02,y,z+1.6,.9,.45,sh(col,.3))}
+  }
+  for(const x of [rx0,rx1])L(s,x,ry1,2,x,ry1,25,wood,1.8);
+  // front posts and beams
+  for(const [x,y] of [[x1,y0],[x0,y1],[x1,y1]])L(s,x,y,2,x,y,H,wood,3.2);
+  L(s,x0,y1,H,x1,y1,H,sh(wood,-.08),3);L(s,x1,y0,H,x1,y1,H,sh(wood,-.16),3);
+  // garlands of dried slices on strings: apple rings, one of apricot halves; they swing while the fan blows
+  for(let i=0;i<5;i++){const x=x0+.2+i*.26,sw=work&&mo?Math.sin(t*1.6+i*1.3)*.018:0,apr=i===2;
+    L(s,x,y1,H-.5,x+sw,y1,H-15,'#e8dcc0',.7);
+    for(let k=0;k<4;k++){const z=H-4-k*3.4,dx=sw*(k+1)/4;E(s,x+dx,y1,z,2.4,2,apr?'#e8963a':'#f1e2b8');E(s,x+dx,y1,z,apr?1.2:1.1,apr?1:.9,apr?'#f4bf6a':'#d6bd88')}}
+  // gable with boards and a painted sun
+  gableWall(s,'y',g);const xm=(x0+x1)/2;
+  for(let k=1;k<6;k++){const x=x0+(x1-x0)*k/6,h=riseAt(GABLE,(x-x0+g.ov)/(x1-x0+2*g.ov))*g.R;L(s,x,y1,H+1,x,y1,H+h-1,'rgba(150,115,70,.3)',1)}
+  for(let k=0;k<8;k++){const a=k*PI/4,X=px(xm,y1),Z=py(xm,y1,H+8);s.line(X+Math.cos(a)*5.6,Z+Math.sin(a)*5.6,X+Math.cos(a)*8,Z+Math.sin(a)*8,'#e3a94a',1.4)}
+  E(s,xm,y1,H+8,4.6,4.6,'#efc35a');E(s,xm-.03,y1,H+9,1.6,1.4,'#f8e09a');
+  roofOf(s,g);
+  // wind fan on the front end of the ridge
+  {const fx=xm,fy=y1+.05,fz=H+g.R;L(s,fx,fy,fz-1,fx,fy,fz+9,'#6f5a44',1.6);const X=px(fx,fy),Z=py(fx,fy,fz+9),c=s.c,turn=work&&mo?t*4:.35;
+   c.save();c.translate(X,Z);c.rotate(turn);for(let k=0;k<4;k++){c.rotate(PI/2);s.poly([{x:1,y:-1.4},{x:8,y:-2.6},{x:8.6,y:.6},{x:1,y:1.2}],k%2?'#e9dcc0':'#c9a26a')}c.restore();s.ellipse(X,Z,1.7,1.7,'#5d4b38')}
+  // lamp under the eave at the front corner (lit while a batch dries)
+  const lx=x0+.05,ly=y1+.14;L(s,x0,y1,H-3,lx,ly,H-3,'#5b4a38',1.4);L(s,lx,ly,H-3,lx,ly,H-6,'#5b4a38',1);fullBox(s,'#5b4a38',lx-.035,ly-.035,lx+.035,ly+.035,H-12,H-6,'#7a6a4e');
+  Q(s,work?'#fff1b8':'#e9dcae',[lx-.028,ly+.037,H-11,lx+.028,ly+.037,H-11,lx+.028,ly+.037,H-7,lx-.028,ly+.037,H-7]);
+  if(work)s.lanternLights?.push({x:px(lx,ly),y:py(lx,ly,H-9)+43});
+  // yard: a basket of apples and a crate of apricots
+  const bx=o.x+.48,by=o.y+1.5;cyl(s,bx,by,.14,0,7,'#c09868','#8f6c45');for(const [dx,dz,c] of [[-4,9,'#d9534f'],[2,10,'#e06a50'],[5,8.6,'#c94a44'],[-1,11.6,'#d9534f']])s.ellipse(px(bx,by)+dx,py(bx,by,dz),2.8,2.6,c);
+  crate(s,o.x+1.2,o.y+1.56,.28,8,'#c9a672');for(const [dx,dy] of [[-.06,-.04],[.06,0],[0,.06]])E(s,o.x+1.2+dx,o.y+1.56+dy,10,2.8,2.6,'#f0a64a');
+  return H+g.R+16}
+
+/* Earth mound with a stone portal and an arched door, a vent pipe that puffs fizz while a batch matures, a «0°» thermometer by the
+   door (zero degrees, zero percent) and «0%» kegs at the entrance. A lamp by the door lights the night shift. */
+function cellar(s,o){
+  const work=o.jobs?.length>0,t=s.time||0,mo=s.motion!==false,c=s.c;
+  ground(s,o.x+.02,o.y+.02,o.x+o.w-.02,o.y+o.h-.02,'rgba(190,205,160,.42)');
+  const mx=o.x+.98,my=o.y+.6,X=px(mx,my),Y=py(mx,my,0);
+  s.shadow(X+2,Y+4,58,21);
+  s.ellipse(X,Y+1,57,23,'#829f69');
+  c.save();c.beginPath();c.ellipse(X,Y-13,53,37,0,0,PI*2);c.clip();
+  s.ellipse(X,Y-13,53,37,'#8fae73');s.ellipse(X+24,Y-4,40,34,'#7f9d66');s.ellipse(X-12,Y-27,38,24,'#97b47a');s.ellipse(X-16,Y-33,26,15,'#9fbc82');s.ellipse(X-20,Y-38,13,6,'#a9c58b');
+  c.restore();
+  // stones at the foot and grass on the top
+  for(const [dx,dy,r] of [[-50,4,4],[-42,10,3.4],[-30,14,4.2],[34,13,3.6],[46,7,4],[52,0,3]])s.ellipse(X+dx,Y+dy,r,r*.6,'#b9b29d');
+  for(const [dx,dy] of [[-30,-34],[-12,-44],[4,-46],[20,-38],[34,-26],[-38,-18]])for(let k=-1;k<=1;k++)s.line(X+dx+k*1.6,Y+dy,X+dx+k*2.4,Y+dy-4-(k?0:1.5),'#6f9256',1);
+  for(const [dx,dy,col] of [[-24,-38,'#f3e3a0'],[12,-44,'#e7a8b5'],[28,-31,'#f3e3a0']]){s.line(X+dx,Y+dy,X+dx,Y+dy-4,'#6f9256',.9);s.ellipse(X+dx,Y+dy-5,1.8,1.5,col)}
+  // vent pipe on the top: tin with a little hat, fizz bubbles while a drink matures
+  const vx=o.x+1.24,vy=o.y+.34;cyl(s,vx,vy,.05,36,53,'#9aa3a6','#b9c1c3');
+  {const V=px(vx,vy),Z=py(vx,vy,55);s.poly([{x:V-6.5,y:Z+1.5},{x:V,y:Z-3.5},{x:V+6.5,y:Z+1.5}],'#7d878a');s.ellipse(V,Z+1.5,6.5,1.6,'#6b7477');
+   const n=work?(mo?4:2):0;for(let i=0;i<n;i++){const f=mo?(t*.45+i*.25)%1:.3+i*.35,bx=V+(mo?Math.sin(t*2.2+i*1.7)*3:i*4-2),by=Z-5-f*24,r=1.1+f*1.5;
+    c.save();c.globalAlpha=(1-f)*.9;c.beginPath();c.ellipse(bx,by,r,r,0,0,PI*2);c.strokeStyle='#f6fbff';c.lineWidth=.9;c.stroke();s.ellipse(bx-r*.35,by-r*.35,r*.3,r*.3,'#ffffff');c.restore()}}
+  // stone portal in the front of the mound: a wide arched wall with turf on top, the door between the level-2 flower boxes
+  const Yf=o.y+1.04,xm=o.x+.68,xa=xm-.44,xb=xm+.42,h=25,stone='#d3c8ac';
+  wallX(s,sh(stone,-.22),xb,Yf-.14,Yf,0,h-2,h-2);
+  Q(s,stone,[xa,Yf,0,xb,Yf,0,xb,Yf,h-2,xm+.28,Yf,h+3,xm,Yf,h+5,xm-.28,Yf,h+3,xa,Yf,h-2]);
+  for(const [a,b,z] of [[xa,xm-.17,6.5],[xm+.17,xb,6.5],[xa,xm-.17,13.5],[xm+.17,xb,13.5],[xa,xm-.17,20],[xm+.17,xb,20]])L(s,a,Yf,z,b,Yf,z,'rgba(120,108,84,.3)',.9);
+  for(const [x,z0,z1] of [[xa+.12,0,6.5],[xb-.14,0,6.5],[xa+.06,6.5,13.5],[xb-.08,6.5,13.5],[xa+.16,13.5,20],[xb-.18,13.5,20]])L(s,x,Yf,z0,x,Yf,z1,'rgba(120,108,84,.28)',.9);
+  Q(s,'#bfb293',[xm-.19,Yf,0,xm+.19,Yf,0,xm+.19,Yf,15,xm,Yf,21,xm-.19,Yf,15]);
+  doorY(s,Yf,xm,.28,16,'#7a5638','#bfb293',true);
+  for(const z of [4.5,11])L(s,xm-.13,Yf,z,xm+.13,Yf,z,'#4f3d2b',1.3);
+  E(s,xm+.08,Yf,8.5,1.2,1.2,'#d9c999');
+  // turf along the top of the wall
+  {const zt=x=>{const d=Math.abs(x-xm);return d<.28?h+5-2*d/.28:h+3-5*(d-.28)/(xb-xm-.28)},xs=[xa-.03,xa+.2,xm-.28,xm-.12,xm,xm+.12,xm+.28,xb-.2,xb+.03],top=[],bot=[];
+   for(const x of xs){const z=zt(Math.min(xb,Math.max(xa,x)));top.push(x,Yf+.02,z+3.2);bot.unshift(x,Yf+.02,z-1.6)}Q(s,'#8fae73',[...top,...bot]);
+   for(let k=1;k<xs.length-1;k+=2){const x=xs[k];L(s,x,Yf+.02,zt(x)+3,x-.02,Yf+.02,zt(x)+6,'#7a9a5e',1);L(s,x+.03,Yf+.02,zt(x)+3,x+.05,Yf+.02,zt(x)+5.5,'#7a9a5e',1)}
+   for(let k=0;k<xs.length;k+=2)E(s,xs[k],Yf+.03,zt(Math.min(xb,Math.max(xa,xs[k])))-1.4,2.6,1.4,'#9cba80')}
+  // «0%» board under the arch top
+  Q(s,'#ead8a8',[xm-.14,Yf+.01,19,xm+.14,Yf+.01,19,xm+.14,Yf+.01,24.5,xm-.14,Yf+.01,24.5]);
+  {const B=px(xm,Yf+.01),Z=py(xm,Yf+.01,21.75);c.save();c.font='700 6.4px "Segoe UI",sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillStyle='#5a4127';c.fillText('0%',B,Z+.4);c.restore()}
+  // thermometer dial at zero, right of the door
+  {const tx=xm+.3,T=px(tx,Yf),Z=py(tx,Yf,14);s.ellipse(T,Z,4.6,4.6,'#7d6a52');s.ellipse(T,Z,3.6,3.6,'#f7f1e2');for(const a of [-2.4,-1.57,-.74])s.line(T+Math.cos(a)*2.6,Z+Math.sin(a)*2.6,T+Math.cos(a)*3.3,Z+Math.sin(a)*3.3,'#7d6a52',.6);s.line(T,Z,T,Z-2.9,'#c9443a',.9);s.ellipse(T,Z,.8,.8,'#c9443a')}
+  // lamp left of the door
+  const lx=xm-.3,ly=Yf+.04;L(s,lx,Yf,18,lx,ly+.08,18,'#4f3d2b',1.2);fullBox(s,'#4f3d2b',lx-.03,ly+.05,lx+.03,ly+.11,12.5,18,'#6a5840');
+  Q(s,work?'#fff1b8':'#e9dcae',[lx-.024,ly+.112,13.1,lx+.024,ly+.112,13.1,lx+.024,ly+.112,16.8,lx-.024,ly+.112,16.8]);
+  if(work)s.lanternLights?.push({x:px(lx,ly+.08),y:py(lx,ly+.08,15)+43});
+  // «0%» kegs at the entrance and a crate of corked bottles
+  const keg=(x,y,r,hh,col)=>{barrel(s,x,y,r,hh,col);const K=px(x,y)+r*TW*.35,Z=py(x+r*.7,y+r*.7,hh*.52);s.poly([{x:K-4.6,y:Z-2.6},{x:K+4.6,y:Z-2.6},{x:K+4.6,y:Z+3},{x:K-4.6,y:Z+3}],'#f4ead2');
+    c.save();c.font='700 5px "Segoe UI",sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillStyle='#8a4a32';c.fillText('0%',K,Z+.3);c.restore()};
+  keg(o.x+1.62,o.y+1.02,.13,11,'#b48a5c');keg(o.x+1.38,o.y+1.36,.15,13,'#a87a4c');
+  crate(s,o.x+.4,o.y+1.56,.28,7,'#c9a672');for(const [dx,col] of [[-.07,'#7a1a2c'],[0,'#e6c25a'],[.07,'#5a3a7a']]){const x=o.x+.4+dx,y=o.y+1.56;L(s,x,y,7,x,y,14,col,3);L(s,x,y,14,x,y,16.5,'#c9a672',1.6)}
+  return 68}
+
+/* Birdhouse (decor 1x1): a pole with a little gabled house, a perch by the round hole and a starling that sits on the ridge and now
+   and then peeks out of the hole (it stays on the ridge with reduced motion). Its trees get the starling of FARM_ORCHARD.md 2.5. */
+export function drawBirdhouse(s,o){
+  const cx=o.x+.5,cy=o.y+.5,t=s.time||0,mo=s.motion!==false,a=.14,z0=36,z1=50,wood='#d6b98a';
+  s.shadow(px(cx,cy),py(cx,cy,0),11,4.5);
+  for(const [dx,dy,hh] of [[-.12,.08,6],[.1,.1,5],[0,.16,7],[.14,-.04,4],[-.06,-.1,5]])L(s,cx+dx,cy+dy,0,cx+dx*1.25,cy+dy*1.25,hh,'#7ea468',1.1);
+  E(s,cx+.15,cy+.13,6.5,1.9,1.6,'#e7a8b5');E(s,cx-.13,cy+.1,7,1.6,1.4,'#f3e3a0');
+  L(s,cx,cy,0,cx,cy,z0+2,'#8b7756',3.4);L(s,cx-.015,cy+.015,1,cx-.015,cy+.015,z0,'#a8916a',1);
+  L(s,cx,cy,z0-7,cx,cy+.09,z0,'#7a6849',1.4);
+  box(s,wood,cx-a,cy-a,cx+a,cy+a,z0,z1);
+  const g={x0:cx-a,y0:cy-a,x1:cx+a,y1:cy+a,zE:z1,prof:GABLE,R:9,ov:.05,roof:'#a8705a',col:wood,courses:2};
+  gableWall(s,'y',g);
+  E(s,cx,cy+a,z0+8.5,2.5,2.7,'#4a3a2a');L(s,cx,cy+a,z0+3.6,cx,cy+a+.09,z0+3.6,'#7a6849',1.4);
+  L(s,cx-a+.02,cy+a,z0+.5,cx+a-.02,cy+a,z0+.5,sh(wood,-.25),1);
+  gableRoof(s,'y',g);
+  const peek=mo&&((t*.11+o.x*.37+o.y*.21)%1)>.62,bird='#3f4352';
+  if(peek){const X=px(cx,cy+a),Z=py(cx,cy+a,z0+8.5);s.ellipse(X,Z,2,2,'#454a5a');s.poly([{x:X+1.6,y:Z-.6},{x:X+4.4,y:Z+.2},{x:X+1.6,y:Z+.9}],'#e2b84a');s.ellipse(X+.5,Z-.7,.45,.45,'#f3f1e8')}
+  else{const X=px(cx,cy+a)+1,Z=py(cx,cy+a,z1+g.R)-1,bob=mo?Math.max(0,Math.sin(t*2.1+o.x))*1:0;
+    s.ellipse(X,Z-2.6,3.6,2.6,bird);s.poly([{x:X-2.6,y:Z-3.4},{x:X-7,y:Z-1.6},{x:X-2.6,y:Z-1.6}],'#363a48');
+    s.ellipse(X+2.8,Z-5-bob*.4,2.1,2,'#454a5a');s.poly([{x:X+4.4,y:Z-5.6-bob*.4},{x:X+7.2,y:Z-4.8-bob*.2},{x:X+4.4,y:Z-4.3-bob*.4}],'#e2b84a');
+    for(const [dx,dy] of [[-1,-3],[1,-2],[-.4,-1.8]])s.ellipse(X+dx,Z+dy,.4,.4,'#cfd3dc');s.ellipse(X+3.3,Z-5.4-bob*.4,.45,.45,'#f3f1e8')}
+}
+const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop,dryer,cellar};
 /* ---------- r6 building upgrades (view only; the level comes from the server object) ----------
    level 2: flower boxes, a lantern post with a hanging sign. level 3: adds a lean-to annex with its own chimney and a
    waving flag on the roof. Both levels get a small gold badge. Buildings without a level (older saves) are level 1. */

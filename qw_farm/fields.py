@@ -438,7 +438,7 @@ def _start(farm, data, now, speed, lv):
     crop_id = ''
     if op == 'sow':
         crop = named(CROPS, data['crop'])
-        need(crop['field'], 'not_field_crop', 'Эта культура не растёт на полях.')
+        need(crop['field'], *(('orchard_crop', 'Плодовые деревья теперь растут в саду: посади саженец во вкладке «Сад».') if crop.get('orchard') else ('not_field_crop', 'Эта культура не растёт на полях.')))
         need(lv >= crop['level'], 'locked', 'Эта культура пока не открыта.')
         crop_id, seeds = crop['id'], crop['cost'] * FIELD_SEED_MULT * f['ha']
     else:

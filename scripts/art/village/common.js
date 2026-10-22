@@ -13,8 +13,8 @@ export function makeS(ctx) {
   // inStatic + shadowLevel 0 = the farm's daylight static layer (contact shadows #41623517, lantern glass unlit).
   Object.assign(s, {c: ctx, time: 0, motion: false, inStatic: true, shadowLevel: 0, lighting: null,
     farm: {id: 'village', size: 12, level: 1, objects: [], home_projects: {entries: {}}},
-    // recorders filled by the patched building code: windows (night lights) and chimney tops (live smoke layer)
-    win: [], smk: []});
+    // recorders filled by the patched building code: windows (night lights), chimney tops (live smoke layer), roofs, chimneys and doors (festival decor)
+    win: [], smk: [], roofs: [], chim: [], doors: []});
   s.lantern = p => s.perimeterLantern(p);
   return s;
 }

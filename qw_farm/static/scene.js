@@ -1,5 +1,6 @@
 import {drawTeamZones,teamSprites,smallAnimal,specialDecor,machineAt,resetWalkingGeese,reactWalkingGeese,releaseWalkingGeese,drawTeaArbor,resetLivestock,livestockMoves} from './scene_expansion.js';
-import {drawBuilding,drawUpgrade,drawBadge,drawRoad} from './scene_buildings.js';
+import {drawBuilding,drawUpgrade,drawBadge,drawRoad,drawBirdhouse} from './scene_buildings.js';
+import {drawTree} from './scene_orchard.js';
 import {Minimap,viewRect,overlaps,objectBounds,panToCenter,clampWorldPoint,sortByDepth,spriteSlots,compareDepth,isoInverse} from './scene_map.js';
 const LATE_CROPS={zucchini:['leaf','#8fb86a'],beans:['pod','#a9c079'],currant:['berry','#4b3f6b'],ginger:['root','#d9b87a'],broccoli:['leaf','#6fa65a'],turnip:['root','#e6d9a8'],gooseberry:['berry','#a8c96a'],barley:['grain','#d7bf74'],celery:['stalk','#8fc07a'],apple:['tree','#d9534f'],cherry:['tree','#b3263e'],millet:['grain','#e2c35a'],leek:['stalk','#a7cf8a'],pear:['tree','#c6cf5a'],rosehip:['berry','#d0453c'],chickpea:['pod','#d8b878'],kohlrabi:['root','#b7d68a'],plum:['tree','#6b4a8c'],sea_buckthorn:['berry','#f09a2a'],ginseng:['root','#d8c49a'],asparagus:['stalk','#9bc872'],apricot:['tree','#f0a64a'],viburnum:['berry','#c4232f'],pomegranate:['tree','#b3262f'],artichoke:['leaf','#8fae6a'],peach:['tree','#f2a07a']};
 /* Original procedural farm artwork + isometric renderer. No third-party assets.
@@ -725,9 +726,11 @@ export class FarmScene {
  drawAnimal(id,q){if(id==='cow')this.cow(q.x,q.y);else if(id==='sheep')this.sheep(q.x,q.y);else if(id==='bees')this.beehive(q.x,q.y);else smallAnimal(this,q.x,q.y,id)}
  drawObject(o){let p=P(o.x+o.w/2,o.y+o.h/2);if(o.id===this.selected)this.footprint(o,'#f8edb837','#f7f0c3');
   if(o.type==='plot'){this.plot(o);return}
+  if(o.type==='tree'){this.orchardTree(o,p);return}
   if(o.type==='road'){drawRoad(this,o);return}
   if(o.type==='duckpond'){this.c.save();this.c.translate(p.x,p.y);this.c.scale(.48,.48);this.pond(0,0);this.c.restore();drawBadge(this,o);if(o.animal_job?.ready_at<=this.now())this.ready(p.x,p.y-30);return;}
   if(specialDecor(this,o,p))return;
+  if(o.type==='birdhouse'){this.birdhouse(o,p);return}
   if(['flowerbed','bench','lantern','scarecrow'].includes(o.type)){this.decor(o,p);return}
   const top=drawUpgrade(this,o,drawBuilding(this,o,p));
   let ready=o.jobs?.some(j=>j.ready_at<=this.now())||(o.animal_job&&o.animal_job.ready_at<=this.now());
@@ -735,7 +738,11 @@ export class FarmScene {
   if(ready)this.ready(p.x+22,p.y-by);
   else if(o.jobs?.length||o.animal_job){let job=o.jobs?.[0]||o.animal_job;this.clockBubble(p.x+25,p.y-by-1,job.ready_at)}
  }
- title(o){return {house:'Дом Филиныча',barn:'Склад',plot:'Грядка'}[o.type]||this.catalog?.buildings[o.type]?.name||o.type}
+ title(o){return {house:'Дом Филиныча',barn:'Склад',plot:'Грядка'}[o.type]||(o.type==='tree'?this.catalog?.orchard?.trees?.[o.species]?.name:null)||this.catalog?.buildings[o.type]?.name||o.type}
+ // Fruit tree (docs/tasks/FARM_ORCHARD.md, section 7): seven species by stage and cycle phase, graft looks and care marks (scene_orchard.js).
+ orchardTree(o,p){drawTree(this,o,p,this.catalog,this.now())}
+ // Birdhouse decor (1x1): a pole with a little house and its starling (scene_buildings.js, same solids as the workshops).
+ birdhouse(o,p){drawBirdhouse(this,o)}
  plotGround(o){this.footprint(o,'#b19a70','#a18a62');this.poly([P(o.x+.06,o.y+.06),P(o.x+.94,o.y+.06),P(o.x+.94,o.y+.94),P(o.x+.06,o.y+.94)],'#937f5d');for(let f of [.25,.48,.71]){let a=P(o.x+.1,o.y+f),b=P(o.x+.9,o.y+f);this.line(a.x,a.y,b.x,b.y,'#b19b73',2.4)}
   if(o.id===this.selected)this.footprint(o,'#f8edb837','#f7f0c3');
   if(!o.crop){let p=P(o.x+.5,o.y+.5);this.line(p.x-3,p.y,p.x+3,p.y,'#d3c49855',1);this.line(p.x,p.y-3,p.x,p.y+3,'#d3c49855',1)}

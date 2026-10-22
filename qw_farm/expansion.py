@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import market, progression, economy, fields, projects, trip_games, swans, festivals, textile, merchant
+from . import market, progression, economy, fields, projects, trip_games, swans, festivals, textile, merchant, orchard
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -41,9 +41,10 @@ SCHEMAS.update(swans.SCHEMAS)  # lake swans: feed_swans
 SCHEMAS.update(festivals.SCHEMAS)  # festivals: festival_task, festival_buy
 SCHEMAS.update(textile.SCHEMAS)  # lessons of Кошка Соня: lesson_deliver
 SCHEMAS.update(merchant.SCHEMAS)  # Сорока-коробейница: merchant_buy, merchant_sell
+SCHEMAS.update(orchard.SCHEMAS)  # fruit orchard: plant_tree, tree_care
 
 
-def upgrade_state(farm):
+def upgrade_state(farm, now=None):
     """Safe in-transaction r1 -> r2; no currency, loot or job duplication."""
     farm.setdefault('schema_version', 1)
     need(farm['schema_version'] <= 2, 'newer_save',
@@ -66,6 +67,7 @@ def upgrade_state(farm):
     festivals.state(farm)       # festivals engine: empty mapping for old farms
     textile.upgrade(farm)       # lessons ledger, setdefault only
     merchant.state(farm)        # Сорока: empty record for old farms
+    orchard.upgrade(farm, now)  # orchard record; one free sapling per fruit once grown on beds (decided once per species)
     trip_games.upgrade(farm)    # open v1 fishing games -> v2 plan (FARM_TRIP_MINIGAMES.md 10.6)
     from . import village_quests
     village_quests.state(farm)
@@ -95,7 +97,9 @@ def detect_secrets(farm, now):
         discover(farm, 'elements', now)
 
 
-def harvest(farm, obj, at, owner=True):
+def harvest(farm, obj, at, owner=True, speed=1):
+    if obj['type'] == 'tree':
+        return orchard.harvest(farm, obj, at, owner, speed)
     crop = obj['crop']
     inventory(farm, {crop['id']: crop['yield_qty']})
     progression.grant_xp(farm, crop['xp'], 'harvest', at, owner, CROPS[crop['id']]['seconds'] if crop['id'] in CROPS else None)
@@ -311,6 +315,10 @@ def _targets(farm, ordered, role, at, box):
     for obj in ordered:
         if not in_zone(obj, box):
             continue
+        if obj['type'] == 'tree':   # orchard: harvesters take ripe fruit, the water role waters saplings; nothing else touches a tree
+            if (role == 'harvest' and orchard.ripe(obj, at)) or (role == 'water' and orchard.waterable(obj, at)):
+                yield obj, None
+            continue
         crop = obj.get('crop')
         if role in {'harvest', 'roots'} and crop and crop['ready_at'] <= at:
             if role != 'roots' or crop['id'] in ROOTS:
@@ -334,6 +342,10 @@ def _next_possible(farm, ordered, role, at, box):
     moments = []
     for obj in ordered:
         if not in_zone(obj, box):
+            continue
+        if obj['type'] == 'tree':
+            if role == 'harvest' and obj.get('fruit') and obj['fruit']['ready_at'] > at:
+                moments.append(obj['fruit']['ready_at'])
             continue
         crop = obj.get('crop')
         if role in {'harvest', 'roots'} and crop and (role != 'roots' or crop['id'] in ROOTS):
@@ -374,7 +386,9 @@ def _work_once(farm, ordered, role, at, shift, box, log=None, worker=None):
     obj, payload = target
     speed = shift['speed']
     if role in {'harvest', 'roots'}:
-        harvest(farm, obj, at, False)
+        harvest(farm, obj, at, False, speed)
+    elif role == 'water' and obj['type'] == 'tree':
+        orchard.water(obj, at)
     elif role == 'water':
         crop = obj['crop']
         crop['ready_at'] = max(at, crop['ready_at'] - (crop['ready_at'] - crop['planted_at']) * .15)
@@ -409,7 +423,7 @@ GENITIVE = dict(
     energy_shop='бодрильни', cannery='консервного цеха', confectionery='кондитерской', creamery='молокозавода',
     juicery='соковарни', noodle_shop='макаронной мастерской', oil_press='маслобойни', sausage_shop='колбасного цеха',
     smokehouse='коптильни', soapery='мыловарни', syrupery='сироповарни', tailor='швейной мастерской',
-    teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой')
+    teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой', dryer='сушильни', cellar='погребка')
 
 
 def craft_text(rows):
@@ -443,7 +457,7 @@ def settle(farm, now):
     is a command, and every command settles first, so history is never rewritten.
     """
     now = tick(now)
-    upgrade_state(farm)
+    upgrade_state(farm, now)
     market.settle(farm, now)  # caravan arrival/expiry and the Moscow-day contract reset, even with no workers
     fields.settle(farm, now)  # r9 stage 15: autopilot/expired field runs and ripening, even with no workers
     workers = [(key, val, EQUIPMENT[key] if key in EQUIPMENT else HELPERS[key])
@@ -527,6 +541,9 @@ def _bulk(farm, kind, data, now, speed, command_id):
             if group == 'plots' and obj['type'] == 'plot' and obj.get('crop') and obj['crop']['ready_at'] <= now:
                 harvest(farm, obj, now)
                 done += 1
+            elif group == 'plots' and orchard.ripe(obj, now):
+                orchard.harvest(farm, obj, now, True, speed)
+                done += 1
             elif group == 'animals' and obj.get('animal_job') and obj['animal_job']['ready_at'] <= now:
                 take_animal(farm, obj, now)
                 done += 1
@@ -563,6 +580,7 @@ def _bulk(farm, kind, data, now, speed, command_id):
     # plant_many
     crop = named(CROPS, data['crop'])
     need(lv >= crop['level'], 'locked', 'Эта культура пока не открыта.')
+    need(not crop.get('orchard'), 'orchard_crop', orchard.BED_MESSAGE)
     empty = sorted((o for o in ordered if o['type'] == 'plot' and not o.get('crop') and in_zone(o, box)),
                    key=lambda o: (o['y'], o['x'], o['id']))
     need(bool(empty), 'no_empty_plots', 'В этой области нет свободных грядок.')
@@ -586,6 +604,10 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
         return text
     if kind in merchant.SCHEMAS:
         text = merchant.apply(farm, kind, data, now)
+        event(farm, now, text, kind)
+        return text
+    if kind in orchard.SCHEMAS:
+        text = orchard.apply(farm, kind, data, now, command_id, speed)
         event(farm, now, text, kind)
         return text
     if kind in projects.SCHEMAS:
@@ -628,6 +650,7 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
             crop = named(CROPS, data['crop'])
             need(not data['replant'], 'invalid_command', 'Трактор засевает только свободные грядки.', 422)
             need(lv >= crop['level'], 'locked', 'Эта культура пока не открыта.')
+            need(not crop.get('orchard'), 'orchard_crop', orchard.BED_MESSAGE)
             need(all(p['crop'] is None for p in selected), 'busy_plot', 'В плане есть занятая грядка.')
             need(farm['coins'] >= crop['cost'] * len(selected), 'insufficient_coins', 'Не хватает монет на весь посев.')
             for obj in selected:
@@ -761,6 +784,7 @@ def validate_expansion(farm):
     festivals.validate(farm)
     textile.validate(farm)
     merchant.validate(farm)
+    orchard.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),
          'invalid_team', 'Некорректный состав команды.', 500)

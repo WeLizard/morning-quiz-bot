@@ -513,7 +513,8 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
    switch are on. The base layer (decor, day window light) lies under the night tint, the glow layer above it shows only at night. */
 .village-fest{position:absolute;inset:0;pointer-events:none;display:none}
 .village-fest>svg{display:block;width:100%;height:100%}
-:root[data-festival=posidelki][data-festival-decor=on] .village-fest[data-fest=posidelki]{display:block}
+:root[data-festival=posidelki][data-festival-decor=on] .village-fest[data-fest=posidelki],:root[data-festival=new_year][data-festival-decor=on] .village-fest[data-fest=new_year],
+:root[data-festival=maslenitsa][data-festival-decor=on] .village-fest[data-fest=maslenitsa],:root[data-festival=spring_flowers][data-festival-decor=on] .village-fest[data-fest=spring_flowers]{display:block}
 .village-fest-base .vf-night,.village-fest-glow .vf-decor,.village-fest-glow .vf-day{display:none}
 :root[data-farm-theme=night] .village-fest-base .vf-day{display:none}
 :root:not([data-farm-theme=night]) .village-fest-glow .vf-night{display:none}

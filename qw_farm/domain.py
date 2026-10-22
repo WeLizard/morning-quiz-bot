@@ -132,7 +132,8 @@ def daily(farm, key, now, limit):
 def reachable(farm):
     from .textile import recipe_level
     lv=level(farm['xp'])
-    result={k for k,v in CROPS.items() if v['level']<=lv}
+    from . import orchard
+    result={k for k,v in CROPS.items() if v['level']<=lv and not v.get('orchard')}|orchard.fruits_in_reach(farm)   # fruit: only from a bearing tree or an old bed planting
     from .catalog import ROUTES, route_level
     types={b['type'] for b in farm['objects']}
     for _ in range(20):
@@ -231,8 +232,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
     """Apply one strictly validated command to locked copies of farm aggregates."""
     now=tick(now)
     from . import expansion
-    expansion.upgrade_state(me)
-    if other is not me: expansion.upgrade_state(other)
+    expansion.upgrade_state(me,now)
+    if other is not me: expansion.upgrade_state(other,now)
     if kind in expansion.SCHEMAS:
         need(isinstance(data,dict) and set(data)==expansion.SCHEMAS[kind], 'invalid_command', 'Некорректные параметры действия.',422)
         need(me['id']==other['id'], 'not_owner', 'Это не твоя ферма.',403)
@@ -263,6 +264,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         crop=named(CROPS,data['crop'])
         need(obj['type']=='plot' and obj['crop'] is None,'busy_plot','Эта грядка занята.')
         need(lv>=crop['level'],'locked','Эта культура откроется на следующем уровне.')
+        need(not crop.get('orchard'),'orchard_crop','Плодовые деревья теперь растут в саду: посади саженец во вкладке «Сад».')
         gift=pay(me,crop['cost'])
         obj['crop']=dict(id=crop['id'],planted_at=now,ready_at=now+duration(crop['seconds'],speed,me),
             yield_qty=crop['yield_qty'],xp=crop['xp'],helped=False,version=VERSION,cost=crop['cost'],gift=gift)
@@ -271,14 +273,17 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         from . import undo
         text=undo.dig_up(me,obj,now)
     elif kind in {'harvest','collect_all'}:
-        plots=[obj] if kind=='harvest' else [p for p in me['objects'] if p['type']=='plot' and p['crop'] and p['crop']['ready_at']<=now]
+        from . import orchard
+        plots=[obj] if kind=='harvest' else [p for p in me['objects'] if (p['type']=='plot' and p['crop'] and p['crop']['ready_at']<=now) or orchard.ripe(p,now)]
         need(bool(plots),'nothing_ready','Пока ничего не созрело.')
         for p in plots:
+            if p['type']=='tree':orchard.harvest(me,p,now,True,speed);continue
             c=p.get('crop'); need(c is not None and c['ready_at']<=now,'not_ready','Урожай ещё растёт.')
             inventory(me,{c['id']:c['yield_qty']});progression.grant_xp(me,c['xp'],'harvest',now,True,CROPS[c['id']]['seconds'] if c['id'] in CROPS else None);me['stats']['harvests']+=1
             expansion.observe_harvest(me,c['id']);expansion.market.count(me,'h:'+c['id'],c['yield_qty']);p['last_crop']=c['id']
             p['crop']=None;p['revision']+=1
-        text=f'Урожай собран: {len(plots)} гряд.'
+        trees=sum(p['type']=='tree' for p in plots)
+        text=f'Урожай собран: {len(plots)-trees} гряд.' if not trees else f'Урожай собран: {len(plots)-trees} гряд., деревьев: {trees}.' if len(plots)>trees else f'Урожай собран: деревьев {trees}.'
     elif kind=='queue':
         r=named(RECIPES,data['recipe'])
         need(obj['type']==r['building'] and expansion.textile.recipe_level(me,r)<=lv,'wrong_building','Этот рецепт здесь пока недоступен.')
@@ -363,6 +368,9 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
             raise FarmError(error.code,'Для поворота не хватает места.',error.status) from None
         obj['w'],obj['h']=obj['h'],obj['w']
         obj['orientation']=1-obj.get('orientation',0);obj['revision']+=1;text='Постройка повёрнута.'
+    elif kind=='demolish' and obj['type']=='tree':
+        from . import orchard
+        text=orchard.uproot(me,obj,now,speed)
     elif kind=='demolish':
         need(obj['type'] not in {'house','barn'},'cannot_demolish','Дом и склад нельзя снести.')
         need(not (obj.get('crop') or obj.get('jobs') or obj.get('animal_job') or obj.get('animal')),
@@ -461,10 +469,16 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
                 me['neighbors'].pop(b,None);other['neighbors'].pop(a,None);text='Соседство отменено.'
     elif kind=='help':
         social_allowed(me,other,'allow_help')
-        c=obj.get('crop');need(c and c['ready_at']>now and not c['helped'],'cannot_help','Эта грядка уже готова или ей уже помогли.')
-        daily(me,f'help:{other["id"]}',now,3);daily(me,'help_total',now,10)
-        c['ready_at']=max(now,c['ready_at']-max(1,math.ceil((c['ready_at']-c['planted_at'])*0.2)));c['helped']=True;obj['revision']+=1
-        me['stats']['helps']+=1;event(other,now,f'{me["name"]} поливает грядку. Урожай созреет раньше.','social');text='Грядка полита. Спасибо за помощь!'
+        if obj['type']=='tree':
+            from . import orchard
+            orchard.check_help(obj,now)   # the same limits as a bed: 3 per neighbour and 10 per day
+            daily(me,f'help:{other["id"]}',now,3);daily(me,'help_total',now,10);orchard.help_tree(obj,now)
+            me['stats']['helps']+=1;event(other,now,f'{me["name"]} поливает дерево. Урожай созреет раньше.','social');text='Дерево полито. Спасибо за помощь!'
+        else:
+            c=obj.get('crop');need(c and c['ready_at']>now and not c['helped'],'cannot_help','Эта грядка уже готова или ей уже помогли.')
+            daily(me,f'help:{other["id"]}',now,3);daily(me,'help_total',now,10)
+            c['ready_at']=max(now,c['ready_at']-max(1,math.ceil((c['ready_at']-c['planted_at'])*0.2)));c['helped']=True;obj['revision']+=1
+            me['stats']['helps']+=1;event(other,now,f'{me["name"]} поливает грядку. Урожай созреет раньше.','social');text='Грядка полита. Спасибо за помощь!'
     elif kind=='prank':
         social_allowed(me,other,'allow_pranks')
         need(me['settings']['allow_pranks'],'mutual_consent','Включи проделки и на своей ферме.',403)
@@ -546,6 +560,8 @@ def project(farm, visitor, now):
         result['festival']=festivals.owner_view(farm,now)
         from . import merchant
         result['merchant_view']=merchant.owner_view(farm,now)
+        from . import orchard
+        result['orchard_view']=orchard.owner_view(farm,now)
         result['home_projects']=projects.owner_state(farm)
         for o in result['objects']:
             if o['type'] in _ex.WORKSHOP_TYPES:o.setdefault('recipes_memory',[])
@@ -556,6 +572,9 @@ def project(farm, visitor, now):
             obj['jobs']=[{'ready_at':j['ready_at']} for j in obj.get('jobs',[])]
             for k in ('last_recipe','recipes_memory','recipe_cursor'):obj.pop(k,None)
             if obj.get('animal_job'):obj['animal_job']={'ready_at':obj['animal_job']['ready_at']}
+            if obj['type']=='tree':   # a visitor sees the look and the ripeness, never the price, the voucher or the care state
+                for k in ('cost','gift','paid_with','pruned_until','prune_at'):obj.pop(k,None)
+                if obj.get('fruit'):obj['fruit']={'ready_at':obj['fruit']['ready_at'],'helped':obj['fruit']['helped']}
         result['equipment']={k:{'active':bool(v.get('shift') and v['shift']['status']=='working'),'last_run_at':v.get('last_run_at',0)} for k,v in farm.get('equipment',{}).items()}
         result['helpers']={k:{'active':bool(v.get('shift') and v['shift']['status']=='working')} for k,v in farm.get('helpers',{}).items()}
         result['pranks']=[{'kind':p['kind'],'until':p['until']} for p in farm['pranks'] if p['until']>now]

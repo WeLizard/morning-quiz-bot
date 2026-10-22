@@ -175,7 +175,7 @@ def test_content_contract_and_pilot_shape():
     assert {g['kind'] for g in sold} >= {'decor_big', 'tree_decor', 'graft', 'voucher', 'mascot', 'curio'}
     assert all(g['bound'] and not g['wired'] for g in c['goods'])           # placeholders: nothing is wired to the scene yet
     assert any(g['seller'] == 'magpie' for g in sold) and any(g['seller'] == 'sonya' for g in sold)
-    assert all(F.CONTENT[f] is None for f in F.FESTIVALS if f != 'posidelki')    # stubs: engine handles them, content is TODO
+    assert all(F.CONTENT[f] is None for f in F.FESTIVALS if f not in ('posidelki', 'new_year', 'maslenitsa', 'spring_flowers'))    # stubs: TODO
     for g in sold:
         assert F.price(g) == max(1, -(-g['k'] * income_ref(g['level']) // 100))
     big = next(g for g in sold if g['kind'] == 'decor_big')
@@ -320,7 +320,7 @@ def test_old_farm_without_festivals_loads_and_stays_unchanged_otherwise():
     {'posidelki-2026': {**F.blank(), 'bought': {'fest_posid_basket': 1}}},                  # a task reward cannot be "bought"
     {'posidelki-2026': {**F.blank(), 'bought': {'fest_posid_wreath': 2}}},                  # over the yearly limit
     {'posidelki-2026': {**F.blank(), 'tasks': {'ghost': 1}}},
-    {'new_year-2027': {**F.blank(), 'keepsake': True}},                                    # a stub festival has no memorable item
+    {'april_fools-2027': {**F.blank(), 'keepsake': True}},                                 # a stub festival has no memorable item
     {'posidelki-2026': {'tasks': {}}},
 ])
 def test_validate_state_rejects_corrupt_festival_state(bad):
@@ -360,8 +360,8 @@ def test_owner_view_lists_goods_prices_status_and_the_past_shop():
     assert past['id'] == 'posidelki' and past['key'] == 'posidelki-2026'
     assert next(g for g in past['goods'] if g['id'] == 'fest_posid_wreath')['status'] == 'owned'
     assert next(g for g in past['goods'] if g['id'] == 'fest_posid_lights')['price'] == F.past_price(F.good_of('posidelki', 'fest_posid_lights'))
-    stub = F.owner_view(f, ts(2027, 1, 3))
-    assert stub['fair']['id'] == 'new_year' and stub['fair']['todo'] and stub['fair']['tasks'] == [] and stub['fair']['goods'] == []
+    stub = F.owner_view(f, ts(2027, 4, 1))
+    assert stub['fair']['id'] == 'april_fools' and stub['fair']['todo'] and stub['fair']['tasks'] == [] and stub['fair']['goods'] == []
 
 
 # ---- service: idempotency by command_id and the ledger -------------------------------------------------------------------------
@@ -467,3 +467,154 @@ def test_split_festival_year_has_one_key_for_both_runs_and_the_magpie_comes_once
     assert a['starts_at'] != b['starts_at']                                 # two runs, so starts_at alone is not a once-per-year mark
     assert F.public_calendar(farm(), ts(2030, 3, 4))['current']['key'] == 'maslenitsa-2030'
     assert [d for d in range(4, 11) if F.current(ts(2030, 3, d)) and F.current(ts(2030, 3, d))['id'] == 'maslenitsa' and F.current(ts(2030, 3, d))['magpie']] == [4]
+
+
+# ---- content of the filled festivals: «Новый год», «Масленица», «Весенние цветы» --------------------------------------------------
+FILLED = ('new_year', 'maslenitsa', 'spring_flowers')
+FIRST_FAIR_DAY = {'new_year': ts(2026, 12, 30), 'maslenitsa': ts(2027, 3, 9), 'spring_flowers': ts(2027, 3, 6)}
+# value law bands (design 9.2/9.7: small things 0.5-2 days of income, big ones 5-10, scroll 0.25, graft/voucher 0.1)
+K_RANGE = {'decor': (50, 200), 'tree_decor': (50, 200), 'wall': (25, 100), 'roof': (25, 100), 'path': (50, 200), 'village': (25, 100),
+           'mascot': (100, 300), 'curio': (100, 300), 'decor_big': (500, 1000), 'scroll': (25, 25), 'graft': (8, 12), 'voucher': (8, 12)}
+PREFIX = {'new_year': 'fest_ny_', 'maslenitsa': 'fest_mas_', 'spring_flowers': 'fest_flw_'}
+
+
+def _everything_obtainable(level_no):
+    """Goods a farm with every workshop and animal can have at ``level_no`` (the forest drops wood and the rest regardless)."""
+    from qw_farm.catalog import ANIMALS, ITEMS, RECIPES
+    from qw_farm.domain import reachable
+    f = farm(xp=LEVELS[level_no - 1])
+    f['objects'] = [{'type': t} for t in {r['building'] for r in RECIPES.values()}] + [{'type': 'barn', 'animal': a} for a in ANIMALS]
+    return set(reachable(f)) | {i for i, v in ITEMS.items() if v['kind'] == 'forest'}
+
+
+@pytest.mark.parametrize('fid', FILLED)
+def test_filled_festival_content_contract(fid):
+    from qw_farm.catalog import ITEMS, ORCHARD_WIRED
+    c = F.CONTENT[fid]
+    goods = c['goods']
+    ids = [g['id'] for g in goods]
+    assert len(ids) == len(set(ids)) and all(i.startswith(PREFIX[fid]) for i in ids)
+    assert 3 <= len(c['tasks']) <= 5 and len({t['reward'] for t in c['tasks']}) == len(c['tasks'])
+    assert sum(g['source'] == 'keepsake' for g in goods) == 1                      # exactly one memorable item of the year
+    keep = next(g for g in goods if g['source'] == 'keepsake')
+    assert keep['kind'] == 'keepsake' and keep['limit'] == 1 and F.price(keep) == 0 and keep['place'] in ('farm1', 'fence')
+    for g in goods:
+        assert g['bound'] and g['limit'] == 1                                      # festival items are bound, one of each per year
+        assert g['level'] <= 30
+        if g['source'] != 'keepsake':
+            assert F.price(g) == max(1, -(-g['k'] * income_ref(g['level']) // 100))        # the value law, nothing hand-priced
+            assert F.past_price(g) == -(-F.price(g) * 150 // 100)
+        if g['orchard']:
+            assert g['kind'] in ('voucher', 'graft') and g['place'] == 'orchard' and g['wired'] == bool(ORCHARD_WIRED)
+            assert g['ref'] == '' or (g['ref'] in ITEMS and ITEMS[g['ref']].get('orchard'))
+        else:
+            assert not g['wired'] and not g['ref']
+        if g['source'] == 'fair':
+            assert g['seller'] in ('agata', 'sonya', 'magpie')
+            lo, hi = K_RANGE[g['kind']]
+            assert lo <= g['k'] <= hi, (g['id'], g['k'])
+        else:
+            assert g['seller'] == 'agata' and g['source'] != 'fair'
+    assert len([g for g in goods if g['kind'] in ('decor', 'decor_big', 'wall', 'roof', 'path', 'village', 'mascot', 'tree_decor')]) >= 4
+    assert any(g['seller'] == 'magpie' and g['kind'] == 'curio' for g in goods)
+    assert sum(g['kind'] == 'decor_big' for g in goods) <= 1                         # one 2x2 per festival
+
+
+def test_ids_are_unique_across_all_festivals():
+    ids = [g['id'] for fid in F.FESTIVALS for g in F.content(fid)['goods']]
+    assert len(ids) == len(set(ids))
+
+
+def test_new_year_has_every_decor_form_the_owner_decided_on():
+    goods = F.CONTENT['new_year']['goods']
+    places = {g['place'] for g in goods}
+    assert {'farm1', 'farm2', 'fence', 'roof', 'path', 'village', 'mascot', 'orchard'} <= places     # 1x1, 2x2, fence, roof, path, square, mascot
+    assert sum(g['place'] == 'village' for g in goods) >= 2                                        # more than one square place
+    assert {g['kind'] for g in goods} >= {'tree_decor', 'graft', 'voucher', 'scroll', 'curio', 'keepsake', 'mascot', 'decor_big'}
+    assert {g['seller'] for g in goods} == {'agata', 'sonya', 'magpie'}
+    voucher = next(g for g in goods if g['kind'] == 'voucher')
+    assert voucher['ref'] == 'voucher_orchard' and voucher['orchard']
+    assert F.CONTENT['new_year']['goods'][-1]['source'] == 'keepsake'
+    assert [t['host'] for t in F.CONTENT['new_year']['tasks']].count('Агата') >= 1 and any(t['host'] == 'Соня' for t in F.CONTENT['new_year']['tasks'])
+
+
+@pytest.mark.parametrize('fid', FILLED)
+def test_tasks_are_completable_from_obtainable_goods_at_their_level(fid):
+    from qw_farm.catalog import ITEMS
+    for t in F.CONTENT[fid]['tasks']:
+        have = _everything_obtainable(t['level'])
+        assert 1 <= t['level'] <= 30
+        for i, option in enumerate(t['options']):
+            assert all(ITEMS[k]['kind'] in ('product', 'crop', 'forest') and not ITEMS[k].get('bound') for k in option)
+            assert set(option) <= have, f'{fid}/{t["id"]} option {i} needs goods not obtainable at level {t["level"]}: {set(option) - have}'
+        assert len(t['options']) >= 2                                                # a fallback from ordinary goods
+        assert sum(ITEMS[k]['price'] * q for k, q in t['options'][0].items()) > 0
+
+
+@pytest.mark.parametrize('fid', FILLED)
+def test_full_festival_run_tasks_keepsake_once_fair_limits_and_past_shop(fid):
+    c = F.CONTENT[fid]
+    day = FIRST_FAIR_DAY[fid]
+    need_inv = {}
+    for t in c['tasks']:
+        for k, q in t['options'][0].items():
+            need_inv[k] = need_inv.get(k, 0) + q
+    f = farm(coins=10 ** 9, inv=need_inv, at=day)
+    coins, xp = f['coins'], f['xp']
+    key = F.current(day)['key']
+    for n, t in enumerate(c['tasks']):
+        text = cmd(f, 'festival_task', task(t['id'], 0, fid), day)
+        assert (n == len(c['tasks']) - 1) == ('навсегда в коллекции' in text)
+    assert (f['coins'], f['xp']) == (coins, xp) and not any(f['inventory'].values())
+    e = f['festivals'][key]
+    assert e['keepsake'] is True and set(e['rewards']) == {t['reward'] for t in c['tasks']}
+    keep = next(g for g in c['goods'] if g['source'] == 'keepsake')
+    assert F.collection(f)[keep['id']]['count'] == 1
+    assert code(f, 'festival_buy', buy(keep['id'], fid), day) == 'unknown_item'
+    # fair: every lot once; the second purchase is refused; the Magpie sells on the first fair day
+    sold = [g for g in c['goods'] if g['source'] == 'fair']
+    before = f['coins']
+    for g in sold:
+        cmd(f, 'festival_buy', buy(g['id'], fid), day)
+        assert code(f, 'festival_buy', buy(g['id'], fid), day) == 'limit_reached'
+    assert before - f['coins'] == sum(F.price(g) for g in sold)
+    validate_state(f)
+    # the owner view lists exactly the sold lots and the tasks, and is clean of private fields for a neighbour
+    view = project(f, f, day)['festival']
+    assert [g['id'] for g in view['fair']['goods']] == [g['id'] for g in sold] and view['fair']['keepsake']['got'] is True
+    assert all(g['status'] == 'owned' for g in view['fair']['goods']) and all(t['done'] for t in view['fair']['tasks'])
+    # past shop: after the fair a lot is bought at x1.5 of THIS year's table; the keepsake and task rewards never appear there
+    g0 = sold[0]
+    year = int(key.rsplit('-', 1)[1])
+    later = ts(year + 1, 7, 1) if fid != 'new_year' else ts(2027, 1, 20)
+    fresh = farm(coins=10 ** 9, at=later)
+    c0 = fresh['coins']
+    cmd(fresh, 'festival_buy', buy(g0['id'], fid), later)
+    assert c0 - fresh['coins'] == F.past_price(g0)
+    assert code(fresh, 'festival_buy', buy(keep['id'], fid), later) == 'unknown_item'
+    listed = [x['id'] for p in F.owner_view(fresh, later)['past'] if p['id'] == fid for x in p['goods']]
+    assert listed == [g['id'] for g in sold]
+
+
+def test_new_year_magpie_is_there_on_the_first_fair_day_only_and_the_year_toy_is_per_year():
+    first = FIRST_FAIR_DAY['new_year']
+    f = farm(coins=10 ** 9, at=first)
+    ball = 'fest_ny_ball'
+    assert F.current(first)['key'] == 'new_year-2027' and F.current(first)['magpie']
+    assert not F.current(ts(2026, 12, 31))['magpie']
+    assert code(f, 'festival_buy', buy(ball, 'new_year'), ts(2026, 12, 31)) == 'seller_away'
+    cmd(f, 'festival_buy', buy(ball, 'new_year'), first)
+    # next year's occurrence is a new key: the toy of 2028 is a separate keepsake, the collection keeps both years
+    f2 = farm(coins=10 ** 9, inv={'pie': 9, 'pancake': 20, 'cheese': 9, 'mittens': 5, 'scarf': 3, 'wool_plaid': 3, 'gingerbread': 9}, at=first)
+    for year_start in (first, ts(2027, 12, 30)):
+        for t in F.CONTENT['new_year']['tasks']:
+            cmd(f2, 'festival_task', task(t['id'], 0, 'new_year'), year_start)
+    assert F.collection(f2)['fest_ny_year_toy']['years'] == [2027, 2028] and F.collection(f2)['fest_ny_year_toy']['count'] == 2
+    validate_state(f2)
+
+
+def test_new_year_fair_window_and_name_of_the_toy():
+    assert F.current(ts(2026, 12, 29))['phase'] == 'decor' and F.current(ts(2026, 12, 30))['phase'] == 'fair'
+    assert F.current(ts(2027, 1, 8))['phase'] == 'fair' and F.current(ts(2027, 1, 9))['phase'] == 'decor'
+    assert F.current(ts(2027, 1, 14))['id'] == 'new_year' and F.current(ts(2027, 1, 15)) is None
+    assert F.owner_view(farm(), ts(2026, 12, 30))['fair']['todo'] is False

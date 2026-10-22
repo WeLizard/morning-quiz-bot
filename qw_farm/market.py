@@ -203,7 +203,7 @@ def make_contracts(farm, day):
     m = farm['market']
     lv = level(farm['xp'])
     rng = _rng(farm['id'], 'contracts', day)
-    crops = sorted(c['id'] for c in CROPS.values() if c['level'] <= lv and c['seconds'] <= 14400)
+    crops = sorted(c['id'] for c in CROPS.values() if c['level'] <= lv and c['seconds'] <= 14400 and not c.get('orchard'))   # orchard fruit grows on trees
     types = {o['type'] for o in farm['objects']}
     recipes = sorted(r['id'] for r in RECIPES.values() if textile.recipe_level(farm, r) <= lv and r['building'] in types and not r.get('exclusive')
                      and sum(ITEMS[k]['price'] for k in r['outputs']) >= 8)

@@ -6,6 +6,7 @@ import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,cou
 import {openFieldGame,yieldQty,growthPermille} from './tractor_game.js';
 import * as FEST from './festivals.js';
 import * as MERCH from './merchant.js';
+import * as ORCH from './orchard.js';
 import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js';
 import {CLASS_LABEL,LONG_HINT,seedStats,sortSeeds,planMachine,planRepeat,planTap,remember} from './farm_runs.js';
 import {parseInvite,parseInviteHint,incomingInvite,clearInvite,openTelegram,shareLink,mailtoUrl} from './invite.js';
@@ -83,7 +84,7 @@ const VILLAGE_PLAYER_SVG='<svg class="vp-art" viewBox="-17 -48 34 52" aria-hidde
 const VILLAGE_WALK={n:[77,365,2323,365,1920,427,1922,428,1874,452,287,471,2113,471,2060,497,498,576,1902,576,1218,602,1176,605,709,681,1691,681,1408,698,1390,707,1533,760,1056,767,919,787,586,813,510,814,609,825,547,832,595,832,1016,835,1384,835,656,848,489,861,946,870,1279,888,1502,891,480,892,1499,892,998,896,476,898,485,900,986,900,884,901,988,901,1305,901,1516,901,1063,909,1174,914,1226,914,1331,914,750,922,1308,925,937,927,1147,927,1253,927,1358,927,963,940,1437,940,1095,953,1200,953,1305,953,1411,953,1279,966,1042,980,1147,980,1358,980,1200,985,1179,995,1209,1002,1200,1006,797,1012,1586,1015,809,1017,1147,1032,1231,1043,1895,1044,1174,1045,1745,1055,1194,1056,1200,1059,1186,1060,358,1067,1706,1074,1077,1094,1334,1094,645,1099,1770,1107,1010,1109,674,1114,1029,1118,1814,1129,533,1155,1253,1164,1235,1173,884,1190,1323,1217,1639,1217,2007,1225,323,1260,744,1260,2156,1300,1656,1325,2095,1331,919,1348,112,1366,959,1368,1057,1374,1797,1383,1937,1383,1008,1391,1007,1392,1013,1395,42,1401,2358,1401,830,1433,1200,1474,1186,1481,1340,1559,1551,1664,1762,1769],e:[0,5,1,6,2,3,3,4,3,7,5,8,6,7,7,9,8,12,9,13,10,11,10,14,12,18,13,16,14,15,14,16,16,25,17,18,18,24,19,21,19,22,20,22,21,23,21,26,22,27,24,28,25,32,27,31,28,33,29,39,30,32,31,34,32,40,33,38,33,41,34,35,34,76,36,38,37,45,37,47,38,47,39,44,39,49,40,52,42,48,43,49,44,46,44,50,47,51,48,53,48,54,49,54,49,55,50,55,50,56,51,58,51,67,52,56,52,66,53,58,53,59,54,59,55,57,55,60,56,60,58,68,59,62,60,69,61,62,62,64,63,64,64,68,65,67,66,77,67,80,68,71,69,74,69,79,70,81,71,73,71,78,72,77,73,74,73,75,76,86,77,81,78,84,78,88,80,83,80,86,81,85,82,84,84,89,85,91,85,92,86,93,86,94,87,88,88,90,89,94,92,95,93,99,94,98,95,97,95,108,96,102,97,103,98,100,99,107,100,105,100,109,101,106,102,103,104,105,105,106,106,111,110,111,111,112,112,113,113,114],a:{"gate":110,"hall":61,"merchant":41,"place:board":46,"place:library":15,"place:market":36,"place:pier":20,"place:post":45,"place:workshop":70,"start":104,"visitor:0":101,"visitor:1":75,"visitor:2":35,"visitor:3":83,"Агата":30,"Кошка Кая":23,"Кошка Соня":79,"Лиса Даша":96,"Медведь Пух":109,"Механик Крот":72,"Неведома Зверушка":4,"Петух Олег":11,"Почтальон Ёж":65,"Суслик Игорь":82,"Филиныч":17},z:[[33,308,1025,804,954,839,-37,343],[2367,308,2437,343,1446,839,1376,804],[919,927,989,962,33,1440,-37,1405],[1481,927,2437,1405,2367,1440,1411,962],[1130,1032,1200,1067,814,1260,744,1225],[393,1050,1858,1783,1788,1818,323,1085],[1235,594,1516,734,1481,752,1200,611],[1902,401,2042,471,2007,488,1867,418],[603,804,744,874,709,892,568,822],[1130,1103,1340,1208,1305,1225,1095,1120],[1411,1067,1446,1085,1270,1173,1235,1155],[1762,1138,1797,1155,1586,1260,1551,1243],[1200,716,1551,892,1200,1067,849,892],[600,592,754,669,684,704,530,627]]};
 // Festival layers of the village (scripts/art/village/fest_<id>.js, vector): one file per festival, fetched only while
 // html[data-festival=<id>][data-festival-decor=on]. style.css shows decor and day light under the night tint, the glow above it.
-const VILLAGE_FEST={posidelki:'village-fest-posidelki.svg'},villageFestCache={};
+const VILLAGE_FEST={posidelki:'village-fest-posidelki.svg',new_year:'village-fest-new_year.svg',maslenitsa:'village-fest-maslenitsa.svg',spring_flowers:'village-fest-spring_flowers.svg'},villageFestCache={};
 // Сорока-коробейница (scripts/art/village/merchant.js, generated): the cart is a world-scale layer (asset), the magpie a fixed-size
 // figure like the player's (frames vm-stand / vm-call). Both stay hidden unless html[data-merchant] is set; the merchant mechanic sets it
 // and calls syncVillageMerchant(). cart = box of the cart, foot = where she stands (world units 2400x1800); the player's approach
@@ -126,7 +127,7 @@ const VILLAGE_SITES=[['Трактир',28.7,80.4],['Оранжерея',43.4,26.
 const VILLAGE_PLACES=[['board','Доска заказов','orders',54.5,49,'orders'],['post','Почта: соседи и подарки','friends',29.5,50,'neighbors'],['market','Рынок: склад и продажа','shop',40.3,47.4,'inventory'],['workshop','Мастерская: производство','workshop',80.4,56.6,'production'],['library','Библиотека: журнал фермы','journal',56,37.4,'journal'],['pier','Причал: озеро и рыбалка','lake',19.6,42.8,'lake']];
 // Visiting guests: picked by the Moscow date, so everyone sees the same guests on the same day. They only point to existing sections.
 const VILLAGE_VISITORS=[['trader','Странствующий торговец','🧳','Заглянул по пути на ярмарку. Покажешь, что лежит на складе? Может, сторгуемся.','Открыть склад','inventory'],['fisher','Рыбак Сом','🎣','На озере у фермы сегодня клюёт! Возьми удочку, пока рыба играет.','К озеру','lake'],['forester','Лесник Бор','🌲','В лесу поспели ягоды и грибы. Соберёшь — пригодятся в пирогах.','В лес','forest'],['teller','Сказитель','📜','Хочешь, расскажу, что было на этой ферме? Всё записано в журнале.','Открыть журнал','journal'],['crafter','Плотник Тёс','🔨','Руки чешутся что-нибудь построить. Посмотрим, что можно поставить на ферме?','К постройкам','build'],['traveler','Путница Веся','🎒','Иду от соседей — машут тебе и ждут в гости.','К соседям','neighbors'],['bogatyr','Богатырь','🛡️','У озера на распутье лежит камень. Кто надпись прочтёт, тот путь свой найдёт…','К находкам','secrets']];
-// Easter-egg guests: extra pool, never replaces the daily guests. Names nod to Ilya's other projects; the figures are local critters.
+// Easter-egg guests: extra pool, never replaces the daily guests. Names nod to the owner's other projects; the figures are local critters.
 const VILLAGE_EGGS=[['egg_dymok','Ёж Дымок','🦔','Весь в саже: трубы чистил. Если на ферме чем-то пахнет — загляни в журнал, там всё записано.','Открыть журнал','journal'],['egg_shustrik','Мышь Шустрик','🐭','Таскаю посылки по узким лазам, где никто не ходит. Пройдись по соседям — там тебя ждут.','К соседям','neighbors'],['egg_pushok','Барсук Пушок','🦡','Сторожу чужие амбары, а свой не успеваю. Глянь, что у тебя на складе.','Открыть склад','inventory'],['egg_boryan','Лис Борян','🦊','Из сараев и канав знаю, где что плохо лежит. Давай поищем находки вместе?','К находкам','secrets'],['egg_belyana','Сова Беляна','🦉','Люблю, когда всё лежит ровно. Давай посмотрим на заказы — разложим по порядку.','К заказам','orders'],['egg_kroshka','Божья коровка Крошка','🐞','Я маленькая, зато в лесу знаю каждую тропинку. Пойдём за ягодами?','В лес','forest'],['egg_sharik','Лягух Шарик','🐸','Квакаю на весь пруд — не вытерпел! Рыба сегодня резвая, беги к озеру.','К озеру','lake'],['egg_filya','Паучок Филя','🕷️','Тяну нити на любые катушки. Загляни в мастерские — там тоже что-то мотается.','К мастерским','production'],['egg_makro','Бобёр Макро','🦫','Всё строю по чертежу и по ГОСТу, зубами не разгрызть. Посмотрим, что можно возвести?','К постройкам','build']];
 const VILLAGE_VISITOR_SPOTS=[[44.8,74.5],[49.4,57.3],[20.2,48.4],[28.1,60.3]];
 const VILLAGE_STAGES=['Подготовка','Флажки','Цветы','Праздник!'];
@@ -140,12 +141,12 @@ const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
 const own=()=>S.farm?.is_owner;
 const now=()=>Date.now()/1000+(S.offset||0);
 const el=(tag,txt,cls)=>{let n=document.createElement(tag);if(txt!==undefined&&txt!==null)n.textContent=txt;if(cls)n.className=cls;return n;};
-const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg#${id}`);n.append(u);return n;};
+const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg#${FEST.iconId(id)}`);n.append(u);return n;};
 function lakeDoorArt(){const n=document.createElementNS('http://www.w3.org/2000/svg','svg');n.setAttribute('class','lake-door-art');n.setAttribute('viewBox','0 0 160 68');n.setAttribute('aria-hidden','true');n.setAttribute('focusable','false');n.innerHTML='<defs><clipPath id="lake-card-clip"><rect width="160" height="68" rx="13"/></clipPath><linearGradient id="lake-sky" x2="0" y2="1"><stop stop-color="#dcebd1"/><stop offset="1" stop-color="#f3eacb"/></linearGradient><linearGradient id="lake-water" x2="0" y2="1"><stop stop-color="#8ec7c1"/><stop offset="1" stop-color="#5d9d9c"/></linearGradient></defs><g clip-path="url(#lake-card-clip)"><rect width="160" height="68" fill="url(#lake-sky)"/><circle cx="125" cy="15" r="8" fill="#f6d47d" opacity=".82"/><path d="M0 34 24 16l25 19 28-22 34 24 23-15 26 17v29H0Z" fill="#9bb68b"/><path d="M0 43q25-11 48 0t47 0 65 0v34H0Z" fill="#6f966d"/><path d="M0 47q25-9 49 0t47 0 64 0v25H0Z" fill="url(#lake-water)"/><path d="M8 52q12-4 23 0t23 0m18 0q12-4 23 0t23 0m-73 9q11-3 22 0t22 0m36-7q10-3 20 0" fill="none" stroke="#d4ebe1" stroke-width="1.7" stroke-linecap="round" opacity=".85"/><path d="M8 45V29m0 11-5-7m5 4 5-7m-1 15V33m0 8 5-7m-5 4-4-6m135 12V28m0 13-5-7m5 4 5-7m-1 11V34m0 8 5-7m-5 4-4-6" fill="none" stroke="#547952" stroke-width="2" stroke-linecap="round"/><path d="M65 45q10-7 20 0-10 7-20 0Z" fill="#f0d39a" stroke="#7c795a" stroke-width="1.2"/><path d="m82 44 5-4v10l-5-4" fill="#e7c27a"/><circle cx="72" cy="45" r="1" fill="#365b4c"/><path d="M73 23q5-5 10 0m-7 5q4-4 8 0" fill="none" stroke="#fff8df" stroke-width="1.5" stroke-linecap="round" opacity=".9"/></g>';return n;}
 const button=(text,fn,cls='primary',disabled=false)=>{let b=el('button',text,cls);b.type='button';b.disabled=disabled;b.onclick=fn;return b;};
 const itemName=id=>S.catalog?.items[id]?.name||id;
-const objName=o=>o.type==='plot'?'Грядка':o.type==='house'?'Дом Филиныча':o.type==='barn'?'Склад':S.catalog.buildings[o.type]?.name||o.type;
-const objIcon=o=>o.type==='plot'?(o.crop?.id||'wheat'):o.type==='house'?'home':o.type==='barn'?'shop':S.catalog.animals[o.animal]?.outputs?Object.keys(S.catalog.animals[o.animal].outputs)[0]:'workshop';
+const objName=o=>o.type==='tree'?ORCH.treeName(S.catalog,o):o.type==='plot'?'Грядка':o.type==='house'?'Дом Филиныча':o.type==='barn'?'Склад':S.catalog.buildings[o.type]?.name||o.type;
+const objIcon=o=>o.type==='tree'?(ORCH.species(S.catalog,o)?.fruit||'apple'):o.type==='plot'?(o.crop?.id||'wheat'):o.type==='house'?'home':o.type==='barn'?'shop':S.catalog.animals[o.animal]?.outputs?Object.keys(S.catalog.animals[o.animal].outputs)[0]:'workshop';
 const stock=(id)=>S.me?.inventory[id]||0;
 const enough=needs=>Object.entries(needs).every(([k,q])=>stock(k)>=q);
 const timeText=seconds=>{seconds=Math.max(0,Math.ceil(seconds));if(seconds<60)return `${seconds} с`;const m=Math.ceil(seconds/60);if(m<60)return `${m} мин`;return m%60?`${Math.floor(m/60)} ч ${m%60} мин`:`${m/60} ч`;};
@@ -318,7 +319,7 @@ function seedsSnapshot(){return JSON.stringify([S.farm?.is_owner,S.me?.level,S.s
 function readySnapshot(){
  const t=now(),due=at=>typeof at==='number'&&at<=t;
  return JSON.stringify([
-  (S.farm?.objects||[]).map(o=>[(o.jobs||[]).map(j=>[due(j.starts_at),due(j.ready_at)]),due(o.animal_job?.ready_at),due(o.crop?.ready_at)]),
+  (S.farm?.objects||[]).map(o=>[(o.jobs||[]).map(j=>[due(j.starts_at),due(j.ready_at)]),due(o.animal_job?.ready_at),due(o.crop?.ready_at),due(o.fruit?.ready_at)]),
   (S.me?.trips||[]).map(trip=>[due(trip.ready_at),due(trip.started_at+(S.catalog?.undo?.window||60))]),
   (S.me?.fields||[]).map(f=>[due(f.crop?.ready_at),due(f.run?.done_at),due(f.run?.expires_at)]),
   due(S.me?.economy_status?.feast_until),
@@ -427,7 +428,7 @@ function updateHUD(){
  $('farm-name').textContent=displayName;
  $('farm-caption').textContent=own()?'СВОЁ МЕСТО ПОД СОЛНЦЕМ':'ХОРОШИЕ СОСЕДИ · ХОРОШИЙ ДЕНЬ';$('farm-subtitle').textContent=own()?'Растёт, пока ты занимаешься своими делами.':'В гостях: можно помочь, а хозяйничать будет владелец.';$('return-home').hidden=own();$('fields-door').hidden=!own()||!(S.catalog.fields&&S.me.level>=S.catalog.fields.min_level);$('object-list-button').textContent='Список объектов';
 }
-const tabs=[['orders','orders','Заказы'],['inventory','shop','Склад'],['fields','tractor','Поля'],['build','home','Строить'],['production','workshop','Мастерские'],['team','tractor','Команда'],['forest','forest','В лес'],['lake','lake','Озеро'],['neighbors','friends','Соседи'],['secrets','discovery','Находки'],['journal','journal','Журнал'],['village','coin','Деревня'],['festival','coin','Праздник']];
+const tabs=[['orders','orders','Заказы'],['inventory','shop','Склад'],['fields','tractor','Поля'],['build','home','Строить'],['production','workshop','Мастерские'],['team','tractor','Команда'],['forest','forest','В лес'],['lake','lake','Озеро'],['neighbors','friends','Соседи'],['secrets','discovery','Находки'],['journal','journal','Журнал'],['village','coin','Деревня'],['orchard','orchard','Сад'],['festival','coin','Праздник']];
 function renderRail(){
  const mobile=matchMedia('(max-width:850px)').matches;
  const mainTabs=new Set(['orders','inventory','fields','build','production','team','forest','lake','neighbors']);
@@ -447,8 +448,9 @@ let seedCardVisible=false,seedCardTimer=0;
 function showSeedCard(ms=0){seedCardVisible=true;clearTimeout(seedCardTimer);updateSeedCard();if(ms)seedCardTimer=setTimeout(hideSeedCard,ms);}
 function hideSeedCard(){clearTimeout(seedCardTimer);seedCardVisible=false;$('seedcard').hidden=true;}
 function renderSeeds(){const parent=$('seedbar'),scroll=parent.scrollLeft;parent.replaceChildren();parent.hidden=!own();$('quick-stack').hidden=!own();$('harvest-all').hidden=!own();updateSeedCard();updateRepeat();if(!own())return;parent.append(el('div','ПОСАДИТЬ','seedbar-label'));
- for(let c of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic),S.me.level)){let locked=c.level>S.me.level,st=seedStats(c,S.catalog.items[c.id].price,S.speed,S.catalog.crop_classes),b=button(null,()=>{S.seed=c.id;renderSeeds();showSeedCard(2600);document.body.classList.remove('panel-open');},`seed ${S.seed===c.id?'active':''} cls-${st.cls}`,locked);b.addEventListener('pointerenter',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('pointerleave',()=>{if(c.id===S.seed)hideSeedCard();});b.addEventListener('focus',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('blur',()=>{if(c.id===S.seed)hideSeedCard();});const details=el('small',null,'seed-details');if(locked)details.append(el('span',`С ${c.level} ур.`));else details.append(el('span',`${fmt(c.cost)} мон.`),el('span',seedTimeText(st.seconds)));b.append(icon(c.id),el('span',c.name),details);b.dataset.class=st.cls;b.setAttribute('aria-label',locked?`${c.name}: нужен уровень ${c.level}`:seedLine(c,st));parent.append(b);}
+ for(let c of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic&&!c.orchard),S.me.level)){let locked=c.level>S.me.level,st=seedStats(c,S.catalog.items[c.id].price,S.speed,S.catalog.crop_classes),b=button(null,()=>{S.seed=c.id;renderSeeds();showSeedCard(2600);document.body.classList.remove('panel-open');},`seed ${S.seed===c.id?'active':''} cls-${st.cls}`,locked);b.addEventListener('pointerenter',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('pointerleave',()=>{if(c.id===S.seed)hideSeedCard();});b.addEventListener('focus',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('blur',()=>{if(c.id===S.seed)hideSeedCard();});const details=el('small',null,'seed-details');if(locked)details.append(el('span',`С ${c.level} ур.`));else details.append(el('span',`${fmt(c.cost)} мон.`),el('span',seedTimeText(st.seconds)));b.append(icon(c.id),el('span',c.name),details);b.dataset.class=st.cls;b.setAttribute('aria-label',locked?`${c.name}: нужен уровень ${c.level}`:seedLine(c,st));parent.append(b);}
  for(const k of MERCH.seedPacks(S.catalog,stock,S.me.level)){const b=button(null,()=>{S.seed=k.id;renderSeeds();document.body.classList.remove('panel-open');},`seed ${S.seed===k.id?'active':''} cls-pack`);b.dataset.seedPack=k.id;const d=el('small',null,'seed-details');d.append(el('span','из пакета'),el('span',`осталось ${k.left}`));b.append(icon(k.id),el('span',k.name),d);b.setAttribute('aria-label',`${k.name}: посадить из пакета, осталось ${k.left}`);parent.append(b);}
+ parent.append(el('div','Плодовые деревья — в разделе «Сад»','seedbar-label'));
  parent.scrollLeft=scroll;}
 function seedLine(c,st){return `${c.name} — семена ${fmt(c.cost)} мон., ${st.label}, ${timeText(st.seconds)}, урожай ×${c.yield_qty}, ≈${fmt(st.perHour)} мон./ч, ≈${fmt(st.xpPerHour)} опыта/ч`+(st.cls==='long'?`. ${LONG_HINT}.`:'');}
 // The card of the chosen seed: class, time, income and XP per hour, and a hint for long crops.
@@ -468,13 +470,13 @@ function tapMachine(id){const plan=planTap(id,S.lastRun,S.me,S.catalog,now());
  if(plan){runPlan(plan);return;}
  const spec=S.catalog.equipment[id],box=el('div');
  if(id==='tractor'){const [w,sel]=field('Культура для трактора','select');
-  for(const crop of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic),S.me.level).filter(c=>c.level<=S.me.level)){const st=seedStats(crop,S.catalog.items[crop.id].price,S.speed,S.catalog.crop_classes),o=el('option',`${crop.name} · ${st.label} · ${timeText(st.seconds)} · ${crop.cost} мон.`);o.value=crop.id;sel.append(o);}
+  for(const crop of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic&&!c.orchard),S.me.level).filter(c=>c.level<=S.me.level)){const st=seedStats(crop,S.catalog.items[crop.id].price,S.speed,S.catalog.crop_classes),o=el('option',`${crop.name} · ${st.label} · ${timeText(st.seconds)} · ${crop.cost} мон.`);o.value=crop.id;sel.append(o);}
   sel.value=S.catalog.crops[S.seed]?.level<=S.me.level?S.seed:sel.options[0]?.value;box.append(w,el('p','Засеет свободные грядки (до 24 за рейс). В следующий раз машина по нажатию повторит этот рейс сама.','note'));
   modal(spec.name,box,[button('Засеять',safe(async()=>{const plan=planMachine({machine:id,crop:sel.value,replant:false},S.me,S.catalog,now());if(!plan.ok){toast(plan.why,true);return;}$('dialog').close();await runPlan(plan);}),'primary')]);return;}
  const [w,replant]=checkbox('Сразу пересеять те же культуры',true);box.append(w,el('p','Уберёт готовые зерновые (до 24 грядок за рейс). В следующий раз машина по нажатию повторит этот рейс сама.','note'));
  modal(spec.name,box,[button('Отправить комбайн',safe(async()=>{const plan=planMachine({machine:id,crop:'',replant:replant.checked},S.me,S.catalog,now());if(!plan.ok){toast(plan.why,true);return;}$('dialog').close();await runPlan(plan);}),'primary')]);}
 let readiness='';
-function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(S.tab==='fields'&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>o.crop&&o.crop.ready_at<=now()).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);}
+function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(S.tab==='fields'&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>(o.crop&&o.crop.ready_at<=now())||ORCH.ripe(o,now())).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);}
 function clickObject(o,cell){hideStoneSpeech();
  if(S.placing){
   const p=S.placing;if(p.committing)return;
@@ -488,6 +490,7 @@ function clickObject(o,cell){hideStoneSpeech();
  if(o.type==='arbor'){selectTab('arbor');return;}
  if(o.type==='stone'){showStoneSpeech();return;}
  if(o.type==='machine'){if(own())tapMachine(o.machine);return;}
+ if(o.type==='tree'&&own()&&ORCH.ripe(o,now())){command('harvest',{object:o.id,revision:o.revision}).then(ok=>{if(ok)scene.burst(o);});return;}
  if(o.type==='plot'&&own()){
   if(o.crop&&o.crop.ready_at<=now()){command('harvest',{object:o.id,revision:o.revision}).then(ok=>{if(ok)scene.burst(o);});return;}
   if(!o.crop){const r=MERCH.plantRequest(o,S.seed,S.catalog,stock);if(r.error){toast(r.error,true);S.seed='wheat';renderSeeds();return;}command(...r.command);return;}
@@ -498,7 +501,7 @@ function renderPanel(){
  syncVillageScene();if(typeof syncFestivalWorld==='function')syncFestivalWorld();if(!S.me)return;let p=$('panel-content');const villageFocus=S.tab==='village'?document.activeElement?.dataset?.villageFocus:null;const villageServices=S.tab==='village'?[...p.querySelectorAll('.village-services[open]')].map(n=>n.dataset.villageService):[];const villagePanelKey=S.tab==='village'?JSON.stringify([villageSheet,villageResident]):null;const oldScroll=S.lastRenderedTab===S.tab&&(S.tab!=='village'||S.lastRenderedVillageSheet===villagePanelKey)?p.scrollTop:0;S.lastRenderedTab=S.tab;S.lastRenderedVillageSheet=villagePanelKey;p.replaceChildren();
  if(!own()&&S.tab!=='object'&&S.tab!=='neighbors'){renderVisit(p);panelRenderSignature=panelSnapshot();return;}
  scene.zones=null;scene.areaPreview=null;scene.dirty=true;
- if(S.tab==='lake')renderLake(p);else if(S.tab==='arbor')renderArbor(p);else{const fn={orders:renderOrders,inventory:renderInventory,build:renderBuild,production:renderProduction,neighbors:renderNeighbors,journal:renderJournal,settings:renderSettings,object:renderObject,objects:renderObjects,team:renderTeam,forest:renderForest,secrets:renderSecrets,more:renderMore,village:renderVillage,fields:renderFields,festival:typeof renderFestivalTab==='function'?renderFestivalTab:undefined}[S.tab]||renderOrders;fn(p);}if(S.tab==='orders'&&typeof festivalBanner==='function')festivalBanner(p);for(const n of p.querySelectorAll('.village-services'))n.open=villageServices.includes(n.dataset.villageService);p.scrollTop=oldScroll;if(villageFocus){const target=[...p.querySelectorAll('[data-village-focus]')].find(n=>n.dataset.villageFocus===villageFocus)||p.querySelector('[data-village-focus=resident]');target?.focus({preventScroll:true});}panelRenderSignature=panelSnapshot();
+ if(S.tab==='lake')renderLake(p);else if(S.tab==='arbor')renderArbor(p);else{const fn={orders:renderOrders,inventory:renderInventory,build:renderBuild,production:renderProduction,neighbors:renderNeighbors,journal:renderJournal,settings:renderSettings,object:renderObject,objects:renderObjects,team:renderTeam,forest:renderForest,secrets:renderSecrets,more:renderMore,village:renderVillage,fields:renderFields,orchard:typeof renderOrchard==='function'?renderOrchard:undefined,festival:typeof renderFestivalTab==='function'?renderFestivalTab:undefined}[S.tab]||renderOrders;fn(p);}if(S.tab==='orders'&&typeof festivalBanner==='function')festivalBanner(p);for(const n of p.querySelectorAll('.village-services'))n.open=villageServices.includes(n.dataset.villageService);p.scrollTop=oldScroll;if(villageFocus){const target=[...p.querySelectorAll('[data-village-focus]')].find(n=>n.dataset.villageFocus===villageFocus)||p.querySelector('[data-village-focus=resident]');target?.focus({preventScroll:true});}panelRenderSignature=panelSnapshot();
 }
 /* ---- building upgrades 1 -> 3: all numbers come from the server catalog (S.catalog.upgrades) ---- */
 const UP=()=>S.catalog.upgrades;
@@ -701,7 +704,58 @@ function landExpansion(p){
  if(step){const expand=button('Расширить участок',()=>command('expand'),'secondary small',locked);expand.setAttribute('aria-label',`Расширить участок до ${step.size} × ${step.size} за ${step.cost} монет`);row.append(expand);if(locked)row.append(el('small',`Доступно с ${step.level} уровня`,'land-expansion-lock'));}
  p.append(row);
 }
-function renderBuild(p){heading('Обустройство','ЗДЕСЬ БУДЕТ ТВОЯ ИСТОРИЯ');landExpansion(p);note('Выбери объект, нажми на свободную клетку и нажми по ней ещё раз или «Поставить». Перемещение уже построенного бесплатно.',p);let specs=[{id:'plot',name:'Новая грядка',cost:35,level:1,w:1,h:1},...Object.values(S.catalog.buildings)];for(let b of specs){if(b.curio&&!(S.me.merchant?.curios||[]).includes(b.id))continue;let c=card(b.name,`${b.w} × ${b.h} клеток · ${b.cost} монет`,b.id==='plot'?'wheat':'workshop');const purpose=buildingPurpose(b.id,S.catalog);if(purpose.length)note(purpose.join(' '),c);if(b.level>S.me.level)note(`Откроется на уровне ${b.level}`,c);if(b.secret&&!S.me.secrets.includes(b.secret))note('Найди эту пасхалку в разделе «Находки».',c);const locked=b.reward&&!(S.me.economy?.unlocked||[]).includes(b.id);if(locked)note(`Награда фонда деревни: ${b.source}`,c);const placed=S.farm.objects.filter(o=>o.type===b.id);if(placed.length){const row=el('div',null,'building-purpose-row');row.append(el('small',`Уже на ферме: ${placed.length}`));for(const o of placed){const pick=button(null,()=>{farmViewEpoch++;S.selected=o.id;S.tab='object';scene.focus(o,true,sheetInset());showPanel();renderRail();renderPanel();},'text-button building-purpose-pick');pick.append(icon(objIcon(o)),el('span',`${o.x+1}, ${o.y+1}`));row.append(pick);}c.append(row);}c.append(button('Разместить',()=>beginPlacement(b),'secondary wide',b.level>S.me.level||b.cost>S.me.coins||(b.secret&&!S.me.secrets.includes(b.secret))||locked));p.append(c);}}
+function renderBuild(p){heading('Обустройство','ЗДЕСЬ БУДЕТ ТВОЯ ИСТОРИЯ');landExpansion(p);note('Выбери объект, нажми на свободную клетку и нажми по ней ещё раз или «Поставить». Перемещение уже построенного бесплатно. Плодовые деревья сажают во вкладке «Сад».',p);let specs=[{id:'plot',name:'Новая грядка',cost:35,level:1,w:1,h:1},...Object.values(S.catalog.buildings)];for(let b of specs){if(b.curio&&!(S.me.merchant?.curios||[]).includes(b.id))continue;let c=card(b.name,`${b.w} × ${b.h} клеток · ${b.cost} монет`,b.id==='plot'?'wheat':'workshop');const purpose=buildingPurpose(b.id,S.catalog);if(purpose.length)note(purpose.join(' '),c);if(b.level>S.me.level)note(`Откроется на уровне ${b.level}`,c);if(b.secret&&!S.me.secrets.includes(b.secret))note('Найди эту пасхалку в разделе «Находки».',c);const locked=b.reward&&!(S.me.economy?.unlocked||[]).includes(b.id);if(locked)note(`Награда фонда деревни: ${b.source}`,c);const placed=S.farm.objects.filter(o=>o.type===b.id);if(placed.length){const row=el('div',null,'building-purpose-row');row.append(el('small',`Уже на ферме: ${placed.length}`));for(const o of placed){const pick=button(null,()=>{farmViewEpoch++;S.selected=o.id;S.tab='object';scene.focus(o,true,sheetInset());showPanel();renderRail();renderPanel();},'text-button building-purpose-pick');pick.append(icon(objIcon(o)),el('span',`${o.x+1}, ${o.y+1}`));row.append(pick);}c.append(row);}c.append(button('Разместить',()=>beginPlacement(b),'secondary wide',b.level>S.me.level||b.cost>S.me.coins||(b.secret&&!S.me.secrets.includes(b.secret))||locked));p.append(c);}}
+/* ---- fruit orchard (docs/tasks/FARM_ORCHARD.md): the «Сад» tab and the card of a tree. Every number comes from the server (S.catalog.orchard, S.me.orchard_view) ---- */
+const orchardInfo=o=>ORCH.view(S.me)?.trees?.[o.id]||null;
+function renderOrchard(p){
+ heading('Сад','ДЕРЕВО РАСТЁТ, УРОЖАЙ ВОЗВРАЩАЕТСЯ');
+ const v=ORCH.view(S.me),rows=ORCH.saplingRows(S.catalog,S.me,v),mine=ORCH.treeSummary(S.catalog,S.me.objects);
+ note('Саженец покупают один раз: дерево плодоносит снова и снова, каждый «садовый год» — это 20 часов. Грядок оно не занимает, но у участка есть лимит деревьев. Ничего не гибнет и не портится, а заходить обязательно не нужно.',p);
+ if(v)note(`Деревьев: ${v.count} из ${v.limit}${mine?` · ${mine}`:''}`,p);
+ if(v&&Object.keys(v.discounts||{}).length)note(`Талоны со скидкой: ${Object.entries(v.discounts).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ')}`,p);
+ for(const r of rows){
+  const c=card(r.sapling,`${r.name} · первый урожай через ${duration(r.first)}`,'sapling_'+r.id);
+  c.append(el('p',`Урожай ×${r.yield_qty} у молодого дерева, с годами больше · опыт за урожай ${r.xp}${r.potted?' · растёт в кадке':''}`,'note'));
+  if(r.locked)note(`Откроется на уровне ${r.level}`,c);else if(r.blocked)note(r.blocked,c);
+  const stack=el('div',null,'qw-btn-stack');
+  r.options.forEach((opt,i)=>{
+   const b=button(opt.price?`Посадить · ${fmt(opt.price)} мон.`:'Посадить бесплатно',()=>beginPlacement(ORCH.plantSpec(r,opt,S.catalog)),'secondary wide',r.locked||!!r.blocked||opt.price>S.me.coins);
+   b.dataset.voucher=opt.voucher||'';stack.append(b,el('small',opt.label+(opt.qty?` · есть ×${opt.qty}`:''),'note'));
+  });
+  c.append(stack);p.append(c);
+ }
+ note('Редкие сорта и прививки привозит Сорока-коробейница: у них свой облик, а урожай и место в саду те же.',p);
+}
+function renderTree(o,p){
+ const t=now(),mine=own(),v=ORCH.view(S.me),f=ORCH.treeFacts(S.catalog,o,mine?orchardInfo(o):null,t,v?.infusion||0,v?.grafts||{});
+ const box=card(f.name,mine&&f.age!==null?`${f.stageName} · ${ORCH.gardenYears(f.age)}`:'Плодовое дерево',f.fruit||'apple');
+ box.append(el('p',ORCH.stageNote(f.stage),'note'));
+ if(f.lookName)note(`Привито: «${f.lookName}»`,box);
+ if(o.fruit){box.append(el('p',f.ripe?'Урожай созрел и ждёт на ветках':o.harvests?'Следующий урожай через:':'Первый урожай через:','note'),timer(o.fruit.ready_at));if(mine&&o.fruit.started_at)box.append(growthMeter(o.fruit.started_at,o.fruit.ready_at));}
+ if(mine){
+  box.append(el('p',`Урожай этого года: ×${f.qty}${f.nextYield&&f.nextYield!==f.qty?` (по возрасту ×${f.nextYield})`:''}${f.goldenPct?` · шанс золотого плода ${f.goldenPct}%`:''}`,'note'));
+  if(f.pest)note(f.pestActive?`${f.pest} на ветке. Урожай не убавится, но золотого плода в этом году не будет.`:`${f.pest}: за деревом присматривает скворечник.`,box);
+  if(f.dry)note('На дереве сухие ветки: подрезка бесплатная, даёт древесину и больше плодов на ближайшие семь урожаев. Если не обрезать, ничего не потеряется.',box);
+  const stack=el('div',null,'qw-btn-stack');
+  stack.append(button('Собрать урожай',()=>command('harvest',{object:o.id,revision:o.revision}).then(ok=>{if(ok)scene.burst(o);}),'primary wide',!f.ripe));
+  if(f.pestActive)stack.append(button('Опрыскать настоем',()=>command(...ORCH.careCommand(o,'spray')),'secondary wide',!f.canSpray),...(f.canSpray?[]:[el('small',f.sprayWhy,'note')]));
+  if(f.dry)stack.append(button('Обрезать ветки',()=>command(...ORCH.careCommand(o,'prune')),'secondary wide'));
+  for(const g of f.grafts)stack.append(button(`Привить: ${g.name}`,()=>command(...ORCH.careCommand(o,'graft',g.id)),'secondary wide',g.same));
+  box.append(stack);
+ }else if(S.farm.permissions.allow_help)box.append(button(f.helped?'Сосед уже помог':'Полить дерево',()=>command('help',{object:o.id,revision:o.revision},S.farm.id),'primary wide',f.helped||f.ripe));
+ p.append(box);
+ if(mine){
+  p.append(button('Переместить дерево',()=>beginPlacement({w:o.w,h:o.h,name:objName(o)},o),'text-button'));
+  p.append(button('Выкорчевать',()=>confirmUproot(o),'text-button danger'));
+ }else renderVisitActions(p);
+}
+function confirmUproot(o){
+ const u=ORCH.uprootText(S.catalog,o,now(),S.catalog.undo?.window||60);
+ modal(`Выкорчевать «${objName(o)}»?`,u.text,[button(u.early?'Отменить посадку':'Выкорчевать',safe(async()=>{
+  $('dialog').close();
+  if(await command('demolish',{object:o.id,revision:o.revision})){S.selected=null;scene.selected=null;scene.dirty=true;S.tab='orchard';renderRail();renderPanel();}
+ }),'primary')]);
+}
 function beginPlacement(spec,obj=null){if(villageVisible())exitVillage();S.placing={spec,obj,cell:null};scene.placement={spec,ignore:obj?.id};closePanel();renderPlacement();}
 function cancelPlacement(){S.placing=null;scene.placement=null;$('placement').hidden=true;}
 // Beds and decor can be placed one after another: the mode stays open until «Готово», Esc, or the money/limit runs out.
@@ -711,13 +765,13 @@ function renderPlacement(){let n=$('placement'),p=S.placing;if(!p){n.hidden=true
  n.replaceChildren(el('strong',p.obj?`Переместить: ${objName(p.obj)}`:p.spec.name),el('p',hint,'note'));
  let row=el('div');row.append(button(p.count?'Готово':'Отмена',()=>{cancelPlacement();renderPanel();},'secondary',p.committing),button(p.committing?'Сохраняем…':'Поставить',safe(()=>commitPlacement(p)),'primary',!p.cell||p.committing));n.append(row);}
 async function commitPlacement(p){if(!p.cell||S.placing!==p||p.committing)return;const cell={x:p.cell.x,y:p.cell.y};p.committing=true;renderPlacement();let ok=false;
- try{const data=p.obj?{object:p.obj.id,x:cell.x,y:cell.y,revision:p.obj.revision}:{type:p.spec.id,x:cell.x,y:cell.y};ok=await command(p.obj?'move':'build',data);}
+ try{if(p.spec.tree)ok=await command(...ORCH.plantCommand(p.spec,cell));else{const data=p.obj?{object:p.obj.id,x:cell.x,y:cell.y,revision:p.obj.revision}:{type:p.spec.id,x:cell.x,y:cell.y};ok=await command(p.obj?'move':'build',data);}}
  finally{p.committing=false;if(S.placing===p)renderPlacement();}
  if(!ok||S.placing!==p){if(S.placing===p)renderPlacement();return;}
  const again=repeatable(p.spec);
  if(again&&S.me.coins>=p.spec.cost&&S.me.level>=(p.spec.level||1)){p.count=(p.count||0)+1;p.cell=null;scene.placement.cell=null;scene.dirty=true;renderPlacement();}
  else{if(again)toast('Монет на следующую не хватает — режим закрыт.');cancelPlacement();renderPanel();}}
-function renderProduction(p){heading('Мастерские','СЫРЬЁ СТАНОВИТСЯ ЧЕМ-ТО БОЛЬШИМ');note('Работа в очередях продолжается с закрытой вкладкой. Готовые товары ждут на полке, не пропадая.',p);bulkCard(p);for(let o of S.me.objects.filter(o=>o.type!=='plot'&&!['house','barn'].includes(o.type)&&!S.catalog.buildings[o.type]?.decor))p.append(objectButton(o));}
+function renderProduction(p){heading('Мастерские','СЫРЬЁ СТАНОВИТСЯ ЧЕМ-ТО БОЛЬШИМ');note('Работа в очередях продолжается с закрытой вкладкой. Готовые товары ждут на полке, не пропадая.',p);bulkCard(p);for(let o of S.me.objects.filter(o=>o.type!=='plot'&&o.type!=='tree'&&!['house','barn'].includes(o.type)&&!S.catalog.buildings[o.type]?.decor))p.append(objectButton(o));}
 // On phones the panel is a sheet over the map: report how many canvas pixels it covers so the camera aims above it.
 function sheetInset(){const p=$('panel').getBoundingClientRect(),c=$('farm-canvas').getBoundingClientRect();return matchMedia('(max-width:850px)').matches&&p.height&&p.top<c.bottom?Math.max(0,c.bottom-p.top):0;}
 function stateBadge(row){
@@ -755,6 +809,7 @@ function renderObjects(p){
 function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){S.tab='orders';renderPanel();return;}heading(objName(o),own()?'ТВОЁ ХОЗЯЙСТВО':'В ГОСТЯХ У СОСЕДА');
  if(o.type==='plot'){
   let c=o.crop;if(c){let box=card(itemName(c.id),`Урожай ×${c.yield_qty}`,c.id);box.append(timer(c.ready_at));box.append(growthMeter(c.planted_at,c.ready_at));if(own()){box.append(button('Собрать',()=>command('harvest',{object:o.id,revision:o.revision}),'primary wide',c.ready_at>now()));box.append(button('Выкопать',()=>confirmDigUp(o),'secondary wide',c.ready_at<=now()));}else if(S.farm.permissions.allow_help)box.append(button(c.helped?'Сосед уже помог':'Полить грядку',()=>command('help',{object:o.id,revision:o.revision},S.farm.id),'primary wide',c.helped||c.ready_at<=now()));p.append(box);}else if(own()){note('Выбери семена внизу и нажми грядку — или посади выбранную культуру здесь.',p);p.append(button(`Посадить: ${itemName(S.seed)}`,()=>command('plant',{object:o.id,crop:S.seed,revision:o.revision}),'primary wide'));}else note('Грядка отдыхает до следующего посева.',p);
+ }else if(o.type==='tree'){renderTree(o,p);return;
  }else if(o.type==='house'){note('Дом Филиныча — место, где урожай становится частью фермы.',p);renderMinigame('house',p);renderProjectHouse(p);if(own())p.append(button('Открыть заказы',()=>selectTab('orders'),'primary wide'));}
  else if(!own()){note('Владелец занимается производством сам. Найди растущую грядку, чтобы помочь.',p);renderVisitActions(p);return;}
  else if(o.type==='barn'){note('Здесь сохраняется весь урожай. Ограничения вместимости нет: улучшенный склад приносит больше монет при продаже.',p);renderMinigame('barn',p);renderProjectBarnShelf(p);p.append(button('Открыть склад',()=>selectTab('inventory'),'primary wide'));upgradeCard(o,p);}
@@ -887,7 +942,7 @@ function bulkCounts(z){
  let feed=0,restart=0;
  for(const o of objs)if(o.animal&&!o.animal_job&&S.catalog.animals[o.animal]&&take(batchOf(S.catalog.animals[o.animal],o).inputs))feed++;
  for(const o of objs){if((o.jobs||[]).length>=slotsOf(o))continue;const r=recipeMemory(o).map(id=>S.catalog.recipes[id]).find(r=>r.building===o.type&&recipeLevel(r)<=lv&&Object.entries(r.inputs).every(([k,q])=>(stockLeft[k]||0)>=q));if(r&&take(r.inputs))restart++;}
- return {plots:objs.filter(o=>o.type==='plot'&&o.crop&&o.crop.ready_at<=t).length,animals:objs.filter(o=>o.animal_job&&o.animal_job.ready_at<=t).length,
+ return {plots:objs.filter(o=>(o.type==='plot'&&o.crop&&o.crop.ready_at<=t)||(o.type==='tree'&&o.fruit&&o.fruit.ready_at<=t)).length,animals:objs.filter(o=>o.animal_job&&o.animal_job.ready_at<=t).length,
   workshops:objs.reduce((a,o)=>a+(o.jobs||[]).filter(j=>j.ready_at<=t).length,0),feed,restart,empty:objs.filter(o=>o.type==='plot'&&!o.crop).length};
 }
 function bulkCard(p){
@@ -939,7 +994,7 @@ function renderTeam(p){
    if(!owned)c.append(button(`Купить за ${spec.cost}`,()=>command('buy_equipment',{equipment:spec.id}),'primary wide',S.me.coins<spec.cost||S.me.level<spec.level));
    else if(spec.id==='tractor'){
     const [w,sel]=field('Культура для трактора','select');
-    for(let crop of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic),S.me.level).filter(c=>c.level<=S.me.level)){const st=seedStats(crop,S.catalog.items[crop.id].price,S.speed,S.catalog.crop_classes);let o=el('option',`${crop.name} · ${st.label} · ${timeText(st.seconds)} · ${crop.cost} мон./грядка`);o.value=crop.id;sel.append(o);}sel.value=S.tractorCrop||S.lastRun?.tractor?.crop||S.seed;if(!sel.value)sel.value=sel.options[0]?.value;
+    for(let crop of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic&&!c.orchard),S.me.level).filter(c=>c.level<=S.me.level)){const st=seedStats(crop,S.catalog.items[crop.id].price,S.speed,S.catalog.crop_classes);let o=el('option',`${crop.name} · ${st.label} · ${timeText(st.seconds)} · ${crop.cost} мон./грядка`);o.value=crop.id;sel.append(o);}sel.value=S.tractorCrop||S.lastRun?.tractor?.crop||S.seed;if(!sel.value)sel.value=sel.options[0]?.value;
     const info=el('p',null,'note'),go=button('',()=>{S.tractorCrop=sel.value;runPlan(planMachine({machine:spec.id,crop:sel.value,replant:false},S.me,S.catalog,now()));},'secondary wide');
     const upd=()=>{const plan=planMachine({machine:spec.id,crop:sel.value,replant:false},S.me,S.catalog,now());info.textContent=plan.ok?`Засеем ${plan.count} грядок: ${fmt(plan.cost)} монет на семена. За рейс — не больше 24 грядок.`:plan.why;go.textContent=plan.ok?`Засеять свободные · ${plan.count}`:'Засеять свободные';go.disabled=!plan.ok;};
     sel.onchange=()=>{S.tractorCrop=sel.value;upd();};upd();
@@ -1035,10 +1090,10 @@ function placeStoneSpeech(){
 // The tea arbor: a rest stop with a summary of what is ready and Филиныч's tea-time question (the same server game and cooldown as in his house).
 function renderArbor(p){
  heading('Чайная беседка','ПЕРЕРЫВ С ФИЛИНЫЧЕМ');
- const t=now(),objects=S.me.objects||[],crops=objects.filter(o=>o.type==='plot'&&o.crop&&o.crop.ready_at<=t).length,jobs=objects.filter(o=>o.jobs?.some(j=>j.ready_at<=t)||(o.animal_job&&o.animal_job.ready_at<=t)).length,orders=(S.me.orders||[]).length;
+ const t=now(),objects=S.me.objects||[],crops=objects.filter(o=>(o.type==='plot'&&o.crop&&o.crop.ready_at<=t)||ORCH.ripe(o,t)).length,jobs=objects.filter(o=>o.jobs?.some(j=>j.ready_at<=t)||(o.animal_job&&o.animal_job.ready_at<=t)).length,orders=(S.me.orders||[]).length;
  note('Присядь, выдохни и посмотри, что на ферме уже ждёт тебя. Филиныч любит задавать вопрос за чаем.',p);
  const c=card('Что ждёт на ферме','Сводка за чаем','home');
- const rows=[[`Готовый урожай: ${crops}`,crops>0,'Собрать',()=>{closePanel();const o=objects.find(o=>o.type==='plot'&&o.crop&&o.crop.ready_at<=t);if(o)scene.focus(o,true,window.innerWidth<=850?Math.round(window.innerHeight*.4):0);}],[`Готово в мастерских и у животных: ${jobs}`,jobs>0,'Показать',()=>selectTab('production')],[`Заказов на доске: ${orders}`,orders>0,'К заказам',()=>selectTab('orders')]];
+ const rows=[[`Готовый урожай: ${crops}`,crops>0,'Собрать',()=>{closePanel();const o=objects.find(o=>(o.type==='plot'&&o.crop&&o.crop.ready_at<=t)||ORCH.ripe(o,t));if(o)scene.focus(o,true,window.innerWidth<=850?Math.round(window.innerHeight*.4):0);}],[`Готово в мастерских и у животных: ${jobs}`,jobs>0,'Показать',()=>selectTab('production')],[`Заказов на доске: ${orders}`,orders>0,'К заказам',()=>selectTab('orders')]];
  for(const [text,active,label,go] of rows){const line=el('div',null,'card-footer');line.append(el('span',text,'reward'),button(label,go,'secondary',!active));c.append(line);}
  p.append(c);
  renderMinigame('house',p);

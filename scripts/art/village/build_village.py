@@ -18,6 +18,7 @@ import base64
 import hashlib
 import io
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -57,6 +58,20 @@ def app_buttons() -> list:
     w = lambda x, y: [round(x * 24, 1), round(y * 18, 1)]  # noqa: E731
     return ([w(*v) for v in d["spots"].values()] + [w(p[3], p[4]) for p in d["places"]] + [w(*v) for v in d["visitors"]]
             + [w(*d["hall"]), w(*d["gate"])])
+
+
+def festival_badge() -> list:
+    """The village festival badge («Праздник с N ур.», «Праздник 2/4»), a world-unit rect: a wide DOM plate under the plaza
+    (style.css .village-festival box, .village-stage-badge at its left/top). Festival decor keeps clear of it."""
+    css = (ROOT / "qw_farm" / "static" / "style.css").read_text(encoding="utf-8")
+    box = re.search(r"\.village-festival\{inset:auto;left:([\d.]+)%;top:([\d.]+)%;width:([\d.]+)%;height:([\d.]+)%\}", css)
+    badge = re.search(r"\.village-stage-badge\{position:absolute;left:([\d.]+)%;top:([\d.]+)%", css)
+    if not box or not badge:
+        raise RuntimeError("style.css changed: the village festival badge is not found")
+    l, t, w, h = map(float, box.groups())
+    x, y = (l + w * float(badge[1]) / 100) * 24, (t + h * float(badge[2]) / 100) * 18
+    # [x0, y0, x1, y1]: about 110x24 css px, which is ~260x56 world units at the phone zoom of the village
+    return [round(x - 130, 1), round(y - 32, 1), round(x + 130, 1), round(y + 32, 1)]
 
 
 def walk_targets() -> dict:
@@ -108,11 +123,13 @@ def manifest(meta: dict) -> dict:
         "merchant": {"cart": meta["merchant"]["cart"], "foot": meta["merchant"]["foot"]},
         # walk graph (walk.js, README «Граф проходимости»): flat world-unit node pairs, flat index pairs, named anchors
         "walk": {k: meta["walk"][k] for k in ("nodes", "edges", "anchors", "areas")},
+        # the New Year fir on the plaza and its empty loops for the players' named toys (fest_ny_toy), world units
+        "new_year_fir": {k: meta["fest"]["new_year"][k] for k in ("fir", "hooks")},
         "problems": meta.get("problems", []) + meta["walk"]["problems"] + [p for f in meta["fest"].values() for p in f["problems"]],
     }
 
 
-INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/merchant.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
+INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/merchant.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
 
@@ -132,7 +149,7 @@ def versions() -> dict:
 def build(out: Path, install: bool = False) -> dict:
     from PIL import Image
     harness._env_browsers()
-    res = harness.run("village.js", {"targets": walk_targets(), "buttons": app_buttons()})
+    res = harness.run("village.js", {"targets": walk_targets(), "buttons": app_buttons(), "badge": festival_badge()})
     out.mkdir(parents=True, exist_ok=True)
     png = res["world"]
     im = Image.open(io.BytesIO(png)).convert("RGB")

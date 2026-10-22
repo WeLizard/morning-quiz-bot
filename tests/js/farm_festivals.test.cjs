@@ -166,3 +166,19 @@ test('last years lots are hidden while the same festival fair is open',async()=>
  assert.deepEqual(F.pastShop({past:[{id:'x',live:true}]}),[]);
  assert.deepEqual(F.pastShop(null),[]);
 });
+
+test('every festival item id resolves to an icon: its own symbol in icons.svg, or a fallback to an existing one',async()=>{
+ const F=await load();
+ const svg=fs.readFileSync(path.join(STATIC,'icons.svg'),'utf8'),symbols=new Set([...svg.matchAll(/<symbol id="([^"]+)"/g)].map(m=>m[1]));
+ const py=fs.readFileSync(path.join(__dirname,'../../qw_farm/festivals.py'),'utf8');
+ const ids=[...new Set([...py.matchAll(/\b_g\('(fest_[a-z0-9_]+)'/g)].map(m=>m[1]))];
+ assert.ok(ids.length>=40,'the content of the filled festivals is parsed');
+ const missing=ids.filter(id=>!symbols.has(F.iconId(id)));
+ assert.deepEqual(missing,[],'items that would render blank');
+ const stale=Object.keys(F.ICON_FALLBACK).filter(id=>symbols.has(id));
+ assert.deepEqual(stale,[],'icon drawn: delete its ICON_FALLBACK line');
+ const orphan=Object.keys(F.ICON_FALLBACK).filter(id=>!ids.includes(id));
+ assert.deepEqual(orphan,[],'ICON_FALLBACK names an item the server does not have');
+ assert.ok(Object.values(F.ICON_FALLBACK).every(id=>symbols.has(id)&&id.startsWith('fest_posid_')));
+ assert.equal(F.iconId('fest_posid_socks'),'fest_posid_socks');assert.equal(F.iconId('wool'),'wool');assert.equal(F.iconId('constructor'),'constructor');
+});

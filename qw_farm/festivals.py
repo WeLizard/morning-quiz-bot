@@ -26,7 +26,7 @@ from datetime import date, timedelta
 from functools import lru_cache
 import re
 
-from .catalog import ITEMS, income_ref, level, tick
+from .catalog import ITEMS, ORCHARD_WIRED, income_ref, level, tick
 from .domain import need, inventory, pay
 from . import economy
 
@@ -212,9 +212,10 @@ PLACES = ('farm1', 'farm2', 'fence', 'roof', 'path', 'village', 'mascot', 'tree'
 KINDS = ('decor', 'decor_big', 'wall', 'roof', 'path', 'village', 'mascot', 'tree_decor', 'voucher', 'graft', 'scroll', 'curio', 'keepsake')
 
 
-def _g(gid, name, kind, place, lvl, k, seller='agata', source='fair', limit=1, note=''):
+def _g(gid, name, kind, place, lvl, k, seller='agata', source='fair', limit=1, note='', wired=False, ref=''):
+    """``ref`` names the catalog item an orchard lot stands for (``voucher_orchard``); an orchard lot is ``wired`` only with the orchard."""
     return dict(id=gid, name=name, kind=kind, place=place, level=lvl, k=k, seller=seller, source=source, limit=limit, note=note,
-                wired=False, bound=True, orchard=kind in ('voucher', 'graft'))
+                wired=wired, bound=True, orchard=kind in ('voucher', 'graft'), ref=ref)
 
 
 def _t(tid, title, host, lvl, options, reward):
@@ -250,6 +251,89 @@ CONTENT = {
             _g('fest_posid_socks', 'Носки года', 'keepsake', 'fence', 5, 0, source='keepsake', limit=1),
         ]),
 }
+# «Новый год» (design 9.2 item 1, 9.3, 9.10): 4 tasks, the full set of decor forms (1x1, 2x2, fence, roof, path, village square,
+# mascot), one decorative tree (outside the orchard limit), a graft and a voucher (orchard lots, ``wired`` only with the orchard),
+# a pattern scroll, a Magpie curio and the keepsake of the year. Textile goods only where the design says (mittens, scarf, plaid).
+# Not here (other systems): «Двенадцать ударов» (Oleg), cards of the Hedgehog, Kaya's contest, the winter-pepper exotic seed.
+CONTENT['new_year'] = dict(
+    tasks=[
+        _t('table', 'Новогодний стол', 'Агата', 6, [{'pie': 2, 'pancake': 3, 'cheese': 2}, {'pancake': 4, 'bread': 4, 'cheese': 3}], 'fest_ny_cap'),
+        _t('warm', 'Варежки и шарфы всей деревне', 'Соня', 7, [{'mittens': 2, 'scarf': 1}, {'yarn': 5, 'wool': 6}], 'fest_ny_mitten_garland'),
+        _t('plaid', 'Пледы на скамейки у ёлки', 'Соня', 8, [{'wool_plaid': 1}, {'wool_cloth': 2, 'pillow': 1}], 'fest_ny_plaid'),
+        _t('ginger', 'Пряники на ёлку', 'Агата', 7, [{'gingerbread': 3}, {'honey': 4, 'flour': 3}], 'fest_ny_sign'),
+    ],
+    goods=[
+        _g('fest_ny_fir', 'Ёлочка в кадке', 'tree_decor', 'farm1', 8, 120, note='декор, вне лимита сада'),
+        _g('fest_ny_snowman', 'Снеговик', 'decor', 'farm1', 5, 80),
+        _g('fest_ny_sleigh', 'Сани с подарками', 'decor_big', 'farm2', 20, 600, note='2×2, верхние уровни'),
+        _g('fest_ny_icicles', 'Гирлянда-сосульки', 'wall', 'fence', 5, 40),
+        _g('fest_ny_lights', 'Фонарики вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_ny_toy', 'Именная ёлочная игрушка', 'village', 'village', 5, 60, note='ячейка площади, на большой ёлке'),
+        _g('fest_ny_bullfinch', 'Снегирь', 'mascot', 'mascot', 12, 200, note='ходит за игроком по деревне'),
+        _g('fest_ny_graft', 'Прививка «Яблоня в инее»', 'graft', 'orchard', 16, 10, note='облик дерева; ждёт сад', wired=ORCHARD_WIRED),
+        _g('fest_ny_voucher', 'Талон сада со скидкой 25%', 'voucher', 'orchard', 16, 8, note='ждёт сад', wired=ORCHARD_WIRED,
+           ref='voucher_orchard'),
+        _g('fest_ny_scarf_post', 'Шарф с оленями на столбик', 'wall', 'fence', 7, 50, seller='sonya'),
+        _g('fest_ny_scroll', 'Свиток «Варежки и шарф с оленями»', 'scroll', 'none', 7, 25, seller='sonya',
+           note='рецепт узора; откроется в портновской, когда его подключат'),
+        _g('fest_ny_ball', 'Заморский шар-диковинка', 'curio', 'farm1', 10, 250, seller='magpie',
+           note='диковинка Сороки; семена «Зимний перец» — TODO, когда появятся в каталоге заморских культур'),
+        # earned by tasks, not sold
+        _g('fest_ny_cap', 'Снежная шапка с флажком', 'roof', 'roof', 6, 60, source='task:table'),
+        _g('fest_ny_mitten_garland', 'Гирлянда из варежек', 'wall', 'fence', 7, 60, source='task:warm'),
+        _g('fest_ny_plaid', 'Плед на скамейку у ёлки', 'village', 'village', 8, 60, source='task:plaid'),
+        _g('fest_ny_sign', 'Снеговик с табличкой фермы', 'village', 'village', 7, 60, source='task:ginger', note='общий ряд на площади'),
+        # the memorable item of the year: every task, never sold, never returns (one per year: «Ёлочная игрушка 2027» and so on)
+        _g('fest_ny_year_toy', 'Ёлочная игрушка года', 'keepsake', 'farm1', 8, 0, source='keepsake'),
+    ])
+
+# «Масленица» (9.2 item 2): the show «Проводы Зимы», the straw effigy, the slide and the village tables are scene layers (art);
+# here are the fair, the tasks the design names (Pukh, the pie tower in the guise of pancakes, Kaya's judging) and the decor.
+# TODO (engine): «Сто блинов на спор» is a week-long accumulation in the design; the engine has single hand-ins, so it is one hand-in.
+CONTENT['maslenitsa'] = dict(
+    tasks=[
+        _t('hundred', 'Сто блинов на спор', 'Пух', 4, [{'pancake': 24}, {'pancake': 12, 'jam': 6}], 'fest_mas_stack'),
+        _t('tower', 'Пирог до небес: блинная башня', 'Агата', 6, [{'pie': 2, 'pancake': 10}, {'pancake': 14, 'cheese': 4}], 'fest_mas_flag'),
+        _t('judge', 'Лучший блин для Каи', 'Кая', 4, [{'pancake': 6, 'jam': 2}, {'pancake': 6, 'cheese': 3}], 'fest_mas_tables'),
+    ],
+    goods=[
+        _g('fest_mas_samovar', 'Самовар с баранками', 'decor', 'farm1', 8, 150),
+        _g('fest_mas_effigy', 'Чучело у грядок', 'decor', 'farm1', 5, 80),
+        _g('fest_mas_ribbons', 'Ленты на забор', 'wall', 'fence', 5, 40),
+        _g('fest_mas_voucher', 'Талон сада со скидкой 25%', 'voucher', 'orchard', 16, 8, note='ждёт сад', wired=ORCHARD_WIRED,
+           ref='voucher_orchard'),
+        _g('fest_mas_scroll', 'Свиток «Блины с вареньем»', 'scroll', 'none', 5, 25,
+           note='рецепт для пекарни; откроется, когда его подключат'),
+        _g('fest_mas_tea', 'Медовый чай заморский', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_mas_stack', 'Блинная башенка', 'decor', 'farm1', 4, 60, source='task:hundred'),
+        _g('fest_mas_flag', 'Масленичный флажок', 'roof', 'roof', 6, 60, source='task:tower'),
+        _g('fest_mas_tables', 'Столы с блинами', 'village', 'village', 4, 60, source='task:judge', note='ячейка площади'),
+        _g('fest_mas_blin', 'Блин года', 'keepsake', 'farm1', 6, 0, source='keepsake'),
+    ])
+
+# «Весенние цветы» (9.2 item 3). Крот gives a gear to everyone: his task takes the timber for the housing («Вечная шестерёнка»).
+# The Hedgehog's «Букет для соседки» is a gift in the design (not here); the bouquet is handed in for the fair item instead.
+CONTENT['spring_flowers'] = dict(
+    tasks=[
+        _t('bouquet', 'Букет для соседки', 'Ёж', 7, [{'bouquet': 1}, {'lavender': 6}], 'fest_flw_vase'),
+        _t('ribbons', 'Ленточки на грядки', 'Соня', 6, [{'linen': 2}, {'linen_thread': 8}], 'fest_flw_ribbons'),
+        _t('gear', 'Вечная шестерёнка', 'Крот', 4, [{'wood': 8}, {'wood': 4, 'hay': 6}], 'fest_flw_gear'),
+    ],
+    goods=[
+        _g('fest_flw_cart', 'Цветочная тележка-клумба', 'decor_big', 'farm2', 20, 600, note='2×2, верхние уровни'),
+        _g('fest_flw_tulips', 'Тюльпаны вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_flw_pots', 'Цветочные горшки', 'decor', 'farm1', 5, 60),
+        _g('fest_flw_arch', 'Цветочная арка', 'village', 'village', 5, 60, note='ячейка площади'),
+        _g('fest_flw_graft', 'Прививка «Яблоня в цвету»', 'graft', 'orchard', 16, 10, note='облик дерева; ждёт сад', wired=ORCHARD_WIRED),
+        _g('fest_flw_gift', 'Букет в праздничной упаковке', 'decor', 'farm1', 7, 80, seller='sonya'),
+        _g('fest_flw_bulb', 'Заморская луковица «Огненный тюльпан»', 'curio', 'farm1', 10, 250, seller='magpie',
+           note='диковинка Сороки; сама заморская культура — TODO, когда появится в каталоге'),
+        _g('fest_flw_vase', 'Ваза на рынке', 'village', 'village', 7, 60, source='task:bouquet', note='ячейка площади'),
+        _g('fest_flw_ribbons', 'Ленточки на грядки', 'wall', 'fence', 6, 60, source='task:ribbons'),
+        _g('fest_flw_gear', 'Вечная шестерёнка', 'decor', 'farm1', 4, 60, source='task:gear'),
+        _g('fest_flw_tulip', 'Первый тюльпан', 'keepsake', 'farm1', 7, 0, source='keepsake'),
+    ])
+
 # Every other festival is defined in the calendar (windows, host, theme) and handled by the engine;
 # its tasks/goods are a TODO stub until its content turn (design 9.8).
 for _fid in FESTIVALS:
@@ -285,6 +369,7 @@ def validate_content():
             assert g['kind'] in KINDS and g['place'] in PLACES and g['limit'] >= 1 and g['seller'] in ('agata', 'sonya', 'magpie', 'host')
             assert g['source'] in ('fair', 'keepsake') or g['source'].startswith('task:')
             assert g['source'] == 'keepsake' or g['k'] > 0
+            assert not g['ref'] or (g['orchard'] and g['ref'] in ITEMS)
         tids = [t['id'] for t in c['tasks']]
         assert len(tids) == len(set(tids)) and len(tids) <= 5
         for t in c['tasks']:
@@ -420,6 +505,9 @@ def buy(farm, data, now):
     pay(farm, cost)
     e = entry(farm, key)
     e['bought'][item] = e['bought'].get(item, 0) + 1
+    if g.get('orchard') and g.get('wired'):   # the orchard exists: a voucher or a graft lot gives a usable warehouse item (qw_farm/orchard.py)
+        from . import orchard
+        orchard.deliver_festival_good(farm, g)
     where = 'на ярмарке' if fair else 'в «Лавке прошлых праздников»'
     return f'{g["name"]}: куплено {where} за {cost} монет.'
 

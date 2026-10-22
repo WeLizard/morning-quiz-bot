@@ -101,12 +101,12 @@ def spy(monkeypatch):
 def test_catalog_tables_and_public_projection():
     validate()
     # 9 field crops of r9 plus the long (>= FIELD_MIN_GROW) crops that R16 added later; counted, not pinned, so a new long crop keeps the test valid
-    r16_field = sum(1 for k in catalog.R16_CROP_IDS if CROPS[k]['seconds'] >= catalog.FIELD_MIN_GROW)
+    r16_field = sum(1 for k in catalog.R16_CROP_IDS if CROPS[k]['seconds'] >= catalog.FIELD_MIN_GROW and not CROPS[k].get('orchard'))
     assert validate_fields() == dict(field_steps=5, field_machines=3, field_crops=9 + r16_field)
     assert [(s['level'], s['ha'], s['cost']) for s in FIELD_STEPS] == [(22, 1, 60000), (27, 1, 120000), (32, 2, 250000), (38, 2, 450000), (44, 3, 800000)]
     assert {k: m['costs'][1:] for k, m in FIELD_MACHINES.items()} == {k: (30000, 120000) for k in FIELD_MACHINES}
     assert {m['op'] for m in FIELD_MACHINES.values()} == set(OPS)
-    assert all(c['field'] == (c['seconds'] >= catalog.FIELD_MIN_GROW) for c in CROPS.values())
+    assert all(c['field'] == (c['seconds'] >= catalog.FIELD_MIN_GROW and not c.get('orchard')) for c in CROPS.values())
     assert not CROPS['wheat']['field'] and CROPS['saffron']['field']
     pub = public_catalog()['fields']
     assert pub['steps'][0]['cost'] == 60000 and set(pub['machines']) == set(FIELD_MACHINES) and 'saffron' in pub['crops']

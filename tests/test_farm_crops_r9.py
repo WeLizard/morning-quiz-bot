@@ -85,7 +85,8 @@ def test_same_time_means_a_better_newer_crop_r2():
 
 
 def test_field_crops_are_exactly_the_long_class():
-    assert {k for k, c in CROPS.items() if c['field']} == {k for k, c in CROPS.items() if crop_class(c['seconds']) == 'long'}
+    # the orchard fruit (long class too) grows on trees now: closed for fields (FARM_ORCHARD.md section 3)
+    assert {k for k, c in CROPS.items() if c['field']} == {k for k, c in CROPS.items() if crop_class(c['seconds']) == 'long' and not c.get('orchard')}
     assert sorted(k for k, c in R9_CROPS.items() if c['field']) == sorted(
         ['cabbage', 'flax', 'rice', 'watermelon', 'eggplant', 'buckwheat', 'chamomile', 'hops', 'saffron'])
     assert all(c['seconds'] >= catalog.FIELD_MIN_GROW for c in CROPS.values() if c['field'])

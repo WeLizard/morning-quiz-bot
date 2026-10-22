@@ -497,15 +497,15 @@ REP_POINTS=[0,2,5,10,18,30]          # delivered orders needed for each level
 REP_BONUS=5                          # percent of coins/XP per level (max 25)
 REP_SPECIAL_LEVEL=2                  # from «Приятель» a resident asks for favourite goods
 NPC_TASTES={
- 'Филиныч':('tea','mint_tea','jam','honey','pie'),
- 'Агата':('bouquet','pie','gingerbread','berry_jam','bread'),
- 'Почтальон Ёж':('mushroom_soup','chanterelle','hazelnut','wildberry','pancake'),
- 'Механик Крот':('soup','potato','vegetable_stew','bread','pickles'),
+ 'Филиныч':('tea','mint_tea','jam','honey','pie','cherry_tincture'),
+ 'Агата':('bouquet','pie','gingerbread','berry_jam','bread','charlotte'),
+ 'Почтальон Ёж':('mushroom_soup','chanterelle','hazelnut','wildberry','pancake','dried_apples'),
+ 'Механик Крот':('soup','potato','vegetable_stew','bread','pickles','pear_kvass'),
  'Кошка Кая':('milk','cheese','omelet','berry_milk','goat_cheese'),
  'Кошка Соня':('pillow','down_blanket','scarf','mohair_plaid','mittens','wool_plaid','down_shawl','quilt','silk_quilt'),
- 'Суслик Игорь':('sunflower','oat_cookie','porridge','corn','pumpkin'),
- 'Неведома Зверушка':('truffle','saffron','lavender','peacock_feather','truffle_tart'),
- 'Медведь Пух':('berry_charge','honey_charge','forest_charge','honey','gingerbread'),
+ 'Суслик Игорь':('sunflower','oat_cookie','porridge','corn','pumpkin','prunes','dried_apricot'),
+ 'Неведома Зверушка':('truffle','saffron','lavender','peacock_feather','truffle_tart','apricot_five_star'),
+ 'Медведь Пух':('berry_charge','honey_charge','forest_charge','honey','gingerbread','mead_zero'),
 }
 # Residents who order a themed product most of the time (only goods reachable for the player count; see domain.make_order)
 NPC_SIGNATURE={'Медведь Пух':('berry_charge','honey_charge','forest_charge'),
@@ -523,7 +523,7 @@ MARKET=dict(
 )
 
 def public_catalog():
-    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
+    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),orchard=orchard_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
 
 def validate():
     for r in RECIPES.values():
@@ -735,7 +735,7 @@ for i,n,c,l in [('creamery','Молокозавод',6000,21),('sausage_shop','�
 ANIMALS['calf']=dict(id='calf',name='Бычки',building='cattle_barn',inputs={'hay':2,'feed':2,'beet':1},outputs={'meat':2},seconds=4800,level=25,cost=2600)
 
 def _xp_r9(b,t):
-    if b in ('creamery','sausage_shop','oil_press','juicery','energy_shop','cannery','smokehouse','tailor','confectionery','syrupery','soapery','noodle_shop'):return max(6,t//80)
+    if b in ('creamery','sausage_shop','oil_press','juicery','energy_shop','cannery','smokehouse','tailor','confectionery','syrupery','soapery','noodle_shop','dryer','cellar'):return max(6,t//80)
     if b=='mill':return max(1,t//45)
     return max(4,t//90)
 
@@ -1178,15 +1178,15 @@ for _sid, _sname, _slv, _names in CURIO_SERIES:
         BUILDINGS[_cid] = dict(id=_cid, name=_n, cost=0, level=_slv, w=1, h=1, decor=True, curio=True, series=_sid,
                                source='Сорока-коробейница: диковинка сезона')
 
-# Orchard hooks (FARM_ORCHARD.md is not implemented): defined, bound, flagged ``wired=False`` and kept OUT of the stock until the orchard exists.
-ORCHARD_WIRED = False
+# Orchard hooks (FARM_ORCHARD.md; rules in qw_farm/orchard.py): bound goods of the merchant, live since the orchard exists.
+ORCHARD_WIRED = True
 ORCHARD_ROWS = [
     ('graft_apple_paradise', 'Прививка «Райская яблоня»', 'graft', 16, 10),
     ('graft_pear_bergamot', 'Прививка «Груша-бергамот»', 'graft', 16, 10),
     ('voucher_orchard', 'Скидочный талон сада −25%', 'voucher', 16, 8),
 ]
 for _id, _n, _kind, _l, _k in ORCHARD_ROWS:
-    ITEMS[_id] = dict(id=_id, name=_n, price=0, color='#8fb86a', kind=_kind, bound=True, orchard=True, wired=False, level=_l)
+    ITEMS[_id] = dict(id=_id, name=_n, price=0, color='#8fb86a', kind=_kind, bound=True, orchard=True, wired=ORCHARD_WIRED, level=_l)
 
 MERCHANT = dict(
     visits_per_week=2, visit_hours=24, slots=6,                            # 2 visits a week, 24 h each (Moscow day), 6 slots
@@ -1214,3 +1214,139 @@ validate_merchant()
 
 def merchant_catalog():
     return deepcopy(dict(exotic_crops=EXOTIC_CROPS, curios=CURIOS, scrolls=list(SCROLL_RECIPES), config=MERCHANT, orchard_wired=ORCHARD_WIRED))
+# ---- Fruit orchard (docs/tasks/FARM_ORCHARD.md; rules: qw_farm/orchard.py) ------------------------------------------------------
+# A tree is a 1x1 object that bears fruit again and again ("garden year" = one cycle of TREE_CYCLE seconds). Fruit rows of CROPS stay (price,
+# old plantings, fields and recipes keep working); their NEW plantings on beds and fields are closed (``orchard`` = the species, ``field`` False).
+TREE_CYCLE = 72000                  # a garden year: 20 hours
+TREE_YOUNG_HARVESTS, TREE_ADULT_HARVESTS, TREE_CENTURY_HARVESTS = 5, 20, 100   # harvest n: Y up to 5, Y+1 up to 20, Y+2 later; "century" from the 100th
+TREE_PEST_PCT = 20                  # per cycle, deterministic (hash of farm, tree and harvests); a pest never lowers the yield
+TREE_GOLD_PERMILLE = (20, 40)       # golden fruit per harvest of an adult tree / a century tree
+TREE_PRUNE_EVERY = 7                # dry branches every 7 harvests; pruning gives wood x2 and +1 fruit for the next 7 harvests
+TREE_PRUNE_WOOD = 2
+TREE_WATER_CUT = 150                # permille: a helper's watering shortens the sapling phase by 15%
+TREE_HELP_PCT = 20                  # a neighbour's help: -20% of the time left in the current cycle
+TREE_BIRDHOUSE_RADIUS = 2           # a birdhouse within 2 cells treats a pest by itself
+TREE_VOUCHER_DISCOUNT_PCT = 25      # a discount voucher (the merchant's, a festival's)
+TREE_REFUND_WOOD = 2
+TREE_PESTS = (('caterpillar', 'Гусеница в кепке'), ('aphid', 'Тля'), ('moth', 'Плодожорка'))
+# species, name, sapling name, fruit id, level, juvenile cycles, base yield Y, XP per cycle, sapling price
+# first harvest after juvenile + 1 cycles; XP per cycle = 1/4 of crop_law(level, 12 h); sapling = 12 days of an adult tree's fruit sales
+_TREE_ROWS = [
+    ('apple', 'Яблоня', 'Саженец яблони', 'apple', 16, 2, 2, 20, 2300),
+    ('cherry', 'Вишня', 'Саженец вишни', 'cherry', 20, 2, 1, 25, 2700),
+    ('pear', 'Груша', 'Саженец груши', 'pear', 24, 3, 2, 27, 2400),
+    ('plum', 'Слива', 'Саженец сливы', 'plum', 28, 2, 2, 29, 2400),
+    ('apricot', 'Абрикос', 'Саженец абрикоса', 'apricot', 36, 3, 2, 34, 2500),
+    ('peach', 'Персик', 'Саженец персика', 'peach', 44, 2, 2, 40, 2600),
+    ('pomegranate', 'Гранат', 'Саженец граната (в кадке)', 'pomegranate', 47, 3, 1, 43, 3300),
+]
+TREES = {}
+for _sp, _n, _sn, _fruit, _l, _j, _y, _x, _c in _TREE_ROWS:
+    TREES[_sp] = dict(id=_sp, name=_n, sapling=_sn, fruit=_fruit, level=_l, juvenile=_j, yield_qty=_y, xp=_x, cost=_c, potted=_sp == 'pomegranate')
+    CROPS[_fruit]['orchard'] = _sp
+    CROPS[_fruit]['field'] = False
+TREE_BY_FRUIT = {t['fruit']: t['id'] for t in TREES.values()}
+# Trees per land size (they take no beds): none up to 14, then 2 at 16 and +1 per step. Half of the table of FARM_ORCHARD.md 2.4: the balance simulator
+# (section 9) showed the full table too strong; decided on the recommendation, the owner may revise it.
+TREE_LIMITS = {s: (0 if s < 16 else (s - 12) // 2) for s in sorted(LAND_SIZES)}
+
+
+def tree_limit(size):
+    return TREE_LIMITS.get(size, 0)
+
+
+# Grafts change only the look of a planted tree (``obj['look']``). More grafts (festivals) register here: item id -> species, look, look name.
+GRAFTS = {
+    'graft_apple_paradise': dict(species='apple', look='paradise', name='Райская яблоня'),
+    'graft_pear_bergamot': dict(species='pear', look='bergamot', name='Груша-бергамот'),
+}
+
+def register_graft(item_id, species, look, name, level=16):
+    """A graft (merchant, festival) is a bound warehouse item that changes only the ``look`` of a planted tree of ``species``."""
+    GRAFTS[item_id] = dict(species=species, look=look, name=name)
+    ITEMS.setdefault(item_id, dict(id=item_id, name=f'Прививка «{name}»', price=0, color='#8fb86a', kind='graft', bound=True, orchard=True, wired=True, level=level))
+
+
+# Festival grafts (qw_farm/festivals.py lots with the same ids): the look names are the drawing slots of the artist.
+for _gid, _gname, _glook in [('fest_posid_graft', 'Яблоня в уютном чехле', 'cozy'), ('fest_ny_graft', 'Яблоня в инее', 'frost'), ('fest_flw_graft', 'Яблоня в цвету', 'bloom')]:
+    register_graft(_gid, 'apple', _glook, _gname)
+
+ITEMS['rejuvenating_apple'] = dict(id='rejuvenating_apple', name='Молодильное яблочко', price=500, color='#e8c04a', kind='product')
+BUILDINGS['dryer'] = dict(id='dryer', name='Сушильня', cost=6000, level=20, w=2, h=2, decor=False)
+BUILDINGS['cellar'] = dict(id='cellar', name='Погребок «Ноль градусов»', cost=8500, level=24, w=2, h=2, decor=False)
+BUILDINGS['birdhouse'] = dict(id='birdhouse', name='Скворечник', cost=1500, level=16, w=1, h=1, decor=True)
+CELLAR_MOTTO = 'Безалкогольно. Градус — только в названии'
+# id, recipe name, building, inputs, output qty, minutes, level, colour, item name. Price = (inputs + AV) / output by the workshop value law.
+_ORCHARD_RECIPES = [
+    ('garden_infusion', 'Заварить садовый настой', 'teahouse', {'garlic': 1, 'chamomile': 2}, 3, 10, 16, '#7aa86a', 'Садовый настой «Гусеницам вход воспрещён»'),
+    ('charlotte', 'Испечь шарлотку', 'bakery', {'apple': 2, 'flour': 1, 'egg': 2}, 1, 20, 16, '#d9a05a', 'Шарлотка'),
+    ('apple_juice', 'Отжать яблочный сок', 'juicery', {'apple': 2}, 2, 10, 16, '#e0b84a', 'Яблочный сок'),
+    ('caramel_apples', 'Яблоки в карамели', 'confectionery', {'apple': 2, 'honey': 1}, 2, 15, 19, '#b5452f', 'Яблоки в карамели'),
+    ('cherry_jam_5min', 'Сварить варенье «Пятиминутка»', 'kitchen', {'cherry': 2, 'honey': 1}, 2, 5, 20, '#8f1c32',
+     'Вишнёвое варенье «Пятиминутка» (варится пять минут, честно)'),
+    ('cherry_juice', 'Отжать вишнёвый сок', 'juicery', {'cherry': 2}, 2, 10, 20, '#9c1c34', 'Вишнёвый сок'),
+    ('dried_apples', 'Насушить яблок', 'dryer', {'apple': 3}, 2, 30, 20, '#e6c88a', 'Сушёные яблоки'),
+    ('dried_cherry', 'Навялить вишни', 'dryer', {'cherry': 2}, 1, 30, 22, '#7a1a2c', 'Вяленая вишня'),
+    ('pear_juice', 'Отжать грушевый сок', 'juicery', {'pear': 2}, 2, 10, 24, '#d6d98a', 'Грушевый сок'),
+    ('apple_pear_puree', 'Протереть яблочно-грушевое пюре', 'kitchen', {'apple': 2, 'pear': 1}, 2, 15, 24, '#e2c98a', 'Яблочно-грушевое пюре'),
+    ('cider_zero', 'Выдержать сидр «Ноль процентов»', 'cellar', {'apple_juice': 3}, 2, 60, 24, '#e6c25a', 'Сидр «Ноль процентов»'),
+    ('pear_kvass', 'Заквасить грушевый квас', 'cellar', {'pear': 2, 'kvass': 1}, 2, 40, 25, '#cdbf6a', 'Грушевый квас'),
+    ('mead_zero', 'Настоять медовуху-безградуху', 'cellar', {'honey': 3, 'apple_juice': 1}, 2, 60, 26, '#d6a83a', 'Медовуха-безградуха'),
+    ('belev_pastila', 'Высушить белёвскую пастилу', 'dryer', {'apple_pear_puree': 2, 'egg': 1}, 2, 60, 26, '#e8d6a8', 'Белёвская пастила'),
+    ('cherry_tincture', 'Настоять вишнёвую настойку', 'cellar', {'cherry_juice': 2, 'honey': 1}, 2, 120, 27, '#7a1a2c', 'Вишнёвая настойка «На честном слове»'),
+    ('prunes', 'Высушить чернослив', 'dryer', {'plum': 3}, 2, 40, 28, '#3f2a4f', 'Чернослив'),
+    ('plum_liqueur', 'Настоять сливянку', 'cellar', {'plum': 3, 'honey': 1}, 2, 120, 30, '#5a3a7a', 'Сливянка «Сливки общества»'),
+    ('uzvar', 'Сварить узвар', 'kitchen', {'dried_apples': 1, 'prunes': 1, 'honey': 1}, 3, 20, 30, '#a8703a', 'Узвар'),
+    ('mulled_nevein', 'Сварить глинтвейн-невейн', 'cellar', {'cider_zero': 1, 'cherry_juice': 1, 'ginger': 1, 'honey': 1}, 2, 30, 32, '#a8323a', 'Глинтвейн-невейн'),
+    ('pear_sparkle', 'Взбодрить шипучку «Игристая груша»', 'cellar', {'pear_juice': 3, 'honey': 1}, 2, 90, 34, '#e0e6a0', 'Шипучка «Игристая груша»'),
+    ('dried_apricot', 'Насушить курагу', 'dryer', {'apricot': 3}, 2, 40, 36, '#e0963a', 'Курага'),
+    ('apricot_five_star', 'Выдержать «Пять звёздочек»', 'cellar', {'dried_apricot': 2, 'honey': 1}, 1, 240, 38, '#e8a850', 'Абрикосовый «Пять звёздочек» 0%'),
+    ('cellar_chest', 'Собрать погребной сундучок', 'cellar', {'cider_zero': 1, 'pear_kvass': 1, 'cherry_tincture': 1, 'plum_liqueur': 1}, 1, 60, 40, '#8a6a4a',
+     'Погребной сундучок «Ноль градусов»'),
+    ('rejuvenating_elixir', 'Выдержать эликсир «Молодильный»', 'cellar', {'rejuvenating_apple': 1, 'mead_zero': 1}, 1, 120, 40, '#f0d878', 'Эликсир «Молодильный» 0%'),
+    ('peach_punch', 'Смешать персиковый пунш', 'cellar', {'peach': 2, 'pear_juice': 1, 'mint': 1}, 2, 60, 45, '#f2a07a', 'Персиковый пунш «Бархатный сезон»'),
+]
+ORCHARD_RECIPE_IDS = frozenset(r[0] for r in _ORCHARD_RECIPES)
+ORCHARD_ITEM_IDS = ORCHARD_RECIPE_IDS | {'rejuvenating_apple'}
+ORCHARD_BUILDING_IDS = frozenset({'dryer', 'cellar', 'birdhouse'})
+for _i, _rn, _b, _inp, _q, _min, _l, _col, _name in _ORCHARD_RECIPES:
+    _t = _min * 60
+    _vin = sum(ITEMS[k]['price'] * q for k, q in _inp.items())
+    ITEMS[_i] = dict(id=_i, name=_name, price=math.ceil((_vin + math.ceil(round(_t / 60 * (2.5 + 0.1 * _l), 6))) / _q), color=_col, kind='product')
+    RECIPES[_i] = dict(id=_i, name=_rn, building=_b, inputs=_inp, outputs={_i: _q}, seconds=_t, level=_l, xp=_xp_r9(_b, _t))
+# Shop-window texts (the drinks of the cellar: «0%» is always in the name or in this line; no drunkenness mechanics anywhere).
+ORCHARD_TEXT = dict(
+    garden_infusion='Гусеницам вход воспрещён. Тля читает плохо, но понимает.',
+    cider_zero='Ноль процентов алкоголя, сто процентов яблок, двести процентов шипения.',
+    pear_kvass='Квасили грушу. Груша не возражала.',
+    mead_zero='Медведь Пух: «Градусов ноль, мёда — все».',
+    cherry_tincture='Настояна на честном слове. Слово крепче, чем настойка: в ней 0%.',
+    plum_liqueur='Подаётся в приличном обществе: курицам, гусям и одному павлину.',
+    mulled_nevein='Горячий и пряный. Вина в нём нет — и вины тоже.',
+    pear_sparkle='Пузырьки настоящие, повод придумайте сами.',
+    apricot_five_star='Звёздочки поставила Неведома Зверушка в отзыве. Выдержка — четыре часа, градусов — ноль.',
+    cellar_chest='Дегустация без последствий: наутро стыдно только за съеденную пастилу.',
+    rejuvenating_elixir='Молодит на один день. Проверено на петухе: кукарекал на час раньше.',
+    peach_punch='Бархатный, как персик. Сезон — как повезёт.',
+    rejuvenating_apple='Выросло на груше. Садовники не объясняют.',
+)
+
+
+def validate_orchard():
+    assert all(t['fruit'] in CROPS and CROPS[t['fruit']]['orchard'] == t['id'] and not CROPS[t['fruit']]['field'] for t in TREES.values())
+    assert [t['level'] for t in TREES.values()] == sorted(t['level'] for t in TREES.values())
+    assert all(g['species'] in TREES for g in GRAFTS.values()) and all(i in ITEMS for i in GRAFTS)
+    assert all(RECIPES[r]['level'] >= BUILDINGS[RECIPES[r]['building']]['level'] for r in ORCHARD_RECIPE_IDS)
+    assert tree_limit(14) == 0 and tree_limit(16) == 2 and tree_limit(20) == 4 and tree_limit(30) == 9 and tree_limit(32) == 10
+    return dict(trees=len(TREES), recipes=len(ORCHARD_RECIPE_IDS))
+
+
+validate_orchard()
+
+
+def orchard_catalog():
+    return deepcopy(dict(trees=TREES, limits={str(k): v for k, v in TREE_LIMITS.items() if v}, grafts=GRAFTS, texts=ORCHARD_TEXT, motto=CELLAR_MOTTO,
+                         pests=[dict(id=i, name=n) for i, n in TREE_PESTS],
+                         rules=dict(cycle=TREE_CYCLE, young=TREE_YOUNG_HARVESTS, adult=TREE_ADULT_HARVESTS, century=TREE_CENTURY_HARVESTS,
+                                    prune_every=TREE_PRUNE_EVERY, birdhouse_radius=TREE_BIRDHOUSE_RADIUS, help_pct=TREE_HELP_PCT,
+                                    discount_pct=TREE_VOUCHER_DISCOUNT_PCT, gold_permille=list(TREE_GOLD_PERMILLE))))

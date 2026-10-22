@@ -1,9 +1,10 @@
 """Headless Chromium harness for the village art generator.
 
 The farm's own drawing modules (qw_farm/static/scene*.js) are served from a private origin, read from the
-working tree on every run. scene_buildings.js gets three recorder hooks and an export line at serve time
+working tree on every run. scene_buildings.js gets recorder hooks and an export line at serve time
 (the same patch the 2026-10-15 generator applied to its copy): windows are recorded for the night lights,
-chimney smoke and windmill sails are recorded instead of painted (they are live layers in the game).
+chimney smoke and windmill sails are recorded instead of painted (they are live layers in the game); roofs,
+chimneys and doors are recorded for the festival layers without changing the drawing.
 Nothing is written into qw_farm/static.
 """
 from __future__ import annotations
@@ -29,6 +30,12 @@ BUILDING_HOOKS = (
     ("function winY(s,Y,xc,z,w,h,glass='#abc9c7',frame='#f3ead2'){", "s.win&&s.win.push(['a',px(xc,Y),py(xc,Y,z+h/2),w,h]);"),
     ("function winX(s,X,yc,z,w,h,glass='#9fbebc',frame='#eadfc4'){", "s.win&&s.win.push(['b',px(X,yc),py(X,yc,z+h/2),w,h]);"),
     ("function smoke(s,x,y,z,on=true,k=1){", "if(s.smk){s.smk.push([px(x,y),py(x,y,z)]);return}"),
+    # roofs, chimneys and doors, for festival layers that dress them (snow, lights, flowerbeds): recorded, the drawing is unchanged
+    ("function gableRoof(s,axis,g){", "s.roofs&&s.roofs.push(['gable',axis,{...g}]);"),
+    ("function hipRoof(s,x0,y0,x1,y1,zE,rise,col,ov,topFlat=0){", "s.roofs&&s.roofs.push(['hip',[x0,y0,x1,y1,zE,rise,col,ov,topFlat]]);"),
+    ("function chimney(s,x,y,za,zb,col='#a8826a',w=.11){", "s.chim&&s.chim.push([x,y,za,zb,col,w]);"),
+    ("function doorY(s,Y,xc,w,h,fill='#8f7556',frame='#efe5cb',arch=false){", "s.doors&&s.doors.push(['y',Y,xc,w]);"),
+    ("function doorX(s,X,yc,w,h,fill='#7f6a4d',frame='#e5d9bb',arch=false){", "s.doors&&s.doors.push(['x',X,yc,w]);"),
 )
 SAILS = "const c=s.c;c.save();c.translate(px(hx,hy),py(hx,hy,hz));c.rotate(s.time*(work?.9:.2)+.45);"
 

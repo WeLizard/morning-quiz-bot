@@ -88,6 +88,8 @@ PROFILES = {
                     sessions=(8 * 3600, 22 * 3600), orders=12, grind=False, skilled=True),
 }
 ANIMAL_BY_HOUSE = {a['building']: a for a in C.ANIMALS.values()}
+ORCHARD_FRUIT = {t['fruit'] for t in C.TREES.values()}
+FRUIT_RECIPES = frozenset(r['id'] for r in C.RECIPES.values() if r['id'] in C.ORCHARD_RECIPE_IDS or set(r['inputs']) & ORCHARD_FRUIT)
 WORKSHOPS = sorted({r['building'] for r in C.RECIPES.values()})
 PAID_DECOR = [*C.DECOR_SHOP, *C.DECOR_EXTRA]
 GUIDES = [h for h in C.HELPERS.values() if h['role'] == 'guide']
@@ -131,8 +133,10 @@ def fill(recipes, slots, mult, gap):
 
 
 class Sim:
-    def __init__(self, name, days, debug=False, fields=True):
-        self.name, self.days, self.debug, self.fields = name, days, debug, fields
+    def __init__(self, name, days, debug=False, fields=True, orchard=True):
+        self.name, self.days, self.debug, self.fields, self.orchard = name, days, debug, fields, orchard
+        self.fruit_xp = Counter()             # band -> xp of the recipes that eat orchard fruit or orchard goods (approx.: counted when queued)
+        self.trees_bought = Counter()         # species -> trees bought
         self.p = PROFILES[name]
         self.sessions = sorted(self.p['sessions'])
         self.t0 = T_BASE + self.sessions[0]
@@ -267,7 +271,7 @@ class Sim:
         lv = self.lv()
         rows = []
         for c in C.CROPS.values():
-            if c['level'] <= lv:
+            if c['level'] <= lv and not c.get('orchard'):   # fruit grows on trees now (FARM_ORCHARD.md)
                 profit = c['yield_qty'] * c['price'] - c['cost']
                 e = self.eff(c['seconds'], now)
                 rows.append(((c['xp'] + 0.25 * profit) / e, c))
@@ -390,9 +394,25 @@ class Sim:
             for r in self.pick_jobs(o, now, dem, reach):
                 if not self.cmd('queue', {'object': o['id'], 'recipe': r['id']}, now, 'workshops'):
                     break
+                if r['id'] in FRUIT_RECIPES:
+                    self.fruit_xp[band_of(self.lv())] += r['xp']
         return dem
 
     # ---------------------------------------------------------------- forest trips
+    def orchard_visit(self, now):
+        """Fruit first (own tag, so the orchard is measured on its own), then care: the casual player only collects."""
+        f = self.f
+        for o in self.objects(lambda o: o['type'] == 'tree'):
+            if o['fruit'] and o['fruit']['ready_at'] <= now:
+                self.cmd('harvest', {'object': o['id'], 'revision': o['revision']}, now, 'orchard')
+        if self.name == 'casual':
+            return
+        for o in self.objects(lambda o: o['type'] == 'tree'):
+            if o['harvests'] >= o.get('prune_at', 7):
+                self.cmd('tree_care', {'object': o['id'], 'action': 'prune', 'item': None}, now, 'orchard')
+            elif o['fruit'] and o['fruit'].get('pest') and f['inventory'].get('garden_infusion', 0) > 0:
+                self.cmd('tree_care', {'object': o['id'], 'action': 'spray', 'item': None}, now, 'orchard')
+
     def trips(self, now):
         f = self.f
         for t in list(f['trips']):
@@ -505,7 +525,7 @@ class Sim:
         cap = int(0.6 * len(empty))
         used = 0
         for item, q in sorted(dem.items(), key=lambda kv: -kv[1] * price(kv[0])):
-            if item in C.CROPS and C.CROPS[item]['level'] <= lv and used < cap:
+            if item in C.CROPS and C.CROPS[item]['level'] <= lv and used < cap and not C.CROPS[item].get('orchard'):
                 crop = C.CROPS[item]
                 deficit = q - self.stock(item) - self.growing(item)
                 if deficit > 0 and self.eff(crop['seconds'], now) <= 2 * self.gap(now):
@@ -630,6 +650,16 @@ class Sim:
                 gain = (C.BARN_SELL_BONUS[cur + 1] - C.BARN_SELL_BONUS[cur]) / 100 * sum(recent) / 5
             if gain > 0:
                 cands.append((total / gain, cost['coins'], ('upgrade', o)))
+        # orchard (FARM_ORCHARD.md): a sapling pays back by an adult tree's fruit and XP per harvest, after the juvenile wait
+        trees = [o for o in f['objects'] if o['type'] == 'tree']
+        if self.orchard and len(trees) < C.tree_limit(f['size']) and len(f['objects']) < C.object_limit(f['size']) and self.spot(1, 1, False):
+            for sp, t in C.TREES.items():
+                if t['level'] > lv or budget < t['cost']:
+                    continue
+                value = (t['yield_qty'] + 1) * price(t['fruit']) + t['xp']
+                rate = value / (self.eff(C.TREE_CYCLE, now) / DAY) * FRICTION
+                delay = (t['juvenile'] + 1) * C.TREE_CYCLE / DAY
+                cands.append((t['cost'] / rate + delay, t['cost'], ('tree', sp)))
         # forest guides: cheap, permanent
         for h in GUIDES:
             if h['id'] not in f['helpers'] and lv >= h['level'] and budget >= h['cost']:
@@ -668,6 +698,11 @@ class Sim:
                     return True
             elif kind == 'guide':
                 if self.cmd('hire_helper', {'helper': arg}, now, 'capex:guide'):
+                    return True
+            elif kind == 'tree':
+                sp = self.spot(1, 1, False)
+                if sp and self.cmd('plant_tree', {'species': arg, 'x': sp[0], 'y': sp[1], 'voucher': None}, now, 'capex:orchard'):
+                    self.trees_bought[arg] += 1
                     return True
         return False
 
@@ -835,6 +870,7 @@ class Sim:
         self.settle(t)
         self.cmd('collect_group', {'group': 'animals', 'area': None}, t, 'animals')
         self.cmd('collect_group', {'group': 'workshops', 'area': None}, t, 'workshops')
+        self.orchard_visit(t)
         self.cmd('collect_group', {'group': 'plots', 'area': None}, t, 'crops')
         self.rewards(t)
         self.pay_debt(t)
@@ -946,6 +982,7 @@ def report(sim):
                                                          for b in BANDS if sim.level_t.get(b[0]) is not None))
     out.append('max days on one level in band: ' + ', '.join(f'L{b[0]}-{b[1]} {slowest(sim, b):.1f}' for b in BANDS if sim.level_t.get(b[0]) is not None))
     out.extend(field_report(sim, srcs_all, xp_all, tot))
+    out.extend(orchard_report(sim, srcs_all, xp_all))
     if sim.debug:
         out.append('refused commands: ' + ', '.join(f'{k[0]}/{k[1]}={v}' for k, v in sim.err.most_common(12)))
     return '\n'.join(out)
@@ -984,6 +1021,23 @@ def field_report(sim, srcs_all, xp_all, sink_tot):
     return out
 
 
+def orchard_report(sim, srcs_all, xp_all):
+    """FARM_ORCHARD.md section 9: the orchard's own XP/coins, the XP of the fruit recipes, and the share per level band."""
+    trees = [o for o in sim.f['objects'] if o['type'] == 'tree']
+    if not sim.orchard:
+        return ['', 'ORCHARD: switched off (--no-orchard): fruit beds are closed by the catalog and no sapling is ever bought']
+    xt = sum(xp_all.values()) or 1
+    own, proc = xp_all.get('orchard', 0), sum(sim.fruit_xp.values())
+    out = ['', f'ORCHARD: {len(trees)} trees at the end ({", ".join(f"{k} {v}" for k, v in sorted(sim.trees_bought.items())) or "none"}); '
+           f'tree XP {own} = {100 * own / xt:.1f}% of all XP, fruit recipes (counted when queued) {proc} = {100 * proc / xt:.1f}%, '
+           f'together {100 * (own + proc) / xt:.1f}%; coins value added {srcs_all.get("orchard", 0)}; sapling capex '
+           f'{sum(sim.capex[b]["capex:orchard"] for b in BANDS)}']
+    out.append('  per band (tree XP + fruit-recipe XP as % of the band XP): ' + '; '.join(
+        f'L{b[0]}-{b[1]} {100 * (sim.xp_src[b]["orchard"] + sim.fruit_xp[b]) / max(1, sum(sim.xp_src[b].values())):.1f}%'
+        for b in BANDS if sim.level_t.get(b[0]) is not None))
+    return out
+
+
 def coins_at(self, t):
     d = int((t - self.t0) // DAY)
     return self.end_coins.get(d, self.f['coins'])
@@ -998,11 +1052,12 @@ def main():
     ap.add_argument('--profile', default='all', choices=['all', *PROFILES])
     ap.add_argument('--debug', action='store_true')
     ap.add_argument('--no-fields', action='store_true', help='baseline: the player never buys a field')
+    ap.add_argument('--no-orchard', action='store_true', help='baseline: the player never buys a fruit tree (fruit beds are closed by the catalog)')
     args = ap.parse_args()
     print(f'catalog {C.VERSION}; days={args.days}')
     for name in (PROFILES if args.profile == 'all' else [args.profile]):
         t = time.time()
-        sim = Sim(name, args.days, args.debug, not args.no_fields).run()
+        sim = Sim(name, args.days, args.debug, not args.no_fields, not args.no_orchard).run()
         print(report(sim))
         print(f'(simulated in {time.time() - t:.1f}s)\n')
 

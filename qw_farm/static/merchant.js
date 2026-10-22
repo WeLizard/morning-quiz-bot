@@ -37,6 +37,7 @@ export function slotBlock(s,coins){
  if(s.status==='owned')return s.kind==='scroll'?'Рецепт уже известен':'Уже в коллекции';
  if(s.status==='locked')return `С ${s.min_level} уровня`;
  if(s.status==='sold'||s.left<=0)return 'На этот визит всё';
+ if(s.status==='notree')return 'Нужно посаженное дерево';
  if(coins<s.price)return 'Не хватает монет';
  return '';
 }

@@ -1079,3 +1079,14 @@ html .scene-area .map-controls{display:flex;flex-direction:column;border:1px sol
 :root[data-farm-theme=night] .caravan-result.is-refund .cr-head::before{background:#6c6a5a;color:#f1ecdb}
 :root[data-farm-theme=night] .caravan-result.is-refund .cr-head strong{color:var(--ink)}
 :root[data-farm-theme=night] .caravan-result.is-refund .cr-coins{color:var(--muted)}
+/* ===== Phone header hotfix (UI_RULES §3.3/§4). The XP status is one line: phones show the first bonus word,
+   the full text stays in title/aria-label, so the HUD never grows the 56px bar. The destination cards share the
+   row left of the map tools: they shrink to fit (3 cards fit from 360px) and only scroll when there are more. */
+@media(max-width:520px) and (orientation:portrait){
+ html .topbar .hud-bonus{display:block;max-width:64px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+ html .topbar .hud-bonus span+span{display:none}
+}
+@media(max-width:850px){
+ html .compact .header-destinations{padding-right:12px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 14px),transparent 100%)}
+ html .compact .header-destinations>.forest-door:not(.fields-door){flex:1 1 0;width:auto;min-width:64px;max-width:92px}
+}

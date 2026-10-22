@@ -203,9 +203,12 @@ test('the new client code adds no tiny text and no raw colours of its own',()=>{
  assert.ok(!/font-size|#[0-9a-f]{3,6}/i.test(src));
 });
 
-test('the seed bar only hints at the garden, the merchant explains a graft without a tree, no screen of saplings has a primary button',async()=>{
+test('the seed bar keeps saplings out and stays one row, the merchant explains a graft without a tree, no screen of saplings has a primary button',async()=>{
  const app=read('qw_farm/static/app.js'),M=await load('merchant.js');
- assert.ok(app.includes("'Плодовые деревья — в разделе «Сад»','seedbar-label'"));
+ const seeds=app.slice(app.indexOf('function renderSeeds'),app.indexOf('function seedLine'));
+ assert.ok(seeds.includes('!c.exotic&&!c.orchard'),'orchard saplings are not seeds');
+ assert.ok(!seeds.includes('Плодовые деревья'),'no long hint in the seed bar: the vertical label class made it half a screen tall');
+ assert.equal((seeds.match(/'seedbar-label'/g)||[]).length,1,'only the short «ПОСАДИТЬ» label is vertical');
  assert.ok(!app.includes("selectTab('orchard')"),'one path to the tab: the rail, not a second button');
  assert.equal(M.slotBlock({status:'notree',left:1,price:10,kind:'graft'},1000),'Нужно посаженное дерево');
  const render=app.slice(app.indexOf('function renderOrchard'),app.indexOf('function renderTree'));

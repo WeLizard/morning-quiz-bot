@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE))
 import build_village  # noqa: E402
 
 WORK = ROOT / ".local" / "village-generator" / "test"
-KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256")
+KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256")
 
 
 def _app_const(src: str, name: str):
@@ -34,6 +34,10 @@ def test_village_generator_is_reproducible():
     b = build_village.build(WORK / "b")
     assert {k: a[k] for k in KEYS} == {k: b[k] for k in KEYS}, "two runs differ"
     assert (WORK / "a" / "village.svg").read_bytes() == (WORK / "b" / "village.svg").read_bytes()
+    assert a["fest_sha256"] == b["fest_sha256"], "festival layers differ between runs"
+    for fid in a["fest_sha256"]:   # the installed festival layer is the generated one
+        game = ROOT / "qw_farm" / "static" / f"village-fest-{fid}.svg"
+        assert game.read_bytes() == (WORK / "a" / f"village-fest-{fid}.svg").read_bytes(), f"{game.name}: rebuild with --install"
     ref = json.loads((HERE / "reference.json").read_text(encoding="utf-8"))
     changed = sorted(k for k in set(ref["inputs"]) | set(a["inputs"]) if ref["inputs"].get(k) != a["inputs"].get(k))
     if changed:

@@ -10,7 +10,7 @@ import math
 import re
 from .catalog import (tick, CROPS, ITEMS, BUILDINGS, RECIPES, ANIMALS, QUESTS, LEVELS, NPCS, VERSION, level, is_land_size, land_step,
                       MAX_BUILDING_LEVEL, RECIPE_SPEED, BARN_SELL_BONUS, upgrade_kind, upgrade_cost, effective_level,
-                      queue_slots, animal_batch, animal_xp, ANIMAL_XP_LEGACY, land_bound, plot_limit, object_limit)
+                      queue_slots, animal_batch, animal_xp, ANIMAL_XP_LEGACY, land_bound, plot_limit, object_limit, WEARABLE_ITEM_IDS)
 from . import progression, economy, projects
 
 
@@ -125,6 +125,7 @@ def daily(farm, key, now, limit):
 
 
 def reachable(farm):
+    from .textile import recipe_level
     lv=level(farm['xp'])
     result={k for k,v in CROPS.items() if v['level']<=lv}
     from .catalog import ROUTES, route_level
@@ -138,7 +139,7 @@ def reachable(farm):
             if any(o.get('animal')==a['id'] for o in farm['objects']) and a['level']<=lv and set(a['inputs'])<=result:
                 result.update(a['outputs'])
         for r in RECIPES.values():
-            if r['building'] in types and r['level']<=lv and set(r['inputs'])<=result:
+            if r['building'] in types and recipe_level(farm,r)<=lv and set(r['inputs'])<=result:
                 result.update(r['outputs'])
         if len(result)==old: break
     return sorted(result)
@@ -159,17 +160,18 @@ def make_order(farm, slot, now):
     price=sum(ITEMS[k]['price']*q for k,q in needs.items())
     npc,subtitle=NPCS[rng % len(NPCS)]
     if seq>2:   # a resident with a signature theme (Медведь Пух: energy drinks) mostly asks for it, when it is reachable
-        from .catalog import NPC_SIGNATURE, SIGNATURE_PCT
+        from .catalog import NPC_SIGNATURE, SIGNATURE_PCT, NPC_SIGNATURE_PCT, SIGNATURE_MAX_VALUE
         sig=[i for i in NPC_SIGNATURE.get(npc,()) if i in products]
-        if sig and (rng//41)%100<SIGNATURE_PCT:
-            needs={sig[(rng//43)%len(sig)]:1+(rng//47)%3}
+        if sig and (rng//41)%100<NPC_SIGNATURE_PCT.get(npc,SIGNATURE_PCT):
+            pick=sig[(rng//43)%len(sig)];qty=1+(rng//47)%3
+            needs={pick:1 if ITEMS[pick]['price']*qty>SIGNATURE_MAX_VALUE else qty}
             price=sum(ITEMS[k]['price']*q for k,q in needs.items())
     special=None
     if seq>2:
         from . import market
         special=market.special_needs(farm,rng,npc,products)
     if special:
-        needs=special;price=sum(ITEMS[k]['price']*q for k,q in needs.items());subtitle='Особая просьба: любимое лакомство'
+        needs=special;price=sum(ITEMS[k]['price']*q for k,q in needs.items());subtitle='Особая просьба: любимая вещь' if set(needs)<=WEARABLE_ITEM_IDS else 'Особая просьба: любимое лакомство'
     coins=math.ceil(price*1.45)+6
     if special:coins=math.ceil(coins*1.2)
     return dict(id=f'order_{seq}',slot=slot,npc=npc,title=subtitle,needs=needs,
@@ -266,7 +268,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         text=f'Урожай собран: {len(plots)} гряд.'
     elif kind=='queue':
         r=named(RECIPES,data['recipe'])
-        need(obj['type']==r['building'] and r['level']<=lv,'wrong_building','Этот рецепт здесь пока недоступен.')
+        need(obj['type']==r['building'] and expansion.textile.recipe_level(me,r)<=lv,'wrong_building','Этот рецепт здесь пока недоступен.')
         need(len(obj['jobs']) < queue_slots(obj.get('level')),'queue_full','Очередь заполнена. Забери готовые товары.')
         inventory(me,r['inputs'],-1)
         obj['jobs'].append(expansion.make_job(obj,r,now,speed,command_id,me))
@@ -521,6 +523,8 @@ def project(farm, visitor, now):
         result['oleg_game']=oleg.public(farm,now)
         from . import swans
         result['swans']=swans.public(farm,now)
+        from . import festivals
+        result['festival']=festivals.owner_view(farm,now)
         result['home_projects']=projects.owner_state(farm)
         for o in result['objects']:
             if o['type'] in _ex.WORKSHOP_TYPES:o.setdefault('recipes_memory',[])
@@ -536,6 +540,8 @@ def project(farm, visitor, now):
         result['pranks']=[{'kind':p['kind'],'until':p['until']} for p in farm['pranks'] if p['until']>now]
         result['listings']=deepcopy(farm['listings']) if farm['settings']['allow_trade'] and visitor['neighbors'].get(farm['id'],{}).get('status')=='accepted' else []
         result['home_projects']=projects.public_state(farm)
+        from . import festivals
+        result['festival']=festivals.public_calendar(farm,now)
     result.update(is_owner=own,level=level(farm['xp']),server_time=now)
     if own:result.setdefault('fields',[]);result.setdefault('field_machines',{})
     if own:result['xp_bonus']=progression.status(farm,now);result['economy_status']=economy.status(farm,now)

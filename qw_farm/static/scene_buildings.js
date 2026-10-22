@@ -873,7 +873,128 @@ function energyShop(s,o){
   s.line(px(kx,ky)-2,py(kx,ky,13),px(g.x1+.04,ty+.12)+3,py(g.x1+.04,ty+.12,6),'#5f6b5e',1.6);
   fullBox(s,'#b48f63',kx+.12,ky-.42,kx+.42,ky-.14,0,8,'#c9a57a');fullBox(s,'#c9a672',kx+.15,ky-.4,kx+.39,ky-.16,8,15,'#d8b886');
   return g.H+g.R+30}
-const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop};
+/* ---------- textile workshops: spinnery (Прядильня) and weavery (Ткацкая) ---------- */
+/* A wheel standing in a plane parallel to the lit wall (x–z): centre (x,y,z), radius r in tiles, spokes at angle turn. */
+function wheelXZ(s,x,y,z,r,turn,rim,spoke){const c=s.c,X=px(x,y),Y=py(x,y,z),K=34,pt=a=>[X+Math.cos(a)*r*TW,Y+Math.cos(a)*r*TH-Math.sin(a)*r*K];
+  c.beginPath();for(let k=0;k<8;k++){const [u,v]=pt(turn+k*PI/4);c.moveTo(X,Y);c.lineTo(u,v)}c.strokeStyle=spoke;c.lineWidth=1.1;c.lineCap='round';c.stroke();
+  c.beginPath();for(let k=0;k<=28;k++){const [u,v]=pt(k*PI/14);if(k)c.lineTo(u,v);else c.moveTo(u,v)}c.closePath();
+  c.strokeStyle=rim;c.lineWidth=3;c.lineJoin='round';c.stroke();c.strokeStyle=sh(rim,.32);c.lineWidth=1;c.stroke();
+  s.ellipse(X,Y,2.6,2.6,sh(rim,-.12));s.ellipse(X-.5,Y-.5,1.1,1.1,sh(rim,.4));return pt}
+/* Saxony spinning wheel: the wheel at (x,y), bench and flyer towards -x. turn = wheel angle (0 = at rest). */
+function spinningWheel(s,x,y,turn,yarn){const wood='#9a7550',d=sh(wood,-.2),r=.23,zc=14,fx=x-.44;
+  L(s,fx+.02,y-.07,0,fx+.06,y-.04,10,d,2);L(s,x+.12,y-.05,0,x+.08,y-.03,6,d,2);
+  // treadle on the ground and the footman rod up to the crank
+  L(s,x-.02,y+.08,1,x-.3,y+.08,2.5,sh(wood,-.08),3);
+  const cx=Math.cos(turn)*2.2,cz=Math.sin(turn)*2.2;s.line(px(x,y)+cx,py(x,y,zc)-cz,px(x-.08,y+.08),py(x-.08,y+.08,2),'#7b5d3f',1.1);
+  const pt=wheelXZ(s,x,y,zc,r,turn,'#8a6745','#b8956a');
+  // uprights, sloping bench and front legs
+  L(s,x+.03,y+.05,6,x,y+.05,zc,wood,2.2);L(s,x+.12,y,6,fx,y,10,wood,3.4);L(s,x+.12,y,6.6,fx,y,10.6,sh(wood,.22),1);
+  L(s,fx+.02,y+.07,0,fx+.06,y+.04,10,wood,2.2);L(s,x+.12,y+.06,0,x+.08,y+.03,6,wood,2.2);
+  // maidens with the flyer and a full bobbin
+  L(s,fx-.06,y,10,fx-.06,y,21,wood,1.8);L(s,fx+.12,y,10,fx+.12,y,21,wood,1.8);
+  L(s,fx-.04,y,18,fx+.08,y,18,yarn,5.2);L(s,fx-.03,y,19.2,fx+.07,y,19.2,sh(yarn,.25),1.4);
+  E(s,fx+.1,y,18,1.8,2.4,sh(wood,-.05));
+  // drive band from the rim to the whorl
+  const [a1,b1]=pt(PI*.62),[a2,b2]=pt(PI*1.38),W={x:px(fx+.1,y),y:py(fx+.1,y,18)};
+  s.line(a1,b1,W.x,W.y-2,'#efe3c6',.8);s.line(a2,b2,W.x,W.y+2,'#efe3c6',.8);
+  E(s,fx-.07,y,22,1.4,1.4,sh(wood,.15))}
+/* Round willow basket; fill 'wool' = fleece, otherwise a list of yarn ball colours. */
+function woolBasket(s,x,y,r,fill){cyl(s,x,y,r,0,8,'#c09868','#8f6c45');const X=px(x,y),rx=r*TW*1.4142,ry=r*TH*1.4142,c=s.c;
+  for(const z of [2.7,5.4]){c.beginPath();c.ellipse(X,py(x,y,z),rx,ry,0,0,PI);c.strokeStyle='rgba(110,78,42,.45)';c.lineWidth=1;c.stroke()}
+  const Y=py(x,y,8);
+  if(fill==='wool'){for(const [dx,dy,a,b] of [[-.42,.05,.42,.36],[.38,0,.44,.38],[0,-.3,.5,.4],[-.08,.15,.46,.34]])s.ellipse(X+dx*rx,Y+dy*ry-2,a*rx,b*rx,'#f3eee2');s.ellipse(X-.12*rx,Y-.4*ry-3,.3*rx,.22*rx,'#fffaf0')}
+  else fill.forEach((col,i)=>{const dx=(i-(fill.length-1)/2)*rx*.55,dy=(i%2?-.9:.3);s.ellipse(X+dx,Y+dy-2.4,3.4,3.2,col);s.line(X+dx-2.4,Y+dy-3.6,X+dx+2,Y+dy-1.2,sh(col,.25),.8)});
+  c.beginPath();c.ellipse(X,Y,rx,ry,0,0,PI);c.strokeStyle='#b08a5c';c.lineWidth=1.6;c.stroke()}
+/* Cloth roll lying along x: from x to x+len, axis at height z, radius r (tiles); the +x end shows the wound spiral. */
+function clothRoll(s,x,y,z,len,r,col,band){const K=34,cap=(xx,rr,f)=>{const X=px(xx,y),Y=py(xx,y,z),c=s.c;c.beginPath();for(let k=0;k<16;k++){const a=k*PI/8;const u=X-Math.cos(a)*rr*TW,v=Y+Math.cos(a)*rr*TH-Math.sin(a)*rr*K;if(k)c.lineTo(u,v);else c.moveTo(u,v)}c.closePath();c.fillStyle=f;c.fill()};
+  const n=Math.max(3,Math.round(len/.04));for(let i=0;i<n;i++)cap(x+len*i/n,r,i<n*.5?sh(col,-.06):col);
+  const at=(xx,a)=>[px(xx,y)-Math.cos(a)*r*TW,py(xx,y,z)+Math.cos(a)*r*TH-Math.sin(a)*r*K];
+  for(const a of [.55,1.45]){const [u1,v1]=at(x+.02,a),[u2,v2]=at(x+len-.02,a);s.line(u1,v1,u2,v2,band,1.5)}
+  {const [u1,v1]=at(x+.02,2.3),[u2,v2]=at(x+len-.02,2.3);s.line(u1,v1,u2,v2,sh(col,.2),1)}
+  cap(x+len,r,sh(col,.14));cap(x+len,r*.62,sh(col,-.04));cap(x+len,r*.26,sh(col,.2))}
+
+function spinnery(s,o){
+  const work=o.jobs?.length>0,t=s.time||0,x0=o.x+.18,y0=o.y+.14,x1=o.x+1.42,yw=o.y+.54,y1=o.y+1.02,H=30,col='#efe1c6',wood='#9a7550';
+  const g=gparams({x0,y0,x1,y1,H,zE:H,col,roof:'#c7b07c',axis:'y',prof:GABLE,R:22,ov:.12,trim:'#e3d29e',courses:5},{});
+  const xm=(x0+x1)/2;
+  ground(s,o.x+.02,o.y+.02,o.x+o.w-.02,o.y+o.h-.02,'rgba(222,208,168,.42)');
+  shadowAt(s,x0,y0,x1,y1);
+  // a closed cottage at the back, an open porch under the front gable
+  box(s,col,x0,y0,x1,yw,0,H);plinth(s,'#b9a888',x0,y0,x1,yw,5);corners(s,x0,y0,x1,yw,H,'#b89670');
+  doorX(s,x1,(y0+yw)/2,.26,20,'#8b6f52','#f6ecd6',true);
+  top(s,'#d3b689',x0,yw,x1,y1,3);wallY(s,'#ae9068',y1,x0,x1,0,3,3);wallX(s,'#97795a',x1,yw,y1,0,3,3);
+  for(let k=1;k<6;k++){const x=x0+(x1-x0)*k/6;L(s,x,yw,3,x,y1,3,'rgba(110,80,45,.22)',.8)}
+  // inside the porch: a basket of fleece and the spinning wheel (turns while a job runs)
+  woolBasket(s,x0+.15,o.y+.8,.11,'wool');
+  spinningWheel(s,o.x+1.04,o.y+.86,work?t*2.6:.35,'#f1e9da');
+  // a low rail on the open side, posts, the front beam and the gable with a yarn-ball sign
+  rail(s,x1-.02,yw+.04,x1-.02,y1-.06,9,wood);
+  for(const x of [x0+.04,x1-.04])L(s,x,y1-.03,3,x,y1-.03,H,wood,3.2);
+  L(s,x0,y1,H,x1,y1,H,sh(wood,-.08),3);
+  // skeins drying on the front beam
+  [['#e8c9a0',.1],['#d9a7bb',.2],['#a9c6d6',.3],['#f3eee2',.4]].forEach(([c,dx],i)=>{const x=x0+dx+.02,sw=Math.sin(t*1.3+i)*.8;L(s,x,y1,H-1,x+sw*.01,y1,H-10,c,3.4);E(s,x+sw*.01,y1,H-11,1.9,2.1,sh(c,-.12))});
+  gableWall(s,'y',g);
+  for(let k=1;k<5;k++){const x=x0+(x1-x0)*k/5,h=riseAt(GABLE,(x-x0+g.ov)/(x1-x0+2*g.ov))*g.R;L(s,x,y1,H+1,x,y1,H+h-1,'rgba(150,120,80,.25)',1)}
+  E(s,xm,y1,H+9,6.4,6.4,'#f6ecd6');E(s,xm,y1,H+9,4.8,4.8,'#d9a7bb');s.line(px(xm,y1)-4,py(xm,y1,H+10),px(xm,y1)+3,py(xm,y1,H+7),'#f3dde5',1);s.line(px(xm,y1)-3,py(xm,y1,H+12),px(xm,y1)+4,py(xm,y1,H+9),'#f3dde5',1);
+  roofOf(s,g);
+  // straw tufts along the visible eave
+  for(let y=y0-g.ov+.05;y<y1+g.ov;y+=.1)E(s,x1+g.ov,y,H-.5,2.7,1.8,(Math.round(y*7)%2)?'#b49a62':'#c2a96d');
+  // porch lamp on a bracket at the front corner post (warm halo at night)
+  const lx=x0+.04,ly=y1+.16;L(s,x0+.04,y1-.03,H-3,lx,ly,H-3,'#5b4a38',1.6);L(s,lx,ly,H-3,lx,ly,H-5,'#5b4a38',1);fullBox(s,'#5b4a38',lx-.04,ly-.04,lx+.04,ly+.04,H-11,H-5,'#7a6a4e');
+  Q(s,'#fff1b8',[lx-.03,ly+.042,H-10,lx+.03,ly+.042,H-10,lx+.03,ly+.042,H-6,lx-.03,ly+.042,H-6]);
+  s.lanternLights?.push({x:px(lx,ly),y:py(lx,ly,H-8)+43});
+  // fluff drifting off the wheel while it spins
+  if(work&&s.motion!==false)for(let i=0;i<2;i++){const f=(t*.35+i*.5)%1,X=px(o.x+.62,o.y+.86)+f*10,Y=py(o.x+.62,o.y+.86,22)-f*16;s.ellipse(X,Y,1.6,1.3,`rgba(255,252,240,${(.85*(1-f)).toFixed(3)})`)}
+  // a basket of yarn balls in the yard
+  woolBasket(s,o.x+1.22,o.y+1.56,.12,['#d9a7bb','#a9c6d6','#e8c9a0']);
+  return H+g.R+14}
+
+function weavery(s,o){
+  const work=o.jobs?.length>0,t=s.time||0;
+  const g=gparams({x0:o.x+.14,y0:o.y+.14,x1:o.x+1.5,y1:o.y+1.0,H:34,col:'#ece2cb',roof:'#a8705d',axis:'y',prof:GABLE,R:22,ov:.12,base:'#b98c74',baseH:6,corner:'#f8f1df',trim:'#e5c4b3',courses:4},{});
+  ground(s,o.x+.02,o.y+.02,o.x+o.w-.02,o.y+o.h-.02,'rgba(218,204,176,.42)');
+  body(s,g);const Y=g.y1,xm=(g.x0+g.x1)/2;
+  boards(s,'y',Y,g.x0,g.x1,0,6,2,'rgba(110,60,40,.25)');boards(s,'x',g.x1,g.y0,g.y1,0,6,2,'rgba(90,50,35,.22)');
+  // big workshop window with the loom inside
+  const wa=xm-.46,wb=xm+.46,z0=9,z1=30;
+  Q(s,'#f8f1df',[wa-.04,Y,z0-2,wb+.04,Y,z0-2,wb+.04,Y,z1+2,wa-.04,Y,z1+2]);
+  Q(s,'#5f5459',[wa,Y,z0,wb,Y,z0,wb,Y,z1,wa,Y,z1]);Q(s,'#6d6066',[wa,Y,z1-7,wb,Y,z1-7,wb,Y,z1,wa,Y,z1]);
+  const la=wa+.1,lb=wb-.1,hz=z0+13+(work?Math.sin(t*4.2)*1.6:0);
+  L(s,la,Y,z0,la,Y,z1-1,'#b08a5e',2.4);L(s,lb,Y,z0,lb,Y,z1-1,'#b08a5e',2.4);L(s,la-.03,Y,z1-3,lb+.03,Y,z1-3,'#c9a272',2.6);
+  const warp=['#f1e6cf','#e6a7b0','#f1e6cf','#a9c8bd','#f1e6cf','#e9d28a','#f1e6cf','#a6b7dc','#f1e6cf'];
+  for(let i=0;i<warp.length;i++){const x=la+.05+(lb-la-.1)*i/(warp.length-1);L(s,x,Y,z1-3,x,Y,hz+.5,warp[i],.9);L(s,x,Y,hz-.5,x,Y,z0+7,warp[i],.9)}
+  L(s,la,Y,hz,lb,Y,hz,'#d8b57f',2);
+  Q(s,'#c98f8f',[la+.03,Y,z0+1.5,lb-.03,Y,z0+1.5,lb-.03,Y,z0+7,la+.03,Y,z0+7]);
+  for(const z of [z0+3.2,z0+5.4])L(s,la+.03,Y,z,lb-.03,Y,z,'#f1d6d0',1);
+  for(let i=1;i<4;i++){const x=la+(lb-la)*i/4;L(s,x,Y,z0+1.5,x,Y,z0+7,'#a86f6f',.9)}
+  L(s,la,Y,z0+7.5,lb,Y,z0+7.5,'#9a774f',2.2);
+  const sx=work?xm+Math.sin(t*2.4)*(lb-la)*.42:la+.12;E(s,sx,Y,hz-2.6,3.6,1.5,'#8a5a3a');E(s,sx-.01,Y,hz-2.2,1.6,.6,'#c99a6a');
+  // glazing bars and a soft reflection over the glass, a wooden sill
+  for(const f of [1/3,2/3]){const x=wa+(wb-wa)*f;L(s,x,Y,z0,x,Y,z1,'rgba(248,241,223,.75)',1.2)}L(s,wa,Y,z1-7,wb,Y,z1-7,'rgba(248,241,223,.75)',1.2);
+  Q(s,'rgba(255,255,255,.1)',[wa+.08,Y,z1,wa+.3,Y,z1,wa+.12,Y,z0,wa,Y,z0,wa,Y,z0+6]);
+  Q(s,'#c9a672',[wa-.07,Y,z0-2,wb+.07,Y,z0-2,wb+.07,Y+.07,z0-3.5,wa-.07,Y+.07,z0-3.5]);
+  // round attic window on the gable
+  E(s,xm,Y,g.H+9,5.6,5.6,'#f8f1df');E(s,xm,Y,g.H+9,4.1,4.1,'#a9c4c8');s.line(px(xm,Y)-4,py(xm,Y,g.H+9),px(xm,Y)+4,py(xm,Y,g.H+9),'#f8f1df',1);
+  // right wall: door under a little canopy and a window
+  const yd=g.y1-.28;doorX(s,g.x1,yd,.32,21,'#7f9c98','#f8f1df');
+  winX(s,g.x1,g.y0+.33,14,.26,12,'#b4cfc9','#f8f1df');winX(s,g.x1,yd,g.H-8,.22,6,'#b4cfc9','#f8f1df');
+  roofOf(s,g);
+  Q(s,'#b88373',[g.x1,yd-.25,27,g.x1,yd+.25,27,g.x1+.22,yd+.25,23,g.x1+.22,yd-.25,23]);L(s,g.x1+.22,yd-.25,23,g.x1+.22,yd+.25,23,'#8a5b4c',1.6);
+  // sign: a checked cloth swatch on a bracket at the front corner
+  L(s,g.x0+.02,Y,30,g.x0+.02,Y+.26,30,'#5f4a38',1.6);
+  {const X=px(g.x0+.02,Y+.22),Z=py(g.x0+.02,Y+.22,29);s.line(X,Z,X,Z+2,'#5f4a38',1);s.poly([{x:X-5,y:Z+2},{x:X+5,y:Z+2},{x:X+5,y:Z+12},{x:X-5,y:Z+12}],'#e9d6b0');
+   for(const k of [0,1,2])s.line(X-5,Z+4+k*3.4,X+5,Z+4+k*3.4,'#c98f8f',1.3);for(const k of [0,1,2])s.line(X-3.4+k*3.4,Z+2,X-3.4+k*3.4,Z+12,'rgba(130,110,160,.7)',1.1)}
+  // weathervane with a shuttle on the front end of the ridge
+  {const vx=xm,vy=g.y1-.12,vz=g.H+g.R;L(s,vx,vy,vz,vx,vy,vz+11,'#6f6658',1.4);const X=px(vx,vy),Z=py(vx,vy,vz+10);s.poly([{x:X-8,y:Z},{x:X-3,y:Z-2},{x:X+3,y:Z-2},{x:X+8,y:Z},{x:X+3,y:Z+2},{x:X-3,y:Z+2}],'#c9a272');s.ellipse(X,Z,2.2,1,'#7a5236')}
+  // the night shift: lit window while the loom works
+  if(work)s.lanternLights?.push({x:px(xm,Y),y:py(xm,Y,(z0+z1)/2)+43});
+  // cloth rolls on a pallet by the shaded wall
+  const rx=o.x+1.55,ry=o.y+1.02;
+  fullBox(s,'#b08f63',rx,ry-.02,rx+.4,ry+.32,0,3,'#c9a672');
+  clothRoll(s,rx+.02,ry+.06,6.2,.36,.085,'#a9a3b8','#cfcadb');clothRoll(s,rx+.02,ry+.24,6.2,.36,.085,'#c98f8f','#f1d6d0');
+  clothRoll(s,rx+.02,ry+.15,11.6,.36,.085,'#e8dfe9','#fbf7fb');
+  return g.H+g.R+16}
+const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop};
 /* ---------- r6 building upgrades (view only; the level comes from the server object) ----------
    level 2: flower boxes, a lantern post with a hanging sign. level 3: adds a lean-to annex with its own chimney and a
    waving flag on the roof. Both levels get a small gold badge. Buildings without a level (older saves) are level 1. */

@@ -10,7 +10,7 @@ from .domain import FarmError, need
 STATIC=Path(__file__).with_name('static')
 API='/api/farm/v1'
 LOCAL_LIMITS={False:600,True:300}  # per IP per minute: reads / writes (one farm action = one write + one read)
-ASSETS={'village.svg','app.js','scene.js','style.css','icons.svg','farm-card.svg','invite.js','scene_expansion.js','scene_buildings.js','scene_map.js','tractor_game.js','trip_game.js','farm_runs.js','address.js','dasha-game.js','dasha-game.css','dasha-scene.svg','oleg-game.js','oleg-game.css'}
+ASSETS={'village.svg','app.js','scene.js','style.css','icons.svg','farm-card.svg','invite.js','scene_expansion.js','scene_buildings.js','scene_map.js','tractor_game.js','trip_game.js','farm_runs.js','address.js','dasha-game.js','dasha-game.css','dasha-scene.svg','oleg-game.js','oleg-game.css','festivals.js','festivals.css','village-fest-posidelki.svg'}
 CSP="default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
 
 

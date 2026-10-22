@@ -7,6 +7,7 @@ import {B,makeS,P,TW,TH} from './common.js';
 import {paintGate,boardSvg} from './gate.js';
 import {buildWalk} from './walk.js';
 import {playerSvg} from './player.js';
+import {posidelki} from './fest_posidelki.js';
 
 export async function render(opts={}){
 const W=3200,H=2400,OX=1600,OY=300,K=1.3;
@@ -46,7 +47,7 @@ const inWater=(x,y)=>distRiver(x,y)<RW/2||inPond(x,y);
 const occupied=[];
 // h = how tall the thing stands (farm px): the walk graph keeps grass routes out of the area a tall object hides on screen
 function claim(x0,y0,x1,y1,tag,h=0){occupied.push(Object.assign([x0,y0,x1,y1],{tag,h}))}
-const FENCES=[],BRIDGES=[];
+const FENCES=[],BRIDGES=[],BENCHES=[],LAMPS=[];
 function free(x,y,m=.6){return !occupied.some(r=>x>r[0]-m&&x<r[2]+m&&y>r[1]-m&&y<r[3]+m)}
 function blockedArea(x0,y0,x1,y1){for(let x=x0;x<x1;x+=.25)for(let y=y0;y<y1;y+=.25){if(isRoad(x,y)||isPlaza(x,y)||distRiver(x,y)<RW/2+.5||inPond(x,y,.3))return true}return false}
 const problems=[];
@@ -131,7 +132,7 @@ function stall(x,y,c1,goods){anchor(x,y,'stall');anchor(x+1.4,y+1,'stall');claim
  goods.forEach((g,i)=>{const q=P(x+.3+i*.42,y+.68,11);s.ellipse(q.x,q.y-2,5,3,g);s.ellipse(q.x-1,q.y-3,2.4,1.6,'#ffffff55')});
  for(const [a,b] of [[x+.06,y1-.06],[x1-.06,y1-.06]])B.L(s,a,b,11,a,b,26,'#9c7d58',2.2);
  B.awning(s,x-.06,x1+.06,y,32,1.2,8,'#f4ece0',c1,6)})}
-function lamp(x,y){anchor(x,y,'lamp');if(isRoad(x,y)||isPlaza(x,y)&&false)problems.push('lamp on road '+x+','+y);claim(x-.15,y-.15,x+.15,y+.15);add(x+y,()=>{const p=P(x,y);s.lantern(p);meta.lamps.push(scr({x:p.x,y:p.y-43}))})}
+function lamp(x,y){LAMPS.push([x,y]);anchor(x,y,'lamp');if(isRoad(x,y)||isPlaza(x,y)&&false)problems.push('lamp on road '+x+','+y);claim(x-.15,y-.15,x+.15,y+.15);add(x+y,()=>{const p=P(x,y);s.lantern(p);meta.lamps.push(scr({x:p.x,y:p.y-43}))})}
 function tree(x,y,k=1,fruit=null){anchor(x,y,'tree');add(x+y,()=>{s.treeSprite(x,y,k);if(fruit){const p=P(x,y);for(const [dx,dy] of [[-10,-44],[8,-50],[12,-36],[-2,-60],[-14,-54],[4,-40]])s.ellipse(p.x+dx*k,p.y+dy*k,2.4*k,2.4*k,fruit)}})}
 function pine(x,y,k=1){anchor(x,y,'pine');add(x+y,()=>{const p=P(x,y),c=ctx;c.save();c.translate(p.x,p.y);c.scale(k,k);s.shadow(0,0,17,7);s.line(0,0,0,-14,'#9e8a60',4);
  for(const [t,w,b] of [[-62,20,-12],[-78,16,-32],[-92,12,-50]]){s.poly([{x:0,y:t},{x:-w,y:b},{x:0,y:b+3}],'#7da073');s.poly([{x:0,y:t},{x:w,y:b},{x:0,y:b+3}],'#71976d')}
@@ -144,7 +145,7 @@ function bush(x,y,berry){anchor(x,y,'bush');add(x+y,()=>{const p=P(x,y);s.ellips
 function flowers(x,y){anchor(x,y,'flowers');add(x+y,()=>{const p=P(x,y),cols=['#e7a8b5','#f1dc8a','#c3b0de','#f4f1e6'];for(let i=0;i<6;i++){const fx=p.x+(i-2.5)*4.3,fy=p.y+((i*5)%4)-1,h=6+((i*3)%4);s.line(fx,fy,fx,fy-h,'#7ea468',1);s.ellipse(fx,fy-h-1,2.1,1.8,cols[(i+Math.floor(x))%4]);s.ellipse(fx,fy-h-1,.8,.7,'#d9a93d')}})}
 function rock(x,y){anchor(x,y,'rock');add(x+y,()=>{const p=P(x,y);s.ellipse(p.x+3,p.y+2,10,3.6,'#7d806e30');s.ellipse(p.x,p.y-1,8.5,4.4,'#9c9e8e');s.ellipse(p.x-1,p.y-4,7,5,'#b1b3a2');s.ellipse(p.x-2,p.y-5.5,3,1.6,'#cfd1c0')})}
 function fence(x1,y1,x2,y2){FENCES.push([x1,y1,x2,y2]);const n=Math.max(1,Math.round(Math.hypot(x2-x1,y2-y1)/1.2));for(let i=0;i<n;i++){const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n],b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n];add(Math.max(a[0],b[0])+Math.max(a[1],b[1])-.05,()=>B.rail(s,a[0],a[1],b[0],b[1],10,'#b79f72'))}}
-function bench(x,y,axis='x'){anchor(x,y,'bench');claim(x-.35,y-.35,x+.35,y+.35);add(x+y,()=>{if(axis==='x'){B.fullBox(s,'#b48f66',x-.32,y-.12,x+.32,y+.12,6,8,'#c9a57a');for(const dx of [-.26,.26]){B.L(s,x+dx,y+.1,0,x+dx,y+.1,6,'#8a6c4c',1.8);B.L(s,x+dx,y-.1,0,x+dx,y-.1,14,'#8a6c4c',1.8)}B.Q(s,'#b48f66',[x-.32,y-.12,10,x+.32,y-.12,10,x+.32,y-.12,15,x-.32,y-.12,15])}
+function bench(x,y,axis='x'){BENCHES.push([x,y,axis]);anchor(x,y,'bench');claim(x-.35,y-.35,x+.35,y+.35);add(x+y,()=>{if(axis==='x'){B.fullBox(s,'#b48f66',x-.32,y-.12,x+.32,y+.12,6,8,'#c9a57a');for(const dx of [-.26,.26]){B.L(s,x+dx,y+.1,0,x+dx,y+.1,6,'#8a6c4c',1.8);B.L(s,x+dx,y-.1,0,x+dx,y-.1,14,'#8a6c4c',1.8)}B.Q(s,'#b48f66',[x-.32,y-.12,10,x+.32,y-.12,10,x+.32,y-.12,15,x-.32,y-.12,15])}
  else{B.fullBox(s,'#b48f66',x-.12,y-.32,x+.12,y+.32,6,8,'#c9a57a');for(const dy of [-.26,.26]){B.L(s,x+.1,y+dy,0,x+.1,y+dy,6,'#8a6c4c',1.8);B.L(s,x-.1,y+dy,0,x-.1,y+dy,14,'#8a6c4c',1.8)}B.Q(s,'#a07e58',[x-.12,y-.32,10,x-.12,y+.32,10,x-.12,y+.32,15,x-.12,y-.32,15])}})}
 function bales(x,y){anchor(x,y,'bales');claim(x-.3,y-.3,x+.7,y+.5);add(x+y+.6,()=>{B.bale(s,x,y,.34,11);B.bale(s,x+.42,y+.1,.34,11);B.bale(s,x+.2,y+.05,.3,11)})}
 function haystack(x,y){anchor(x,y,'haystack');claim(x-.6,y-.6,x+.6,y+.6,'haystack',40);add(x+y+.5,()=>{const p=P(x,y);s.shadow(p.x,p.y,26,10);ctx.beginPath();ctx.moveTo(p.x-24,p.y);ctx.bezierCurveTo(p.x-26,p.y-26,p.x-12,p.y-40,p.x,p.y-40);ctx.bezierCurveTo(p.x+12,p.y-40,p.x+26,p.y-26,p.x+24,p.y);ctx.quadraticCurveTo(p.x,p.y+9,p.x-24,p.y);ctx.fillStyle='#e0c97c';ctx.fill();
@@ -370,6 +371,10 @@ meta.walk=buildWalk({toWorld,toTile,roads:ROADS,lanes:LANES,plaza:PLAZA,bridges:
  trees:trees.map(t=>[t[0],t[1],t[2]]),fences:FENCES,inWater,targets:opts.targets||{}});
 meta.walk_blockers={occupied:occupied.filter(r=>r.tag!=='spot'&&r.tag!=='tree').map(r=>r.slice(0,4).map(v=>+v.toFixed(3))),trees:trees.map(t=>[+t[0].toFixed(3),+t[1].toFixed(3),+t[2].toFixed(3)]),
  fences:FENCES,bridges:BRIDGES,river:river.map(([a,b])=>[+a.toFixed(3),+b.toFixed(3)]),river_width:RW,pond:POND};
+// festival layers (vector, live in the game, shown by html[data-festival] flags): anchored to this render
+meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windows:s.win,chimneys:s.smk,fences:FENCES,bridges:BRIDGES,
+ benches:BENCHES.filter(b=>isPlaza(b[0],b[1])),lamps:LAMPS,spots:SPOT,free:(x,y)=>free(x,y,.05),samovar:[20.3,18.9],plaza:PLAZA,
+ tall:occupied.filter(r=>r.h>=20).map(r=>({r:[r[0],r[1],r[2],r[3]],h:r.h}))})};
 meta.player=playerSvg();   // the player's figure (player.js), a live layer like the gate board
 return {world:cv.toDataURL('image/png'),meta,size:[W,H]};
 }

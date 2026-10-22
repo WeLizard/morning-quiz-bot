@@ -4,6 +4,7 @@ import {mountOlegGame} from './oleg-game.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame,yieldQty,growthPermille} from './tractor_game.js';
+import * as FEST from './festivals.js';
 import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js';
 import {CLASS_LABEL,LONG_HINT,seedStats,sortSeeds,planMachine,planRepeat,planTap,remember} from './farm_runs.js';
 import {parseInvite,parseInviteHint,incomingInvite,clearInvite,openTelegram,shareLink,mailtoUrl} from './invite.js';
@@ -52,7 +53,7 @@ const VILLAGE_VOICES={
  'Почтальон Ёж':['Письма доставлены! А вот за вкусностями пришлось зайти к тебе.','Твоя посылка всегда приходит вовремя. На тебя можно положиться!','У меня для тебя добрые вести. И место в сумке для нашего заказа!'],
  'Механик Крот':['Шестерёнки готовы. Теперь бы перекусить перед работой!','С твоей помощью мастерская работает как часы.','Заходи, друг! Лучшие идеи приходят после хорошего обеда.'],
  'Кошка Кая':['Я выбираю самые свежие продукты. Покажешь свой урожай?','Мне нравится твой вкус. У тебя всегда найдётся что-то особенное.','Я оставила тебе лучшее место на площади. Расскажешь, что вырастило хозяйство?'],
- 'Кошка Соня':['Можно я ещё немного посплю? А потом попробую что-нибудь вкусное.','Узнаю твои шаги. Ради твоих угощений даже приятно просыпаться.','Для тебя я уже проснулась! Давай устроим тихий вечер с лакомствами.'],
+ 'Кошка Соня':['Можно я ещё немного посплю? Только сначала погрею лапки о тёплый плед.','Узнаю твои шаги. Ради мягкого пледа и тёплых носков даже приятно просыпаться.','Для тебя я уже проснулась! Давай устроим тихий вечер: чай, одеяло и немного пряжи.'],
  'Суслик Игорь':['Запасы сами себя не соберут! Проверим, что сегодня на складе?','Вот это надёжный поставщик! С тобой моя кладовая не пустует.','Я припас для тебя добрые слова. А для кладовой — ещё одну просьбу!'],
  'Неведома Зверушка':['Из-за кустов кто-то любопытно смотрит на твой урожай…','Зверушка узнаёт тебя и смело выходит на площадь.','Зверушка радостно машет лапкой: ты теперь свой!'],
  'Медведь Пух':['Утро только началось, а мне уже мало бодрости! Найдётся у тебя что-нибудь на заряд?','С твоими зарядами я за день успеваю втрое больше! Давай ещё баночку-другую?','Для тебя у бочки всегда тёплое место. А для моей кружки — ещё один заказ!']
@@ -79,6 +80,9 @@ const VILLAGE_PLAYER_SVG='<svg class="vp-art" viewBox="-17 -48 34 52" aria-hidde
 // Walk graph of the village (generated: manifest.walk of scripts/art/village/build_village.py, format in its README):
 // n = node x,y pairs and z = walkable quads in world units (2400x1800), e = node index pairs, a = approach node per target.
 const VILLAGE_WALK={n:[77,365,2323,365,1920,427,1922,428,1874,452,287,471,2113,471,2060,497,498,576,1902,576,1218,602,1176,605,709,681,1691,681,1408,698,1390,707,1533,760,1056,767,919,787,586,813,510,814,609,825,547,832,595,832,1016,835,1384,835,656,848,989,848,489,861,1068,861,946,870,1042,874,1279,888,1502,891,480,892,1499,892,476,898,485,900,986,900,884,901,988,901,1305,901,1516,901,1174,914,1226,914,1331,914,750,922,1308,925,937,927,1147,927,1253,927,1358,927,963,940,1437,940,1095,953,1200,953,1305,953,1411,953,1279,966,1042,980,1147,980,1358,980,1200,985,1179,995,1209,1002,1200,1006,797,1012,1586,1015,809,1017,1147,1032,1231,1043,1895,1044,1174,1045,1745,1055,1194,1056,1200,1059,1186,1060,358,1067,1706,1074,1077,1094,1334,1094,645,1099,1770,1107,1010,1109,674,1114,1029,1118,1814,1129,533,1155,1253,1164,1235,1173,884,1190,1323,1217,1639,1217,2007,1225,323,1260,744,1260,2156,1300,1656,1325,2095,1331,919,1348,112,1366,959,1368,1057,1374,1797,1383,1937,1383,1008,1391,1007,1392,1013,1395,42,1401,2358,1401,830,1433,1200,1474,1186,1481,1340,1559,1551,1664,1762,1769],e:[0,5,1,6,2,3,3,4,3,7,5,8,6,7,7,9,8,12,9,13,10,11,10,14,12,18,13,16,14,15,14,16,16,25,17,18,18,24,19,21,19,22,20,22,21,23,21,26,22,28,24,27,25,35,27,30,27,31,28,34,29,31,31,40,32,41,33,35,34,36,35,42,36,37,36,77,38,40,39,46,39,48,40,48,41,45,41,50,42,53,43,49,44,50,45,47,45,51,48,52,49,54,49,55,50,55,50,56,51,56,51,57,52,59,52,68,53,57,53,67,54,59,54,60,55,60,56,58,56,61,57,61,59,69,60,63,61,70,62,63,63,65,64,65,65,69,66,68,67,78,68,81,69,72,70,75,70,80,71,82,72,74,72,79,73,78,74,75,74,76,77,87,78,82,79,85,79,89,81,84,81,87,82,86,83,85,85,90,86,92,86,93,87,94,87,95,88,89,89,91,90,95,93,96,94,100,95,99,96,98,96,109,97,103,98,104,99,101,100,108,101,106,101,110,102,107,103,104,105,106,106,107,107,112,111,112,112,113,113,114,114,115],a:{"gate":111,"hall":62,"place:board":47,"place:library":15,"place:market":38,"place:pier":20,"place:post":46,"place:workshop":71,"start":105,"visitor:0":102,"visitor:1":76,"visitor:2":37,"visitor:3":84,"Агата":33,"Кошка Кая":23,"Кошка Соня":80,"Лиса Даша":97,"Медведь Пух":110,"Механик Крот":73,"Неведома Зверушка":4,"Петух Олег":11,"Почтальон Ёж":66,"Суслик Игорь":83,"Филиныч":17},z:[[33,308,1025,804,954,839,-37,343],[2367,308,2437,343,1446,839,1376,804],[919,927,989,962,33,1440,-37,1405],[1481,927,2437,1405,2367,1440,1411,962],[1130,1032,1200,1067,814,1260,744,1225],[393,1050,1858,1783,1788,1818,323,1085],[1235,594,1516,734,1481,752,1200,611],[1902,401,2042,471,2007,488,1867,418],[603,804,744,874,709,892,568,822],[1130,1103,1340,1208,1305,1225,1095,1120],[1411,1067,1446,1085,1270,1173,1235,1155],[1762,1138,1797,1155,1586,1260,1551,1243],[1200,716,1551,892,1200,1067,849,892],[600,592,754,669,684,704,530,627]]};
+// Festival layers of the village (scripts/art/village/fest_<id>.js, vector): one file per festival, fetched only while
+// html[data-festival=<id>][data-festival-decor=on]. style.css shows decor and day light under the night tint, the glow above it.
+const VILLAGE_FEST={posidelki:'village-fest-posidelki.svg'},villageFestCache={};
 // River-mill water wheel (overshot): it stands in the plane of the mill's long wall (iso 1:-0.5, the axle painted in village.svg runs
 // into that wall) with its hub on the axle end (731.7, 555) and its lower paddles in the race. The flume ends at the wheel's
 // top on the tower side; its water arcs over the top and lands on the far paddles, so the top turns away from the flume
@@ -417,11 +421,11 @@ function updateHUD(){
  $('farm-name').textContent=displayName;
  $('farm-caption').textContent=own()?'СВОЁ МЕСТО ПОД СОЛНЦЕМ':'ХОРОШИЕ СОСЕДИ · ХОРОШИЙ ДЕНЬ';$('farm-subtitle').textContent=own()?'Растёт, пока ты занимаешься своими делами.':'В гостях: можно помочь, а хозяйничать будет владелец.';$('return-home').hidden=own();$('fields-door').hidden=!own()||!(S.catalog.fields&&S.me.level>=S.catalog.fields.min_level);$('object-list-button').textContent='Список объектов';
 }
-const tabs=[['orders','orders','Заказы'],['inventory','shop','Склад'],['fields','tractor','Поля'],['build','home','Строить'],['production','workshop','Мастерские'],['team','tractor','Команда'],['forest','forest','В лес'],['lake','lake','Озеро'],['neighbors','friends','Соседи'],['secrets','discovery','Находки'],['journal','journal','Журнал'],['village','coin','Деревня']];
+const tabs=[['orders','orders','Заказы'],['inventory','shop','Склад'],['fields','tractor','Поля'],['build','home','Строить'],['production','workshop','Мастерские'],['team','tractor','Команда'],['forest','forest','В лес'],['lake','lake','Озеро'],['neighbors','friends','Соседи'],['secrets','discovery','Находки'],['journal','journal','Журнал'],['village','coin','Деревня'],['festival','coin','Праздник']];
 function renderRail(){
  const mobile=matchMedia('(max-width:850px)').matches;
  const mainTabs=new Set(['orders','inventory','fields','build','production','team','forest','lake','neighbors']);
- const entries=mobile?[...tabs.filter(([id])=>mainTabs.has(id)),['more','menu','Ещё']]:tabs;
+ const shown=tabs.filter(([id])=>id!=='festival'||festivalTab()),entries=mobile?[...shown.filter(([id])=>mainTabs.has(id)),['more','menu','Ещё']]:shown;
  const rail=$('rail');rail.replaceChildren();for(let [id,ic,title]of entries){let b=button(null,()=>selectTab(id),'',false);b.append(icon(ic),el('span',title));b.dataset.tab=id;b.setAttribute('aria-label',title);b.classList.toggle('active',id===S.tab||id==='more'&&!entries.some(([k])=>k===S.tab));rail.append(b);}
  syncNav();
  if(mobile)requestAnimationFrame(()=>{const active=rail.querySelector('.active');if(active)rail.scrollTo({left:Math.max(0,active.offsetLeft-(rail.clientWidth-active.offsetWidth)/2),behavior:'smooth'});});
@@ -483,10 +487,10 @@ function clickObject(o,cell){hideStoneSpeech();
  farmViewEpoch++;S.selected=o.id;S.tab='object';scene.focus(o);showPanel();renderRail();renderPanel();
 }
 function renderPanel(){
- syncVillageScene();if(!S.me)return;let p=$('panel-content');const villageFocus=S.tab==='village'?document.activeElement?.dataset?.villageFocus:null;const villageServices=S.tab==='village'?[...p.querySelectorAll('.village-services[open]')].map(n=>n.dataset.villageService):[];const villagePanelKey=S.tab==='village'?JSON.stringify([villageSheet,villageResident]):null;const oldScroll=S.lastRenderedTab===S.tab&&(S.tab!=='village'||S.lastRenderedVillageSheet===villagePanelKey)?p.scrollTop:0;S.lastRenderedTab=S.tab;S.lastRenderedVillageSheet=villagePanelKey;p.replaceChildren();
+ syncVillageScene();if(typeof syncFestivalWorld==='function')syncFestivalWorld();if(!S.me)return;let p=$('panel-content');const villageFocus=S.tab==='village'?document.activeElement?.dataset?.villageFocus:null;const villageServices=S.tab==='village'?[...p.querySelectorAll('.village-services[open]')].map(n=>n.dataset.villageService):[];const villagePanelKey=S.tab==='village'?JSON.stringify([villageSheet,villageResident]):null;const oldScroll=S.lastRenderedTab===S.tab&&(S.tab!=='village'||S.lastRenderedVillageSheet===villagePanelKey)?p.scrollTop:0;S.lastRenderedTab=S.tab;S.lastRenderedVillageSheet=villagePanelKey;p.replaceChildren();
  if(!own()&&S.tab!=='object'&&S.tab!=='neighbors'){renderVisit(p);panelRenderSignature=panelSnapshot();return;}
  scene.zones=null;scene.areaPreview=null;scene.dirty=true;
- if(S.tab==='lake')renderLake(p);else if(S.tab==='arbor')renderArbor(p);else{const fn={orders:renderOrders,inventory:renderInventory,build:renderBuild,production:renderProduction,neighbors:renderNeighbors,journal:renderJournal,settings:renderSettings,object:renderObject,objects:renderObjects,team:renderTeam,forest:renderForest,secrets:renderSecrets,more:renderMore,village:renderVillage,fields:renderFields}[S.tab]||renderOrders;fn(p);}for(const n of p.querySelectorAll('.village-services'))n.open=villageServices.includes(n.dataset.villageService);p.scrollTop=oldScroll;if(villageFocus){const target=[...p.querySelectorAll('[data-village-focus]')].find(n=>n.dataset.villageFocus===villageFocus)||p.querySelector('[data-village-focus=resident]');target?.focus({preventScroll:true});}panelRenderSignature=panelSnapshot();
+ if(S.tab==='lake')renderLake(p);else if(S.tab==='arbor')renderArbor(p);else{const fn={orders:renderOrders,inventory:renderInventory,build:renderBuild,production:renderProduction,neighbors:renderNeighbors,journal:renderJournal,settings:renderSettings,object:renderObject,objects:renderObjects,team:renderTeam,forest:renderForest,secrets:renderSecrets,more:renderMore,village:renderVillage,fields:renderFields,festival:typeof renderFestivalTab==='function'?renderFestivalTab:undefined}[S.tab]||renderOrders;fn(p);}if(S.tab==='orders'&&typeof festivalBanner==='function')festivalBanner(p);for(const n of p.querySelectorAll('.village-services'))n.open=villageServices.includes(n.dataset.villageService);p.scrollTop=oldScroll;if(villageFocus){const target=[...p.querySelectorAll('[data-village-focus]')].find(n=>n.dataset.villageFocus===villageFocus)||p.querySelector('[data-village-focus=resident]');target?.focus({preventScroll:true});}panelRenderSignature=panelSnapshot();
 }
 /* ---- building upgrades 1 -> 3: all numbers come from the server catalog (S.catalog.upgrades) ---- */
 const UP=()=>S.catalog.upgrades;
@@ -755,7 +759,8 @@ function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){
    const readyCount=o.jobs.filter(j=>j.ready_at<=now()).length;
    if(readyCount>=2)p.append(button(`Забрать всё готовое · ${readyCount}`,()=>command('collect_building',{object:o.id}),'primary wide'));
    for(let j of o.jobs){let row=el('div',null,'queue-job'),ready=j.ready_at<=now();row.append(button(ready?'Забрать':'Отменить',()=>ready?command('collect',{object:o.id,job:j.id}):(j.starts_at>now()&&!recipeMemory(o).includes(j.recipe))?command('cancel_job',{object:o.id,job:j.id}):confirmCancelJob(o,j),ready?'primary small':'light small'),el('strong',S.catalog.recipes[j.recipe]?.name||'Продукция'));let s=el('small');s.append(j.starts_at>now()?el('span','В очереди · '):el('span',''),timer(j.ready_at));row.append(s);p.append(row);}
-   for(let r of recipes){let c=card(r.name,null,Object.keys(r.outputs)[0]);c.append(goods(r.inputs));let out=Object.entries(r.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');c.append(el('p',`→ ${out} · ${duration(r.seconds*speedOf(o))}`,'recipe-time'));c.append(button(r.level>S.me.level?`Нужен ${r.level} уровень`:'В очередь',()=>command('queue',{object:o.id,recipe:r.id}),'secondary wide',r.level>S.me.level||!enough(r.inputs)||o.jobs.length>=slotsOf(o)));p.append(c);}
+   renderLessonCard(o,p);
+   for(let r of recipes){let c=card(r.name,null,Object.keys(r.outputs)[0]);c.append(goods(r.inputs));let out=Object.entries(r.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');c.append(el('p',`→ ${out} · ${duration(r.seconds*speedOf(o))}`,'recipe-time'));c.append(button(recipeLevel(r)>S.me.level?`Нужен ${recipeLevel(r)} уровень`:'В очередь',()=>command('queue',{object:o.id,recipe:r.id}),'secondary wide',recipeLevel(r)>S.me.level||!enough(r.inputs)||o.jobs.length>=slotsOf(o)));p.append(c);}
    upgradeCard(o,p);
   }
   if(S.catalog.buildings[o.type]?.decor)note('Маленькая деталь, которая делает место твоим. Можно переставить в любой свободный уголок.',p);
@@ -767,6 +772,20 @@ function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){
   const remove=button(label,()=>confirmDemolish(o),'text-button danger',!!reason);
   if(reason){remove.title=reason;note(reason,p);}
   p.append(remove);
+ }
+}
+/* Textile lessons of Кошка Соня: a delivered step opens the recipes marked `teach` sooner (server: textile.recipe_level). */
+const recipeLevel=r=>{const t=r.teach;return t&&(S.me?.lessons?.[t.track]||0)>=t.step?Math.max(1,r.level-t.early):r.level;};
+function renderLessonCard(o,p){
+ for(const track of Object.values(S.catalog.lessons||{})){
+  const taught=Object.values(S.catalog.recipes).filter(x=>x.teach?.track===track.id);
+  if(!taught.some(x=>x.building===o.type))continue;
+  const done=S.me?.lessons?.[track.id]||0,step=track.steps[done];
+  if(!step){note(`${track.npc}: все уроки пройдены.`,p);continue;}
+  const opens=taught.filter(x=>x.teach.step===step.step).map(x=>x.name.toLowerCase()).join(', ');
+  const c=card(track.name,`${track.npc}: «${step.text}»${opens?`. Откроет раньше: ${opens}`:''}`,'yarn');
+  c.append(goods(step.items),button(S.me.level<step.level?`Нужен ${step.level} уровень`:'Сдать урок',()=>command('lesson_deliver',{track:track.id}),'secondary wide',S.me.level<step.level||!enough(step.items)));
+  p.append(c);
  }
 }
 function confirmDemolish(o){
@@ -858,7 +877,7 @@ function bulkCounts(z){
  const take=needs=>{if(!Object.entries(needs).every(([k,q])=>(stockLeft[k]||0)>=q))return false;for(const [k,q] of Object.entries(needs))stockLeft[k]-=q;return true;};
  let feed=0,restart=0;
  for(const o of objs)if(o.animal&&!o.animal_job&&S.catalog.animals[o.animal]&&take(batchOf(S.catalog.animals[o.animal],o).inputs))feed++;
- for(const o of objs){if((o.jobs||[]).length>=slotsOf(o))continue;const r=recipeMemory(o).map(id=>S.catalog.recipes[id]).find(r=>r.building===o.type&&r.level<=lv&&Object.entries(r.inputs).every(([k,q])=>(stockLeft[k]||0)>=q));if(r&&take(r.inputs))restart++;}
+ for(const o of objs){if((o.jobs||[]).length>=slotsOf(o))continue;const r=recipeMemory(o).map(id=>S.catalog.recipes[id]).find(r=>r.building===o.type&&recipeLevel(r)<=lv&&Object.entries(r.inputs).every(([k,q])=>(stockLeft[k]||0)>=q));if(r&&take(r.inputs))restart++;}
  return {plots:objs.filter(o=>o.type==='plot'&&o.crop&&o.crop.ready_at<=t).length,animals:objs.filter(o=>o.animal_job&&o.animal_job.ready_at<=t).length,
   workshops:objs.reduce((a,o)=>a+(o.jobs||[]).filter(j=>j.ready_at<=t).length,0),feed,restart,empty:objs.filter(o=>o.type==='plot'&&!o.crop).length};
 }
@@ -1108,7 +1127,30 @@ function renderSecrets(p){
   p.append(c);
  }
 }
-function renderMore(p){heading('Все разделы','ПОД РУКОЙ, НО НЕ ПЕРЕД ГЛАЗАМИ');let grid=el('div',null,'more-grid');for(let [id,ico,title]of tabs){let b=button(null,()=>selectTab(id),'more-item');b.append(icon(ico),el('span',title));b.dataset.moreTab=id;grid.append(b);}p.append(grid,button('Список всех объектов',()=>selectTab('objects'),'secondary wide'));}
+// Festivals: the server sends the calendar and the fair (S.me.festival); the device only keeps the show/hide switches.
+const festivalView=()=>S.me?.festival||null;
+const festivalTab=()=>FEST.tabVisible(festivalView());
+function syncFestivalWorld(){
+ const view=festivalView(),flags=FEST.applyWorld(view);syncVillageFest();
+ const cur=view?.current;if(!cur||!own())return;
+ const mark=`${cur.id}:${cur.starts_at}`;let seen=null;try{seen=localStorage.getItem('qw-farm.festival-seen');}catch{}
+ if(seen!==mark){try{localStorage.setItem('qw-farm.festival-seen',mark);}catch{}toast(`В деревне праздник: ${cur.name}.`);}
+ return flags;
+}
+function festivalHelpers(){
+ return {el,button,card,goods,note,checkbox,stock,fmt,itemName,command,icon,busy:()=>S.busy,coins:()=>S.me?.coins||0,rerender:()=>{if(S.me)renderPanel();}};
+}
+function renderFestivalTab(p){
+ heading('Праздник','ДЕРЕВНЯ НАРЯЖАЕТСЯ');
+ FEST.renderFestival(p,festivalView(),festivalHelpers());
+}
+function festivalBanner(p){
+ const view=festivalView(),text=FEST.bannerText(view);if(!own()||!text)return;
+ const row=el('section',null,'card fest-banner'),line=el('div',null,'card-footer');
+ line.append(el('span',text,'reward'),button('Открыть',()=>selectTab('festival'),'qw-btn secondary'));
+ row.append(line);p.prepend(row);
+}
+function renderMore(p){heading('Все разделы','ПОД РУКОЙ, НО НЕ ПЕРЕД ГЛАЗАМИ');let grid=el('div',null,'more-grid');for(let [id,ico,title]of tabs.filter(([id])=>id!=='festival'||festivalTab())){let b=button(null,()=>selectTab(id),'more-item');b.append(icon(ico),el('span',title));b.dataset.moreTab=id;grid.append(b);}p.append(grid,button('Список всех объектов',()=>selectTab('objects'),'secondary wide'));}
 function closeDashaGame(){if(!dashaGameOpen)return true;dashaGameOpen=false;document.body.classList.remove('dasha-game-open');dashaGame?.destroy();dashaGame=null;navPop('dasha-wager');requestAnimationFrame(()=>document.querySelector('[data-open-dasha]')?.focus({preventScroll:true}));return true;}
 async function openDashaGame(){
  if(!own()||!S.me)return;
@@ -1408,7 +1450,8 @@ QW?.menu.register([
  {id:'farm-settings',icon:'sliders',label:'Настройки фермы',hint:'название, кто видит, соседи',hidden:()=>!S.me,disabled:()=>!!S.fieldGame,onSelect:()=>{if(!own())backHome();selectTab('settings');}},
  {id:'farm-light',icon:'sun',label:'Свет на ферме',value:()=>LIGHT_LABELS[lightingMode],onSelect:()=>setLightingMode({auto:'day',day:'night',night:'auto'}[lightingMode])},
  {id:'farm-immersive',icon:'layers',label:'Только ферма и счётчики · H',hidden:()=>!S.me,disabled:()=>!!S.fieldGame,toggle:()=>document.body.classList.contains('immersive'),onSelect:toggleImmersive},
- {id:'farm-help',icon:'help',label:'Управление и подсказки',onSelect:showControlsHelp}
+ {id:'farm-help',icon:'help',label:'Управление и подсказки',onSelect:showControlsHelp},
+ ...FEST.menuItems(()=>S.me?.festival,()=>{if(S.me)renderPanel();})
 ],'Весёлый фермер');
 document.addEventListener('fullscreenchange',()=>{syncFullscreenState();scheduleSceneResize();});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(S.me)renderRail();scene.resize();},100);});
@@ -1662,6 +1705,16 @@ function villagePlaces(){
   const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(el('span',face,'village-visitor-face'));b.append(walker);const say=el('span','💬','village-thought');say.setAttribute('aria-hidden','true');b.append(say);layer.append(b);});
  return layer;
 }
+function villageFestLayer(kind){const n=el('div',null,`village-fest village-fest-${kind}`);n.setAttribute('aria-hidden','true');return n;}
+function syncVillageFest(){
+ const d=globalThis.document?.documentElement?.dataset,id=d?.festivalDecor==='on'?d.festival:'',file=VILLAGE_FEST[id];
+ const layers=[...($('village-scene')?.querySelectorAll?.('.village-fest')||[])];
+ if(!file||!layers.length)return;
+ const fill=svg=>{for(const n of layers)if(n.dataset.fest!==id){n.innerHTML=svg;n.dataset.fest=id;}};
+ if(villageFestCache[id]){fill(villageFestCache[id]);return;}
+ if(typeof fetch!=='function')return;
+ fetch(`/app/farm/assets/${file}`).then(r=>r.ok?r.text():'').then(svg=>{if(svg.startsWith('<svg')){villageFestCache[id]=svg;fill(svg);}}).catch(()=>{});
+}
 function villageBuildWorld(){
  const world=el('div',null,'village-world'),art=el('img',null,'village-art');art.src='/app/farm/assets/village.svg';art.alt='Большая деревня: площадь с ратушей и колодцем, дома жителей, рынок, почта, мастерская, мельница у реки, пруд, сады и дорога к воротам на ферму';art.draggable=false;art.decoding='async';world.append(art);
  world.onclick=e=>{if(e.target?.closest?.('button'))return;const r=world.getBoundingClientRect();villageWalk([villageClamp((e.clientX-r.left)/r.width*100,2,98),villageClamp((e.clientY-r.top)/r.height*100,3,97)]);};
@@ -1672,14 +1725,14 @@ function villageBuildWorld(){
  const actors=el('div',null,'village-actors');
  const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE_BOARD[0]}%`;gate.style.top=`${VILLAGE_GATE_BOARD[1]}%`;gate.style.width=`${VILLAGE_GATE_BOARD[2]}%`;gate.style.height=`${VILLAGE_GATE_BOARD[3]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','На ферму: ворота деревни');gate.title='На ферму';gate.innerHTML=VILLAGE_GATE_SIGN;
  const player=el('div',null,'village-player');player.setAttribute('aria-hidden','true');player.style.left=`${villagePos[0]}%`;player.style.top=`${villagePos[1]}%`;player.dataset.face='right';player.innerHTML=VILLAGE_PLAYER_SVG;
- world.append(sun,villageFx(),night,villageWaterWheel(),actors,villagePlaces(),gate,player);
+ world.append(villageFestLayer('base'),sun,villageFx(),night,villageFestLayer('glow'),villageWaterWheel(),actors,villagePlaces(),gate,player);
  return world;
 }
 function syncVillageScene(){
  let root=$('village-scene');if(!root){root=el('section',null,'village-scene');root.id='village-scene';root.setAttribute('aria-label','Деревенская площадь');root.tabIndex=0;document.querySelector('.scene-area').append(root);}
  let hud=$('village-hud');if(!hud){hud=el('div',null,'village-hud');hud.id='village-hud';document.querySelector('.scene-area').append(hud);}
  const visible=villageVisible(),entering=visible&&root.hidden===true;root.hidden=!visible;hud.hidden=!visible;document.body.classList.toggle('village-open',visible);$('farm-canvas').inert=visible;if(!visible){villageWalkStop();villageResident=null;villageSheet=null;}syncScenePause();if(!visible)return;
- villageBindWorld(root);if(entering)villageCenter(villagePos,false);
+ villageBindWorld(root);if(entering)villageCenter(villagePos,false);syncVillageFest();
  if(!villageVisBound&&document.addEventListener){villageVisBound=true;document.addEventListener('visibilitychange',()=>$('village-scene')?.classList?.toggle('village-paused',document.hidden));}
  const names=villageNames(),stage=villageStage(),sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)]),villageQuestPhase(n)])]);if(sig===villageSceneSignature)return;villageSceneSignature=sig;
  root.setAttribute('aria-label',(stage===null?(eco()?.fund_open?'Деревня. Данные праздника обновляются.':`Деревня. Сезонный фонд откроется с ${ECON().fund_level} уровня.`):`Деревня. ${['Начало подготовки праздника','Флажки к празднику','Цветы к празднику','Площадь готова к празднику'][stage]}.`)+' Прокручивай карту, нажимай на землю, чтобы идти, или выбирай жителей кнопками.');

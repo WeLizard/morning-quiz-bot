@@ -125,7 +125,7 @@ export function placeHint(a,size,box,gap=8){
 }
 
 /* ---- what a building is for, generated from the catalog ---- */
-const PURPOSE_LEAD={mill:'Мелет урожай в муку и масло.',feedmill:'Готовит корм для животных.',bakery:'Печёт хлеб и сладкое.',kitchen:'Готовит блюда и варенье.',dairy:'Перерабатывает молочное.',loom:'Делает пряжу и букеты.'};
+const PURPOSE_LEAD={mill:'Мелет урожай в муку и масло.',feedmill:'Готовит корм для животных.',bakery:'Печёт хлеб и сладкое.',kitchen:'Готовит блюда и варенье.',dairy:'Перерабатывает молочное.',loom:'Вяжет, набивает подушки и плетёт букеты.',spinnery:'Прядёт шерсть, пух и лён.',weavery:'Ткёт полотно, сукно и пледы.'};
 const uniq=a=>[...new Set(a)];
 const short=(a,max)=>a.slice(0,max).join(', ')+(a.length>max?' и др.':'');
 /** Up to two short lines: what the building makes, from what, and who or what needs it. [] for decor and plain houses. */

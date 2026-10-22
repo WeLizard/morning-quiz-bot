@@ -489,6 +489,18 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .vfx-sails::after{content:'';position:absolute;left:50%;top:50%;width:9%;aspect-ratio:1;border-radius:50%;background:#d9ccac;border:2px solid #8a7452;translate:-50% -50%}
 .vfx-sails b{position:absolute;left:50%;top:50%;width:11%;height:48%;box-sizing:border-box;background:linear-gradient(90deg,#8a7452 0 2px,transparent 2px),repeating-linear-gradient(0deg,#f1e8c8 0 6px,#bba97f 6px 7px);border:1px solid #9d8b64;transform-origin:0 0}
 .vfx-sails b:nth-child(1){transform:rotate(180deg) translate(-50%,0)}.vfx-sails b:nth-child(2){transform:rotate(270deg) translate(-50%,0)}.vfx-sails b:nth-child(3){transform:rotate(0deg) translate(-50%,0)}.vfx-sails b:nth-child(4){transform:rotate(90deg) translate(-50%,0)}
+/* Festival layers of the village (app.js VILLAGE_FEST, scripts/art/village/fest_<id>.js): hidden unless that festival and its decor
+   switch are on. The base layer (decor, day window light) lies under the night tint, the glow layer above it shows only at night. */
+.village-fest{position:absolute;inset:0;pointer-events:none;display:none}
+.village-fest>svg{display:block;width:100%;height:100%}
+:root[data-festival=posidelki][data-festival-decor=on] .village-fest[data-fest=posidelki]{display:block}
+.village-fest-base .vf-night,.village-fest-glow .vf-decor,.village-fest-glow .vf-day{display:none}
+:root[data-farm-theme=night] .village-fest-base .vf-day{display:none}
+:root:not([data-farm-theme=night]) .village-fest-glow .vf-night{display:none}
+@media(prefers-reduced-motion:no-preference){
+ .vf-smoke{animation:vf-rise 6s ease-in-out infinite}.vf-s2{animation-delay:-2s}.vf-s3{animation-delay:-4s}
+ @keyframes vf-rise{0%{opacity:0;transform:translateY(6px)}30%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+}
 /* water wheel of the river mill: inline SVG in the long-wall plane (app.js VILLAGE_WHEEL_SVG). It sits above the night window layer,
    so at night it takes the colour of the .vn-tint overlay through its own colour matrix instead of a blanket brightness filter. */
 .vfx-wheel{position:absolute;display:block;pointer-events:none}.vfx-wheel-art{display:block;width:100%;height:100%;overflow:visible}

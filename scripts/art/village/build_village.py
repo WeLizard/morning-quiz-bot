@@ -94,11 +94,11 @@ def manifest(meta: dict) -> dict:
         "sites": [[s["label"]] + pc(*s["at"]) for s in meta["sites"]],
         # walk graph (walk.js, README «Граф проходимости»): flat world-unit node pairs, flat index pairs, named anchors
         "walk": {k: meta["walk"][k] for k in ("nodes", "edges", "anchors", "areas")},
-        "problems": meta.get("problems", []) + meta["walk"]["problems"],
+        "problems": meta.get("problems", []) + meta["walk"]["problems"] + [p for f in meta["fest"].values() for p in f["problems"]],
     }
 
 
-INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
+INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
 
@@ -132,18 +132,23 @@ def build(out: Path, install: bool = False) -> dict:
     (out / "walk_check.json").write_text(json.dumps({"graph": res["meta"]["walk"]["debug"], "blockers": res["meta"]["walk_blockers"],
                                                      "dropped": res["meta"]["walk"]["dropped"]}, ensure_ascii=False), encoding="utf-8")
     (out / "player.svg").write_text(res["meta"]["player"], encoding="utf-8", newline="")
+    for fid, layer in res["meta"]["fest"].items():   # festival layers: qw_farm/static/village-fest-<id>.svg
+        (out / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
     (out / "gate_board.svg").write_text(res["meta"]["gate_art"]["board"]["svg"], encoding="utf-8", newline="")
     (out / "manifest.json").write_text(json.dumps(man, ensure_ascii=False, indent=1), encoding="utf-8")
     hashes = {"rgba_sha256": hashlib.sha256(im.tobytes()).hexdigest(),
               "webp_sha256": hashlib.sha256(webp).hexdigest(),
               "svg_sha256": hashlib.sha256(svg.encode()).hexdigest(),
-              "svg_bytes": len(svg.encode()), "versions": versions(), "inputs": inputs()}
+              "svg_bytes": len(svg.encode()), "versions": versions(), "inputs": inputs(),
+              "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()}}
     (out / "hashes.json").write_text(json.dumps(hashes, indent=1), encoding="utf-8")
     if man["problems"]:
         print("layout problems:", *man["problems"], sep="\n  ")
     if install:
         GAME_SVG.write_text(svg, encoding="utf-8", newline="")
-        print("installed", GAME_SVG)
+        for fid, layer in res["meta"]["fest"].items():
+            (GAME_SVG.parent / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
+        print("installed", GAME_SVG, "and festival layers", ", ".join(res["meta"]["fest"]))
     return hashes
 
 

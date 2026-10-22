@@ -32,10 +32,22 @@ export class SvgCtx {
   moveTo(x, y) { this.d += `M${n(x)} ${n(y)}` }
   lineTo(x, y) { this.d += `L${n(x)} ${n(y)}` }
   closePath() { this.d += 'Z' }
-  ellipse(x, y, rx, ry, rot = 0, a0 = 0, a1 = Math.PI * 2) {
-    // full ellipses only (that is all the farm code draws): two half arcs
-    this.d += `M${n(x - rx)} ${n(y)}A${n(rx)} ${n(ry)} 0 1 0 ${n(x + rx)} ${n(y)}A${n(rx)} ${n(ry)} 0 1 0 ${n(x - rx)} ${n(y)}Z`;
+  ellipse(x, y, rx, ry, rot = 0, a0 = 0, a1 = Math.PI * 2, ccw = false) {
+    const T = Math.PI * 2;
+    if (Math.abs(a1 - a0) >= T - 1e-9) {   // a whole ellipse: two half arcs
+      this.d += `M${n(x - rx)} ${n(y)}A${n(rx)} ${n(ry)} 0 1 0 ${n(x + rx)} ${n(y)}A${n(rx)} ${n(ry)} 0 1 0 ${n(x - rx)} ${n(y)}Z`;
+      return;
+    }
+    // an arc as canvas draws it (rot 0): line to its start, then clockwise (or counter-clockwise) to its end
+    let d = ccw ? a0 - a1 : a1 - a0; d = ((d % T) + T) % T;
+    const sx = x + rx * Math.cos(a0), sy = y + ry * Math.sin(a0), ex = x + rx * Math.cos(a1), ey = y + ry * Math.sin(a1);
+    this.d += `${this.d ? 'L' : 'M'}${n(sx)} ${n(sy)}A${n(rx)} ${n(ry)} 0 ${d > Math.PI ? 1 : 0} ${ccw ? 0 : 1} ${n(ex)} ${n(ey)}`;
   }
+  quadraticCurveTo(cx, cy, x, y) { this.d += `Q${n(cx)} ${n(cy)} ${n(x)} ${n(y)}` }
+  bezierCurveTo(c1x, c1y, c2x, c2y, x, y) { this.d += `C${n(c1x)} ${n(c1y)} ${n(c2x)} ${n(c2y)} ${n(x)} ${n(y)}` }
+  // named groups, so a layer can show or animate parts of the drawing (class names only: no inline styles under the CSP)
+  group(cls) { this.out.push(`<g class="${esc(cls)}">`) }
+  end() { this.out.push('</g>') }
   createLinearGradient(x0, y0, x1, y1) {
     const id = `${this.prefix}${this.ids++}`, stops = [];
     const g = {id, addColorStop: (o, c) => stops.push(`<stop offset="${n(o)}" stop-color="${c}"/>`)};

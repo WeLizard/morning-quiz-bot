@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import market, progression, economy, fields, projects, trip_games, swans
+from . import market, progression, economy, fields, projects, trip_games, swans, festivals, textile
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -38,6 +38,8 @@ SCHEMAS.update(fields.SCHEMAS)  # r9 stage 15: buy_field, buy_machine, upgrade_m
 SCHEMAS.update(projects.SCHEMAS)
 SCHEMAS.update(trip_games.SCHEMAS)  # trip minigames: trip_play
 SCHEMAS.update(swans.SCHEMAS)  # lake swans: feed_swans
+SCHEMAS.update(festivals.SCHEMAS)  # festivals: festival_task, festival_buy
+SCHEMAS.update(textile.SCHEMAS)  # lessons of Кошка Соня: lesson_deliver
 
 
 def upgrade_state(farm):
@@ -60,6 +62,8 @@ def upgrade_state(farm):
         farm['stats'].setdefault(key, 0)
     market.upgrade_market(farm)
     swans.state(farm)
+    festivals.state(farm)       # festivals engine: empty mapping for old farms
+    textile.upgrade(farm)       # lessons ledger, setdefault only
     trip_games.upgrade(farm)    # open v1 fishing games -> v2 plan (FARM_TRIP_MINIGAMES.md 10.6)
     from . import village_quests
     village_quests.state(farm)
@@ -228,7 +232,7 @@ def restartable(farm, obj, lv):
     mem = recipe_memory(obj)
     for step in range(len(mem)):
         recipe = RECIPES.get(mem[(obj.get('recipe_cursor', 0) + step) % len(mem)])
-        if (recipe and recipe['building'] == obj['type'] and recipe['level'] <= lv
+        if (recipe and recipe['building'] == obj['type'] and textile.recipe_level(farm, recipe) <= lv
                 and all(farm['inventory'].get(k, 0) >= q for k, q in recipe['inputs'].items())):
             return recipe
     return None
@@ -388,7 +392,7 @@ GENITIVE = dict(
     energy_shop='бодрильни', cannery='консервного цеха', confectionery='кондитерской', creamery='молокозавода',
     juicery='соковарни', noodle_shop='макаронной мастерской', oil_press='маслобойни', sausage_shop='колбасного цеха',
     smokehouse='коптильни', soapery='мыловарни', syrupery='сироповарни', tailor='швейной мастерской',
-    teahouse='чайной беседки')
+    teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой')
 
 
 def craft_text(rows):
@@ -555,6 +559,14 @@ def _bulk(farm, kind, data, now, speed, command_id):
 
 def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
     lv = level(farm['xp'])
+    if kind in textile.SCHEMAS:
+        text = textile.apply(farm, kind, data)
+        event(farm, now, text, kind)
+        return text
+    if kind in festivals.SCHEMAS:
+        text = festivals.apply(farm, kind, data, now)
+        event(farm, now, text, kind)
+        return text
     if kind in projects.SCHEMAS:
         text = projects.apply(farm, kind, data)
         event(farm, now, text, kind)
@@ -725,6 +737,8 @@ def validate_expansion(farm):
     fields.validate(farm)
     trip_games.validate(farm)
     swans.validate(farm)
+    festivals.validate(farm)
+    textile.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),
          'invalid_team', 'Некорректный состав команды.', 500)

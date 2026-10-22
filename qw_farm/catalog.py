@@ -502,14 +502,17 @@ NPC_TASTES={
  'Почтальон Ёж':('mushroom_soup','chanterelle','hazelnut','wildberry','pancake'),
  'Механик Крот':('soup','potato','vegetable_stew','bread','pickles'),
  'Кошка Кая':('milk','cheese','omelet','berry_milk','goat_cheese'),
- 'Кошка Соня':('pillow','down_blanket','scarf','mohair_plaid','mittens'),
+ 'Кошка Соня':('pillow','down_blanket','scarf','mohair_plaid','mittens','wool_plaid','down_shawl','quilt','silk_quilt'),
  'Суслик Игорь':('sunflower','oat_cookie','porridge','corn','pumpkin'),
  'Неведома Зверушка':('truffle','saffron','lavender','peacock_feather','truffle_tart'),
  'Медведь Пух':('berry_charge','honey_charge','forest_charge','honey','gingerbread'),
 }
 # Residents who order a themed product most of the time (only goods reachable for the player count; see domain.make_order)
-NPC_SIGNATURE={'Медведь Пух':('berry_charge','honey_charge','forest_charge')}
+NPC_SIGNATURE={'Медведь Пух':('berry_charge','honey_charge','forest_charge'),
+ 'Кошка Соня':('pillow','mittens','scarf','socks','wool_plaid','down_shawl','quilt','mohair_plaid','down_blanket','silk_quilt')}
 SIGNATURE_PCT=70
+NPC_SIGNATURE_PCT={'Кошка Соня':50}   # share of a resident's orders that ask for the signature theme; others use SIGNATURE_PCT
+SIGNATURE_MAX_VALUE=1500             # a signature order with price * qty above this asks for one piece (as market.special_needs)
 MARKET=dict(
  rep_names=REP_NAMES,rep_points=REP_POINTS,rep_bonus=REP_BONUS,special_level=REP_SPECIAL_LEVEL,special_bonus=20,
  tastes={k:list(v) for k,v in NPC_TASTES.items()},
@@ -520,7 +523,7 @@ MARKET=dict(
 )
 
 def public_catalog():
-    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,crops=CROPS,crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
+    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,lessons=LESSONS,crops=CROPS,crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
 
 def validate():
     for r in RECIPES.values():
@@ -953,6 +956,65 @@ for i,n,b,inputs,out,t,l in [
     RECIPES[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,xp=_xp_r9(b,t))
 ENERGY_ITEM_IDS=frozenset({'berry_charge','honey_charge','forest_charge'})
 ENERGY_RECIPE_IDS=ENERGY_ITEM_IDS
+
+# ---- textile chain: spinnery, weavery, new cloth and clothes (additive, variant «a» of docs/tasks/FARM_TEXTILE_CHAIN.md) ----------------
+# price = (inputs + minutes * (2.5 + 0.1 * level)) / output; the old yarn/linen/scarf rows stay as they are. No farm state migration.
+TEXTILE_ITEM_ROWS = [
+ ('down_yarn', 'Пуховая пряжа', 80, '#e3d4d8'),
+ ('linen_thread', 'Льняная нить', 40, '#cdbf9b'),
+ ('alpaca_yarn', 'Пряжа альпаки', 52, '#c2a98b'),
+ ('wool_cloth', 'Шерстяное сукно', 196, '#a9a3b8'),
+ ('wool_plaid', 'Шерстяной плед', 300, '#c98f8f'),
+ ('quilt', 'Стёганое одеяло', 445, '#e4cfa3'),
+ ('silk_cloth', 'Шёлковое полотно', 618, '#e8dfe9'),
+ ('down_shawl', 'Пуховый платок', 226, '#ece3e6'),
+ ('socks', 'Шерстяные носки', 50, '#b79aa8'),
+ ('robe', 'Уютный халат', 598, '#9fb0c8'),
+ ('silk_quilt', 'Шёлковое одеяло', 1122, '#d8c7e3'),
+]
+TEXTILE_BUILDING_ROWS = [('spinnery', 'Прядильня', 300, 5), ('weavery', 'Ткацкая', 500, 6)]
+# id, name, building, inputs, outputs, seconds, level
+TEXTILE_RECIPE_ROWS = [
+ ('spin_yarn', 'Спрясть пряжу', 'spinnery', {'wool': 4}, {'yarn': 2}, 720, 5),
+ ('down_yarn', 'Спрясть пуховую пряжу', 'spinnery', {'rabbit_fluff': 4}, {'down_yarn': 2}, 960, 5),
+ ('linen_thread', 'Спрясть льняную нить', 'spinnery', {'flax': 2}, {'linen_thread': 2}, 600, 6),
+ ('alpaca_yarn', 'Спрясть пряжу альпаки', 'spinnery', {'alpaca_fiber': 2}, {'alpaca_yarn': 2}, 600, 7),
+ ('weave_linen', 'Соткать полотно из нити', 'weavery', {'linen_thread': 2}, {'linen': 1}, 300, 6),
+ ('wool_cloth', 'Соткать сукно', 'weavery', {'yarn': 2}, {'wool_cloth': 1}, 1200, 6),
+ ('wool_plaid', 'Соткать шерстяной плед', 'weavery', {'yarn': 3}, {'wool_plaid': 1}, 1800, 8),
+ ('quilt', 'Простегать одеяло', 'weavery', {'wool_cloth': 1, 'linen': 1, 'feather': 2}, {'quilt': 1}, 1800, 12),
+ ('silk_cloth', 'Соткать шёлковое полотно', 'weavery', {'silk': 2}, {'silk_cloth': 1}, 1500, 34),
+ ('knit_scarf', 'Связать шарф из пряжи альпаки', 'loom', {'alpaca_yarn': 1}, {'scarf': 1}, 840, 7),
+ ('down_shawl', 'Связать пуховый платок', 'loom', {'down_yarn': 2}, {'down_shawl': 1}, 1200, 8),
+ ('socks', 'Связать носки', 'loom', {'yarn': 1}, {'socks': 2}, 600, 9),
+ ('robe', 'Сшить уютный халат', 'tailor', {'wool_cloth': 2, 'down_yarn': 1}, {'robe': 1}, 1800, 17),
+ ('silk_quilt', 'Сшить шёлковое одеяло', 'tailor', {'silk_cloth': 1, 'swan_down': 2}, {'silk_quilt': 1}, 2400, 36),
+]
+for i,n,p,col in TEXTILE_ITEM_ROWS:
+    ITEMS[i]=dict(id=i,name=n,price=p,color=col,kind='product')
+for i,n,c,l in TEXTILE_BUILDING_ROWS:
+    BUILDINGS[i]=dict(id=i,name=n,cost=c,level=l,w=2,h=2,decor=False)
+for i,n,b,inputs,out,t,l in TEXTILE_RECIPE_ROWS:
+    RECIPES[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,xp=_xp_r9(b,t))
+# the one edit of an old row: the pillow is stuffed with feathers only (queued batches keep their own inputs/outputs/xp)
+RECIPES['pillow'].update(inputs={'feather':3},seconds=660,xp=_xp_r9('loom',660))
+TEXTILE_ITEM_IDS=frozenset(r[0] for r in TEXTILE_ITEM_ROWS)
+TEXTILE_RECIPE_IDS=frozenset(r[0] for r in TEXTILE_RECIPE_ROWS)
+TEXTILE_BUILDING_IDS=frozenset(r[0] for r in TEXTILE_BUILDING_ROWS)
+# TODO(textile factory, FARM_TEXTILE_CHAIN.md section 12 / step 7): 'textile_mill' (L30, 45000, hopper lines, 'factory' upgrade kind) is a separate
+# project that waits for the owner's answers (question 4); nothing of it is defined here on purpose, so that no empty building is for sale.
+# Finished clothes, blankets and decorations (not food): the special-request caption of a resident reads «любимая вещь» for them.
+WEARABLE_ITEM_IDS=frozenset({'pillow','scarf','mittens','mohair_plaid','down_blanket','wool_plaid','down_shawl','socks','quilt','robe','silk_quilt',
+                             'sundress','alpaca_coat','felt_boots','silk_scarf','bouquet','plume_bouquet','feather_fan','golden_fan','hop_wreath'})
+# Lessons of «Кошка Соня» (FARM_VILLAGE_MINIGAMES.md 3.3): a delivered step lets listed recipes open ``early`` levels sooner.
+# The base chain never needs a lesson; recipes with ``teach`` are also opened by their plain level. Pattern recipes with Сорока's dyes (dye_*)
+# are NOT defined: the merchant is not implemented, so the dyes cannot be obtained (FARM_TEXTILE_CHAIN.md section 8, FARM_VILLAGE_MINIGAMES.md 3.3).
+LESSONS={'weaving':dict(id='weaving',npc='Кошка Соня',name='Уроки ткачества',steps=(
+    dict(step=1,level=6,text='Спрясть шесть мотков пряжи',items={'yarn':6},reward={'yarn':1}),
+    dict(step=2,level=8,text='Соткать два куска сукна',items={'wool_cloth':2},reward={'down_yarn':1}),
+))}
+for _r,_step,_early in (('wool_plaid',1,2),('down_shawl',1,1),('quilt',2,2)):
+    RECIPES[_r]['teach']=dict(npc='Кошка Соня',track='weaving',step=_step,early=_early)
 
 # Paid decor and trophies that fill the levels between the five shop tiers (separate from DECOR_SHOP: its tier levels are pinned).
 DECOR_EXTRA=[dict(id=i,name=n,cost=c,level=l,w=w,h=h,trophy=tr) for i,n,c,l,w,h,tr in R16_DECOR_ROWS]

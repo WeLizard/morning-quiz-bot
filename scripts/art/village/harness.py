@@ -113,7 +113,11 @@ def run(entry: str, args: dict, viewport=(800, 600), mounts: dict | None = None)
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
         page.route(ORIGIN + "/**", handle)
         page.goto(ORIGIN + "/index.html")
-        page.wait_for_function("window.__ready === true", timeout=30000)
+        try:
+            page.wait_for_function("window.__ready === true", timeout=30000)
+        except Exception as exc:   # a module that fails to load never sets __ready: show why
+            browser.close()
+            raise RuntimeError("generator page did not load:\n" + "\n".join(errors)) from exc
         result = page.evaluate("args => window.__run(args)", args)
         browser.close()
     if errors:

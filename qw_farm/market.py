@@ -9,7 +9,7 @@ import math
 from .catalog import (CROPS, ITEMS, RECIPES, NPCS, REP_NAMES, REP_POINTS, REP_BONUS, REP_SPECIAL_LEVEL, NPC_TASTES,
                       MARKET, PLOT_LIMITS, level)
 from .domain import need, find, inventory, event
-from . import progression
+from . import progression, textile
 
 SCHEMAS = {
     'caravan_fill': {'crate'},
@@ -205,7 +205,7 @@ def make_contracts(farm, day):
     rng = _rng(farm['id'], 'contracts', day)
     crops = sorted(c['id'] for c in CROPS.values() if c['level'] <= lv and c['seconds'] <= 14400)
     types = {o['type'] for o in farm['objects']}
-    recipes = sorted(r['id'] for r in RECIPES.values() if r['level'] <= lv and r['building'] in types
+    recipes = sorted(r['id'] for r in RECIPES.values() if textile.recipe_level(farm, r) <= lv and r['building'] in types
                      and sum(ITEMS[k]['price'] for k in r['outputs']) >= 8)
     items = []
 

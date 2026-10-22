@@ -84,7 +84,9 @@ Unique partial index по account_id при unsettled; значения и фа�
 недостаточный заработанный баланс; rollback; owner/guest/receipt privacy;
 merge с active/history; один итоговый баланс и ledger после reload/restart.
 Клиент: серверный баланс, восстановление active, ни одной локальной выплаты,
-нет морковки при shuffle/pick/hover, Back/close, клавиатура, reduced motion,
+нет морковки-результата при shuffle/pick/hover (декоративная морковка видна только
+до того, как Даша опускает ширму; перемешивание за ширмой косметическое и не зависит
+от данных раунда — решение 2026-10-22), Back/close, клавиатура, reduced motion,
 ПК/390/320, правила/кнопки ≥44 px. Адресные JS + PG, общий dev gate,
 независимое ревью и sandbox без переноса тестовой БД. Production не разрешён.
 

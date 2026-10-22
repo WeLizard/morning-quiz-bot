@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import market, progression, economy, fields, projects, trip_games, swans, festivals, textile
+from . import market, progression, economy, fields, projects, trip_games, swans, festivals, textile, merchant
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -40,6 +40,7 @@ SCHEMAS.update(trip_games.SCHEMAS)  # trip minigames: trip_play
 SCHEMAS.update(swans.SCHEMAS)  # lake swans: feed_swans
 SCHEMAS.update(festivals.SCHEMAS)  # festivals: festival_task, festival_buy
 SCHEMAS.update(textile.SCHEMAS)  # lessons of Кошка Соня: lesson_deliver
+SCHEMAS.update(merchant.SCHEMAS)  # Сорока-коробейница: merchant_buy, merchant_sell
 
 
 def upgrade_state(farm):
@@ -64,6 +65,7 @@ def upgrade_state(farm):
     swans.state(farm)
     festivals.state(farm)       # festivals engine: empty mapping for old farms
     textile.upgrade(farm)       # lessons ledger, setdefault only
+    merchant.state(farm)        # Сорока: empty record for old farms
     trip_games.upgrade(farm)    # open v1 fishing games -> v2 plan (FARM_TRIP_MINIGAMES.md 10.6)
     from . import village_quests
     village_quests.state(farm)
@@ -84,7 +86,7 @@ def discover(farm, key, now):
 
 
 def observe_harvest(farm, crop_id):
-    if crop_id not in farm['harvested_crops']:
+    if crop_id in CROPS and crop_id not in farm['harvested_crops']:   # foreign (merchant) crops do not count for the secret
         farm['harvested_crops'].append(crop_id)
 
 
@@ -195,12 +197,27 @@ def _drop_at(obj, index):
         obj['recipe_cursor'] -= 1   # the cursor keeps pointing at the same recipe
 
 
-def remember_recipe(obj, recipe_id):
-    """A manual enqueue: append (or move to the end), drop the oldest beyond the cap."""
+def is_manual_job(job):
+    """A job the player queued by hand. Automation ids are ``auto-<shift>-<n>``; jobs saved before the ``manual`` flag are told apart by that id."""
+    flag = job.get('manual')
+    return flag if isinstance(flag, bool) else not str(job.get('id', '')).startswith('auto-')
+
+
+def has_manual_job(obj):
+    return any(is_manual_job(j) for j in obj.get('jobs', []))
+
+
+def remember_recipe(obj, recipe_id, new_setup=False):
+    """A manual enqueue. ``new_setup`` (no manual job left in the queue) replaces the remembered setup with this recipe;
+    otherwise append (dedupe, keep first-appearance order) and drop the oldest beyond the cap."""
     mem = _own_memory(obj)
-    if recipe_id in mem:
-        _drop_at(obj, mem.index(recipe_id))
-    mem.append(recipe_id)
+    if new_setup:
+        mem[:] = [recipe_id]
+        obj['recipe_cursor'] = 0
+        _sync_memory(obj)
+        return
+    if recipe_id not in mem:
+        mem.append(recipe_id)
     while len(mem) > memory_cap(obj):
         _drop_at(obj, 0)
     _sync_memory(obj)
@@ -567,6 +584,10 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
         text = festivals.apply(farm, kind, data, now)
         event(farm, now, text, kind)
         return text
+    if kind in merchant.SCHEMAS:
+        text = merchant.apply(farm, kind, data, now)
+        event(farm, now, text, kind)
+        return text
     if kind in projects.SCHEMAS:
         text = projects.apply(farm, kind, data)
         event(farm, now, text, kind)
@@ -739,6 +760,7 @@ def validate_expansion(farm):
     swans.validate(farm)
     festivals.validate(farm)
     textile.validate(farm)
+    merchant.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),
          'invalid_team', 'Некорректный состав команды.', 500)

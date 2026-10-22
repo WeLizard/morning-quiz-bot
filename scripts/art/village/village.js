@@ -8,6 +8,7 @@ import {paintGate,boardSvg} from './gate.js';
 import {buildWalk} from './walk.js';
 import {playerSvg} from './player.js';
 import {posidelki} from './fest_posidelki.js';
+import {merchantCart,magpieSvg} from './merchant.js';
 
 export async function render(opts={}){
 const W=3200,H=2400,OX=1600,OY=300,K=1.3;
@@ -367,14 +368,38 @@ if(DEBUG){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#f0f8';for(const [k,[x,y]
 // walk graph (walk.js): the paths of this plan, checked against everything placed on it
 const toWorld=(x,y)=>{const p=P(x,y);return [(OX+K*p.x)*.75,(OY+K*p.y)*.75]};
 const toTile=(X,Y)=>{const px=(X/.75-OX)/K,py=(Y/.75-OY)/K;return [(px/TW+py/TH)/2,(py/TH-px/TW)/2]};
+// the peddler's place on the plaza by the market stalls: kept free in the walk graph, drawn only during her visit
+// Candidates on and around the plaza near the stalls; kept: the cart on free ground, the magpie's figure (≈90 world units tall)
+// and the cart away from every tap target of the game (opts.buttons, world units), nearest to the stalls wins.
+const STALLS=[18.1,22.9],BUTTONS=opts.buttons||[];
+const T2W=(x,y,z=0)=>{const p=P(x,y,z);return [(OX+K*p.x)*.75,(OY+K*p.y)*.75]};
+const clearOfButtons=(pt,r)=>BUTTONS.every(([bx,by])=>Math.hypot(bx-pt[0],by-pt[1])>=r);
+const cands=[];
+for(let gy=19.5;gy<=24.6;gy+=.25)for(let gx=13.5;gx<=24.6;gx+=.25){
+ const cart=[gx,gy,gx+1.4,gy+.9],mag=[gx+1.75,gy+.5],app=[gx+1.8,gy+1.2];
+ let ok=true;for(let x=cart[0]-.1;x<=cart[2]+.1&&ok;x+=.2)for(let y=cart[1]-.1;y<=cart[3]+.1&&ok;y+=.2)if(!free(x,y,0)||isRoad(x,y)&&!isPlaza(x,y))ok=false;
+ if(!ok||!free(...mag,.25)||!free(...app,.2))continue;
+ const head=T2W(...mag,46),cartC=T2W(gx+.7,gy+.45,30);
+ if(!clearOfButtons(head,90)||!clearOfButtons(cartC,80))continue;
+ cands.push([Math.hypot(gx+.7-STALLS[0],gy+.45-STALLS[1]),gx,gy]);
+}
+cands.sort((a,b)=>a[0]-b[0]||a[1]-b[1]||a[2]-b[2]);
+if(!cands.length)problems.push('merchant: no free place by the stalls clear of the buttons');
+const [,cgx,cgy]=cands[0]||[0,21.55,22.55];
+const CART=[cgx,cgy,cgx+1.4,cgy+.9],MAGPIE=[cgx+1.75,cgy+.5],MAGPIE_APPROACH=[cgx+1.8,cgy+1.2];
+claim(...CART,'cart',40);claim(MAGPIE[0]-.25,MAGPIE[1]-.25,MAGPIE[0]+.25,MAGPIE[1]+.25,'spot');
 meta.walk=buildWalk({toWorld,toTile,roads:ROADS,lanes:LANES,plaza:PLAZA,bridges:BRIDGES,occupied:occupied.map(r=>({r:[r[0],r[1],r[2],r[3]],tag:r.tag,h:r.h||0})),toScreen:(x,y,z=0)=>P(x,y,z),
- trees:trees.map(t=>[t[0],t[1],t[2]]),fences:FENCES,inWater,targets:opts.targets||{}});
+ trees:trees.map(t=>[t[0],t[1],t[2]]),fences:FENCES,inWater,targets:{...(opts.targets||{}),merchant:toWorld(...MAGPIE_APPROACH)}});
 meta.walk_blockers={occupied:occupied.filter(r=>r.tag!=='spot'&&r.tag!=='tree').map(r=>r.slice(0,4).map(v=>+v.toFixed(3))),trees:trees.map(t=>[+t[0].toFixed(3),+t[1].toFixed(3),+t[2].toFixed(3)]),
  fences:FENCES,bridges:BRIDGES,river:river.map(([a,b])=>[+a.toFixed(3),+b.toFixed(3)]),river_width:RW,pond:POND};
 // festival layers (vector, live in the game, shown by html[data-festival] flags): anchored to this render
 meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windows:s.win,chimneys:s.smk,fences:FENCES,bridges:BRIDGES,
  benches:BENCHES.filter(b=>isPlaza(b[0],b[1])),lamps:LAMPS,spots:SPOT,free:(x,y)=>free(x,y,.05),samovar:[20.3,18.9],plaza:PLAZA,
  tall:occupied.filter(r=>r.h>=20).map(r=>({r:[r[0],r[1],r[2],r[3]],h:r.h}))})};
+{const corners=[];for(const [x,y] of [[CART[0],CART[1]],[CART[2],CART[1]],[CART[2],CART[3]],[CART[0],CART[3]]])for(const z of [0,64])corners.push(scr(P(x,y,z)).map(v=>v*.75));
+ const xs=corners.map(c=>c[0]),ys=corners.map(c=>c[1]);
+ meta.merchant={svg:merchantCart({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],box:CART}),figure:magpieSvg(),
+  cart:[Math.min(...xs),Math.min(...ys),Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)].map(Math.round),foot:toWorld(...MAGPIE).map(Math.round)}}
 meta.player=playerSvg();   // the player's figure (player.js), a live layer like the gate board
 return {world:cv.toDataURL('image/png'),meta,size:[W,H]};
 }

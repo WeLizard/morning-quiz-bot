@@ -63,6 +63,8 @@ export function fightStep(st,fish,hold,rules=RULES){
 }
 /** Hold/release during tick k: holding from the strike, every toggle at or before the tick start flips it. */
 export function holdAt(toggles,time){let n=0;for(const t of toggles){if(t<=time)n++;else break;}return n%2===0;}
+/** The server counts at most max_toggles hold/release switches; past the cap a press or release changes nothing in the simulation. */
+export function toggleRoom(toggles,rules=FISH2){return toggles.length<rules.max_toggles;}
 export function fight(fish,strike,toggles,rules=RULES){
  const st=fightStart(rules),tick=F2(rules).tick;let hold=true,j=0;
  while(!st.end){const t=strike+st.k*tick;while(j<toggles.length&&toggles[j]<=t){hold=!hold;j++;}fightStep(st,fish,hold,rules);}
@@ -306,14 +308,15 @@ export function openTripGame(opts){
     hooked=hookedFish(plan,cast(),acc,baitSpec(bait,rules)[1],rules);fst=fightStart(rules);toggles=[];holding=true;phase='fight';
     buzz(25);say(f2.species[hooked.id].rare?'Тяжёлая! Похоже, редкая рыба. Держи и следи за шкалой.':'Засекла! Держи — тяни. Шкала краснеет — отпусти.');announce('Рыба на крючке.');paint();
    }else endCast();
-  }else if(phase==='fight'&&!holding){toggle();holding=true;paint();}
+  }else if(phase==='fight'&&!holding){if(toggle()){holding=true;paint();}else say('Леска уже не слушается рывков — просто смотри, чем всё кончится.');}
  }
- function fishRelease(){if(phase==='fight'&&holding&&!fst.end){toggle();holding=false;paint();}}
+ function fishRelease(){if(phase==='fight'&&holding&&!fst.end&&toggle()){holding=false;paint();}}
  function toggle(){
   const lastT=toggles.length?toggles[toggles.length-1]:strikeAt;
-  if(toggles.length>=f2.max_toggles)return;
+  if(!toggleRoom(toggles,f2))return false;
   // never earlier than a tick already simulated, never closer than the human gap to the previous toggle
   toggles.push(Math.max(Math.ceil(tNow()),lastT+f2.toggle_gap,strikeAt+(fst.k-1)*f2.tick+1));
+  return true;
  }
  function endCast(){
   const entry=[aimAt,strikeAt,strikeAt===null?[]:toggles.slice()];

@@ -23,7 +23,9 @@ export function applyWorld(view,root=globalThis.document?.documentElement,store)
  set('festival',f.festival);set('festivalPhase',f.phase);set('festivalDecor',f.decor?'on':'');set('festivalScares',f.scares?'on':'');set('festivalBirthday',f.birthday||'');
  return f;
 }
-export function tabVisible(view){return !!view&&(!!view.current||!!view.upcoming?.soon||!!view.past?.length||Object.keys(view.collection||{}).length>0);}
+// Last year's lots are hidden while the same festival's fair is open: the stall already sells them at the fair price.
+export function pastShop(view){const cur=view?.current;return (view?.past||[]).filter(p=>!p.live&&!(cur&&cur.phase==='fair'&&cur.id===p.id));}
+export function tabVisible(view){return !!view&&(!!view.current||!!view.upcoming?.soon||!!pastShop(view).length||Object.keys(view.collection||{}).length>0);}
 
 // Pure helpers (unit-tested).
 export function canHandIn(task,optionIndex,stock){
@@ -92,13 +94,14 @@ export function renderFestival(p,view,h){
    p.append(c);
   }
  }
- if(view.past?.length){
+ const past=pastShop(view);
+ if(past.length){
   const d=el('details',null,'village-services fest-past');d.dataset.villageService='Лавка прошлых праздников';
   d.append(el('summary','Лавка прошлых праздников'));
   d.append(el('p',`Вещи прошлых ярмарок продаются всегда, на ${view.past_markup_pct-100}% дороже.`,'note'));
-  for(const past of view.past){
-   const group=el('div',null,'fest-group');group.append(el('h3',`${past.name} ${past.year}`));
-   for(const g of past.goods)group.append(goodRow(g,g.price,h,past.id));
+  for(const entry of past){
+   const group=el('div',null,'fest-group');group.append(el('h3',`${entry.name} ${entry.year}`));
+   for(const g of entry.goods)group.append(goodRow(g,g.price,h,entry.id));
    d.append(group);
   }
   p.append(d);

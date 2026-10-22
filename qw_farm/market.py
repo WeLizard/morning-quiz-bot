@@ -8,7 +8,7 @@ from hashlib import sha256
 import math
 from .catalog import (CROPS, ITEMS, RECIPES, NPCS, REP_NAMES, REP_POINTS, REP_BONUS, REP_SPECIAL_LEVEL, NPC_TASTES,
                       MARKET, PLOT_LIMITS, level)
-from .domain import need, find, inventory, event
+from .domain import need, find, inventory, event, unbound
 from . import progression, textile
 
 SCHEMAS = {
@@ -205,7 +205,7 @@ def make_contracts(farm, day):
     rng = _rng(farm['id'], 'contracts', day)
     crops = sorted(c['id'] for c in CROPS.values() if c['level'] <= lv and c['seconds'] <= 14400)
     types = {o['type'] for o in farm['objects']}
-    recipes = sorted(r['id'] for r in RECIPES.values() if textile.recipe_level(farm, r) <= lv and r['building'] in types
+    recipes = sorted(r['id'] for r in RECIPES.values() if textile.recipe_level(farm, r) <= lv and r['building'] in types and not r.get('exclusive')
                      and sum(ITEMS[k]['price'] for k in r['outputs']) >= 8)
     items = []
 
@@ -256,6 +256,7 @@ def apply_market(farm, kind, data, now, command_id):
         need(type(crate) is int and 0 <= crate < len(car['crates']), 'invalid_crate', 'Такого ящика нет.', 422)
         c = car['crates'][crate]
         need(not c['done'], 'crate_done', 'Этот ящик уже погружен.')
+        unbound([c['item']])
         inventory(farm, {c['item']: c['qty']}, -1)
         c['done'] = True
         text = f'Ящик погружен: {ITEMS[c["item"]]["name"]} ×{c["qty"]}.'

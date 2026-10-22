@@ -155,3 +155,13 @@ def test_postgres_replay_charges_once_and_neighbour_view_is_clean(farm_pg_url):
             await accepted(owner, 'feed_swans', {})
             assert (await raw_farm(env, owner))['swans']['total'] == 2
     asyncio.run(scenario())
+
+
+def test_projection_names_its_moscow_day_so_the_client_can_roll_over_midnight():
+    state = swan_farm()
+    state['swans'] = dict(day=moscow_day(T0), fed=swans.DAILY_LIMIT, next_at=0, total=swans.DAILY_LIMIT)
+    view = swans.public(state, T0)
+    assert view['left'] == 0 and view['day'] == moscow_day(T0)
+    midnight = (moscow_day(T0) + 1) * DAY - 3 * 3600                          # next Moscow midnight
+    nxt = swans.public(state, midnight + 5)
+    assert nxt['day'] == moscow_day(T0) + 1 and nxt['left'] == swans.DAILY_LIMIT

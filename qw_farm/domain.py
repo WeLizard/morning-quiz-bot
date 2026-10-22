@@ -9,7 +9,7 @@ from hashlib import sha256
 import math
 import re
 from .catalog import (tick, CROPS, ITEMS, BUILDINGS, RECIPES, ANIMALS, QUESTS, LEVELS, NPCS, VERSION, level, is_land_size, land_step,
-                      MAX_BUILDING_LEVEL, RECIPE_SPEED, BARN_SELL_BONUS, upgrade_kind, upgrade_cost, effective_level,
+                      MAX_BUILDING_LEVEL, RECIPE_SPEED, EXOTIC_BY_FRUIT, BARN_SELL_BONUS, upgrade_kind, upgrade_cost, effective_level,
                       queue_slots, animal_batch, animal_xp, ANIMAL_XP_LEGACY, land_bound, plot_limit, object_limit, WEARABLE_ITEM_IDS)
 from . import progression, economy, projects
 
@@ -64,6 +64,11 @@ def pay(farm, amount):
     credit = farm['starter_credit']
     farm['starter_credit'] = max(0, credit - amount)
     return credit - farm['starter_credit']  # the part paid from the starter gift (a refund must restore it)
+
+
+def unbound(keys):
+    """Goods of the travelling merchant (seed packs, dyes, grafts, vouchers) belong to the farm: they never leave it."""
+    need(not any(ITEMS.get(k,{}).get('bound') for k in keys),'bound_item','Эта вещь привязана к ферме: её нельзя передать или продать.',422)
 
 
 def event(farm, now, text, kind='info'):
@@ -246,7 +251,15 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         if 'revision' in data:
             need(type(data['revision']) is int and obj['revision']==data['revision'], 'stale_object','Объект изменился. Попробуй ещё раз.')
     lv=level(me['xp']); text='Готово.'
-    if kind=='plant':
+    if kind=='plant' and isinstance(data['crop'],str) and data['crop'] in EXOTIC_BY_FRUIT:
+        spec=EXOTIC_BY_FRUIT[data['crop']]   # a foreign crop: one planting from a merchant's seed pack, no coins
+        need(obj['type']=='plot' and obj['crop'] is None,'busy_plot','Эта грядка занята.')
+        need(lv>=spec['level'],'locked','Эта культура откроется на следующем уровне.')
+        inventory(me,{spec['seed']:1},-1)
+        obj['crop']=dict(id=spec['id'],planted_at=now,ready_at=now+duration(spec['seconds'],speed,me),
+            yield_qty=spec['yield_qty'],xp=spec['xp'],helped=False,version=VERSION,cost=0,gift=0,seed=spec['seed'])
+        obj['revision']+=1; text=f'{spec["name"]}: посажено.'
+    elif kind=='plant':
         crop=named(CROPS,data['crop'])
         need(obj['type']=='plot' and obj['crop'] is None,'busy_plot','Эта грядка занята.')
         need(lv>=crop['level'],'locked','Эта культура откроется на следующем уровне.')
@@ -271,8 +284,10 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(obj['type']==r['building'] and expansion.textile.recipe_level(me,r)<=lv,'wrong_building','Этот рецепт здесь пока недоступен.')
         need(len(obj['jobs']) < queue_slots(obj.get('level')),'queue_full','Очередь заполнена. Забери готовые товары.')
         inventory(me,r['inputs'],-1)
-        obj['jobs'].append(expansion.make_job(obj,r,now,speed,command_id,me))
-        expansion.remember_recipe(obj,r['id'])  # remembered set for the artisans and «повторить партии»
+        new_setup=not expansion.has_manual_job(obj)  # nothing manual left in the queue -> this starts a new setup
+        job=expansion.make_job(obj,r,now,speed,command_id,me);job['manual']=True
+        obj['jobs'].append(job)
+        expansion.remember_recipe(obj,r['id'],new_setup)  # the last manual setup, repeated by the artisans and «повторить партии»
         obj['revision']+=1;text='Производство поставлено в очередь.'
     elif kind=='forget_recipe':
         from . import expansion as ex
@@ -325,6 +340,10 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(lv>=c['level'],'locked',f'Нужен уровень {c["level"]}.')
         need(not c.get('secret') or c['secret'] in me['secrets'],'secret_locked','Этот декор нужно сначала найти в кабинете находок.')
         need(not c.get('reward') or economy.reward_allowed(me,typ),'reward_locked','Этот декор выдаётся наградой фонда деревни.')
+        if c.get('curio'):
+            from . import merchant
+            need(merchant.owns_curio(me,typ),'curio_locked','Эту диковинку продаёт Сорока-коробейница.')
+            need(not any(o['type']==typ for o in me['objects']),'curio_placed','Эта диковинка уже стоит на ферме.')
         need(len(me['objects'])<object_limit(me['size']),'object_limit','Достигнут лимит объектов для этого участка.')
         place(me,data['x'],data['y'],c['w'],c['h'])
         free=c.get('decor') and not c.get('secret') and expansion.market.free_decor(me,typ)  # r8: caravan gift
@@ -382,7 +401,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(isinstance(items,dict) and all(type(q) is int for q in items.values()),'invalid_command','Некорректный вклад.',422)
         value,text,_=economy.contribute(me,coins,items,now)
     elif kind=='sell':
-        item=named(ITEMS,data['item']);qty=number(data['qty'],1,999)
+        item=named(ITEMS,data['item']);qty=number(data['qty'],1,999);unbound([item['id']])
         inventory(me,{item['id']:qty},-1);bonus=barn_sell_bonus(me);gain=item['price']*qty*(100+bonus)//100;me['coins']+=gain
         text=f'Продано: +{gain} монет.'+(f' (склад: +{bonus}%)' if bonus else '')
     elif kind in {'order','skip_order'}:
@@ -457,14 +476,14 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         me['pranks']=[];text='Гусь проводил сам себя за калитку.'
     elif kind=='gift':
         social_allowed(me,other,'allow_gifts')
-        item=named(ITEMS,data['item']);qty=number(data['qty'],1,10)
+        item=named(ITEMS,data['item']);qty=number(data['qty'],1,10);unbound([item['id']])
         need(me['stats']['orders']>=1 and me['stats']['harvests']>=4,'gift_locked','Подарки откроются после первого заказа и четырёх сборов.')
         daily(me,f'gift:{other["id"]}',now,3);daily(me,'gift_total',now,5)
         inventory(me,{item['id']:qty},-1);inventory(other,{item['id']:qty});me['stats']['gifts']+=1
         event(other,now,f'{me["name"]} дарит {item["name"]} ×{qty}.','social');text='Подарок уже у соседа.'
     elif kind=='list':
         need(me['stats']['orders']>=3,'trade_locked','Лавка откроется после трёх заказов.')
-        item=named(ITEMS,data['item']);qty=number(data['qty'],1,20);price=number(data['unit_price'],item['price'],item['price']*2)
+        item=named(ITEMS,data['item']);qty=number(data['qty'],1,20);unbound([item['id']]);price=number(data['unit_price'],item['price'],item['price']*2)
         need(len(me['listings'])<3,'stall_full','В лавке три места. Продай или убери один лот.')
         inventory(me,{item['id']:qty},-1)
         me['listings'].append(dict(id=command_id,item=item['id'],qty=qty,unit_price=price,created_at=now));text='Товар выставлен для соседей.'
@@ -525,6 +544,8 @@ def project(farm, visitor, now):
         result['swans']=swans.public(farm,now)
         from . import festivals
         result['festival']=festivals.owner_view(farm,now)
+        from . import merchant
+        result['merchant_view']=merchant.owner_view(farm,now)
         result['home_projects']=projects.owner_state(farm)
         for o in result['objects']:
             if o['type'] in _ex.WORKSHOP_TYPES:o.setdefault('recipes_memory',[])

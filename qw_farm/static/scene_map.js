@@ -258,3 +258,6 @@ export class Minimap{
   c.restore();
  }
 }
+// Swan feedings left today. The server's `left` is valid only for the Moscow day it was projected on (`day`); after midnight
+// a new day starts with the full limit, without waiting for the next projection.
+export function swansLeft(w,t){return w.day!==undefined&&w.day!==Math.floor((t+10800)/86400)?w.daily_limit:w.left;}

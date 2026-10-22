@@ -145,6 +145,19 @@ def _span(day, key):
     return lo, hi
 
 
+@lru_cache(maxsize=256)
+def _first_fair_day(key):
+    """The first fair day on which the occurrence ``key`` actually acts (a fair day lost to a higher-ranked festival does not count)."""
+    m = KEY_RE.match(key)
+    occ = next(o for o in occurrences(int(m.group(2))) if o['id'] == m.group(1))
+    for a, b in occ['fair']:
+        for day in range(a, b + 1):
+            row = _resolved(day)
+            if row is not None and row[0] == key and row[3] == 'fair':
+                return day
+    return None
+
+
 def current(now):
     """What acts in the world right now (Moscow day): dict(id, name, key, year, phase 'decor'|'fair', host, ...) or None."""
     now = tick(now)
@@ -157,7 +170,7 @@ def current(now):
     lo, hi = _span(day, key)
     occ = next(o for o in occurrences(year) if o['id'] == fid)
     fair_today = [r for r in occ['fair'] if r[0] <= day <= r[1]]
-    first_fair_day = bool(fair_today) and day == fair_today[0][0]
+    first_fair_day = phase == 'fair' and day == _first_fair_day(key)
     magpie = phase == 'fair' and (f['magpie'] == 'all' or first_fair_day)
     return dict(id=fid, name=f['name'], key=key, year=year, phase=phase, host=f['host'], theme=f['theme'],
                 starts_at=_ts(lo), ends_at=_ts(hi + 1), fair_ends_at=_ts(fair_today[0][1] + 1) if fair_today else None,
@@ -423,7 +436,7 @@ def public_calendar(farm, now):
     """What any visitor may see of a farm's festival: the shared world calendar and the farm's own birthday. No economy."""
     now = tick(now)
     cur = current(now)
-    return dict(current=cur and {k: cur[k] for k in ('id', 'name', 'phase', 'host', 'starts_at', 'ends_at')},
+    return dict(current=cur and {k: cur[k] for k in ('id', 'name', 'key', 'phase', 'host', 'starts_at', 'ends_at')},
                 upcoming=upcoming(now), birthday=birthday(farm, now))
 
 
@@ -456,6 +469,8 @@ def owner_view(farm, now):
                             ends_at=cur['fair_ends_at'], tasks=tasks, goods=goods, todo=not c['tasks'] and not c['goods'],
                             keepsake=keep and dict(id=keep['id'], name=keep['name'], got=e['keepsake']))
     for fid in FESTIVALS:
+        if cur is not None and cur['id'] == fid and cur['phase'] == 'fair':
+            continue    # this fair is open: the stall sells at the fair price, so last year's lots (x1.5) are not listed next to it
         last = last_completed(fid, now)
         c = content(fid)
         if last is None or not c['goods']:
@@ -463,7 +478,7 @@ def owner_view(farm, now):
         e = {**blank(), **s.get(last['key'], {})}
         view['past'].append(dict(id=fid, name=FESTIVALS[fid]['name'], key=last['key'], year=last['year'],
                                  goods=[_good_view(g, e, lvl, past_price(g)) for g in c['goods'] if g['source'] == 'fair'],
-                                 live=bool(cur and cur['id'] == fid and cur['phase'] == 'fair')))
+                                 live=False))
     return view
 
 

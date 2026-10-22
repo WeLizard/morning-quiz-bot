@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
 // trip_game.js is an ES module: pure rules first, DOM only inside openTripGame (never called here). Imports are stubbed.
 const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/trip_game.js'),'utf8').replace(/^import .*$/mg,'').replace(/export (const|function|class) /g,'$1 ');
-const names='RULES FISH2 markPosition accuracy strikeTiming fishScore fishResult forageScore walk scaledOutputs quality finalOutputs canPlay playLeft bonusLine evalCast fight fightStart fightStep holdAt biteAt baitSpec hookedFish nibbleTimes skyLine grams fightPoints'.split(' ');
+const names='RULES FISH2 markPosition accuracy strikeTiming fishScore fishResult forageScore walk scaledOutputs quality finalOutputs canPlay playLeft bonusLine evalCast fight fightStart fightStep holdAt toggleRoom biteAt baitSpec hookedFish nibbleTimes skyLine grams fightPoints'.split(' ');
 const ctx={Set,Map,Math,Object,String,Array,Number,JSON,performance:{now:()=>0},smallAnimal:()=>{}};vm.createContext(ctx);vm.runInContext(source+`\nglobalThis.api={${names.join(',')}};`,ctx);
 const api=ctx.api;
 const data=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/farm_trip_games/games.json'),'utf8'));
@@ -83,4 +83,16 @@ test('canPlay: only the player\'s own open game with time left; bonusLine words'
  const done={outputs:{x:3},game:{state:'done',q:1250}};
  assert.deepEqual(plain(api.finalOutputs(done)),{x:4});
  assert.match(api.bonusLine(done,id=>id),/x \+1/);assert.equal(api.bonusLine({outputs:{x:3},game:{state:'done',q:1000}},id=>id),'Как у автопилота');
+});
+
+test('fishing: past the toggle cap the UI keeps the simulated hold state and says so',()=>{
+ const cap=api.FISH2.max_toggles;
+ assert.equal(api.toggleRoom(new Array(cap-1).fill(0)),true);
+ assert.equal(api.toggleRoom(new Array(cap).fill(0)),false);
+ assert.equal(api.toggleRoom([]),true);
+ // fishPress / fishRelease flip `holding` only when toggle() really recorded a switch, and the press at the cap gives a hint
+ const src=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/trip_game.js'),'utf8');
+ assert.match(src,/phase==='fight'&&!holding\)\{if\(toggle\(\)\)\{holding=true;paint\(\);\}else say\(/);
+ assert.match(src,/function fishRelease\(\)\{if\(phase==='fight'&&holding&&!fst\.end&&toggle\(\)\)\{holding=false;paint\(\);\}\}/);
+ assert.match(src,/if\(!toggleRoom\(toggles,f2\)\)return false;/);
 });

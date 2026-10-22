@@ -409,3 +409,24 @@ def test_placeholder_art_exists_for_every_new_item_and_building():
     types = re.search(r'const TYPES=\{([^}]*)\}', (static / 'scene_buildings.js').read_text(encoding='utf-8')).group(1)
     drawers = {m.split(':')[0].strip() for m in types.split(',')}
     assert TEXTILE_BUILDING_IDS <= drawers
+
+
+def test_pillow_needs_a_goose_house_exactly_as_before_and_orders_never_ask_for_it_without_one():
+    # the old pillow (fluff 2 + feather 1) already needed a feather, so a rabbit-only farm never had the pillow: no transition recipe is owed
+    assert 'feather' in RECIPES['pillow']['inputs'] and set(RECIPES['pillow']['inputs']) == {'feather'}
+    for lv in (3, 5, 8):
+        st = textile_farm(lv, ('sheep', 'rabbit')) if lv >= 5 else at_level(lv)
+        if lv < 5:
+            add_building(st, 'rabbit_hutch', 'rb', 0, 2, animal='rabbit')
+        st['inventory'] = {}
+        assert 'pillow' not in reachable(st), lv
+        for seq in range(60):
+            st['orders'] = []
+            st['order_seq'] = seq
+            order = make_order(st, seq % 3, T0)
+            assert 'pillow' not in order['needs'], (lv, seq)
+    goosed = textile_farm(8, ('sheep', 'rabbit', 'goose'))
+    assert 'pillow' in reachable(goosed)
+    # a rabbit-only farm keeps the fluff chain
+    st = textile_farm(5, ('sheep', 'rabbit'))
+    assert {'rabbit_fluff', 'down_yarn'} <= set(reachable(st))

@@ -17,7 +17,7 @@ test('posidelki layer: served as an asset, fetched only for its festival, shown 
  assert.match(api,/'village-fest-posidelki\.svg'/);
  assert.match(app,/const VILLAGE_FEST=\{posidelki:'village-fest-posidelki\.svg'\}/);
  assert.match(app,/d\?\.festivalDecor==='on'\?d\.festival:''/,'nothing is fetched while the decor switch is off');
- assert.match(app,/world\.append\(villageFestLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),/,'base under the night tint, glow above it');
+ assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),/,'base under the night tint, glow above it');
  assert.match(app,/FEST\.applyWorld\(view\);syncVillageFest\(\);/);
  assert.match(css,/\.village-fest\{position:absolute;inset:0;pointer-events:none;display:none\}/);
  assert.match(css,/:root\[data-festival=posidelki\]\[data-festival-decor=on\] \.village-fest\[data-fest=posidelki\]\{display:block\}/);

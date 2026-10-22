@@ -48,7 +48,7 @@ def public(farm, now):
     now = tick(now)
     s = {**blank(), **(farm.get('swans') or {})}
     fed = s['fed'] if s['day'] == progression.moscow_day(now) else 0
-    return dict(public_rules(), left=max(0, DAILY_LIMIT - fed), next_at=s['next_at'], total=s['total'],
+    return dict(public_rules(), left=max(0, DAILY_LIMIT - fed), day=progression.moscow_day(now), next_at=s['next_at'], total=s['total'],
                 unlocked=level(farm['xp']) >= UNLOCK_LEVEL)
 
 

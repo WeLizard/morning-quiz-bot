@@ -44,3 +44,8 @@ test('restart counter uses any affordable remembered recipe and the client has n
  assert.equal(setup(workshop({recipes_memory:[]})).ctx.bulkCounts(z).restart,0);
  assert.doesNotMatch(source,/recipe_changed/);
 });
+test('the last-setup hint sits next to the repeat line',()=>{
+ const h=setup(workshop({recipes_memory:['bread','pie']}));h.ctx.renderObject(h.p);
+ assert.ok(h.notes.some(t=>t==='Повторяется последняя постановка. Новая постановка после опустевшей очереди заменит список.'),h.notes.join('|'));
+ const h2=setup(workshop({recipes_memory:[]}));h2.ctx.renderObject(h2.p);assert.equal(h2.notes.some(t=>t.includes('Повторяется последняя')),false);
+});

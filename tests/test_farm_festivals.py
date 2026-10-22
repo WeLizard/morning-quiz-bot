@@ -438,3 +438,32 @@ def test_postgres_festival_commands_replay_once_and_neighbour_view_is_clean(farm
             env.now[0] = ts(2026, 12, 2)
             assert (await command(owner, 'festival_task', task('warm'))).status_code == 409   # the fair is over
     asyncio.run(scenario())
+
+
+def test_past_shop_hides_last_years_lots_while_the_same_fair_is_open():
+    f = farm(xp=LEVELS[7])
+    live = F.owner_view(f, ts(2027, 11, 28))
+    assert live['fair']['id'] == 'posidelki'
+    assert all(p['id'] != 'posidelki' for p in live['past'])               # the stall sells at the fair price, no x1.5 list beside it
+    after = F.owner_view(f, ts(2027, 12, 5))
+    assert [p['key'] for p in after['past'] if p['id'] == 'posidelki'] == ['posidelki-2027']
+    c0 = f['coins']
+    cmd(f, 'festival_buy', buy('fest_posid_wreath'), ts(2027, 11, 28))
+    assert c0 - f['coins'] == F.price(F.good_of('posidelki', 'fest_posid_wreath'))
+
+
+def test_magpie_first_means_the_first_fair_day_the_festival_actually_gets():
+    # Maslenitsa 2027 (8-14 March) loses 8 March to Spring Flowers (higher priority, fair 6-8 March): the magpie comes on the 9th
+    assert F.current(ts(2027, 3, 8))['id'] == 'spring_flowers'
+    assert F.current(ts(2027, 3, 9))['id'] == 'maslenitsa' and F.current(ts(2027, 3, 9))['magpie']
+    assert not F.current(ts(2027, 3, 10))['magpie']
+    # an untouched festival keeps its own first day
+    assert F.current(ts(2026, 11, 26))['magpie'] and not F.current(ts(2026, 11, 27))['magpie']
+
+
+def test_split_festival_year_has_one_key_for_both_runs_and_the_magpie_comes_once():
+    a, b = F.current(ts(2030, 3, 4)), F.current(ts(2030, 3, 9))
+    assert a['id'] == b['id'] == 'maslenitsa' and a['key'] == b['key'] == 'maslenitsa-2030'
+    assert a['starts_at'] != b['starts_at']                                 # two runs, so starts_at alone is not a once-per-year mark
+    assert F.public_calendar(farm(), ts(2030, 3, 4))['current']['key'] == 'maslenitsa-2030'
+    assert [d for d in range(4, 11) if F.current(ts(2030, 3, d)) and F.current(ts(2030, 3, d))['id'] == 'maslenitsa' and F.current(ts(2030, 3, d))['magpie']] == [4]

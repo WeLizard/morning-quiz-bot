@@ -62,3 +62,16 @@ test('the lake panel wires feed_swans through the server command and shows serve
  assert.match(app,/due\(S\.me\?\.swans\?\.next_at\)/);
  assert.doesNotMatch(app,/feed_swans',\{[^}]/,'the client sends no numbers');
 });
+
+test('after Moscow midnight the lake card recounts the daily limit without a new projection',async()=>{
+ const {swansLeft}=await import('../../qw_farm/static/scene_map.js');
+ const day=20000,at=(d,h)=>d*86400-10800+h*3600;
+ const w={day,left:0,daily_limit:3};
+ assert.equal(swansLeft(w,at(day,23)),0,'same Moscow day: the server number stands');
+ assert.equal(swansLeft(w,at(day+1,0)+1),3,'next Moscow day: the full limit');
+ assert.equal(swansLeft({day,left:1,daily_limit:3},at(day+1,1)),3);
+ assert.equal(swansLeft({left:2,daily_limit:3},at(day+1,1)),2,'an old projection without a day keeps the server number');
+ const app=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
+ assert.match(app,/swansLeft\(w,t\)<=0/);
+ assert.match(app,/\$\{swansLeft\(w,now\(\)\)\} из/);
+});

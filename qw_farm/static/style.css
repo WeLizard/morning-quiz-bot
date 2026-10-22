@@ -489,6 +489,26 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .vfx-sails::after{content:'';position:absolute;left:50%;top:50%;width:9%;aspect-ratio:1;border-radius:50%;background:#d9ccac;border:2px solid #8a7452;translate:-50% -50%}
 .vfx-sails b{position:absolute;left:50%;top:50%;width:11%;height:48%;box-sizing:border-box;background:linear-gradient(90deg,#8a7452 0 2px,transparent 2px),repeating-linear-gradient(0deg,#f1e8c8 0 6px,#bba97f 6px 7px);border:1px solid #9d8b64;transform-origin:0 0}
 .vfx-sails b:nth-child(1){transform:rotate(180deg) translate(-50%,0)}.vfx-sails b:nth-child(2){transform:rotate(270deg) translate(-50%,0)}.vfx-sails b:nth-child(3){transform:rotate(0deg) translate(-50%,0)}.vfx-sails b:nth-child(4){transform:rotate(90deg) translate(-50%,0)}
+/* Сорока-коробейница (app.js VILLAGE_MERCHANT): cart layers and her figure appear only while html[data-merchant] is set.
+   The cart lies under the night tint, its lantern glow above it; the figure stands like the player (feet on the point) and calls buyers. */
+.village-merchant,.village-merchant-figure{display:none}
+.village-merchant{position:absolute;inset:0;pointer-events:none}
+.village-merchant>svg{display:block;width:100%;height:100%}
+:root[data-merchant] .village-merchant,:root[data-merchant] .village-merchant-figure{display:block}
+.village-merchant-base .vm-night,.village-merchant-glow .vm-base{display:none}
+:root:not([data-farm-theme=night]) .village-merchant-glow{display:none}
+.village-merchant-figure{position:absolute;width:44px;height:60px;transform:translate(-50%,-92.6%);z-index:3;pointer-events:none}
+.village-merchant-figure .vm-figure-art{display:block;width:100%;height:100%;overflow:visible;transform-origin:50% 92%}
+.vm-call{display:none}
+:root[data-farm-theme=night] .village-merchant-figure .vm-figure-art{filter:brightness(.9) saturate(.9)}
+@media(prefers-reduced-motion:no-preference){
+ .village-merchant-figure .vm-figure-art{animation:vm-sway 7s ease-in-out infinite}
+ .village-merchant-figure .vm-stand{animation:vm-stand 7s steps(1,end) infinite}
+ .village-merchant-figure .vm-call{display:inline;animation:vm-call 7s steps(1,end) infinite}
+ @keyframes vm-sway{0%,60%,100%{rotate:0deg}70%{rotate:-2.5deg}80%{rotate:2deg}90%{rotate:-1deg}}
+ @keyframes vm-stand{0%{opacity:1}64%{opacity:0}92%{opacity:1}}
+ @keyframes vm-call{0%{opacity:0}64%{opacity:1}92%{opacity:0}}
+}
 /* Festival layers of the village (app.js VILLAGE_FEST, scripts/art/village/fest_<id>.js): hidden unless that festival and its decor
    switch are on. The base layer (decor, day window light) lies under the night tint, the glow layer above it shows only at night. */
 .village-fest{position:absolute;inset:0;pointer-events:none;display:none}

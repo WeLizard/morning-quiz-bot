@@ -19,13 +19,13 @@ def bakery(**inventory):
     return st
 
 
-def test_manual_queue_builds_an_ordered_unique_memory_and_moves_repeats_to_the_end():
+def test_manual_queue_builds_an_ordered_unique_memory_keeping_first_appearance_order():
     st = bakery()
     for r in ('bread', 'bun', 'pancake'):
         queue(st, 'b', r)
     assert obj(st, 'b')['recipes_memory'] == ['bread', 'bun', 'pancake']
     queue(st, 'b', 'bread')
-    assert obj(st, 'b')['recipes_memory'] == ['bun', 'pancake', 'bread'] and obj(st, 'b')['last_recipe'] == 'bread'
+    assert obj(st, 'b')['recipes_memory'] == ['bread', 'bun', 'pancake'] and obj(st, 'b')['last_recipe'] == 'pancake'
 
 
 def test_memory_cap_is_the_queue_slot_count_and_drops_the_oldest():
@@ -148,3 +148,64 @@ def test_cancel_keeps_the_memory_and_neighbours_see_none_of_it():
     seen = project(st, me, T0)['objects'][0]
     assert not {'recipes_memory', 'recipe_cursor', 'last_recipe'} & set(seen)
     assert project(st, st, T0)['objects'][0]['recipes_memory'] == ['bread']
+
+
+def test_new_setup_replaces_memory_only_when_no_manual_job_is_left():
+    st = bakery()
+    queue(st, 'b', 'bread')
+    queue(st, 'b', 'bun')
+    b = obj(st, 'b')
+    assert b['recipes_memory'] == ['bread', 'bun'] and all(j['manual'] for j in b['jobs'])
+    b['jobs'].clear()                                   # everything finished and collected
+    queue(st, 'b', 'pancake')
+    assert b['recipes_memory'] == ['pancake'] and b['last_recipe'] == 'pancake' and b['recipe_cursor'] == 0
+    queue(st, 'b', 'bun')                               # pancake still queued: same setup
+    queue(st, 'b', 'pancake')
+    assert b['recipes_memory'] == ['pancake', 'bun']
+
+
+def test_master_repeats_exactly_the_last_setup():
+    st = bakery()
+    queue(st, 'b', 'bread')
+    queue(st, 'b', 'bun')
+    b = obj(st, 'b')
+    b['jobs'].clear()
+    queue(st, 'b', 'pancake')
+    b['jobs'].clear()
+    hire_and_start(st, 'badger_artisan', 'day')
+    st['helpers']['badger_artisan']['shift']['remaining'] = 2
+    settle(st, T0 + 61)
+    assert [j['recipe'] for j in b['jobs']] == ['pancake', 'pancake'] and b['recipes_memory'] == ['pancake']
+
+
+def test_automation_jobs_neither_start_a_setup_nor_count_as_manual():
+    st = bakery()
+    queue(st, 'b', 'bread')
+    queue(st, 'b', 'bun')
+    b = obj(st, 'b')
+    b['jobs'].clear()
+    hire_and_start(st, 'badger_artisan', 'day')
+    st['helpers']['badger_artisan']['shift']['remaining'] = 1
+    settle(st, T0 + 61)
+    assert b['jobs'] and not any(j.get('manual') for j in b['jobs'])
+    assert b['recipes_memory'] == ['bread', 'bun']      # the automation did not touch the setup
+    queue(st, 'b', 'pancake')                           # only automation jobs in the queue: a new setup
+    assert b['recipes_memory'] == ['pancake']
+
+
+def test_old_jobs_without_the_flag_are_manual_unless_their_id_is_automatic():
+    from qw_farm.expansion import has_manual_job, is_manual_job
+    assert is_manual_job({'id': 'cmd-1'}) and not is_manual_job({'id': 'auto-3-1'})
+    assert is_manual_job({'id': 'auto-x', 'manual': True}) and not is_manual_job({'id': 'c', 'manual': False})
+    assert has_manual_job({'jobs': [{'id': 'auto-1-1'}, {'id': 'old'}]}) and not has_manual_job({'jobs': [{'id': 'auto-1-1'}]})
+    st = bakery()
+    queue(st, 'b', 'bread')
+    b = obj(st, 'b')
+    b['recipes_memory'] = ['bread', 'bun']              # old save: accumulated memory is kept as the current setup
+    for j in b['jobs']:
+        j.pop('manual')
+    queue(st, 'b', 'pancake')                           # an old unflagged job is manual: append
+    assert b['recipes_memory'] == ['bread', 'bun', 'pancake']
+    b['jobs'].clear()
+    queue(st, 'b', 'bun')
+    assert b['recipes_memory'] == ['bun']

@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE))
 import build_village  # noqa: E402
 
 WORK = ROOT / ".local" / "village-generator" / "test"
-KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256")
+KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256", "merchant_sha256")
 
 
 def _app_const(src: str, name: str):
@@ -38,6 +38,10 @@ def test_village_generator_is_reproducible():
     for fid in a["fest_sha256"]:   # the installed festival layer is the generated one
         game = ROOT / "qw_farm" / "static" / f"village-fest-{fid}.svg"
         assert game.read_bytes() == (WORK / "a" / f"village-fest-{fid}.svg").read_bytes(), f"{game.name}: rebuild with --install"
+    cart = ROOT / "qw_farm" / "static" / "village-merchant.svg"
+    assert cart.read_bytes() == (WORK / "a" / "village-merchant.svg").read_bytes(), "village-merchant.svg: rebuild with --install"
+    app = (ROOT / "qw_farm" / "static" / "app.js").read_text(encoding="utf-8")
+    assert (WORK / "a" / "merchant-figure.svg").read_text(encoding="utf-8") in app, "app.js VILLAGE_MERCHANT.figure is the generated one"
     ref = json.loads((HERE / "reference.json").read_text(encoding="utf-8"))
     changed = sorted(k for k in set(ref["inputs"]) | set(a["inputs"]) if ref["inputs"].get(k) != a["inputs"].get(k))
     if changed:

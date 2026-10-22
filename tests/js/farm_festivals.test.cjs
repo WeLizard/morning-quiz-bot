@@ -156,3 +156,13 @@ test('Посиделки items all resolve to an icons.svg symbol, and every fes
  for(const id of ['fest_posid_wreath','fest_posid_quilt','fest_posid_lantern','fest_posid_basket','fest_posid_smoke','fest_posid_socks','fest_posid_lights','fest_posid_rowan'])
   assert.ok(drawn.has(id),`row does not draw ${id}`);
 });
+
+test('last years lots are hidden while the same festival fair is open',async()=>{
+ const F=await load();
+ const past=[{id:'posidelki',key:'posidelki-2026',year:2026,live:false,goods:[]},{id:'maslenitsa',key:'maslenitsa-2026',year:2026,live:false,goods:[]}];
+ const view={current:{id:'posidelki',phase:'fair'},past};
+ assert.deepEqual(F.pastShop(view).map(p=>p.id),['maslenitsa']);
+ assert.deepEqual(F.pastShop({current:{id:'posidelki',phase:'decor'},past}).map(p=>p.id),['posidelki','maslenitsa']);
+ assert.deepEqual(F.pastShop({past:[{id:'x',live:true}]}),[]);
+ assert.deepEqual(F.pastShop(null),[]);
+});

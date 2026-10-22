@@ -1,0 +1,20 @@
+/* Лавка Сороки (FARM_VILLAGE_MINIGAMES.md section 2): existing card/button components, UI_RULES tokens only. */
+.mag-head .reward{margin:6px 0 0}
+.mag-head .village-dialogue{margin:6px 0 0}
+.mag-shelf,.mag-fair,.mag-sell{display:grid;gap:0}
+.mag-slot{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--qw-line,#d4dbcd)}
+.mag-shelf .mag-slot:first-of-type{border-top:0}
+.mag-slot small,.mag-want small{display:block;color:var(--qw-muted,#53604f);font-size:var(--qw-fs-small,13px)}
+.mag-slot .qw-btn{min-height:44px}
+.mag-slot.owned,.mag-slot.sold,.mag-slot.soon{opacity:.7}
+.mag-want{display:grid;gap:4px;margin:8px 0 12px}
+.mag-want .qw-btn,.mag-sell .qw-btn{min-height:44px}
+.mag-collection{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.mag-collection li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.mag-collection .qw-btn{min-height:44px}
+/* the cart's tap target in the village: sits on the cart box (VILLAGE_MERCHANT.cart), a quiet empty spot while she is away */
+.village-cart{position:absolute;box-sizing:border-box;min-width:48px;min-height:48px;margin:0;padding:0;background:transparent;border:0;border-radius:12px;z-index:2}
+.village-cart:focus-visible{outline:3px solid #79975b;outline-offset:2px}
+.village-cart::after{content:'';position:absolute;inset:-8px;border-radius:16px}
+html:not([data-merchant]) .village-cart{opacity:.001}
+html:not([data-merchant]) .village-cart:focus-visible{opacity:1;background:#fff8dcb0}

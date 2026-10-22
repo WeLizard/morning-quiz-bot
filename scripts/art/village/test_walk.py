@@ -62,7 +62,8 @@ def test_connected_and_anchored():
     assert all(isinstance(v, int) for v in walk["nodes"] + walk["edges"]), "compact integer format"
     assert all(0 <= walk["nodes"][i] <= 2400 and 0 <= walk["nodes"][i + 1] <= 1800 for i in range(0, len(walk["nodes"]), 2))
     targets = build_village.walk_targets()
-    assert sorted(walk["anchors"]) == sorted(targets), "every app.js walk target has an anchor"
+    # + the peddler's approach point, placed by the generator itself (merchant.js / village.js)
+    assert sorted(walk["anchors"]) == sorted([*targets, "merchant"]), "every app.js walk target has an anchor"
 
 
 def test_edges_avoid_houses_water_trees():

@@ -42,14 +42,26 @@ def svg_document(webp: bytes) -> str:
             f'<image width="2400" height="1800" xlink:href="data:image/webp;base64,{data}"/></svg>')
 
 
-def walk_targets() -> dict:
-    """Where the client sends the player (app.js villageGo targets), in world units: these become the graph's anchors."""
+def _app_consts() -> dict:
     src = (ROOT / "qw_farm" / "static" / "app.js").read_text(encoding="utf-8")
     decl = [src[src.index(f"const {n}="):src.index(";\n", src.index(f"const {n}=")) + 1]
             for n in ("VILLAGE_SPOTS", "VILLAGE_PLACES", "VILLAGE_VISITOR_SPOTS", "VILLAGE_C")]   # VILLAGE_C line holds START/GATE/HALL
     js = "\n".join(decl) + ("\nconsole.log(JSON.stringify({spots:VILLAGE_SPOTS,places:VILLAGE_PLACES,visitors:VILLAGE_VISITOR_SPOTS,"
                             "gate:VILLAGE_GATE,hall:VILLAGE_HALL,start:VILLAGE_START}))")
-    d = json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8", check=True).stdout)
+    return json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8", check=True).stdout)
+
+
+def app_buttons() -> list:
+    """Centres of the game's tap targets in the village (residents, guests, place signs, hall, gate), world units."""
+    d = _app_consts()
+    w = lambda x, y: [round(x * 24, 1), round(y * 18, 1)]  # noqa: E731
+    return ([w(*v) for v in d["spots"].values()] + [w(p[3], p[4]) for p in d["places"]] + [w(*v) for v in d["visitors"]]
+            + [w(*d["hall"]), w(*d["gate"])])
+
+
+def walk_targets() -> dict:
+    """Where the client sends the player (app.js villageGo targets), in world units: these become the graph's anchors."""
+    d = _app_consts()
     w = lambda x, y: [round(x * 24, 1), round(y * 18, 1)]  # noqa: E731  (% of the world -> world units)
     t = {name: w(x, y + 1.6) for name, (x, y) in d["spots"].items()}
     t.update({f"place:{p[0]}": w(p[3], p[4] + 2.4) for p in d["places"]})
@@ -92,13 +104,15 @@ def manifest(meta: dict) -> dict:
         "gate": pc(meta["gate"][0], meta["gate"][1] - 70),
         "plaza_corner": u(*meta["plaza"][0]),
         "sites": [[s["label"]] + pc(*s["at"]) for s in meta["sites"]],
+        # the peddler (merchant.js): cart layer box and the magpie's foot point, world units
+        "merchant": {"cart": meta["merchant"]["cart"], "foot": meta["merchant"]["foot"]},
         # walk graph (walk.js, README «Граф проходимости»): flat world-unit node pairs, flat index pairs, named anchors
         "walk": {k: meta["walk"][k] for k in ("nodes", "edges", "anchors", "areas")},
         "problems": meta.get("problems", []) + meta["walk"]["problems"] + [p for f in meta["fest"].values() for p in f["problems"]],
     }
 
 
-INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
+INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/merchant.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
 
@@ -118,7 +132,7 @@ def versions() -> dict:
 def build(out: Path, install: bool = False) -> dict:
     from PIL import Image
     harness._env_browsers()
-    res = harness.run("village.js", {"targets": walk_targets()})
+    res = harness.run("village.js", {"targets": walk_targets(), "buttons": app_buttons()})
     out.mkdir(parents=True, exist_ok=True)
     png = res["world"]
     im = Image.open(io.BytesIO(png)).convert("RGB")
@@ -132,6 +146,8 @@ def build(out: Path, install: bool = False) -> dict:
     (out / "walk_check.json").write_text(json.dumps({"graph": res["meta"]["walk"]["debug"], "blockers": res["meta"]["walk_blockers"],
                                                      "dropped": res["meta"]["walk"]["dropped"]}, ensure_ascii=False), encoding="utf-8")
     (out / "player.svg").write_text(res["meta"]["player"], encoding="utf-8", newline="")
+    (out / "village-merchant.svg").write_text(res["meta"]["merchant"]["svg"], encoding="utf-8", newline="")
+    (out / "merchant-figure.svg").write_text(res["meta"]["merchant"]["figure"], encoding="utf-8", newline="")
     for fid, layer in res["meta"]["fest"].items():   # festival layers: qw_farm/static/village-fest-<id>.svg
         (out / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
     (out / "gate_board.svg").write_text(res["meta"]["gate_art"]["board"]["svg"], encoding="utf-8", newline="")
@@ -140,7 +156,8 @@ def build(out: Path, install: bool = False) -> dict:
               "webp_sha256": hashlib.sha256(webp).hexdigest(),
               "svg_sha256": hashlib.sha256(svg.encode()).hexdigest(),
               "svg_bytes": len(svg.encode()), "versions": versions(), "inputs": inputs(),
-              "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()}}
+              "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()},
+              "merchant_sha256": hashlib.sha256((res["meta"]["merchant"]["svg"] + res["meta"]["merchant"]["figure"]).encode()).hexdigest()}
     (out / "hashes.json").write_text(json.dumps(hashes, indent=1), encoding="utf-8")
     if man["problems"]:
         print("layout problems:", *man["problems"], sep="\n  ")
@@ -148,6 +165,7 @@ def build(out: Path, install: bool = False) -> dict:
         GAME_SVG.write_text(svg, encoding="utf-8", newline="")
         for fid, layer in res["meta"]["fest"].items():
             (GAME_SVG.parent / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
+        (GAME_SVG.parent / "village-merchant.svg").write_text(res["meta"]["merchant"]["svg"], encoding="utf-8", newline="")
         print("installed", GAME_SVG, "and festival layers", ", ".join(res["meta"]["fest"]))
     return hashes
 

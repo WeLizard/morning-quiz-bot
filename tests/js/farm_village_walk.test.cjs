@@ -19,7 +19,7 @@ test('walk graph: one connected network inside the world, compact integers',()=>
 });
 test('walk graph: an approach node for every place the player is sent to',()=>{
  const W=value('VILLAGE_WALK'),n=W.n.length/2;
- const want=[...Object.keys(value('VILLAGE_SPOTS')),...value('VILLAGE_PLACES').map(p=>'place:'+p[0]),...value('VILLAGE_VISITOR_SPOTS').map((_,i)=>'visitor:'+i),'gate','hall','start'];
+ const want=[...Object.keys(value('VILLAGE_SPOTS')),...value('VILLAGE_PLACES').map(p=>'place:'+p[0]),...value('VILLAGE_VISITOR_SPOTS').map((_,i)=>'visitor:'+i),'gate','hall','start','merchant'];
  assert.deepEqual(Object.keys(W.a).sort(),want.sort());
  for(const k of want)assert.ok(Number.isInteger(W.a[k])&&W.a[k]<n);
 });

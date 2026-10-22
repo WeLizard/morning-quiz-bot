@@ -523,7 +523,7 @@ MARKET=dict(
 )
 
 def public_catalog():
-    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,lessons=LESSONS,crops=CROPS,crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
+    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
 
 def validate():
     for r in RECIPES.values():
@@ -1007,8 +1007,8 @@ TEXTILE_BUILDING_IDS=frozenset(r[0] for r in TEXTILE_BUILDING_ROWS)
 WEARABLE_ITEM_IDS=frozenset({'pillow','scarf','mittens','mohair_plaid','down_blanket','wool_plaid','down_shawl','socks','quilt','robe','silk_quilt',
                              'sundress','alpaca_coat','felt_boots','silk_scarf','bouquet','plume_bouquet','feather_fan','golden_fan','hop_wreath'})
 # Lessons of «Кошка Соня» (FARM_VILLAGE_MINIGAMES.md 3.3): a delivered step lets listed recipes open ``early`` levels sooner.
-# The base chain never needs a lesson; recipes with ``teach`` are also opened by their plain level. Pattern recipes with Сорока's dyes (dye_*)
-# are NOT defined: the merchant is not implemented, so the dyes cannot be obtained (FARM_TEXTILE_CHAIN.md section 8, FARM_VILLAGE_MINIGAMES.md 3.3).
+# The base chain never needs a lesson; recipes with ``teach`` are also opened by their plain level. The dyeing recipes with Сорока's dyes (dye_*) are defined in the merchant block
+# at the end of this file; the PATTERN recipes of Соня (rugs, tapestries) are still NOT defined (FARM_TEXTILE_CHAIN.md section 8, FARM_VILLAGE_MINIGAMES.md 3.3).
 LESSONS={'weaving':dict(id='weaving',npc='Кошка Соня',name='Уроки ткачества',steps=(
     dict(step=1,level=6,text='Спрясть шесть мотков пряжи',items={'yarn':6},reward={'yarn':1}),
     dict(step=2,level=8,text='Соткать два куска сукна',items={'wool_cloth':2},reward={'down_yarn':1}),
@@ -1084,3 +1084,133 @@ def validate_fields():
     return dict(field_steps=len(FIELD_STEPS),field_machines=len(FIELD_MACHINES),field_crops=sum(c['field'] for c in CROPS.values()))
 
 validate_fields()
+
+# ---- Сорока-коробейница (FARM_VILLAGE_MINIGAMES.md section 2; rules: qw_farm/merchant.py) -----------------------------------
+# Everything she sells is data here and BOUND to the farm (``bound``): it is never gifted, listed, sold, put into the fund or the caravan.
+# Foreign crops are NOT in CROPS (not in the seed shop, orders, contracts, fields); they live in EXOTIC_CROPS and are planted from a seed unit.
+PACK_PLANTINGS = 3                # plantings in one seed pack
+PACK_EDGE_PCT = 110               # net profit of a pack vs the plain crop of the same level and time (target 108-112)
+EXOTIC_PROFIT_PCT = 120           # the foreign fruit pays x1.2 of the crop value law (decision 3, 7.2 item 4)
+
+
+def _merchant_catalog():
+    # id, name, level, seconds, yield, colour
+    crop_rows = [
+        ('fire_pepper', 'Огненный перец', 3, 3600, 3, '#d9442b'),
+        ('blue_corn', 'Голубая кукуруза', 6, 7200, 3, '#6f86c6'),
+        ('moon_pumpkin', 'Лунная тыква', 14, 28800, 5, '#c9d4e8'),
+        ('honey_melon', 'Медовая дыня', 18, 43200, 6, '#e8c25a'),
+        ('stripe_melon', 'Полосатый арбуз', 22, 28800, 5, '#5f9a4e'),
+        ('pearl_rice', 'Жемчужный рис', 26, 86400, 5, '#ece6d8'),
+    ]
+    exotic = {}
+    for cid, name, lv, secs, qty, color in crop_rows:
+        xp_f, profit_f = crop_law(lv, secs)
+        xp, profit = max(1, round(xp_f)), round(profit_f)
+        # law revenue = seed cost (~ xp) + profit; the foreign fruit earns EXOTIC_PROFIT_PCT percent of the law profit
+        price = max(1, math.ceil((xp + profit * EXOTIC_PROFIT_PCT / 100) / qty))
+        exotic[cid] = dict(id='exo_' + cid, name=name, level=lv, seconds=secs, yield_qty=qty, xp=xp, seed='seed_' + cid, color=color,
+                           exotic=True, law_profit=profit)
+        # Pack price (owner decision 2026-10-22): the net profit of a whole pack (3 plantings, fruit at x1.2) is PACK_EDGE_PCT percent of the
+        # plain crop's net profit for the same plantings, so the pack pays; the limits per visit keep the gain small.
+        revenue = qty * price
+        exotic[cid]['pack_price'] = max(1, round(PACK_PLANTINGS * (revenue - profit * PACK_EDGE_PCT / 100)))
+        # the fund (x1.25) takes the foreign fruit at the plain law value of its level and time, never at the x1.2 price (section 2.6)
+        ITEMS['exo_' + cid] = dict(id='exo_' + cid, name=name, price=price, color=color, kind='crop', exotic=True,
+                                   fund_price=max(1, math.ceil((xp + profit) / qty)))
+        ITEMS['seed_' + cid] = dict(id='seed_' + cid, name='Заморские семена: ' + name.lower(), price=0, color=color, kind='exotic_seed', bound=True)
+    return exotic
+
+
+EXOTIC_CROPS = _merchant_catalog()
+EXOTIC_BY_FRUIT = {c['id']: c for c in EXOTIC_CROPS.values()}
+EXOTIC_BY_SEED = {c['seed']: c for c in EXOTIC_CROPS.values()}
+
+
+def _av(seconds, lv):
+    """Workshop value law (FARM_TEXTILE_CHAIN.md section 4): AV = minutes * (2.5 + 0.1 * L)."""
+    return math.ceil(seconds / 60 * (2.5 + 0.1 * lv))
+
+
+# Dyes (only from Сорока) and the dyeing recipes of the tailor, modelled on dyed_linen.
+# id, name, price (workshop law, FARM_TEXTILE_CHAIN.md), level, colour, (result id, result name, recipe name)
+DYE_ROWS = [
+    ('dye_indigo', 'Индиго', 100, 17, '#3b4f8f', ('indigo_linen', 'Индиго-полотно', 'Окрасить в индиго')),
+    ('dye_madder', 'Марена', 120, 19, '#b0463c', ('madder_linen', 'Мареновое полотно', 'Окрасить мареной')),
+    ('dye_saffron', 'Шафранная краска', 150, 22, '#e0a93f', ('saffron_linen', 'Шафрановое полотно', 'Окрасить шафраном')),
+]
+DYES = tuple(r[0] for r in DYE_ROWS)
+for _id, _n, _p, _l, _col, (_oid, _on, _rn) in DYE_ROWS:
+    ITEMS[_id] = dict(id=_id, name=_n, price=_p, color=_col, kind='dye', bound=True, level=_l)
+    _t = 1500
+    ITEMS[_oid] = dict(id=_oid, name=_on, price=ITEMS['linen']['price'] + _p + _av(_t, _l), color=_col, kind='product')
+    RECIPES[_oid] = dict(id=_oid, name=_rn, building='tailor', inputs={'linen': 1, _id: 1}, outputs={_oid: 1}, seconds=_t, level=_l,
+                         xp=_xp_r9('tailor', _t), exclusive='merchant')
+
+
+# Recipe scrolls: buying one opens the recipe for good (``farm['merchant']['scrolls']``); the plain level never opens it.
+def _scroll_recipe(rid, name, building, inputs, out_name, out_qty, seconds, lv, color):
+    value_in = sum(ITEMS[k]['price'] * q for k, q in inputs.items())
+    ITEMS[rid] = dict(id=rid, name=out_name, price=math.ceil((value_in + _av(seconds, lv)) / out_qty), color=color, kind='product')
+    RECIPES[rid] = dict(id=rid, name=name, building=building, inputs=inputs, outputs={rid: out_qty}, seconds=seconds, level=lv,
+                        xp=_xp_r9(building, seconds), exclusive='merchant', scroll=rid)
+
+
+_scroll_recipe('pumpkin_latte', 'Заварить тыквенный латте', 'teahouse', {'exo_moon_pumpkin': 1, 'milk': 2, 'honey': 1}, 'Тыквенный латте', 1, 900, 14, '#c9a06b')
+_scroll_recipe('pepper_gingerbread', 'Испечь пряник с перцем', 'bakery', {'flour': 2, 'honey': 1, 'exo_fire_pepper': 1}, 'Пряник с перцем', 2, 600, 9, '#a8603a')
+_scroll_recipe('watermelon_zero', 'Отжать арбузный морс 0%', 'juicery', {'exo_stripe_melon': 2}, 'Арбузный морс 0%', 2, 600, 22, '#e0707a')
+SCROLL_RECIPES = ('pumpkin_latte', 'pepper_gingerbread', 'watermelon_zero')
+
+# Curios: five seasonal series (a series returns after five seasons, i.e. not earlier than four), four pieces each; one piece once per farm, ever.
+CURIO_RARITY_K = (15, 25, 40, 60)
+CURIO_SERIES = [
+    ('overseas', 'Заморский уголок', 8, ['Заморский фонарик', 'Глобус-флюгер', 'Самовар с петушком', 'Часы с кукушкой-сорокой']),
+    ('fair', 'Ярмарочная', 12, ['Ковёр-самолёт (не летает)', 'Карусель-шкатулка', 'Бубенцы на дугу', 'Расписной сундучок']),
+    ('road', 'Дорожная', 16, ['Фонарь-компас', 'Подзорная труба на штативе', 'Почтовый рожок', 'Флюгер-ветрогон']),
+    ('stars', 'Звёздная', 20, ['Звёздный глобус', 'Лунная лампа', 'Хрустальный шар на подставке', 'Кукушкин телескоп']),
+    ('tea', 'Чайная', 24, ['Чайный столик на колёсиках', 'Самовар-великан', 'Чашка-аквариум', 'Паровой чайник-паровоз']),
+]
+CURIOS = {}
+for _sid, _sname, _slv, _names in CURIO_SERIES:
+    for _i, _n in enumerate(_names):
+        _cid = f'curio_{_sid}_{_i}'
+        CURIOS[_cid] = dict(id=_cid, name=_n, series=_sid, series_name=_sname, level=_slv, k=CURIO_RARITY_K[_i])
+        BUILDINGS[_cid] = dict(id=_cid, name=_n, cost=0, level=_slv, w=1, h=1, decor=True, curio=True, series=_sid,
+                               source='Сорока-коробейница: диковинка сезона')
+
+# Orchard hooks (FARM_ORCHARD.md is not implemented): defined, bound, flagged ``wired=False`` and kept OUT of the stock until the orchard exists.
+ORCHARD_WIRED = False
+ORCHARD_ROWS = [
+    ('graft_apple_paradise', 'Прививка «Райская яблоня»', 'graft', 16, 10),
+    ('graft_pear_bergamot', 'Прививка «Груша-бергамот»', 'graft', 16, 10),
+    ('voucher_orchard', 'Скидочный талон сада −25%', 'voucher', 16, 8),
+]
+for _id, _n, _kind, _l, _k in ORCHARD_ROWS:
+    ITEMS[_id] = dict(id=_id, name=_n, price=0, color='#8fb86a', kind=_kind, bound=True, orchard=True, wired=False, level=_l)
+
+MERCHANT = dict(
+    visits_per_week=2, visit_hours=24, slots=6,                            # 2 visits a week, 24 h each (Moscow day), 6 slots
+    scroll_k=25, orchard_k={r[0]: r[4] for r in ORCHARD_ROWS},
+    limits=dict(exotic_seed=2, dye=10, graft=1, voucher=1, scroll=1, curio=1),
+    pack=PACK_PLANTINGS,                                                                # plantings in one seed pack
+    buyback=dict(bonus_pct=30, cap_pct=2, items=('honey', 'jam', 'peacock_feather', 'bouquet', 'pastila', 'grape_jelly')),
+    curio_series=[s[0] for s in CURIO_SERIES],
+)
+assert all(i in ITEMS for i in MERCHANT['buyback']['items'])
+
+
+def validate_merchant():
+    assert len(EXOTIC_CROPS) == 6
+    for c in EXOTIC_CROPS.values():
+        assert c['seconds'] in CROP_K and c['id'] in ITEMS and c['seed'] in ITEMS and ITEMS[c['seed']]['bound']
+    assert all(ITEMS[k].get('bound') for k in ITEMS if ITEMS[k]['kind'] in ('exotic_seed', 'dye', 'graft', 'voucher'))
+    assert all(r.get('exclusive') == 'merchant' for r in RECIPES.values() if r['id'] in SCROLL_RECIPES or any(k in DYES for k in r['inputs']))
+    assert len(CURIOS) == 20 and len(CURIO_SERIES) >= 5
+    return dict(exotic=len(EXOTIC_CROPS), curios=len(CURIOS))
+
+
+validate_merchant()
+
+
+def merchant_catalog():
+    return deepcopy(dict(exotic_crops=EXOTIC_CROPS, curios=CURIOS, scrolls=list(SCROLL_RECIPES), config=MERCHANT, orchard_wired=ORCHARD_WIRED))

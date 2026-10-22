@@ -149,7 +149,7 @@ def record(farm, season, lv):
 
 
 def goods_value(items):
-    return sum(ITEMS[k]['price'] * q * FUND_MARKUP // 100 for k, q in items.items())
+    return sum(ITEMS[k].get('fund_price', ITEMS[k]['price']) * q * FUND_MARKUP // 100 for k, q in items.items())
 
 
 def _unlock(farm, decor_id):
@@ -165,13 +165,14 @@ def _grant_feast(farm, at):
 
 def contribute(farm, coins, items, at):
     """Validate and book one contribution; returns (value, notice). The caller (domain) already checked the schema."""
-    from .domain import need, inventory
+    from .domain import need, inventory, unbound
     lv = level(farm['xp'])
     need(lv >= FUND_LEVEL, 'locked', f'Фонд деревни открывается с {FUND_LEVEL} уровня.')
     need(type(coins) is int and coins >= 0 and isinstance(items, dict) and len(items) <= 12, 'invalid_command', 'Некорректный вклад.', 422)
     need(coins <= max(0, farm['coins'] - farm['starter_credit']), 'earned_coins',
          'В фонд идут только заработанные монеты, не стартовый подарок.')
     if items:
+        unbound([k for k in items if isinstance(k, str)])
         inventory(farm, items, -1)           # validates ids, quantities and stock before anything is spent
     value = coins + goods_value(items)
     need(value > 0, 'invalid_command', 'Добавь монеты или товары.', 422)

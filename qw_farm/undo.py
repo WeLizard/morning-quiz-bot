@@ -53,6 +53,14 @@ def dig_up(farm, obj, now):
     need(obj['type'] == 'plot', 'wrong_object', 'Выкопать можно только посадку на грядке.')
     need(crop is not None, 'empty_plot', 'Грядка уже свободна.')
     need(crop['ready_at'] > now, 'ripe', 'Урожай уже созрел — лучше собрать его.')
+    if crop.get('seed'):     # a foreign crop: no coins were paid; inside the undo window the seed unit comes back, later it is lost
+        back = now - crop['planted_at'] <= UNDO_WINDOW
+        if back:
+            inventory(farm, {crop['seed']: 1})
+        obj['crop'] = None
+        obj['revision'] += 1
+        name = ITEMS[crop['id']]['name']
+        return f'{name}: посадка отменена, семена вернулись на склад.' if back else f'{name}: выкопано. Семена не вернулись.'
     refund, full = crop_refund(crop, now)
     farm['coins'] += refund
     restore_gift(farm, crop.get('gift', 0), refund)

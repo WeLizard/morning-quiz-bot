@@ -15,14 +15,16 @@
   "scripts/art/village/walk.js": "2f8b62d68b3999c5",
   "scripts/art/village/player.js": "bcd5e9e6d8f689b7",
   "scripts/art/village/fest_posidelki.js": "2ec9cfb7d4a9dad1",
+  "scripts/art/village/merchant.js": "c890c30c4bb04366",
   "qw_farm/static/scene_buildings.js": "cec16883dd1de987",
-  "qw_farm/static/scene.js": "4782a3e0ccab46a2",
+  "qw_farm/static/scene.js": "a6b73547e4a75b5a",
   "qw_farm/static/scene_expansion.js": "7473fa6cdf1de9ff",
-  "qw_farm/static/scene_map.js": "49817e03bca28c95",
-  "scripts/art/village/village.js": "404d7432e8340174",
+  "qw_farm/static/scene_map.js": "68dbaaf64d6d9e97",
+  "scripts/art/village/village.js": "4bb38696b66c2462",
   "scripts/art/village/common.js": "0d3fc65983694e63"
  },
  "fest_sha256": {
   "posidelki": "5ed29158fdf12fb0e17d6b96358428637dff1d298ed87c2b481be90ff463d6b6"
- }
+ },
+ "merchant_sha256": "ba41bfafff67ec8d0f3780478ea81b37c14262686e871c89f12e66397633f27c"
 }

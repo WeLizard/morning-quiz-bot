@@ -19,6 +19,8 @@ def upgrade(farm):
 
 def recipe_level(farm, recipe):
     """Player level from which this farm may use ``recipe`` (its own level, or earlier when a lesson opened it)."""
+    if recipe.get('scroll') and recipe['scroll'] not in (farm.get('merchant') or {}).get('scrolls', ()):
+        return 10 ** 6          # a merchant's scroll recipe: never opened by level, only by the scroll itself
     teach = recipe.get('teach')
     if teach and (farm.get('lessons') or {}).get(teach['track'], 0) >= teach['step']:
         return max(1, recipe['level'] - teach['early'])

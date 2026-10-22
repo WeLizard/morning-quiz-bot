@@ -48,7 +48,7 @@ def add_plots(state, n, crop='wheat', ready_at=T0, x0=0, y0=0, width=20, prefix=
 def add_building(state, kind, oid, x, y, animal=None, last_recipe=None, level=1):
     obj = dict(id=oid, type=kind, x=x, y=y, w=2, h=2, revision=0, level=level, jobs=[], animal=animal, animal_job=None)
     if last_recipe:
-        obj['last_recipe'] = last_recipe
+        obj.update(last_recipe=last_recipe, recipes_memory=[last_recipe], recipe_cursor=0)   # already migrated
     state['objects'].append(obj)
     return obj
 
@@ -330,7 +330,7 @@ def test_artisan_collects_and_restarts_the_remembered_recipe_until_inputs_run_ou
     assert st['inventory'] == {'wheat': 0, 'flour': 5}
     assert obj(st, 'm')['jobs'] == [] and st['stats']['crafts'] == 5
     shift = st['helpers']['beaver_artisan']['shift']
-    assert shift['done'] == 10 and shift['status'] == 'finished'  # five restarts + five collections
+    assert shift['done'] == 10 and shift['status'] == 'finished'  # 3 starts (queue) + 2 collect-and-restart (2 units each) + 3 final collections
 
 
 def test_artisan_needs_a_remembered_recipe_and_enough_inputs_and_respects_the_queue():

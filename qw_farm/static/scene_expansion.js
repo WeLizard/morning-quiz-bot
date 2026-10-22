@@ -26,6 +26,19 @@ export function smallAnimal(s,x,y,id){
  if(['ostrich','silkworm','yak','pheasant'].includes(id)){lateAnimal(s,id);c.restore();return;}
  if(id==='goose'){s.goose(0,0,s.time);}
  else if(id==='duck'){s.shadow(0,1,13,5);s.ellipse(0,-7,13,8,'#b0a485');s.ellipse(-1,-8,9,4,'#a39372');s.ellipse(10,-17,6,6,'#789a7d');s.ellipse(14,-18,1,1,'#455f4b');s.ellipse(17,-15,4,2,'#d6b363');s.line(-4,0,-5,4,'#bd965a',2);s.line(5,0,6,4,'#bd965a',2);}
+ // Swimming duck (mallard drake, about 0.7 of the swan): a boat-shaped hull with an upturned tail, short neck and a flat waterline.
+ // Like the swan it sits in its own ripple; the hull below the waterline is hidden by a water lip, never drawn as legs.
+ else if(id==='duck_swim'){const b=Math.sin(s.time*1.9)*.5;s.ellipse(0,0,15,3.6,'#b6d3cf');s.ellipse(0,-.2,11.5,2.4,'#d4e6e2');
+  c.save();c.translate(0,b);
+  c.beginPath();c.moveTo(-13,-8.5);c.quadraticCurveTo(-9,-6,-4,-9.5);c.quadraticCurveTo(4,-12.2,9,-8.4);c.quadraticCurveTo(12.8,-5.2,11,-1);c.lineTo(-9,-1);c.quadraticCurveTo(-12,-3,-13,-8.5);c.closePath();c.fillStyle='#ada186';c.fill();
+  s.ellipse(8.6,-5,3.3,3,'#a38469');
+  c.beginPath();c.moveTo(-9,-6.6);c.quadraticCurveTo(-1,-10.8,6,-6.6);c.quadraticCurveTo(0,-3.4,-9,-6.6);c.closePath();c.fillStyle='#8f8265';c.fill();
+  s.ellipse(1.6,-5.7,2.6,.9,'#6d8fb0');
+  s.poly([{x:-13.4,y:-8.8},{x:-10.2,y:-7.6},{x:-11.2,y:-10.6}],'#3f4a40');
+  s.ellipse(9,-10.6,2.7,1.3,'#f2efe4');s.ellipse(10.2,-14.4,4.4,4,'#5d8a68');s.ellipse(9.2,-15.6,1.8,1.2,'#7aa684');s.ellipse(11.7,-15.2,.8,.8,'#263028');
+  s.poly([{x:13.8,y:-15},{x:17.6,y:-13.6},{x:17.2,y:-12.5},{x:13.6,y:-12.6}],'#d6b363');
+  c.restore();
+  s.ellipse(-.5,-.6,12.6,1.6,'#c3dcd7');s.line(-17.5,.4,-13.5,.8,'#eef7f0b0',1);s.line(-16,2,-12.5,2,'#eef7f090',1);}
  else if(id==='goat'){s.cow(0,0);s.ellipse(14,-18,5,5,'#d6c6a4');s.line(15,-20,20,-30,'#8c8269',2);s.line(9,-20,9,-29,'#8c8269',2);s.line(19,-7,20,0,'#b3a68d',2);}
  else if(id==='rabbit'){s.shadow(0,0,11,4);s.ellipse(0,-7,10,7,'#ddd1c1');s.ellipse(8,-12,6,6,'#e8decc');s.ellipse(6,-22,2.5,10,'#ddd1c1');s.ellipse(11,-22,2.5,9,'#e8decc');s.ellipse(11,-14,1,1,'#59695b');s.ellipse(-10,-7,4,4,'#f2eada');}
  else if(id==='calf'){s.shadow(0,1,17,6);for(let dx of [-9,-4,7,11])s.line(dx,-4,dx,5,'#7a5a46',3);s.ellipse(0,-11,16,9,'#b98a64');s.ellipse(-5,-13,5,5,'#f1e3cf');s.ellipse(12,-12,7,8,'#c6966d');s.ellipse(17,-8,5,3.4,'#e9c9b4');s.ellipse(14,-18,2,3,'#a47750');s.ellipse(9,-17,2,3,'#a47750');s.ellipse(15,-13,1,1,'#40524b');s.line(-16,-12,-21,-5,'#7a5a46',2);}
@@ -445,7 +458,7 @@ export function specialDecor(s,o,p){
  }
  if(o.type==='duckpond'){
   s.pond(p.x,p.y); // Compact local pond, overridden scale below by caller.
-  if(o.animal)smallAnimal(s,p.x,p.y,'duck');return true;
+  if(o.animal)smallAnimal(s,p.x,p.y,'duck_swim');return true;
  }
  return false;
 }

@@ -14,6 +14,8 @@ const LATE_CROPS={zucchini:['leaf','#8fb86a'],beans:['pod','#a9c079'],currant:['
    (spriteSlots), and front trees follow it. The loop pauses in a hidden tab and backs off
    its animation rate when frames are slow. */
 const TW=36, TH=18;
+// Mill tap box = its drawn silhouette: tower 100 px, sail tips ~104 px above the footprint centre. The old 125 px reach stole taps from neighbours.
+export const MILL_HIT={hw:40,top:106};
 const P=(x,y,z=0)=>({x:(x-y)*TW,y:(x+y)*TH-z});
 const mix=(a,b,t)=>a+(b-a)*t;
 const seed=(x,y=0)=>{let n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n)};
@@ -154,7 +156,7 @@ export class FarmScene {
  pick(x,y){if(!this.farm)return null;let cell=this.cell(x,y),q=this.world(x,y);const mid=this.farm.is_owner?machineAt(this,q.x,q.y):null;if(mid&&mid!=='robot')return {type:'machine',machine:mid,id:'machine:'+mid,x:0,y:0,w:0,h:0};const lake=this.pondCenter(),dx=(q.x-lake.x)/this.lakeSize().rx,dy=(q.y-lake.y)/this.lakeSize().ry,pier=isoInverse(q.x,q.y),G=this.grid(),dock=this.projectStage('lake_pier')>=1&&pier.x>=2&&pier.x<=3&&pier.y>=G-.65&&pier.y<=G+2.2;const ap=this.arborPos();if(this.projectStage('tea_arbor')>=1&&q.x>ap.x-48&&q.x<ap.x+48&&q.y>ap.y-86&&q.y<ap.y+24)return {type:'arbor',id:'arbor'};{const st=this.stonePos();if(q.x>st.x-24&&q.x<st.x+26&&q.y>st.y-58&&q.y<st.y+10)return {type:'stone',id:'stone'}}if(this.inLake(dx,dy)||dock)return {type:'lake',id:'lake'};let objs=[...this.sortedObjects().list].reverse(); // front-most first: the reverse of the paint order
   const exact=objs.find(o=>cell.x>=o.x&&cell.x<o.x+o.w&&cell.y>=o.y&&cell.y<o.y+o.h);
   if(exact)return exact;
-  for(let o of objs){if(o.type==='plot'||o.type==='road')continue;let p=P(o.x+o.w/2,o.y+o.h/2);if(q.x>p.x-43&&q.x<p.x+43&&q.y>p.y-(o.type==='mill'?125:90)&&q.y<p.y+10)return o}
+  for(let o of objs){if(o.type==='plot'||o.type==='road')continue;let p=P(o.x+o.w/2,o.y+o.h/2);const hw=o.type==='mill'?MILL_HIT.hw:43,top=o.type==='mill'?MILL_HIT.top:90;if(q.x>p.x-hw&&q.x<p.x+hw&&q.y>p.y-top&&q.y<p.y+10)return o}
   return null;
  }
  // `camera` moves the view to the object (lists and the mini-map); a tap on the map itself only selects.
@@ -324,7 +326,7 @@ export class FarmScene {
    }
    buildings.push({...o,object:o,bounds:objectBounds(o)});
    if(o.animal&&!livestockMoves(o)){
-    if(o.type==='duckpond'){const p=P(o.x+o.w/2,o.y+o.h/2);pixelPoint(p,()=>{if(!this.nightFlag)smallAnimal(this,p.x,p.y,'duck')},o.id);continue}
+    if(o.type==='duckpond'){const p=P(o.x+o.w/2,o.y+o.h/2);pixelPoint(p,()=>{if(!this.nightFlag)smallAnimal(this,p.x,p.y,'duck_swim')},o.id);continue}
     const p=P(o.x+.35,o.y+1.8);
     if(o.animal==='chicken')for(const [dx,dy] of [[12,6],[30,15]]){const q={x:p.x+dx,y:p.y+dy};pixelPoint(q,()=>this.chicken(q.x,q.y),o.id)}
     else{const q={x:p.x+(o.animal==='sheep'?18:o.animal==='bees'?19:17),y:p.y+9};pixelPoint(q,()=>{if(!(this.nightFlag&&o.animal!=='bees'))this.drawAnimal(o.animal,q)},o.id)}
@@ -404,6 +406,7 @@ export class FarmScene {
   this.skyFlock(view);
  }
  // Mouse hover: the object itself is lightened and gets a soft pale outline (drawn into a scratch canvas, then filtered once).
+ // The same filter is the CSS token --farm-lit (style.css) used by the village sign and residents: keep the two in step.
  drawLit(o){
   const main=this.c;
   if(!('filter' in main)){this.drawObject(o);this.footprint(o,'#fffbe130','#fff6b8');return}
@@ -603,9 +606,9 @@ export class FarmScene {
   // glides by in turn; every minute or so a flock of swan-geese crosses the sky above the water. Pure scene clock, no state.
   const face=v=>v>=0?1:-1,sprite=(kind,x,y,dir,tilt=0)=>{c.save();c.translate(x,y);c.scale(dir,1);if(tilt)c.rotate(tilt);smallAnimal(this,0,0,kind);c.restore()};
   {const u=t*.13,dx=-Math.sin(u)*70,x=p.x-42+Math.cos(u)*70,y=p.y+8+Math.sin(u*2)*16,dive=this.motion&&Math.sin(t*.55)>.93;
-   this.ellipse(x,y+6,15,3.4,'#83aba2a0');
-   if(dive){this.ellipse(x,y,8,5,'#b0a485');this.poly([{x:x-3,y:y-2},{x:x+3,y:y-2},{x:x,y:y-9}],'#8a7d5f');this.ellipse(x,y+6,6,2,'#eef7f0b0')}
-   else sprite('duck',x,y,face(dx));}
+   // Tipping over to feed: only the tail end shows, in the same ripple as the swimming pose (duck_swim draws its own ripple).
+   if(dive){this.ellipse(x,y,11,2.8,'#b6d3cf');this.ellipse(x,y-2.6,6,4,'#ada186');this.poly([{x:x-2.4,y:y-4.6},{x:x+2.4,y:y-4.6},{x:x+.6,y:y-11}],'#3f4a40');this.ellipse(x,y-.5,7.6,1.5,'#c3dcd7');this.ellipse(x,y+.6,9,1.2,'#eef7f080')}
+   else sprite('duck_swim',x,y,face(dx));}
   if(((t%120)+120)%120<80){const u=t*.07+2,x=p.x+70+Math.cos(u)*50,y=p.y-8+Math.sin(u)*14,dir=face(-Math.sin(u));
    for(const k of [0,1]){const ox=k*34*dir*-1,oy=k*7;this.ellipse(x+ox,y+oy+3,19,4,'#a8cfc6a0');sprite('swan',x+ox,y+oy,dir)}}
 

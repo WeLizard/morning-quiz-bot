@@ -15,7 +15,7 @@ function client(){
   setTimeout:(fn,ms)=>{timers.add(++nextTimer);callbacks.set(nextTimer,{fn,ms});return nextTimer;},clearTimeout:id=>{timers.delete(id);callbacks.delete(id);},
   sessionStorage:{setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)},
   document:{querySelector:()=>({style:{}}),body:{classList:{add:v=>classes.add(v),remove:v=>classes.delete(v)}}},
-  '$':id=>nodes[id],toast:t=>messages.push(t),refresh:async()=>true,showLogin:()=>{}};
+  '$':id=>nodes[id],toast:t=>messages.push(t),localizeWagerNotice:t=>t,gf:(m,f,n)=>n,refresh:async()=>true,showLogin:()=>{}};
  vm.createContext(c);
  const feedback=source.slice(source.indexOf('const rateUntil='),source.indexOf('function field('));
  const request=source.slice(source.indexOf('async function request('),source.indexOf('let farmViewEpoch=0,'));

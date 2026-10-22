@@ -60,6 +60,10 @@ def upgrade_state(farm):
     market.upgrade_market(farm)
     from . import village_quests
     village_quests.state(farm)
+    for obj in farm.get('objects', []):
+        if obj['type'] in WORKSHOP_TYPES and (obj.get('last_recipe') or 'recipes_memory' in obj):
+            _own_memory(obj)
+            _sync_memory(obj)
     farm['schema_version'] = 2
     farm['catalog'] = VERSION
     return farm
@@ -146,13 +150,84 @@ def make_job(obj, recipe, at, speed, job_id, farm=None):
                 inputs=deepcopy(recipe['inputs']), outputs=deepcopy(recipe['outputs']), xp=recipe['xp'], version=VERSION)
 
 
+def memory_cap(obj):
+    """How many distinct recipes a workshop remembers: as many as it has queue slots."""
+    return max(1, queue_slots(obj.get('level')))
+
+
+def recipe_memory(obj):
+    """Ordered unique recipe ids the player queued by hand (oldest first); read-only, so a refused command mutates nothing.
+    Migrates the single legacy ``last_recipe`` on the fly."""
+    mem = obj.get('recipes_memory')
+    if isinstance(mem, list):
+        return mem
+    return [obj['last_recipe']] if obj.get('last_recipe') else []
+
+
+def _own_memory(obj):
+    """The stored list (created from the legacy field when missing) for writers."""
+    if not isinstance(obj.get('recipes_memory'), list):
+        obj['recipes_memory'] = recipe_memory(obj)
+    return obj['recipes_memory']
+
+
+def _sync_memory(obj):
+    """Keep the legacy ``last_recipe`` mirror (= newest remembered) and the rotation cursor in range."""
+    mem = obj['recipes_memory']
+    if mem:
+        obj['last_recipe'] = mem[-1]
+    else:
+        obj.pop('last_recipe', None)
+    obj['recipe_cursor'] = obj.get('recipe_cursor', 0) % len(mem) if mem else 0
+
+
+def _drop_at(obj, index):
+    mem = obj['recipes_memory']
+    mem.pop(index)
+    if index < obj.get('recipe_cursor', 0):
+        obj['recipe_cursor'] -= 1   # the cursor keeps pointing at the same recipe
+
+
+def remember_recipe(obj, recipe_id):
+    """A manual enqueue: append (or move to the end), drop the oldest beyond the cap."""
+    mem = _own_memory(obj)
+    if recipe_id in mem:
+        _drop_at(obj, mem.index(recipe_id))
+    mem.append(recipe_id)
+    while len(mem) > memory_cap(obj):
+        _drop_at(obj, 0)
+    _sync_memory(obj)
+
+
+def forget_recipe_id(obj, recipe_id=None):
+    """Forget one remembered recipe (default: the most recent). Returns its id, or None if there is nothing to forget."""
+    mem = _own_memory(obj)
+    if recipe_id is None:
+        recipe_id = mem[-1] if mem else None
+    if recipe_id not in mem:
+        return None
+    _drop_at(obj, mem.index(recipe_id))
+    _sync_memory(obj)
+    return recipe_id
+
+
+def mark_started(obj, recipe_id):
+    """An automatic restart happened: the rotation continues after this recipe."""
+    mem = _own_memory(obj)
+    if recipe_id in mem:
+        obj['recipe_cursor'] = (mem.index(recipe_id) + 1) % len(mem)
+
+
 def restartable(farm, obj, lv):
-    """The remembered recipe of a workshop if it can be queued again right now, else None."""
-    recipe = RECIPES.get(obj.get('last_recipe'))
-    if (recipe and obj['type'] in WORKSHOP_TYPES and recipe['building'] == obj['type'] and recipe['level'] <= lv
-            and len(obj['jobs']) < queue_slots(obj.get('level'))
-            and all(farm['inventory'].get(k, 0) >= q for k, q in recipe['inputs'].items())):
-        return recipe
+    """The next remembered recipe of a workshop (rotation order) that can be queued right now, else None."""
+    if obj['type'] not in WORKSHOP_TYPES or len(obj['jobs']) >= queue_slots(obj.get('level')):
+        return None
+    mem = recipe_memory(obj)
+    for step in range(len(mem)):
+        recipe = RECIPES.get(mem[(obj.get('recipe_cursor', 0) + step) % len(mem)])
+        if (recipe and recipe['building'] == obj['type'] and recipe['level'] <= lv
+                and all(farm['inventory'].get(k, 0) >= q for k, q in recipe['inputs'].items())):
+            return recipe
     return None
 
 
@@ -194,14 +269,16 @@ def take_job(farm, obj, job, at, owner=True):
 def _targets(farm, ordered, role, at, box):
     """Yield (object, payload) eligible at this instant, in deterministic order (by object id)."""
     if role == 'craft':
-        # Collect first (it frees queue slots), then restart the remembered recipe.
+        # Collect first (the master then restarts the same workshop right away if quota allows), then restart idle workshops:
+        # the one that frees up earliest goes first (empty queue = earliest), ties by object id.
         for obj in ordered:
             if obj['type'] in WORKSHOP_TYPES and in_zone(obj, box):
                 for job in obj['jobs']:
                     if job['ready_at'] <= at:
                         yield obj, job
         lv = level(farm['xp'])
-        for obj in ordered:
+        frees = lambda o: (max((j['ready_at'] for j in o.get('jobs', [])), default=float('-inf')), o['id'])
+        for obj in sorted(ordered, key=frees):
             if obj['type'] in WORKSHOP_TYPES and in_zone(obj, box):
                 recipe = restartable(farm, obj, lv)
                 if recipe:
@@ -246,10 +323,30 @@ def _next_possible(farm, ordered, role, at, box):
     return min(moments) if moments else None
 
 
-def _work_once(farm, ordered, role, at, shift, box):
+def _craft_row(log, worker, obj):
+    """Per (worker, workshop) account of one settle: what went to the warehouse, what was put back in."""
+    return log.setdefault((worker, obj['id']), dict(worker=worker, object=obj['id'], type=obj['type'], carried={}, started={}))
+
+
+def _start_craft(farm, obj, recipe, at, speed, job_id, log, worker):
+    inventory(farm, recipe['inputs'], -1)
+    obj['jobs'].append(make_job(obj, recipe, at, speed, job_id))
+    mark_started(obj, recipe['id'])
+    obj['revision'] += 1
+    if log is not None:
+        row = _craft_row(log, worker, obj)
+        row['started'][recipe['id']] = row['started'].get(recipe['id'], 0) + 1
+
+
+def _work_once(farm, ordered, role, at, shift, box, log=None, worker=None):
+    """Do one unit of work; returns the quota units it cost (0 = nothing to do).
+
+    A craft collect costs 1 and the immediate restart of the same workshop another 1 (2 in all); with a single unit
+    left the master only collects."""
     target = next(_targets(farm, ordered, role, at, box), None)
     if target is None:
-        return False
+        return 0
+    units = 1
     obj, payload = target
     speed = shift['speed']
     if role in {'harvest', 'roots'}:
@@ -260,19 +357,56 @@ def _work_once(farm, ordered, role, at, shift, box):
         crop['watered'] = True
         obj['revision'] += 1
     elif role in {'production', 'craft'} and isinstance(payload, dict):
+        outputs = payload['outputs']
         take_job(farm, obj, payload, at, False)
+        if log is not None and role == 'craft':
+            row = _craft_row(log, worker, obj)
+            for item, qty in outputs.items():
+                row['carried'][item] = row['carried'].get(item, 0) + qty
+        if role == 'craft':
+            # The master puts the next remembered recipe straight back: collect (1 unit) + start (1 unit).
+            again = restartable(farm, obj, level(farm['xp'])) if shift['remaining'] >= 2 else None
+            if again:
+                _start_craft(farm, obj, again, at, speed, f'auto-{shift["id"]}-{shift["done"] + 1}', log, worker)
+                units = 2
     elif role == 'craft':
-        recipe = RECIPES[payload]
-        inventory(farm, recipe['inputs'], -1)
-        obj['jobs'].append(make_job(obj, recipe, at, speed, f'auto-{shift["id"]}-{shift["done"]}'))
-        obj['revision'] += 1
+        _start_craft(farm, obj, RECIPES[payload], at, speed, f'auto-{shift["id"]}-{shift["done"]}', log, worker)
     elif role == 'animals':
         if payload:
             take_animal(farm, obj, at, False)
         else:
             start_feed(farm, obj, at, speed, False)   # helpers are never slowed by the owner's upkeep debt
-    farm['stats']['automation'] += 1
-    return True
+    farm['stats']['automation'] += units
+    return units
+
+
+GENITIVE = dict(
+    mill='мельницы', feedmill='кормоцеха', bakery='пекарни', kitchen='летней кухни', dairy='сыроварни', loom='мастерской',
+    energy_shop='бодрильни', cannery='консервного цеха', confectionery='кондитерской', creamery='молокозавода',
+    juicery='соковарни', noodle_shop='макаронной мастерской', oil_press='маслобойни', sausage_shop='колбасного цеха',
+    smokehouse='коптильни', soapery='мыловарни', syrupery='сироповарни', tailor='швейной мастерской',
+    teahouse='чайной беседки')
+
+
+def craft_text(rows):
+    """Shift journal lines, e.g. «Из мельницы на склад: ржаная мука ×3; поставлено: ржаная мука ×3.»
+    (only a restart: «Мельница — поставлено: …»; only a collect: no «поставлено» clause)."""
+    def items(values, names):
+        return ', '.join(f'{names[k]["name"].lower()} ×{n}' for k, n in values.items())
+    parts = []
+    for r in rows:
+        carried, started = items(r['carried'], ITEMS), items(r['started'], RECIPES)
+        if carried:
+            source = f'Из {GENITIVE[r["type"]]}' if r['type'] in GENITIVE else f'Из постройки «{named_building(r["type"])}»'
+            parts.append(f'{source} на склад: {carried}' + (f'; поставлено: {started}.' if started else '.'))
+        elif started:
+            parts.append(f'{named_building(r["type"])} — поставлено: {started}.')
+    return ' ' + ' '.join(parts) if parts else ''
+
+
+def named_building(kind):
+    from .catalog import BUILDINGS
+    return BUILDINGS[kind]['name'] if kind in BUILDINGS else kind
 
 
 def settle(farm, now):
@@ -296,6 +430,7 @@ def settle(farm, now):
     ordered = ordered_objects(farm)
     boxes = {key: rect(val.get('zone')) for key, val, spec in workers}
     counts = {}
+    craft_log = {}
     ended = []
     # Every pass advances one worker by at least one interval, so this bound is never reached by honest data.
     # Saved shifts may still carry fractional deadlines (older clocks were float time.time), so the floor division may yield a float.
@@ -312,10 +447,11 @@ def settle(farm, now):
         at, key, val, spec = min(due, key=lambda x: (x[0], x[1]))
         shift = val['shift']
         role = shift.get('role', spec['role'])
-        if _work_once(farm, ordered, role, at, shift, boxes[key]):
-            shift['remaining'] -= 1
-            shift['done'] += 1
-            counts[key] = counts.get(key, 0) + 1
+        units = _work_once(farm, ordered, role, at, shift, boxes[key], craft_log, key)
+        if units:
+            shift['remaining'] -= units
+            shift['done'] += units
+            counts[key] = counts.get(key, 0) + units
             shift['next_at'] = at + shift['interval']
         else:
             # With several workers, one may produce feed or shorten a crop
@@ -342,7 +478,10 @@ def settle(farm, now):
             ended.append(key)
     if counts:
         names = '; '.join(f'{(EQUIPMENT.get(k) or HELPERS[k])["name"]}: {n}' for k, n in counts.items())
-        event(farm, now, f'Работа команды — {names}. Выполненные действия сохранены.', 'automation')
+        rows = list(craft_log.values())
+        event(farm, now, f'Работа команды — {names}. Выполненные действия сохранены.{craft_text(rows)}', 'automation')
+        if rows:
+            farm['events'][0]['details'] = rows   # additive: old clients show only ``text``
     for key in sorted(set(ended)):
         spec = EQUIPMENT.get(key) or HELPERS[key]
         event(farm, now, f'{spec["name"]}: смена завершена. Новая начнётся только по твоему решению.', 'shift')
@@ -392,6 +531,7 @@ def _bulk(farm, kind, data, now, speed, command_id):
                 if recipe:
                     inventory(farm, recipe['inputs'], -1)
                     obj['jobs'].append(make_job(obj, recipe, now, speed, f'bulk-{command_id}-{done}', farm))
+                    mark_started(obj, recipe['id'])
                     obj['revision'] += 1
                     done += 1
         need(done > 0, 'nothing_to_do', 'Нечего повторять: нет запомненных рецептов, места в очереди или сырья.')

@@ -165,6 +165,8 @@ def test_caravan_partial_fill_complete_reward_and_cooldown():
     assert bonus == 0 or state['market']['rep']  # fresh reputation: no bonus on the first caravan
     assert state['coins'] - coins == car['coins'] and state['xp'] - xp == car['xp']
     assert state['market']['caravan'] is None and state['market']['caravans_done'] == 1
+    last = state['market']['last_caravan']           # the card keeps showing the payout until the next caravan
+    assert last['ok'] and last['npc'] == car['npc'] and last['coins'] == car['coins'] and last['xp'] >= car['xp'] and last['at'] == T0 + 100 + len(car['crates']) - 1
     assert state['market']['rep'][car['npc']] == 3
     assert state['market']['caravan_next_at'] == T0 + 100 + len(car['crates']) - 1 + 24 * 3600
     assert err(state, 'caravan_fill', {'crate': 0}, T0 + 200) == 'no_caravan'
@@ -192,6 +194,7 @@ def test_caravan_missing_goods_and_expiry_refund_delivered_crates_at_shop_price(
     assert late.value.code == 'no_caravan'
     after = state['market']
     assert after['caravans_failed'] == 1 and after['caravans_done'] == 0
+    assert after['last_caravan'] == dict(ok=False, npc=car['npc'], refund=ITEMS[c0['item']]['price'] * c0['qty'], at=car['deadline'])
     assert state['coins'] - coins == ITEMS[c0['item']]['price'] * c0['qty']
     assert after['caravan_next_at'] == car['deadline'] + 24 * 3600
     assert after['caravan'] is None

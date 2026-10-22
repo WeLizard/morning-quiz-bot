@@ -1,0 +1,154 @@
+/* Oleg's chime game: a nested shell view like Dasha's. This stylesheet owns body.oleg-game-open and #oleg-game-view only. */
+body.oleg-game-open .workspace{position:relative;display:block;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding-bottom:0}
+body.oleg-game-open .workspace>#rail,body.oleg-game-open .workspace>.scene-area,body.oleg-game-open .workspace>.side-panel{display:none!important}
+body.oleg-game-open .header-destinations{display:none!important}
+#oleg-game-view[hidden]{display:none!important}
+#oleg-game-view{
+  --qw-game-header:#eff2df;--qw-game-surface:#fffaf0;--qw-game-surface-2:#f2f0dc;
+  --qw-game-text:#234b3d;--qw-game-muted:#577064;--qw-game-line:#d5ddc6;
+  --qw-game-accent:#3c7255;--qw-game-accent-fill:#e8bd65;--qw-game-accent-ink:#3b422e;
+  --qw-game-danger:#9b5947;
+  position:absolute;inset:0;z-index:24;overflow:auto;overscroll-behavior:contain;min-width:0;min-height:0;
+  margin:0;color:var(--qw-game-text);background:radial-gradient(circle at 80% 4%,#fff4d9 0,transparent 38%),#eff2df;font:var(--qw-fs-body)/1.5 var(--qw-font)
+}
+#oleg-game-view *{box-sizing:border-box}
+#oleg-game-view button{font:inherit;cursor:pointer}
+#oleg-game-view button:disabled{cursor:default}
+#oleg-game-view button:focus-visible{outline:3px solid #ac753d;outline-offset:3px}
+#oleg-game-view h1,#oleg-game-view h2,#oleg-game-view h3,#oleg-game-view p{margin:0}
+#oleg-game-view svg{display:block}
+#oleg-game-view [hidden]{display:none!important}
+#oleg-game-view .oleg-page{max-width:1450px;margin:auto;padding:24px var(--qw-gutter) calc(24px + var(--qw-safe-bottom)) var(--qw-gutter)}
+#oleg-game-view .oleg-masthead{display:flex;align-items:center;gap:14px;min-height:52px;margin:0 0 22px}
+#oleg-game-view .oleg-brand-mark{width:52px;height:52px;padding:5px;flex:none;border-radius:17px;background:#fff9e7;box-shadow:0 5px 15px #7e9b7826}
+#oleg-game-view .oleg-brand-mark svg{width:100%;height:100%}
+#oleg-game-view .oleg-mast-title{min-width:0}
+#oleg-game-view .oleg-eyebrow{display:block;color:#6b866d;font-size:var(--qw-fs-caption);font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+#oleg-game-view .oleg-masthead h1{font-size:var(--qw-fs-h1);line-height:1.12;letter-spacing:-.04em;color:#274d3d}
+#oleg-game-view .oleg-back{margin-left:auto;min-height:44px;padding:8px 12px;border:1px solid #c7d3b7;border-radius:12px;background:#eaf0de;color:#52704c;font-weight:700;white-space:nowrap}
+#oleg-game-view .oleg-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,335px);gap:22px;align-items:start}
+#oleg-game-view .oleg-stage-card{min-width:0;background:#f8f4de;padding:9px;border-radius:28px;box-shadow:0 16px 40px #466b4b24;border:1px solid #dae3c7}
+#oleg-game-view .oleg-scene{position:relative;width:100%;aspect-ratio:1100/690;overflow:hidden;border-radius:21px;background:#dce7c9}
+#oleg-game-view .oleg-scene-art{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none;user-select:none}
+#oleg-game-view .oleg-speech{position:absolute;left:3%;top:6%;z-index:2;max-width:min(250px,42%);background:#fff9e9;border:2px solid #dfc697;border-radius:24px 24px 24px 6px;padding:12px 16px;color:#435c46;font-weight:750;font-size:var(--qw-fs-body);line-height:1.32;box-shadow:0 8px 20px #6b56302b}
+#oleg-game-view .oleg-speech::after{content:"";position:absolute;left:26px;bottom:-12px;width:16px;height:16px;transform:rotate(45deg);background:#fff9e9;border-right:2px solid #dfc697;border-bottom:2px solid #dfc697}
+#oleg-game-view .oleg-scene-caption{position:absolute;left:12px;bottom:12px;color:#fff2db;opacity:.75;font-size:13px;font-weight:500;letter-spacing:.02em}
+#oleg-game-view .oleg-bells{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:13px 12px 5px}
+#oleg-game-view .oleg-bell{min-width:0;min-height:76px;display:flex;align-items:center;justify-content:center;gap:9px;border:2px solid #bda77d;border-radius:16px;background:#fff9e9;color:#3c4935;box-shadow:0 4px 0 #cfbea0;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+#oleg-game-view .oleg-bell:disabled{opacity:.6}
+#oleg-game-view .oleg-bell:not(:disabled):hover{transform:translateY(-2px)}
+#oleg-game-view .oleg-bell:not(:disabled):active{transform:translateY(2px);box-shadow:0 1px 0 #cfbea0}
+#oleg-game-view .oleg-bell-shape{position:relative;width:35px;height:36px;flex:none;border:2px solid #75533d;border-radius:15px 15px 9px 9px;clip-path:polygon(24% 0,76% 0,81% 60%,100% 83%,0 83%,19% 60%);filter:drop-shadow(0 2px 1px #624a38)}
+#oleg-game-view .oleg-bell-shape::after{content:"";position:absolute;width:7px;height:7px;left:12px;bottom:1px;border-radius:50%;background:#f6d88c}
+#oleg-game-view .oleg-bell-1 .oleg-bell-shape{background:linear-gradient(#eb8870,#c64d42)}
+#oleg-game-view .oleg-bell-2 .oleg-bell-shape{background:linear-gradient(#f8d878,#d49a32)}
+#oleg-game-view .oleg-bell-3 .oleg-bell-shape{background:linear-gradient(#a6c78b,#5f8b61)}
+#oleg-game-view .oleg-bell-4 .oleg-bell-shape{background:linear-gradient(#9fc8cf,#5d879a)}
+#oleg-game-view .oleg-bell-label{font-size:var(--qw-fs-control);font-weight:800}
+#oleg-game-view .oleg-bell.oleg-lit{transform:translateY(-5px) scale(1.035);filter:brightness(1.14);box-shadow:0 8px 0 #b99b68,0 0 0 4px #f4d78a;opacity:1}
+#oleg-game-view .oleg-bell.oleg-lit .oleg-bell-shape{animation:oleg-bell-ring .35s ease-in-out 2}
+#oleg-game-view .oleg-side{display:grid;gap:14px}
+#oleg-game-view .oleg-card{min-width:0;background:#fffaf0;border:1px solid #dce3ca;border-radius:22px;padding:22px;box-shadow:0 10px 27px #496c4b17}
+#oleg-game-view .oleg-intro{background:linear-gradient(135deg,#fffdf2,#edf2d9)}
+#oleg-game-view .oleg-intro h2{margin:5px 0 10px;color:#2d5944;font-size:var(--qw-fs-h2);line-height:1.2}
+#oleg-game-view .oleg-intro p{color:#456351;font-size:var(--qw-fs-body)}
+#oleg-game-view .oleg-reward{margin-top:9px;color:#795c39;font-weight:700;font-size:var(--qw-fs-small)}
+#oleg-game-view .oleg-panel{display:grid;gap:12px}
+#oleg-game-view .oleg-round-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#oleg-game-view .oleg-round-head strong{display:block;margin-top:2px;font-size:24px;line-height:1.1}
+#oleg-game-view .oleg-sound{min-height:44px;padding:7px 12px;border:1px solid #c7d3b7;border-radius:12px;background:#f5f5e6;color:#345945;font-weight:750;font-size:var(--qw-fs-small)}
+#oleg-game-view .oleg-sound[aria-pressed="true"]{background:#dcebbd;border-color:#72946c}
+#oleg-game-view .oleg-progress{height:12px;overflow:hidden;border-radius:999px;background:#e4e7d5;border:1px solid #d3dac4}
+#oleg-game-view .oleg-progress span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#9eb66a,#e8bd65);transition:width .3s ease}
+#oleg-game-view .oleg-round-hint{color:#54705b;font-size:var(--qw-fs-small);font-weight:700}
+#oleg-game-view .oleg-primary,#oleg-game-view .oleg-secondary{width:100%;min-height:52px;border-radius:14px;font-size:var(--qw-fs-control);font-weight:800}
+#oleg-game-view .oleg-primary{border:1px solid #bc8e4d;background:linear-gradient(#f5d785,#e4b85b);color:#3f422e;box-shadow:0 4px 0 #bc9558,0 8px 16px #8d764126}
+#oleg-game-view .oleg-primary:disabled{opacity:.6;box-shadow:none}
+#oleg-game-view .oleg-primary:not(:disabled):hover{filter:brightness(1.045);transform:translateY(-1px)}
+#oleg-game-view .oleg-status{min-height:3em;color:#587064;font-size:var(--qw-fs-small);text-align:center}
+#oleg-game-view .oleg-key-help{padding-top:8px;border-top:1px solid #e2e5d5;color:#697d69;font-size:var(--qw-fs-small);text-align:center}
+/* Stage (olegSceneSvg): bells mirror the buttons, Oleg's mood follows the game (data-mood on .oleg-scene). */
+#oleg-game-view svg.oleg-scene-art{width:100%;height:100%}
+#oleg-game-view .os-moon,#oleg-game-view .os-stars,#oleg-game-view .os-eye-happy,#oleg-game-view .os-eye-oops,#oleg-game-view .os-drop,#oleg-game-view .os-notes{opacity:0;transition:opacity .2s ease}
+#oleg-game-view .os-glow{opacity:0;transition:opacity .15s ease}
+#oleg-game-view .os-bell{transform-box:view-box}
+#oleg-game-view .os-bell.oleg-lit .os-glow{opacity:1}
+#oleg-game-view .os-bell.oleg-lit>path{filter:brightness(1.1) saturate(1.15)}
+#oleg-game-view .os-bell.oleg-lit{animation:os-swing .5s ease-in-out}
+#oleg-game-view .os-head,#oleg-game-view .os-wing,#oleg-game-view .os-oleg,#oleg-game-view .os-beak-low{transform-box:view-box;transition:transform .18s ease}
+#oleg-game-view .os-head{transform-origin:424px 340px}
+#oleg-game-view .os-wing{transform-origin:330px 470px}
+#oleg-game-view .os-oleg{transform-origin:340px 600px}
+#oleg-game-view .os-beak-low{transform-origin:470px 338px}
+#oleg-game-view .oleg-scene.os-striking .os-wing{transform:rotate(-7deg)}
+#oleg-game-view .oleg-scene[data-mood=sing] .os-notes,#oleg-game-view .oleg-scene[data-mood=happy] .os-notes{opacity:1}
+#oleg-game-view .oleg-scene[data-mood=sing] .os-beak-low,#oleg-game-view .oleg-scene[data-mood=happy] .os-beak-low{transform:rotate(14deg)}
+#oleg-game-view .oleg-scene[data-mood=happy] .os-eye-open{opacity:0}
+#oleg-game-view .oleg-scene[data-mood=happy] .os-eye-happy{opacity:1}
+#oleg-game-view .oleg-scene[data-mood=happy] .os-oleg{animation:os-hop .7s ease-out 2}
+#oleg-game-view .oleg-scene[data-mood=oops] .os-eye-open{opacity:0}
+#oleg-game-view .oleg-scene[data-mood=oops] .os-eye-oops,#oleg-game-view .oleg-scene[data-mood=oops] .os-drop{opacity:1}
+#oleg-game-view .oleg-scene[data-mood=oops] .os-head{transform:rotate(-8deg)}
+#oleg-game-view .oleg-scene[data-mood=listen] .os-head{transform:rotate(4deg)}
+:root[data-farm-theme=night] #oleg-game-view .os-sky-top{stop-color:#30416a}
+:root[data-farm-theme=night] #oleg-game-view .os-sky-bottom{stop-color:#6b6f8f}
+:root[data-farm-theme=night] #oleg-game-view .os-sun{opacity:0}
+:root[data-farm-theme=night] #oleg-game-view .os-moon,:root[data-farm-theme=night] #oleg-game-view .os-stars{opacity:1}
+:root[data-farm-theme=night] #oleg-game-view .os-hill-far{fill:#5f7c7c}
+:root[data-farm-theme=night] #oleg-game-view .os-hill-mid{fill:#4f6f63}
+:root[data-farm-theme=night] #oleg-game-view .os-ground{fill:#4c6b52}
+:root[data-farm-theme=night] #oleg-game-view .os-trodden{fill:#77805f}
+:root[data-farm-theme=night] #oleg-game-view .os-crown{fill:#4f6e58}
+:root[data-farm-theme=night] #oleg-game-view .os-crown-shade{fill:#41604c}
+:root[data-farm-theme=night] #oleg-game-view .os-crown-light{fill:#5d7d63}
+:root[data-farm-theme=night] #oleg-game-view .os-trunk{fill:#6f5a45}
+:root[data-farm-theme=night] #oleg-game-view .os-trunk-shade{fill:#5c4a39}
+:root[data-farm-theme=night] #oleg-game-view .os-wall-lit{fill:#b8ad91}
+:root[data-farm-theme=night] #oleg-game-view .os-wall-dark{fill:#958c76}
+:root[data-farm-theme=night] #oleg-game-view .os-roof{fill:#577064}
+:root[data-farm-theme=night] #oleg-game-view .os-roof-back{fill:#687f72}
+:root[data-farm-theme=night] #oleg-game-view .os-glass{fill:#f6d98a}
+:root[data-farm-theme=night] #oleg-game-view .os-night-tint{opacity:.16}
+:root[data-farm-theme=night] #oleg-game-view .os-oleg{filter:brightness(.94) sepia(.14) saturate(1.08)}
+:root[data-farm-theme=night] #oleg-game-view .os-stand>rect{filter:brightness(.86) saturate(.92)}
+:root[data-farm-theme=night] #oleg-game-view .os-lamp{fill:#ffe08a;filter:drop-shadow(0 0 6px #ffd56a)}
+@keyframes os-swing{0%{transform:rotate(0)}25%{transform:rotate(9deg)}60%{transform:rotate(-7deg)}100%{transform:rotate(0)}}
+@keyframes os-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}}
+@keyframes oleg-bell-ring{0%,100%{rotate:0deg}25%{rotate:8deg}75%{rotate:-8deg}}
+@media(max-width:900px){#oleg-game-view .oleg-layout{grid-template-columns:minmax(0,1fr)}#oleg-game-view .oleg-scene{max-height:58vw}#oleg-game-view .oleg-side{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#oleg-game-view .oleg-panel{order:0}#oleg-game-view .oleg-intro{order:1;align-self:start}}
+@media(max-width:600px){
+  #oleg-game-view .oleg-page{padding-top:16px;padding-bottom:calc(16px + var(--qw-safe-bottom))}
+  #oleg-game-view .oleg-masthead{gap:10px;margin-bottom:14px}
+  #oleg-game-view .oleg-brand-mark{width:44px;height:44px}
+  #oleg-game-view .oleg-mast-title{flex:1}
+  #oleg-game-view .oleg-masthead .oleg-eyebrow{display:none}
+  #oleg-game-view .oleg-layout{gap:13px}
+  #oleg-game-view .oleg-stage-card{padding:6px;border-radius:21px}
+  #oleg-game-view .oleg-scene{display:flex;flex-direction:column;aspect-ratio:auto;max-height:none;border-radius:16px}
+  #oleg-game-view .oleg-scene-art{height:auto;aspect-ratio:1100/690;object-fit:contain;flex:none}
+  #oleg-game-view .oleg-speech{position:static;order:-1;max-width:none;margin:8px 8px 0;padding:8px 12px;font-size:13px}
+  #oleg-game-view .oleg-speech::after{display:none}
+  #oleg-game-view .oleg-scene-caption{position:static;margin:6px 10px 10px;color:#577064;font-size:12px}
+  #oleg-game-view .oleg-bells{gap:8px;padding:10px 5px 3px}
+  #oleg-game-view .oleg-bell{min-height:58px;gap:5px;border-radius:12px}
+  #oleg-game-view .oleg-bell-shape{width:27px;height:29px}
+  #oleg-game-view .oleg-bell-shape::after{left:9px;width:6px;height:6px}
+  #oleg-game-view .oleg-bell-label{font-size:14px}
+  #oleg-game-view .oleg-side{grid-template-columns:1fr;gap:12px}
+  #oleg-game-view .oleg-card{padding:17px;border-radius:18px}
+  #oleg-game-view .oleg-panel{gap:10px}
+  #oleg-game-view .oleg-intro p{font-size:var(--qw-fs-small)}
+}
+@media(max-width:359px){
+  #oleg-game-view .oleg-page{padding-left:calc(12px + var(--qw-safe-left));padding-right:calc(12px + var(--qw-safe-right))}
+  #oleg-game-view .oleg-masthead{gap:8px}
+  #oleg-game-view .oleg-brand-mark{width:40px;height:40px}
+  #oleg-game-view .oleg-masthead h1{font-size:22px}
+  #oleg-game-view .oleg-masthead .oleg-eyebrow{display:none}
+  #oleg-game-view .oleg-bell{flex-direction:column;gap:1px;min-height:62px}
+  #oleg-game-view .oleg-bell-shape{width:25px;height:26px}
+}
+@media(prefers-reduced-motion:reduce){
+  #oleg-game-view *,#oleg-game-view *::before,#oleg-game-view *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+  #oleg-game-view .oleg-bell.oleg-lit{outline:3px solid #d9aa4e}
+}

@@ -82,7 +82,7 @@ test('command receipt suppresses the ordinary toast only when payment is confirm
  const S={me:{id:'a'},pending:{actor:'a',kind:'accept_neighbor',data:{},target:'b',command_id:'one'},busy:false};
  const context={S,clearTimeout(){},pendingRetryTimer:null,rateRecoveryAttempt:0,
   connection(){},document:{body:{classList:{add(){},remove(){}}}},API:'/api/farm/v1',
-  request:async()=>responses.shift(),rememberMachineCommand(){},savePending(){},toast:text=>notices.push(text),
+  request:async()=>responses.shift(),rememberMachineCommand(){},savePending(){},toast:text=>notices.push(text),localizeWagerNotice:text=>text,gf:(m,f,n)=>n,
   refresh:async()=>true,updateRepeat(){},scheduleRateRecovery(){},schedulePendingRetry(){}};
  vm.createContext(context);vm.runInContext(snippet+'\nthis.sendPending=sendPending',context);
  assert.equal(await context.sendPending(),true);

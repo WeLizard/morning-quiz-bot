@@ -216,6 +216,7 @@ SCHEMAS={
  'list':{'item','qty','unit_price'},'buy':{'listing'},'cancel_listing':{'listing'},
  'pay_upkeep':set(),'fund_contribute':{'coins','items'},
 }
+OPTIONAL_KEYS={'forget_recipe':{'recipe'}}  # forget one remembered recipe; without it the most recent one
 SOCIAL={'request_neighbor','accept_neighbor','claim_neighbor_reward','remove_neighbor','block','unblock','help','prank','gift','buy'}
 
 
@@ -233,7 +234,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         economy.bill(me,now)       # r9 stage 14: one upkeep bill per active Moscow day, after the command
         return text
     need(kind in SCHEMAS, 'unknown_command', 'Неизвестное действие.', 422)
-    need(isinstance(data,dict) and set(data)==SCHEMAS[kind], 'invalid_command', 'Некорректные параметры действия.',422)
+    need(isinstance(data,dict) and SCHEMAS[kind]<=set(data)<=SCHEMAS[kind]|OPTIONAL_KEYS.get(kind,set()), 'invalid_command', 'Некорректные параметры действия.',422)
     need(kind in SOCIAL or me['id']==other['id'], 'not_owner', 'Это не твоя ферма.',403)
     if kind in {'help','prank','gift','buy'}:
         social_allowed(me, other, {'help':'allow_help','prank':'allow_pranks','gift':'allow_gifts','buy':'allow_trade'}[kind])
@@ -269,26 +270,30 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(len(obj['jobs']) < queue_slots(obj.get('level')),'queue_full','Очередь заполнена. Забери готовые товары.')
         inventory(me,r['inputs'],-1)
         obj['jobs'].append(expansion.make_job(obj,r,now,speed,command_id,me))
-        obj['last_recipe']=r['id']  # remembered for the artisans and «повторить партии»
+        expansion.remember_recipe(obj,r['id'])  # remembered set for the artisans and «повторить партии»
         obj['revision']+=1;text='Производство поставлено в очередь.'
     elif kind=='forget_recipe':
         from . import expansion as ex
         need(obj['type'] in ex.WORKSHOP_TYPES,'wrong_object','Забыть рецепт можно только в мастерской.')
-        need(bool(obj.get('last_recipe')),'no_recipe','В этой мастерской нет запомненного рецепта.')
-        rid=obj.pop('last_recipe');obj['revision']+=1
-        text=f'Рецепт «{RECIPES[rid]["name"] if rid in RECIPES else rid}» забыт: помощники будут только забирать готовое.'
+        want=data.get('recipe')
+        if 'recipe' in data:
+            need(isinstance(want,str) and want in RECIPES and RECIPES[want]['building']==obj['type'],'wrong_recipe','Такой рецепт в этой мастерской не готовят.',422)
+            need(want in ex.recipe_memory(obj),'no_recipe','Этот рецепт не запомнен в мастерской.')
+        else:
+            need(bool(ex.recipe_memory(obj)),'no_recipe','В этой мастерской нет запомненного рецепта.')
+        rid=ex.forget_recipe_id(obj,want);obj['revision']+=1
+        text=f'Рецепт «{RECIPES[rid]["name"] if rid in RECIPES else rid}» забыт: помощники его больше не повторят.'
     elif kind in {'cancel_job','cancel_job_and_forget_recipe'}:
         from . import undo
         if kind=='cancel_job_and_forget_recipe':
             need(obj['type'] in expansion.WORKSHOP_TYPES,'wrong_object','Забыть рецепт можно только в мастерской.')
         job=find(obj.get('jobs',[]),data['job'])
         if kind=='cancel_job_and_forget_recipe':
-            need(bool(obj.get('last_recipe')),'no_recipe','В этой мастерской нет запомненного рецепта.')
-            need(obj['last_recipe']==job.get('recipe'),'recipe_changed','Запомненный рецепт изменился. Обнови мастерскую перед отменой.')
+            need(job.get('recipe') in expansion.recipe_memory(obj),'no_recipe','Рецепт этой партии не запомнен в мастерской.')
         text=undo.cancel_job(me,obj,job,now)
         if kind=='cancel_job_and_forget_recipe':
-            obj.pop('last_recipe')
-            text+=' Рецепт забыт: помощники будут только забирать готовое.'
+            expansion.forget_recipe_id(obj,job['recipe'])
+            text+=' Рецепт забыт: помощники его больше не повторят.'
     elif kind=='collect':
         job=find(obj.get('jobs',[]),data['job'])
         need(job['ready_at']<=now,'not_ready','Продукция ещё не готова.')
@@ -482,9 +487,10 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
 
 def validate_state(farm):
     from .expansion import validate_expansion
-    from . import minigames
+    from . import minigames, oleg
     validate_expansion(farm)
     minigames.validate(farm)
+    oleg.validate(farm)
     progression.validate(farm)
     economy.validate(farm)
     from . import village_quests
@@ -510,15 +516,18 @@ def project(farm, visitor, now):
         result=deepcopy(farm)
         from . import village_quests
         result['village_errands']=village_quests.public(farm,now)
-        from . import minigames
+        from . import minigames, oleg, expansion as _ex
         result['minigames']=minigames.public(farm,now)
+        result['oleg_game']=oleg.public(farm,now)
         result['home_projects']=projects.owner_state(farm)
+        for o in result['objects']:
+            if o['type'] in _ex.WORKSHOP_TYPES:o.setdefault('recipes_memory',[])
     else:
         result={k:deepcopy(farm[k]) for k in ['id','name','size','revision','objects']}
         # Only visual progress and ready flags, never production contents or economy.
         for obj in result['objects']:
             obj['jobs']=[{'ready_at':j['ready_at']} for j in obj.get('jobs',[])]
-            obj.pop('last_recipe',None)
+            for k in ('last_recipe','recipes_memory','recipe_cursor'):obj.pop(k,None)
             if obj.get('animal_job'):obj['animal_job']={'ready_at':obj['animal_job']['ready_at']}
         result['equipment']={k:{'active':bool(v.get('shift') and v['shift']['status']=='working'),'last_run_at':v.get('last_run_at',0)} for k,v in farm.get('equipment',{}).items()}
         result['helpers']={k:{'active':bool(v.get('shift') and v['shift']['status']=='working')} for k,v in farm.get('helpers',{}).items()}

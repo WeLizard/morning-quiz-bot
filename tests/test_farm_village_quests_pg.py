@@ -49,14 +49,23 @@ def test_pg_village_errands_and_theft(farm_pg_url):
             at = env.now[0]
             initial = persisted['coins']
             assert (await presence(owner, 'enter', session)).json()['stolen'] == 0
+            entered = await raw_farm(env, owner)
+            revision = entered['revision']
+            assert entered['village_errands']['presence']['last_at'] == at
             for step in (10, 20, 30, 40):
                 env.now[0] = at + step
                 assert (await presence(owner, 'pulse', session)).json()['stolen'] == 0
+            heartbeats = await raw_farm(env, owner)
+            assert heartbeats['revision'] == revision, 'a presence heartbeat must not touch the client-visible revision'
+            assert heartbeats['village_errands']['presence']['last_at'] == at + 40
             env.now[0] = at + 50
             stolen = await presence(owner, 'pulse', session)
             assert stolen.status_code == 200, stolen.text
             assert stolen.json()['stolen'] == 2
-            assert (await raw_farm(env, owner))['coins'] == initial - 2
+            persisted_after_theft = await raw_farm(env, owner)
+            assert persisted_after_theft['coins'] == initial - 2
+            assert persisted_after_theft['revision'] == revision + 1
+            assert persisted_after_theft['village_errands']['presence']['last_at'] == at + 50
             assert (await presence(owner, 'pulse', session)).json()['stolen'] == 0
             assert (await raw_farm(env, owner))['coins'] == initial - 2
             async with env.db.transaction() as db:

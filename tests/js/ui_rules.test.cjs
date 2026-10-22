@@ -12,7 +12,7 @@ const exists = file => fs.existsSync(path.join(root, file));
 
 const PAGES = ['web/mini_client/index.html', 'qw_farm/static/index.html', 'minigames/alchemia-1.0/shell.html'];
 const STYLES = ['web/shell/qw-tokens.css', 'web/shell/qw-shell.css', 'web/mini_client/styles.css',
-    'qw_farm/static/style.css', 'qw_farm/static/dasha-game.css', 'minigames/alchemia-1.0/style.css'];
+    'qw_farm/static/style.css', 'qw_farm/static/dasha-game.css', 'qw_farm/static/oleg-game.css', 'minigames/alchemia-1.0/style.css'];
 const SCRIPTS = ['web/mini_client/app.js', 'web/mini_client/play-ui.js', 'qw_farm/static/app.js'];
 
 test('every page loads the shared tokens and shell', () => {

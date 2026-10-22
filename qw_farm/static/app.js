@@ -1,5 +1,6 @@
 import './address.js';
-import {mountDashaGame,dashaReasonText} from './dasha-game.js';
+import {mountDashaGame,dashaReasonText,localizeWagerNotice} from './dasha-game.js';
+import {mountOlegGame} from './oleg-game.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame,yieldQty,growthPermille} from './tractor_game.js';
@@ -60,21 +61,48 @@ const VILLAGE_VOICES={
 };
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
-let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false;
+let villageResident=null,villageSheet=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false,olegGame=null,olegGameOpen=false;
 let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
 const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Олег':[49.0,32.0]};
 // The world is 2400x1800 art units (village.svg, painted with the farm's own building code). Positions above are percentages of the world;
 // each resident stands at the door of their own house. VILLAGE_C is the back corner of the plaza.
 const VILLAGE_C=[1200,716],VILLAGE_START=[42,77.3],VILLAGE_GATE=[50,83.1],VILLAGE_HALL=[50.0,51.1];
-// Bounds of the drawn "На ферму" board in village.svg, as percentages of its 2400×1800 viewBox.
-const VILLAGE_GATE_BOARD=[50.7,77.95,4.9,6.4];
+// The «Ферма» gate: the arch (posts, beam, chains, lantern) is painted into village.svg and the board is this button, both by
+// scripts/art/village (gate.js, farm sign style: FarmScene.signBoard in the arch plane, recorded as SVG). Generated markup, do not
+// edit by hand: rebuild with build_village.py and copy out/gate_board.svg and manifest.gate_board.board_box. Day and night boards
+// (CSS shows one); only the board's own shape (.vg-hit, 4 units of margin) takes taps. Box: centre x, y, width, height in % of the world.
+const VILLAGE_GATE_BOARD=[50.021,80.167,3.625,4.333];
+const VILLAGE_GATE_SIGN='<svg class="vg-sign" viewBox="1157 1404 87 78" aria-hidden="true" focusable="false"><g class="vg-day"><defs><linearGradient id="vgd0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="26"><stop offset="0" stop-color="#f1dfb2"/><stop offset="1" stop-color="#dcc08c"/></linearGradient></defs><path d="M3 3L75 3L78 7L78 25L75 29L3 29L0 25L0 7Z" fill="#a58559" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="url(#vgd0)" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="none" stroke="#8d6c45" stroke-width="1.5" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 3.5L73 3.5" fill="none" stroke="#fff3cf" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 22.5L73 22.5" fill="none" stroke="#bd9a64" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 5A1.1 1.1 0 1 0 5.6 5A1.1 1.1 0 1 0 3.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 5A1.1 1.1 0 1 0 74.6 5A1.1 1.1 0 1 0 72.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 21A1.1 1.1 0 1 0 5.6 21A1.1 1.1 0 1 0 3.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 21A1.1 1.1 0 1 0 74.6 21A1.1 1.1 0 1 0 72.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><text x="33.6" y="19.56" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#fff0c6" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><text x="33" y="18.76" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#4d3c27" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><path d="M64 9L72 17" fill="none" stroke="#4d3c27" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M66.8 17L72 17L72 11.8" fill="none" stroke="#4d3c27" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/></g><g class="vg-night"><defs><linearGradient id="vgn0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="26"><stop offset="0" stop-color="#dcc48f"/><stop offset="1" stop-color="#c3a676"/></linearGradient></defs><path d="M3 3L75 3L78 7L78 25L75 29L3 29L0 25L0 7Z" fill="#7d6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="url(#vgn0)" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3 0L75 0L78 4L78 22L75 26L3 26L0 22L0 4Z" fill="none" stroke="#8d6c45" stroke-width="1.5" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 3.5L73 3.5" fill="none" stroke="#fff3cf" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M5 22.5L73 22.5" fill="none" stroke="#bd9a64" stroke-width="1" stroke-linecap="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 5A1.1 1.1 0 1 0 5.6 5A1.1 1.1 0 1 0 3.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 5A1.1 1.1 0 1 0 74.6 5A1.1 1.1 0 1 0 72.4 5Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M3.4 21A1.1 1.1 0 1 0 5.6 21A1.1 1.1 0 1 0 3.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M72.4 21A1.1 1.1 0 1 0 74.6 21A1.1 1.1 0 1 0 72.4 21Z" fill="#7a6240" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><text x="33.6" y="19.56" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#fff0c6" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><text x="33" y="18.76" font-weight="700" font-size="16" font-family="system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif" text-anchor="middle" textLength="54" lengthAdjust="spacingAndGlyphs" fill="#2f2617" transform="matrix(1 -0.5 0 1 1161.15 1449.32)">Ферма</text><path d="M64 9L72 17" fill="none" stroke="#2f2617" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/><path d="M66.8 17L72 17L72 11.8" fill="none" stroke="#2f2617" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1 -0.5 0 1 1161.15 1449.32)"/></g><path class="vg-hit" d="M1157.15 1447.32L1243.15 1404.32L1243.15 1438.32L1157.15 1481.32Z" fill="transparent"/></svg>';
+// River-mill water wheel (overshot): it stands in the plane of the mill's long wall (iso 1:-0.5, the axle painted in village.svg runs
+// into that wall) with its hub on the axle end (731.7, 555) and its lower paddles in the race. The flume ends at the wheel's
+// top on the tower side; its water arcs over the top and lands on the far paddles, so the top turns away from the flume
+// (counter-clockwise in the wall plane). Flat shapes in the village palette; only the two paddle groups rotate (CSS, reduced-motion aware).
+const VILLAGE_WHEEL_SVG=(()=>{
+ // The wheel is 9 units wide along the axle: five synchronised layers (back rim, three paddle slices, front face) read as boards
+ // spanning the width. Everything below the waterline (local y > 21) is clipped, so the race painted in village.svg shows through.
+ const paddles=(fill,edge)=>Array.from({length:8},(_,i)=>`<rect x="-3" y="-30.5" width="6" height="9.5" rx="1" transform="rotate(${i*45})" fill="${fill}"${edge?` stroke="${edge}" stroke-width="1"`:''}/>`).join('');
+ const layer=(dx,body)=>`<g transform="matrix(.894,-.447,0,1,${dx},${dx*.48})" clip-path="url(#vw-race)"><g class="vw-rot">${body}</g></g>`;
+ return '<svg class="vfx-wheel-art" viewBox="-40 -50 80 95" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+ +'<defs><clipPath id="vw-race" clipPathUnits="userSpaceOnUse"><rect x="-40" y="-40" width="80" height="61"/></clipPath>'
+ +'<filter id="vw-night" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".34 0 0 0 .075 0 .34 0 0 .122 0 0 .34 0 .259 0 0 0 1 0"/></filter></defs><g class="vw-all">'
+ +layer(-8,`${paddles('#6f4f32','#4f3722')}<circle r="24" fill="none" stroke="#5f432a" stroke-width="4"/>`)
+ +layer(-6,paddles('#8a6340'))+layer(-4,paddles('#966b44'))+layer(-2,paddles('#a3764a'))
+ +layer(0,`<circle r="22" fill="#6a4e34"/>${paddles('#c99c69','#6e4c30')}<circle r="24" fill="none" stroke="#a77a4c" stroke-width="4"/><circle r="24" fill="none" stroke="#6e4c30" stroke-width=".8"/>`
+  +'<path d="M-20.5 0H20.5M0 -20.5V20.5M-14.5 -14.5L14.5 14.5M-14.5 14.5L14.5 -14.5" stroke="#8b6440" stroke-width="2.6" stroke-linecap="round"/>')
+ +'<g transform="matrix(.894,-.447,0,1,0,0)"><circle r="5" fill="#4f3824"/><circle cx="-1.2" cy="-1.3" r="1.8" fill="#7a5a3c"/>'
+ // foam where the paddles enter the race
+ +'<path d="M-19 21.2H-9M-4 21.2H6M11 21.2H18" stroke="#e4f2ef" stroke-width="1.5" stroke-linecap="round" opacity=".9"/>'
+ // flume water: leaves the lip on the tower side, arcs over the top and falls on the far paddles
+ +'<path d="M13.6 -28.2C9 -33.5 0 -34 -5.5 -28.5" fill="none" stroke="#bfe0de" stroke-width="3" stroke-linecap="round" opacity=".9"/><path d="M12 -29.6C8 -32.4 1 -32.8 -3.6 -29.8" fill="none" stroke="#f1f9f7" stroke-width=".9" stroke-linecap="round"/>'
+ +'<circle cx="-8.4" cy="-24.6" r="1.1" fill="#d7eae6"/><circle cx="-6.6" cy="-21.4" r=".85" fill="#d7eae6"/></g></g></svg>';
+})();
 let villagePos=[...VILLAGE_START],villageWalkToken=0,villageDragged=false,villageMini=null;
 // Living village: idle thought, stroll offset in px (x, y) per resident. Motion is pure CSS, no timers.
 const VILLAGE_LIFE={'Филиныч':['📚',52,26],'Агата':['🍞',-50,-25],'Почтальон Ёж':['✉️',52,-26],'Механик Крот':['🔧',-50,-25],'Кошка Кая':['🐟',-48,-10],'Кошка Соня':['💤',44,22],'Суслик Игорь':['🌰',-44,22],'Неведома Зверушка':['❓',48,24],'Медведь Пух':['🥤',46,-22],'Лиса Даша':['🪙',-40,18],'Петух Олег':['🌾',36,-12]};
 // Chimney tops (smoke puffs) exported from the same render as village.svg.
 const VILLAGE_SMOKE=[[649,454],[904,592],[1032,636],[1760,704],[723,757],[1582,751],[1400,862],[1732,851],[590,952],[1954,995],[1573,1051],[747,1106],[2072,1048],[434,1224],[1134,1274],[803,1328],[1881,281]];
 // Night lights in village.svg coordinates (2400x1800): a/b = left/right wall windows, r = round window, c = clock, l = lamp head, p = lamp light pool.
-const VILLAGE_LIGHTS=[[763,1392,'r'],[1858,339,'r'],[1921,334,'r'],[617,562,'a'],[744,530,'b'],[1292,589,'a'],[837,648,'a'],[944,646,'b'],[950,712,'a'],[974,724,'a'],[1082,705,'b'],[1019,736,'b'],[1397,718,'b'],[1767,748,'b'],[1917,741,'b'],[1098,788,'a'],[1098,766,'a'],[1126,801,'a'],[1126,780,'a'],[1302,788,'b'],[1302,766,'b'],[1274,780,'b'],[781,827,'a'],[1525,842,'a'],[1558,858,'a'],[1664,834,'b'],[1168,848,'a'],[1232,848,'b'],[1168,829,'a'],[2028,863,'a'],[1739,903,'b'],[729,932,'a'],[780,939,'b'],[1862,1017,'b'],[514,1024,'a'],[538,1036,'a'],[636,1019,'b'],[1398,1031,'a'],[1436,1027,'b'],[984,1049,'b'],[1986,1060,'b'],[1497,1123,'a'],[1521,1135,'a'],[1619,1118,'b'],[1564,1145,'b'],[1060,1226,'b'],[583,1246,'b'],[474,1297,'b'],[2002,1310,'b'],[1959,1330,'b'],[1521,1343,'a'],[1592,1330,'b'],[1058,1346,'a'],[1177,1338,'b'],[1121,1366,'b'],[1168,805,'c'],[1232,805,'c'],[512,492,'l'],[512,534,'p'],[1888,492,'l'],[1888,534,'p'],[1712,580,'l'],[1712,622,'p'],[789,631,'l'],[789,673,'p'],[863,668,'l'],[863,710,'p'],[1537,668,'l'],[1537,710,'p'],[800,734,'l'],[800,776,'p'],[1024,748,'l'],[1024,790,'p'],[1376,748,'l'],[1376,790,'p'],[856,762,'l'],[856,804,'p'],[1544,762,'l'],[1544,804,'p'],[884,889,'l'],[884,931,'p'],[1516,889,'l'],[1516,931,'p'],[694,983,'l'],[694,1025,'p'],[1572,1015,'l'],[1572,1057,'p'],[575,1043,'l'],[575,1085,'p'],[1200,1046,'l'],[1200,1088,'p'],[1846,1054,'l'],[1846,1096,'p'],[2021,1142,'l'],[2021,1184,'p'],[1010,1142,'l'],[1010,1184,'p'],[744,1169,'l'],[744,1211,'p'],[442,1208,'l'],[442,1250,'p'],[2197,1229,'l'],[2197,1271,'p'],[933,1264,'l'],[933,1306,'p'],[1144,1370,'l'],[1144,1412,'p'],[1390,1492,'l'],[1390,1534,'p'],[1467,1629,'l'],[1467,1671,'p']];
+const VILLAGE_LIGHTS=[[1256,1405,'l'],[763,1392,'r'],[1858,339,'r'],[1921,334,'r'],[617,562,'a'],[744,530,'b'],[1292,589,'a'],[837,648,'a'],[944,646,'b'],[950,712,'a'],[974,724,'a'],[1082,705,'b'],[1019,736,'b'],[1397,718,'b'],[1767,748,'b'],[1917,741,'b'],[1098,788,'a'],[1098,766,'a'],[1126,801,'a'],[1126,780,'a'],[1302,788,'b'],[1302,766,'b'],[1274,780,'b'],[781,827,'a'],[1525,842,'a'],[1558,858,'a'],[1664,834,'b'],[1168,848,'a'],[1232,848,'b'],[1168,829,'a'],[2028,863,'a'],[1739,903,'b'],[729,932,'a'],[780,939,'b'],[1862,1017,'b'],[514,1024,'a'],[538,1036,'a'],[636,1019,'b'],[1398,1031,'a'],[1436,1027,'b'],[984,1049,'b'],[1986,1060,'b'],[1497,1123,'a'],[1521,1135,'a'],[1619,1118,'b'],[1564,1145,'b'],[1060,1226,'b'],[583,1246,'b'],[474,1297,'b'],[2002,1310,'b'],[1959,1330,'b'],[1521,1343,'a'],[1592,1330,'b'],[1058,1346,'a'],[1177,1338,'b'],[1121,1366,'b'],[1168,805,'c'],[1232,805,'c'],[512,492,'l'],[512,534,'p'],[1888,492,'l'],[1888,534,'p'],[1712,580,'l'],[1712,622,'p'],[789,631,'l'],[789,673,'p'],[863,668,'l'],[863,710,'p'],[1537,668,'l'],[1537,710,'p'],[800,734,'l'],[800,776,'p'],[1024,748,'l'],[1024,790,'p'],[1376,748,'l'],[1376,790,'p'],[856,762,'l'],[856,804,'p'],[1544,762,'l'],[1544,804,'p'],[884,889,'l'],[884,931,'p'],[1516,889,'l'],[1516,931,'p'],[694,983,'l'],[694,1025,'p'],[1572,1015,'l'],[1572,1057,'p'],[575,1043,'l'],[575,1085,'p'],[1200,1046,'l'],[1200,1088,'p'],[1846,1054,'l'],[1846,1096,'p'],[2021,1142,'l'],[2021,1184,'p'],[1010,1142,'l'],[1010,1184,'p'],[744,1169,'l'],[744,1211,'p'],[442,1208,'l'],[442,1250,'p'],[2197,1229,'l'],[2197,1271,'p'],[933,1264,'l'],[933,1306,'p'],[1144,1370,'l'],[1144,1412,'p'],[1390,1492,'l'],[1390,1534,'p'],[1467,1629,'l'],[1467,1671,'p']];
 const VILLAGE_FLIES=[[1376,1232],[1179,1246],[442,829],[1053,594],[1741,1359],[905,1215]];
 // Construction sites of future village buildings (art only, no game logic yet).
 const VILLAGE_SITES=[['Трактир',28.7,80.4],['Оранжерея',43.4,26.3],['Ярмарка',71.8,84.2]];
@@ -104,7 +132,7 @@ const objName=o=>o.type==='plot'?'Грядка':o.type==='house'?'Дом Фил�
 const objIcon=o=>o.type==='plot'?(o.crop?.id||'wheat'):o.type==='house'?'home':o.type==='barn'?'shop':S.catalog.animals[o.animal]?.outputs?Object.keys(S.catalog.animals[o.animal].outputs)[0]:'workshop';
 const stock=(id)=>S.me?.inventory[id]||0;
 const enough=needs=>Object.entries(needs).every(([k,q])=>stock(k)>=q);
-const timeText=seconds=>{seconds=Math.max(0,Math.ceil(seconds));if(seconds<60)return `${seconds} с`;if(seconds<3600)return `${Math.ceil(seconds/60)} мин`;return `${Math.floor(seconds/3600)} ч ${Math.ceil(seconds%3600/60)} мин`;};
+const timeText=seconds=>{seconds=Math.max(0,Math.ceil(seconds));if(seconds<60)return `${seconds} с`;const m=Math.ceil(seconds/60);if(m<60)return `${m} мин`;return m%60?`${Math.floor(m/60)} ч ${m%60} мин`:`${m/60} ч`;};
 const seedTimeText=seconds=>timeText(seconds).replaceAll(' мин','м').replaceAll(' ч','ч').replaceAll(' с','с');
 const duration=n=>timeText(Math.max(1,Math.ceil(n/S.speed)));
 function timer(t){let n=el('span');n.dataset.until=t;updateTime(n);return n;}
@@ -295,7 +323,7 @@ async function refresh({render=true}={}){
  if(id&&id!==identity){try{farm=(await request(API+'/farms/'+id)).farm;}catch(e){if(!current())return false;if([403,404].includes(e.status))lostAccess=true;else throw e;}}
  if(!current())return false;
  const beforeScene=sceneSnapshot(),beforeHUD=hudSnapshot(),beforeSeeds=seedsSnapshot();
- S.form=me.address_form||'n';S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();
+ S.form=me.address_form||'n';S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();
  queueNeighborGifts(S.me);
  if(lostAccess){farmViewEpoch++;S.tab='neighbors';toast(gf('Хозяин закрыл доступ. Ты вернулся на свою ферму.','Хозяин закрыл доступ. Ты вернулась на свою ферму.','Доступ закрыт владельцем. Открыта твоя ферма.'));}
  if(beforeScene!==sceneSnapshot())scene.set(S.farm,S.catalog);
@@ -327,9 +355,9 @@ function schedulePendingRetry(e){
 async function sendPending(){
  if(!S.me||!S.pending||S.pending.actor!==S.me.id||S.busy)return false;clearTimeout(pendingRetryTimer);pendingRetryTimer=null;S.busy=true;connection('Сохраняем действие…');document.body.classList.add('is-saving');
  let payload=S.pending,rejectedWagerRoundId=null;
- try{let r=await request(API+'/commands',{method:'POST',data:payload});rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;if(!S.me)return true;if(!r.neighbor_reward_paid)toast(r.notice);await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});return true;}
+ try{let r=await request(API+'/commands',{method:'POST',data:payload});rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;if(!S.me)return true;if(!r.neighbor_reward_paid)toast(localizeWagerNotice(r.notice,gf));await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});return true;}
  catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
- finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
+ finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();olegGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
 }
 // After a real 429 the game recovers by itself: wait out Retry-After, then replay the unconfirmed command with the SAME id
 // (the server is idempotent) or just refresh the screen. No reload is needed.
@@ -361,14 +389,14 @@ function showLogin(message=''){
  if(S.pending)savePending();
  clearTimeout(pendingRetryTimer);pendingRetryTimer=null;pendingRetryAttempt=0;
  clearTimeout(rateRecoveryTimer);rateRecoveryTimer=null;rateRecoveryAttempt=0;
- if(dashaGameOpen)closeDashaGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
+ if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
  S.fieldGame?.close();cancelPlacement();if($('dialog').open)$('dialog').close();closePanel();
  toastList.length=0;renderToasts();connection(message||'Войди через QuizzyWizzy',true);
  document.body.classList.add('farm-login');$('game').hidden=true;$('login').hidden=false;const parent=$('login');parent.replaceChildren();let c=el('div',null,'login-card'),img=el('img',null,'login-hero');img.src='/app/farm-card-v2.webp';img.alt='Филиныч с урожаем на своей ферме';c.append(img);
  const ended=message===SESSION_ENDED||message==='Сессия сменилась. Открой ферму заново.';
  if(ended){c.append(el('div','QUIZZYWIZZY · ПРОГРЕСС СОХРАНЁН','eyebrow'),el('h1','Вернуться на ферму'));note('Войди в QuizzyWizzy и снова открой ферму. Урожай, постройки и выполненная работа сохранены.',c);const link=quizzyLoginLink();link.classList.add('login-return-link');link.setAttribute('aria-label','Войти через QuizzyWizzy и вернуться на ферму');c.append(link);
  }else{c.append(el('div','QUIZZYWIZZY · СВОЁ МЕСТО ПОД СОЛНЦЕМ','eyebrow'),el('h1','Весёлый фермер'));note('Сажай, строй, пеки хлеб. Навещай соседей и не доверяй слишком серьёзным гусям.',c);if(message)note(message,c);c.append(quizzyLoginLink());}
- if(S.config?.demo){note('Это отдельная локальная альфа. Сохранения находятся на запущенном сервере, а не в QuizzyWizzy.',c);let form=el('form'),[w,input]=field('Имя на ферме');input.minLength=2;input.maxLength=20;input.required=true;input.autocomplete='nickname';input.placeholder='Например, Илья';let b=button('Открыть свою ферму',()=>{},'primary wide');b.type='submit';form.append(w,b);form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{let r=await request('/api/farm-demo/session',{method:'POST',data:{name:input.value}});await enter();showRecovery(r.recovery);}catch(err){toast(err.message,true);}finally{b.disabled=false;}};c.append(form);
+ if(S.config?.demo){note('Это отдельная локальная альфа. Сохранения находятся на запущенном сервере, а не в QuizzyWizzy.',c);let form=el('form'),[w,input]=field('Имя на ферме');input.minLength=2;input.maxLength=20;input.required=true;input.autocomplete='nickname';input.placeholder='Например, Мария';let b=button('Открыть свою ферму',()=>{},'primary wide');b.type='submit';form.append(w,b);form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{let r=await request('/api/farm-demo/session',{method:'POST',data:{name:input.value}});await enter();showRecovery(r.recovery);}catch(err){toast(err.message,true);}finally{b.disabled=false;}};c.append(form);
  let details=el('details'),summary=el('summary','Уже есть ферма? Войти по коду'),rf=el('form'),[rw,ri]=field('Код восстановления','password');ri.required=true;ri.autocomplete='off';let rb=button('Вернуться на ферму',()=>{},'secondary wide');rb.type='submit';rf.append(rw,rb);rf.onsubmit=async e=>{e.preventDefault();rb.disabled=true;try{await request('/api/farm-demo/session',{method:'POST',data:{recovery:ri.value.trim()}});ri.value='';await enter();}catch(err){toast(err.message,true);}finally{rb.disabled=false;}};details.append(summary,rf);c.append(details);
  }else{note(mode==='telegram'?'В Telegram закрой игру и открой её заново: так Telegram передаст свежие данные входа. Или перейди на главную QuizzyWizzy и войди в свой аккаунт.':'Войди в свой аккаунт на главной QuizzyWizzy и снова открой ферму.',c);}
  if(rateSeconds('read')||rateSeconds('write')){let status=el('p',null,'note');status.id='login-rate';status.setAttribute('role','status');let retry=button('Повторить',safe(retryConnection),'secondary wide');retry.id='login-retry';c.append(status,retry);}
@@ -392,7 +420,7 @@ function renderRail(){
  syncNav();
  if(mobile)requestAnimationFrame(()=>{const active=rail.querySelector('.active');if(active)rail.scrollTo({left:Math.max(0,active.offsetLeft-(rail.clientWidth-active.offsetWidth)/2),behavior:'smooth'});});
 }
-function selectTab(id){if(dashaGameOpen)closeDashaGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
+function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
 function exitVillage(){villageSheet=null;selectTab('orders');closePanel();}
 function returnToFarm(){if(villageVisible())exitVillage();else backHome();}
 function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkToken++;syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
@@ -717,10 +745,10 @@ function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){
   let animal=Object.values(S.catalog.animals).find(a=>a.building===o.type);
   if(animal){let c=card(animal.name,'Кормление запускает одну порцию. Животные не голодают и не умирают.',Object.keys(animal.outputs)[0]);if(!o.animal)c.append(button(`Поселить за ${animal.cost} монет`,()=>command('buy_animal',{object:o.id,animal:animal.id}),'primary wide',S.me.coins<animal.cost));else if(o.animal_job){c.append(el('p','Продукция будет готова через:','note'),timer(o.animal_job.ready_at),goods(o.animal_job.outputs,false),button('Забрать продукцию',()=>command('collect_animal',{object:o.id}),'primary wide',o.animal_job.ready_at>now()));}else{let bt=batchOf(animal,o);c.append(goods(bt.inputs),el('p',`Одна порция: ${duration(bt.seconds)} → ${Object.entries(bt.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ')}`,'note'),button('Накормить',()=>command('feed',{object:o.id}),'primary wide',!enough(bt.inputs)));}p.append(c);upgradeCard(o,p);}
   const recipes=Object.values(S.catalog.recipes).filter(r=>r.building===o.type);
-  if(recipes.length){note(`Мастерская ${lvlOf(o)} уровня · ${o.jobs.length} / ${slotsOf(o)} мест занято`,p);if(o.last_recipe&&S.catalog.recipes[o.last_recipe]){note(`Запомнен рецепт «${S.catalog.recipes[o.last_recipe].name}»: помощник-мастер и «Повторить партии» ставят его заново. Ручная постановка в очередь запоминает рецепт снова.`,p);p.append(button('Забыть рецепт',()=>command('forget_recipe',{object:o.id}),'light small forget-recipe'));}
+  if(recipes.length){note(`Мастерская ${lvlOf(o)} уровня · ${o.jobs.length} / ${slotsOf(o)} мест занято`,p);{const mem=recipeMemory(o);if(mem.length){note(`Мастер повторяет: ${mem.map(id=>S.catalog.recipes[id].name).join(', ')}. Помощник-мастер и «Повторить партии» ставят их по очереди. Ручная постановка в очередь запоминает рецепт снова.`,p);const box=el('div',null,'forget-recipes qw-btn-stack');for(const id of mem){const b=button(`Забыть: ${S.catalog.recipes[id].name}`,()=>command('forget_recipe',{object:o.id,recipe:id}),'light small forget-recipe');b.dataset.recipe=id;box.append(b);}p.append(box);}}
    const readyCount=o.jobs.filter(j=>j.ready_at<=now()).length;
    if(readyCount>=2)p.append(button(`Забрать всё готовое · ${readyCount}`,()=>command('collect_building',{object:o.id}),'primary wide'));
-   for(let j of o.jobs){let row=el('div',null,'queue-job'),ready=j.ready_at<=now();row.append(button(ready?'Забрать':'Отменить',()=>ready?command('collect',{object:o.id,job:j.id}):(j.starts_at>now()&&o.last_recipe!==j.recipe)?command('cancel_job',{object:o.id,job:j.id}):confirmCancelJob(o,j),ready?'primary small':'light small'),el('strong',S.catalog.recipes[j.recipe]?.name||'Продукция'));let s=el('small');s.append(j.starts_at>now()?el('span','В очереди · '):el('span',''),timer(j.ready_at));row.append(s);p.append(row);}
+   for(let j of o.jobs){let row=el('div',null,'queue-job'),ready=j.ready_at<=now();row.append(button(ready?'Забрать':'Отменить',()=>ready?command('collect',{object:o.id,job:j.id}):(j.starts_at>now()&&!recipeMemory(o).includes(j.recipe))?command('cancel_job',{object:o.id,job:j.id}):confirmCancelJob(o,j),ready?'primary small':'light small'),el('strong',S.catalog.recipes[j.recipe]?.name||'Продукция'));let s=el('small');s.append(j.starts_at>now()?el('span','В очереди · '):el('span',''),timer(j.ready_at));row.append(s);p.append(row);}
    for(let r of recipes){let c=card(r.name,null,Object.keys(r.outputs)[0]);c.append(goods(r.inputs));let out=Object.entries(r.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');c.append(el('p',`→ ${out} · ${duration(r.seconds*speedOf(o))}`,'recipe-time'));c.append(button(r.level>S.me.level?`Нужен ${r.level} уровень`:'В очередь',()=>command('queue',{object:o.id,recipe:r.id}),'secondary wide',r.level>S.me.level||!enough(r.inputs)||o.jobs.length>=slotsOf(o)));p.append(c);}
    upgradeCard(o,p);
   }
@@ -817,12 +845,14 @@ function zonePicker(label,zone,onChange){
 }
 const inArea=(o,z)=>!z||(o.x<z.x+z.w&&o.x+o.w>z.x&&o.y<z.y+z.h&&o.y+o.h>z.y);
 // Display-only counters: the server recomputes everything when the command arrives.
+// Remembered recipes of a workshop, oldest first; falls back to the legacy single last_recipe.
+function recipeMemory(o){const raw=Array.isArray(o.recipes_memory)?o.recipes_memory:(o.last_recipe?[o.last_recipe]:[]);return raw.filter(id=>S.catalog.recipes[id]);}
 function bulkCounts(z){
  const objs=S.me.objects.filter(o=>inArea(o,z)).sort((a,b)=>a.id<b.id?-1:1),t=now(),lv=S.me.level,stockLeft={...S.me.inventory};
  const take=needs=>{if(!Object.entries(needs).every(([k,q])=>(stockLeft[k]||0)>=q))return false;for(const [k,q] of Object.entries(needs))stockLeft[k]-=q;return true;};
  let feed=0,restart=0;
  for(const o of objs)if(o.animal&&!o.animal_job&&S.catalog.animals[o.animal]&&take(batchOf(S.catalog.animals[o.animal],o).inputs))feed++;
- for(const o of objs){const r=S.catalog.recipes[o.last_recipe];if(r&&r.building===o.type&&r.level<=lv&&(o.jobs||[]).length<slotsOf(o)&&take(r.inputs))restart++;}
+ for(const o of objs){if((o.jobs||[]).length>=slotsOf(o))continue;const r=recipeMemory(o).map(id=>S.catalog.recipes[id]).find(r=>r.building===o.type&&r.level<=lv&&Object.entries(r.inputs).every(([k,q])=>(stockLeft[k]||0)>=q));if(r&&take(r.inputs))restart++;}
  return {plots:objs.filter(o=>o.type==='plot'&&o.crop&&o.crop.ready_at<=t).length,animals:objs.filter(o=>o.animal_job&&o.animal_job.ready_at<=t).length,
   workshops:objs.reduce((a,o)=>a+(o.jobs||[]).filter(j=>j.ready_at<=t).length,0),feed,restart,empty:objs.filter(o=>o.type==='plot'&&!o.crop).length};
 }
@@ -913,8 +943,8 @@ function confirmCancelJob(o,j){
  const rf=jobRefund(j),name=S.catalog.recipes[j.recipe]?.name||'Партия',list=Object.entries(rf.items).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ');
  const text=rf.full?`Ингредиенты вернутся полностью${list?': '+list:''}.`+(j.starts_at>now()?'':` Это ещё можно отменить без потерь, если подтвердить до истечения срока (ещё ${Math.max(0,undoLeft(j.starts_at))} с).`):`Партия остановится, продукции и опыта не будет. `+(list?`Вернётся половина ингредиентов: ${list}.`:'Ничего не вернётся.');
  const cancel=async(forget)=>{$('dialog').close();await command(forget?'cancel_job_and_forget_recipe':'cancel_job',{object:o.id,job:j.id});};
- const tail=o.last_recipe===j.recipe?' Помощник-мастер поставит этот рецепт заново, если не забыть его.':'';
- modal(`Отменить: ${name}?`,text+tail,[button('Отменить партию',safe(()=>cancel(false)),'primary')].concat(o.last_recipe===j.recipe?[button('Отменить и забыть рецепт',safe(()=>cancel(true)),'secondary')]:[]));
+ const remembered=recipeMemory(o).includes(j.recipe),tail=remembered?' Помощник-мастер поставит этот рецепт заново, если не забыть его.':'';
+ modal(`Отменить: ${name}?`,text+tail,[button('Отменить партию',safe(()=>cancel(false)),'primary')].concat(remembered?[button('Отменить и забыть рецепт',safe(()=>cancel(true)),'secondary')]:[]));
 }
 function confirmDigUp(o){
  const c=o.crop;if(!c)return;
@@ -1049,6 +1079,16 @@ async function openDashaGame(){
  dashaGameOpen=true;document.body.classList.add('dasha-game-open');
  dashaGame=mountDashaGame(host,{getState:()=>({wager:S.me?.wager,coins:S.me?.coins}),command,isCommandPending:()=>!!S.pending||S.busy,onBack:closeDashaGame});navPush('dasha-wager',closeDashaGame);
  try{await refresh({render:false});}catch(e){toast(e.message,true);}finally{dashaGame?.render();}
+}
+// Oleg's chime: the same nested view as Dasha's; oleg.py owns melodies, rounds and the daily reward.
+function closeOlegGame(){if(!olegGameOpen)return true;olegGameOpen=false;document.body.classList.remove('oleg-game-open');olegGame?.destroy();olegGame=null;navPop('oleg-chime');requestAnimationFrame(()=>document.querySelector('[data-open-oleg]')?.focus({preventScroll:true}));return true;}
+async function openOlegGame(){
+ if(!own()||!S.me)return;
+ if(!S.me.oleg_game){try{await refresh({render:false});}catch(e){toast(e.message,true);return;}}
+ if(!S.me?.oleg_game){toast('Перезвон пока недоступен. Обнови ферму.',true);return;}
+ const host=$('oleg-game-view');if(olegGameOpen){olegGame?.render();return;}
+ olegGameOpen=true;document.body.classList.add('oleg-game-open');
+ olegGame=mountOlegGame(host,{getState:()=>S.me?.oleg_game,command,isCommandPending:()=>!!S.pending||S.busy,onBack:closeOlegGame});navPush('oleg-chime',closeOlegGame);
 }
 function closePanel(){if(villageVisible()){const returnTo=villageSheet==='townhall'?'townhall':villageResident;villageSheet=null;S.lastRenderedVillageSheet=null;syncVillageScene();const world=$('village-scene');[...world.querySelectorAll('[data-village-npc],[data-village-townhall]')].find(n=>n.dataset.villageNpc===returnTo||n.dataset.villageTownhall===returnTo)?.focus({preventScroll:true});}document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');requestAnimationFrame(()=>scene.resize());}
 function showPanel(){document.body.classList.add('panel-open');document.body.classList.remove('panel-collapsed');requestAnimationFrame(()=>scene.resize());}
@@ -1228,7 +1268,7 @@ async function retryConnection(){
  else if(S.pending)await sendPending();else await refresh();
 }
 document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
+ if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(olegGameOpen){e.preventDefault();closeOlegGame();return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
  if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||e.ctrlKey||e.metaKey||e.altKey||$('dialog').open)return;
  if(e.key.toLowerCase()==='f'){e.preventDefault();toggleFullscreen();}
  if(e.key.toLowerCase()==='h'){e.preventDefault();toggleImmersive();}
@@ -1370,11 +1410,21 @@ function marketCards(p){
  const m=S.me.market;if(!m||!own())return;
  p.append(caravanCard(m),contractsCard(m));
 }
+// The last caravan's outcome, kept until the next one: a small success strip (coins and XP with the same icons as the card footer)
+// or a muted refund strip. Icons are decorative; the words carry the meaning for screen readers.
+function caravanResult(lc){
+ const box=el('div',null,`caravan-result ${lc.ok?'is-ok':'is-refund'}`),head=el('div',null,'cr-head'),row=el('div',null,'cr-gains');
+ head.append(el('strong',lc.ok?'Обоз собран':'Обоз уехал'),el('small',lc.ok?(lc.npc?`${lc.npc} благодарит`:'Спасибо за товар'):(lc.refund>0?'Возврат по цене лавки':'Ничего не погружено, ничего не потеряно')));
+ const gain=(id,text,label,cls)=>{const g=el('span',null,`cr-gain ${cls}`);g.append(icon(id),el('b',text),el('span',label,'sr-only'));return g;};
+ if(lc.ok)row.append(gain('coin',`+${fmt(lc.coins)}`,' монет','cr-coins'),gain('star',`+${fmt(lc.xp)} XP`,'','cr-xp'));
+ else if(lc.refund>0)row.append(gain('coin',`+${fmt(lc.refund)}`,' монет возврата','cr-coins'));
+ box.append(head);if(row.childElementCount)box.append(row);return box;
+}
 function caravanCard(m){
  const cfg=S.catalog.market.caravan,car=m.caravan,c=card('Обоз','Большой заказ · ящик за ящиком','shop');c.classList.add('caravan');
  if(!car){
   if(S.me.level<cfg.level)note(`Обоз заедет на ферму с ${cfg.level} уровня: он просит 3–6 ящиков хороших товаров и щедро платит.`,c);
-  else{const row=el('p',null,'note');row.append('Следующий обоз приедет через ',timer(Math.max(m.caravan_next_at,now())),'.');c.append(row);}
+  else{const lc=m.last_caravan;if(lc)c.append(caravanResult(lc));const row=el('p',null,'note');row.append('Следующий обоз приедет через ',timer(Math.max(m.caravan_next_at,now())),'.');c.append(row);}
   return c;
  }
  const r=repInfo(car.npc),coins=Math.floor(car.coins*(100+r.bonus)/100),xp=Math.floor(car.xp*(100+r.bonus)/100),done=car.crates.filter(x=>x.done).length;
@@ -1472,15 +1522,19 @@ async function villagePresencePulse(action='pulse'){
  const session=villageSession;if(!session||S.tab!=='village'||document.hidden||action==='pulse'&&villageTalkPending)return;
  try{const r=await request(API+'/village/presence',{method:'POST',data:{action,session}});if(session!==villageSession)return;
   if(r.stolen){const fox=$('village-scene')?.querySelector('[data-village-npc="Лиса Даша"]');if(fox){const world=fox.closest('.village-world');fox.style.setProperty('--steal-x',`${(villagePos[0]-VILLAGE_SPOTS['Лиса Даша'][0])*(world?.offsetWidth||1600)/100}px`);fox.style.setProperty('--steal-y',`${(villagePos[1]-VILLAGE_SPOTS['Лиса Даша'][1])*(world?.offsetHeight||1200)/100}px`);fox.classList.add('is-stealing');setTimeout(()=>fox.classList.remove('is-stealing'),1800);}toast(r.notice);await refresh({render:false});}
- }catch(e){if(e.sessionEnded)return;}
+  return true;
+ }catch(e){if(e.sessionEnded)return;return false;}
 }
+// Dasha's theft is possible only for the owner, with coins in the pocket and no cooldown; talking to her cancels it, so the warning belongs to village entry.
+function villageTheftPossible(){const e=S.me?.village_errands;return !!(own()&&e&&(Number(S.me.coins)||0)>0&&now()>=(Number(e.theft_next_at)||0));}
 function villagePresenceStart(){
  if(!S.me||document.hidden||villageSession||typeof crypto==='undefined')return;
  villageSession=crypto.randomUUID();villageEnterPending=villagePresencePulse('enter');
+ if(villageTheftPossible())toast('Лиса Даша может стащить пару монет. Подойди к ней и поздоровайся — тогда не тронет.');
  villagePulseTimer=setInterval(()=>villagePresencePulse(),10000);
  if(!villagePresenceBound){villagePresenceBound=true;document.addEventListener('visibilitychange',()=>{if(document.hidden)villagePresenceStop();else if(S.tab==='village')villagePresenceStart();});}
 }
-function villagePresenceTalk(){if(!villageSession||villageTalkPending)return;villageTalkPending=true;Promise.resolve(villageEnterPending).then(()=>villagePresencePulse('talk'));}
+function villagePresenceTalk(){if(!villageSession||villageTalkPending)return;const session=villageSession;villageTalkPending=true;Promise.resolve(villageEnterPending).then(()=>villagePresencePulse('talk')).then(ok=>{if(ok===false&&session===villageSession)villageTalkPending=false;},()=>{if(session===villageSession)villageTalkPending=false;});}
 function villageQuest(npc){return S.catalog?.market?.village_quests?.[npc]||null;}
 function villageQuestPhase(npc){return S.me?.village_errands?.quests?.[npc]||'available';}
 function villageNames(){return [...Object.keys(S.catalog.market.tastes),...Object.keys(S.catalog.market.village_quests||{})];}
@@ -1529,7 +1583,7 @@ function villageFx(){
  [[230,0],[1300,-36]].forEach(([y,d])=>{const b=villageAt(el('i',null,'vfx-birds va'),0,y);villageVars(b,{'--d':`${d}s`});b.append(el('b'),el('b'),el('b'));fx.append(b);});
  return fx;
 }
-function villageWaterWheel(){const wheel=villageAt(el('i',null,'vfx-wheel'),731,555);wheel.append(el('b',null,'va'));return wheel;}
+function villageWaterWheel(){const w=el('i',null,'vfx-wheel va');w.style.left='28.82%';w.style.top='28.06%';w.style.width='3.333%';w.style.height='5.278%';w.setAttribute('aria-hidden','true');w.innerHTML=VILLAGE_WHEEL_SVG;return w;}
 function villageVisitorsToday(now=Date.now()){const day=Math.floor((now+3*3600e3)/864e5),n=VILLAGE_VISITORS.length-1,a=day%n,b=(a+1+(day*3)%(n-1))%n,list=[VILLAGE_VISITORS[a],VILLAGE_VISITORS[b]];if(day%7===0)list[1]=VILLAGE_VISITORS[n];const out=list.map((v,i)=>({v,spot:VILLAGE_VISITOR_SPOTS[(day+i*2)%VILLAGE_VISITOR_SPOTS.length]}));const egg=villageEggToday(day);if(egg)out.push({v:egg,spot:VILLAGE_VISITOR_SPOTS[(day+1)%VILLAGE_VISITOR_SPOTS.length]});return out;}
 function villageEggToday(day){return day%5===3?VILLAGE_EGGS[Math.floor(day/5)%VILLAGE_EGGS.length]:null;}
 function openVillageVisitor(id){villageVisitor=id;villageResident=null;villageSheet='visitor';syncVillageScene();showPanel();renderPanel();}
@@ -1550,7 +1604,7 @@ function villageBuildWorld(){
  VILLAGE_LIGHTS.forEach(([x,y,k])=>night.append(villageAt(el('i',null,`vn-light vn-${k}`),x,y)));
  VILLAGE_FLIES.forEach(([x,y],i)=>{const n=villageAt(el('i',null,'vn-fly va'),x,y);villageVars(n,{'--d':`${i*1.3}s`,'--fx':`${i%2?-30:26}px`,'--fy':`${i%3?-22:16}px`});night.append(n);});
  const actors=el('div',null,'village-actors');
- const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE_BOARD[0]}%`;gate.style.top=`${VILLAGE_GATE_BOARD[1]}%`;gate.style.width=`${VILLAGE_GATE_BOARD[2]}%`;gate.style.height=`${VILLAGE_GATE_BOARD[3]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','На ферму: ворота деревни');gate.title='На ферму';
+ const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE_BOARD[0]}%`;gate.style.top=`${VILLAGE_GATE_BOARD[1]}%`;gate.style.width=`${VILLAGE_GATE_BOARD[2]}%`;gate.style.height=`${VILLAGE_GATE_BOARD[3]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','На ферму: ворота деревни');gate.title='На ферму';gate.innerHTML=VILLAGE_GATE_SIGN;
  const player=el('div',null,'village-player');player.setAttribute('aria-hidden','true');player.style.left=`${villagePos[0]}%`;player.style.top=`${villagePos[1]}%`;player.dataset.face='right';player.append(el('i',null,'vp-shadow'),el('i',null,'vp-body'),el('i',null,'vp-head'),el('i',null,'vp-hat'));
  world.append(sun,villageFx(),night,villageWaterWheel(),actors,villagePlaces(),gate,player);
  return world;
@@ -1594,18 +1648,27 @@ function appendDashaAction(parent){
  if(!w)note('Загружаем условия игры…',parent);else if(!w.active&&!w.eligible)note(dashaReasonText(w.reason),parent);
  else if(w?.active)note('Твой раунд сохранён. Можно продолжить в любой момент.',parent);
 }
+function appendOlegAction(parent){
+ const g=S.me?.oleg_game;if(!own())return;
+ const b=button('Сыграть с Олегом',openOlegGame,'qw-btn primary wide');b.dataset.openOleg='true';parent.append(b);
+ if(!g)note('Загружаем перезвон…',parent);
+ else if(g.active)note(`Перезвон сохранён: мелодия ${(Number(g.active.round)||0)+1} из ${Number(g.active.rounds)||3}.`,parent);
+ else if(g.rewarded_today)note('Награда за перезвон сегодня получена — можно играть просто так.',parent);
+ else note(`Три мелодии на колокольчиках: +${fmt(g.next_reward?.coins||0)} мон. и +${fmt(g.next_reward?.xp||0)} опыта раз в день.`,parent);
+}
 function renderVillageResident(p){
  const spec=villageQuest(villageResident);
  if(spec){
   const npc=villageResident,phase=villageQuestPhase(npc),c=card(npc,'ЖИТЕЛЬ ДЕРЕВНИ');c.classList.add('village-resident');c.tabIndex=-1;c.dataset.villageFocus='resident';
   c.append(el('p',VILLAGE_VOICES[npc]?.[phase==='done'?1:0]||'', 'village-dialogue'));
-  if(npc==='Лиса Даша'){note('Если не заговорить с Дашей, она может стащить пару монет. Не чаще раза в сутки.',c);appendDashaAction(c);}
+  if(npc==='Лиса Даша')appendDashaAction(c);
+  if(npc==='Петух Олег')appendOlegAction(c);
   p.append(c);
   const q=card(spec.title,phase==='done'?'Сегодня выполнено':phase==='active'?'Задание взято':'Новое задание','orders');
   q.append(goods({[spec.item]:spec.qty},false));
   const reward=el('span',`+${fmt(spec.coins)} мон. · +${fmt(spec.xp)} опыта`,'reward');q.append(reward);
   if(phase==='available')q.append(button('Взять задание',()=>villageQuestAction(npc,'take'),'primary'));
-  else if(phase==='active')q.append(button('Сдать задание',()=>villageQuestAction(npc,'deliver'),'primary',!enough({[spec.item]:spec.qty})));
+  else if(phase==='active'){const ready=enough({[spec.item]:spec.qty});q.append(button('Сдать задание',()=>villageQuestAction(npc,'deliver'),'primary',!ready));if(!ready)note(`Не хватает: ${itemName(spec.item)} ×${fmt(spec.qty-stock(spec.item))}. Вырасти или приготовь на ферме.`,q);}
   else note('Новая просьба появится завтра.',q);
   p.append(q);return;
  }

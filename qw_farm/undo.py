@@ -6,7 +6,7 @@
   the queue (``starts_at > now``) is returned in full at any time. A running batch is returned in full during the first
   ``UNDO_WINDOW`` seconds after ``starts_at`` (the window counts from the start, not from queueing), later ``LATE_REFUND_PCT`` percent
   of every ingredient (floor, zero positions are not returned); no XP and no products. Following batches restart from ``now``.
-  The remembered ``last_recipe`` (artisans, «repeat batches») is untouched; ``forget_recipe`` clears it.
+  The remembered ``recipes_memory`` (artisans, «repeat batches») is untouched; ``forget_recipe`` edits it.
 * Returning from a woodland trip or fishing early: during the first ``UNDO_WINDOW`` seconds the trip is cancelled and everything taken
   (coins for the route, goods taken along) is returned in full; later the player comes back early with
   ``floor(output * elapsed_share * LATE_LOOT_PCT / 100)`` of every item, no XP, no secret, and what was taken is not returned.

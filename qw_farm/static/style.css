@@ -35,7 +35,9 @@ dialog{border:0;border-radius:23px;max-width:440px;width:calc(100vw - 40px);padd
 
 /* Insets from the device and Telegram content controls occupy distinct space. */
 .workspace{margin-left:var(--qw-safe-left);margin-right:var(--qw-safe-right)}
-.topbar,.compact .topbar{padding-left:calc(12px + var(--qw-safe-left));padding-right:calc(10px + var(--qw-safe-right))}
+/* UI_RULES §4: both edges use --qw-gutter plus safe-area, so the gear sits as far from the right edge as the first icon from the left. */
+.topbar,.compact .topbar{padding-left:calc(var(--qw-gutter,16px) + var(--qw-safe-left));padding-right:calc(var(--qw-gutter,16px) + var(--qw-safe-right))}
+.compact .hud{margin-right:6px}
 
 /* Illustrated map actions: friendly game cards, with labels kept readable over the art. */
 .forest-door{width:156px;height:68px;min-height:0;padding:0;border:1px solid #fff9e5;border-radius:14px;overflow:hidden;background:#e5edd5;box-shadow:0 4px 12px #29463425;display:block}
@@ -72,14 +74,14 @@ dialog{border:0;border-radius:23px;max-width:440px;width:calc(100vw - 40px);padd
 @media(max-width:420px){.crate small{display:none}.caravan-head small{margin-left:0;width:100%}}
 
 /* r8 step 9: mini-map and quick finder on a large farm. */
-.map-tools{position:absolute;top:14px;right:14px;z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.map-tools{position:absolute;top:14px;right:var(--qw-gutter,16px);z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .map-tools-row{display:flex;gap:6px}
 .map-chip{min-height:36px;min-width:44px;padding:5px 12px;border:1px solid #e6ebd1;background:#f9faedee;border-radius:10px;font-size:12px;font-weight:650;color:var(--green2);box-shadow:0 3px 10px #45663a18}
 .map-chip svg{display:block;width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .map-chip[aria-pressed="true"]{background:#e3edd2;border-color:#c6d6ad}
 .map-tools .minimap{display:block;width:172px;height:92px;border-radius:12px;background:#f9faedd8;border:1px solid #dfe6c9;box-shadow:0 4px 14px #45663a22;touch-action:none;cursor:crosshair}
 .map-tools .minimap[hidden]{display:none}
-@media(max-width:850px){.map-tools{top:58px;right:10px}.map-tools .minimap{width:132px;height:72px}}
+@media(max-width:850px){.map-tools{top:58px;right:var(--qw-gutter,16px)}.map-tools .minimap{width:132px;height:72px}}
 @media(max-width:850px) and (max-height:520px) and (orientation:landscape){.map-tools{top:46px}.map-tools .minimap{width:120px;height:66px}}
 .immersive .map-tools{top:12px}.immersive #find-button{display:none}
 .find-filters{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}
@@ -487,11 +489,11 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .vfx-sails::after{content:'';position:absolute;left:50%;top:50%;width:9%;aspect-ratio:1;border-radius:50%;background:#d9ccac;border:2px solid #8a7452;translate:-50% -50%}
 .vfx-sails b{position:absolute;left:50%;top:50%;width:11%;height:48%;box-sizing:border-box;background:linear-gradient(90deg,#8a7452 0 2px,transparent 2px),repeating-linear-gradient(0deg,#f1e8c8 0 6px,#bba97f 6px 7px);border:1px solid #9d8b64;transform-origin:0 0}
 .vfx-sails b:nth-child(1){transform:rotate(180deg) translate(-50%,0)}.vfx-sails b:nth-child(2){transform:rotate(270deg) translate(-50%,0)}.vfx-sails b:nth-child(3){transform:rotate(0deg) translate(-50%,0)}.vfx-sails b:nth-child(4){transform:rotate(90deg) translate(-50%,0)}
-/* water wheel of the river mill: lies in the mill's right wall plane (iso 2:1), rim with paddles, spokes */
-.vfx-wheel{position:absolute;width:2.8%;aspect-ratio:1;translate:-50% -50%;transform:matrix(.894,-.447,0,1,0,0);pointer-events:none}
-.vfx-wheel b{display:block;width:100%;height:100%;border-radius:50%;box-sizing:border-box;border:5px dashed #b08a5e;outline:2px solid #7a5c40;outline-offset:-6px;background:radial-gradient(circle,#6f5640 0 12%,transparent 13%),repeating-conic-gradient(#8a6a4a 0 4deg,transparent 4deg 36deg)}
-/* The wheel sits over the night window layer, but stays night-darkened and under village actors. */
-:root[data-farm-theme=night] .vfx-wheel{filter:brightness(.65) saturate(.75)}
+/* water wheel of the river mill: inline SVG in the long-wall plane (app.js VILLAGE_WHEEL_SVG). It sits above the night window layer,
+   so at night it takes the colour of the .vn-tint overlay through its own colour matrix instead of a blanket brightness filter. */
+.vfx-wheel{position:absolute;display:block;pointer-events:none}.vfx-wheel-art{display:block;width:100%;height:100%;overflow:visible}
+.vfx-wheel .vw-rot{transform-box:fill-box;transform-origin:50% 50%}
+:root[data-farm-theme=night] .vfx-wheel .vw-all{filter:url(#vw-night)}
 .vfx-gear{position:absolute;width:1%;aspect-ratio:1;border-radius:50%;box-sizing:border-box;border:4px dotted #6f6a5e;background:#a9a091;translate:-50% -50%}
 .vfx-cloud{position:absolute;left:-6%!important;width:6%;aspect-ratio:3/1;background:radial-gradient(22% 46% at 28% 62%,#fffffff0 96%,transparent),radial-gradient(26% 62% at 52% 44%,#fffffff0 96%,transparent),radial-gradient(20% 44% at 75% 62%,#fffffff0 96%,transparent),radial-gradient(44% 22% at 52% 78%,#f3f6eef0 96%,transparent);opacity:.42}
 .vfx-birds{position:absolute;left:-6%!important;width:6%;aspect-ratio:2/1}
@@ -504,8 +506,9 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 @media(prefers-reduced-motion:no-preference){
  .vfx-smoke{animation:vfx-smoke 5.5s ease-out infinite;animation-delay:var(--d,0s)}
  @keyframes vfx-smoke{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}18%{opacity:.8}100%{opacity:0;transform:translate(10%,-330%) scale(2.2)}}
- .vfx-sails{animation:vfx-spin 30s linear infinite}.vfx-wheel b{animation:vfx-spin 9s linear infinite}.vfx-gear{animation:vfx-spin 14s linear infinite}
+ .vfx-sails{animation:vfx-spin 30s linear infinite}.vfx-wheel .vw-rot{animation:vfx-spin-ccw 10s linear infinite}.vfx-gear{animation:vfx-spin 14s linear infinite}
  @keyframes vfx-spin{from{rotate:0deg}to{rotate:360deg}}
+ @keyframes vfx-spin-ccw{from{rotate:0deg}to{rotate:-360deg}}
  .vfx-cloud{animation:vfx-cloud var(--t,240s) linear infinite;animation-delay:var(--d,0s)}
  @keyframes vfx-cloud{from{transform:translateX(0)}to{transform:translateX(1800%)}}
  .vfx-birds{animation:vfx-birds 80s linear infinite;animation-delay:var(--d,0s)}
@@ -539,12 +542,34 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .vp-body{position:absolute;left:7px;bottom:6px;width:16px;height:19px;box-sizing:border-box;border-radius:7px 7px 4px 4px;background:#4e8fc0;border:2px solid #fff}
 .vp-head{position:absolute;left:9px;bottom:23px;width:12px;height:12px;box-sizing:border-box;border-radius:50%;background:#f1cfa6;border:1.5px solid #fff}
 .vp-hat{position:absolute;left:3px;bottom:31px;width:24px;height:8px;box-sizing:border-box;border-radius:50%;background:#e1c36a;border:1.5px solid #8d7550}
-.village-gate{position:absolute;transform:translate(-50%,-50%);box-sizing:border-box;min-width:44px;min-height:44px;margin:0;padding:0;background:transparent;border:0;border-radius:8px;cursor:pointer;z-index:3}
-.village-gate:hover{background:#fff4d940;box-shadow:inset 0 0 0 2px #775937a8}
-.village-gate:focus-visible{outline:3px solid #79975b;outline-offset:2px}
-:root[data-farm-theme=night] .village-gate:hover{background:#fff4d938}
+.village-gate{position:absolute;transform:translate(-50%,-50%);box-sizing:border-box;min-width:44px;min-height:44px;margin:0;padding:0;background:transparent;border:0;border-radius:8px;cursor:pointer;z-index:6;-webkit-tap-highlight-color:transparent;pointer-events:none}
+/* The sign itself is the control and never leaves its posts: the global button:hover lift would replace the centring transform. */
+.village-gate:hover:not(:disabled),.village-gate:active{transform:translate(-50%,-50%);filter:none}
+.village-gate:focus-visible{outline:none}
+/* Only the painted board takes taps: the button box is the board's bounding box, the hit shape is .vg-hit (board + 4 units). */
+.village-gate .vg-sign{display:block;width:100%;height:100%;overflow:visible;pointer-events:none;transition:filter .12s ease}
+.village-gate .vg-hit{pointer-events:visiblePainted}
+/* Hover and press use the farm scene's object highlight (scene.js drawLit): lighter board plus a pale outline.
+   Keyboard focus adds a clear 2px ring that follows the board's shape (the pale glow alone is too faint on grass). */
+.village-gate:hover .vg-sign{filter:var(--farm-lit)}
+.village-gate:active .vg-sign{filter:var(--farm-lit-pressed)}
+.village-gate:focus-visible .vg-sign{filter:brightness(1.12) var(--farm-focus-ring)}
+.village-gate:focus-visible:active .vg-sign{filter:brightness(.94) var(--farm-focus-ring)}
+/* the board of the original painted gate: cream face, thin brown border, dark-brown lettering, no glow */
+/* Day and night boards of gate.js; at night the board stays light above the tint, like the farm's own name sign. */
+.vg-night{display:none}:root[data-farm-theme=night] .vg-day{display:none}:root[data-farm-theme=night] .vg-night{display:inline}
+@media(prefers-reduced-motion:reduce){.village-gate .vg-sign{transition:none}}
+/* Residents get the same highlight on hover and keyboard focus. */
+.village-npc:hover .village-walker svg,.village-npc:focus-visible .village-walker svg{filter:var(--farm-lit)}
+:root[data-farm-theme=night]{--farm-focus-ring:drop-shadow(2px 0 0 #f2d57a) drop-shadow(-2px 0 0 #f2d57a) drop-shadow(0 2px 0 #f2d57a) drop-shadow(0 -2px 0 #f2d57a)}
+:root[data-farm-theme=night] :is(.village-npc,.village-townhall):focus-visible{outline-color:#f2d57a}
+/* phone-friendly hit areas: the 48px resident button grows an invisible 8px ring (64px target) and the wandering figure carries it along */
+.village-npc::after,.village-visitor::after,.village-walker::after{content:'';position:absolute;inset:-8px;border-radius:50%}
+.village-walker{pointer-events:auto;position:relative}
 /* place signs, construction sites and daily guests: static layer, centred with margins (no transforms) */
-.village-places{position:absolute;inset:0;pointer-events:none;z-index:3}
+.village-places{position:absolute;inset:0;pointer-events:none;z-index:6}
+/* Static targets (gate, place signs) stack above wandering residents, whose 64px rings drift up to ~50px; signs also beat guests. */
+.village-place{z-index:2}.village-visitor{z-index:1}
 .village-places>button{pointer-events:auto}
 .village-place{position:absolute;box-sizing:border-box;width:44px;height:44px;margin:-22px 0 0 -22px;padding:0;display:grid;place-items:center;background:#fff8dcf0;border:2px solid #e0c98c;border-radius:12px;box-shadow:0 3px 8px #5a4a2a33;color:#6a5124}
 .village-place svg{width:24px;height:24px}
@@ -659,7 +684,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 }
 
 /* Local day/night lighting: surfaces change independently of the canvas artwork. */
-:root{--surface:#fffef9;--surface-soft:#edf2e4;--surface-selected:#dfead2;--float:#fffdf2ed;--accent-ink:#244b34}
+:root{--farm-focus-ring:drop-shadow(2px 0 0 #2f5d1e) drop-shadow(-2px 0 0 #2f5d1e) drop-shadow(0 2px 0 #2f5d1e) drop-shadow(0 -2px 0 #2f5d1e);--farm-lit:brightness(1.12) drop-shadow(0 0 1px #fffbd0) drop-shadow(0 0 2px #fff2a0);--farm-lit-pressed:brightness(.94) drop-shadow(0 0 1px #fffbd0) drop-shadow(0 0 2px #fff2a0);--surface:#fffef9;--surface-soft:#edf2e4;--surface-selected:#dfead2;--float:#fffdf2ed;--accent-ink:#244b34}
 body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-controls button,.lighting-toggle,.login-screen{transition:background-color .6s ease,color .6s ease,border-color .6s ease}
 /* A painted sky icon with a transparent 44px tap target at the left edge of the header. */
 .lighting-toggle{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:3px;border:0;border-radius:50%;background:transparent;color:var(--ink);touch-action:manipulation}
@@ -924,3 +949,79 @@ body.dasha-game-open .header-destinations{display:none!important}
 @media(max-width:600px){body.dasha-game-open .workspace{padding-bottom:0}#dasha-game-view .dasha-page{padding-bottom:calc(16px + var(--qw-safe-bottom))}#dasha-game-view .dasha-stage-card{order:0}#dasha-game-view .dasha-side{order:1}#dasha-game-view .dasha-wager{order:0}#dasha-game-view .dasha-intro{order:1}#dasha-game-view .dasha-foot-note{order:2}}
 @media(max-width:359px){#dasha-game-view .dasha-page{padding-left:calc(12px + var(--qw-safe-left));padding-right:calc(12px + var(--qw-safe-right))}#dasha-game-view .dasha-masthead{gap:8px}#dasha-game-view .dasha-brand-mark{width:40px;height:40px}#dasha-game-view .dasha-masthead h1{font-size:22px}}
 @media(prefers-reduced-motion:reduce){#dasha-game-view *,#dasha-game-view *::before,#dasha-game-view *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+/* ===== Header rhythm (UI_RULES §4, game header). One inset on all four sides of the 36px ⚙ plate:
+   the bar is 56px, the 44px tap boxes sit (bar-44)/2 from the edges, so the visible plate has (bar-36)/2 = 10px
+   above, below and to the right; the light toggle mirrors it on the left. Floating map tools, mini-map and zoom
+   share the same right edge. Later than every older header rule on purpose (html prefix wins on specificity). */
+html .compact,html .compact .topbar,html .compact.immersive .topbar{--bar:56px}
+@media(max-width:850px) and (max-height:520px) and (orientation:landscape){html .compact,html .compact .topbar,html .compact.immersive .topbar{--bar:50px}}
+html .topbar,html .compact .topbar{--hdr-x:calc((var(--bar) - 44px) / 2);--hdr-gap:12px;height:calc(var(--bar) + var(--qw-safe-top));min-height:0;gap:var(--hdr-gap);
+ padding-left:calc(var(--hdr-x) + var(--qw-safe-left));padding-right:calc(var(--hdr-x) + var(--qw-safe-right))}
+@media(max-width:850px){html .topbar,html .compact .topbar{--hdr-gap:8px}}
+html .topbar>.hud,html .compact .hud{margin-right:0}
+html .topbar>.header-actions{margin-left:0;gap:var(--hdr-gap)}
+html .compact .lighting-toggle{margin-right:0}
+@media(min-width:851px){html .compact .header-destinations{gap:var(--hdr-gap,12px)}}
+/* the ⚙ keeps its 44×44 tap box; only a 36px plate is painted inside it */
+html .topbar .header-actions .qw-gear{position:relative;isolation:isolate;background:transparent;border:0;box-shadow:none;border-radius:12px;color:#4d6b4c}
+html .topbar .header-actions .qw-gear::before{content:'';position:absolute;inset:4px;z-index:-1;border-radius:11px;background:#eef2e4;border:1px solid #d3dcc4;box-shadow:0 1px 2px #3a55301a;transition:background-color .15s ease,border-color .15s ease}
+html .topbar .header-actions .qw-gear svg{width:22px;height:22px}
+html .topbar .header-actions .qw-gear:hover::before{background:#e4ebd6}
+html .topbar .header-actions .qw-gear[aria-expanded="true"]::before{border-color:var(--qw-game-accent,#466300)}
+html .topbar .header-actions .qw-gear:focus-visible{outline:none}
+html .topbar .header-actions .qw-gear:focus-visible::before{outline:2px solid var(--qw-game-accent,#466300);outline-offset:2px}
+:root[data-farm-theme=night] .topbar .header-actions .qw-gear{background:transparent;border:0;color:var(--ink)}
+:root[data-farm-theme=night] .topbar .header-actions .qw-gear::before{background:var(--surface-soft);border-color:var(--line);box-shadow:none}
+:root[data-farm-theme=night] .topbar .header-actions .qw-gear:hover::before{background:var(--surface-selected)}
+/* phones: the destination row and the map tools line up with the header plates and never overlap */
+@media(max-width:850px){
+ html .compact .header-destinations{left:calc(var(--qw-safe-left) + var(--hdr-x,6px) - 1px);right:calc(var(--qw-safe-right,0px) + (var(--bar) - 36px) / 2 + 104px);gap:8px}
+}
+html .map-tools,html .compact .map-tools{right:calc((var(--bar) - 36px) / 2)}
+html .scene-dock{--dock-inline:calc((var(--bar) - 36px) / 2)}
+
+/* ===== Zoom group: same surface, radius and icon stroke as the map chips; 44px square segments, inset hairlines. */
+html .scene-area .map-controls{display:flex;flex-direction:column;border:1px solid #e6ebd1;border-radius:12px;background:#f9faedee;box-shadow:0 3px 10px #45663a18;overflow:hidden}
+:root[data-farm-theme] .scene-area .map-controls>button{position:relative;display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;border:0;border-radius:0;background:transparent;color:var(--green2);font-size:0;line-height:0;transform:none}
+:root[data-farm-theme] .scene-area .map-controls>button+button::before{content:'';position:absolute;left:11px;right:11px;top:0;height:1px;background:#e1e7d0}
+.scene-area .map-controls>button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+:root[data-farm-theme] .scene-area .map-controls>button:hover{background:#eef3e2}
+:root[data-farm-theme] .scene-area .map-controls>button:active{background:#e3ebd3}
+:root[data-farm-theme] .scene-area .map-controls>button:focus-visible{outline:2px solid #79975b;outline-offset:-3px;border-radius:10px}
+@media(max-width:850px) and (max-height:520px) and (orientation:landscape){
+ html .scene-area .scene-dock .map-controls{flex-direction:row}
+ :root[data-farm-theme] .scene-area .map-controls>button+button::before{left:0;right:auto;top:11px;bottom:11px;width:1px;height:auto}
+}
+:root[data-farm-theme=night] .scene-area .map-controls{background:var(--float);border-color:var(--line);box-shadow:0 3px 12px #0000002e}
+:root[data-farm-theme=night] .scene-area .map-controls>button{color:var(--ink)}
+:root[data-farm-theme=night] .scene-area .map-controls>button+button::before{background:var(--line)}
+:root[data-farm-theme=night] .scene-area .map-controls>button:hover{background:var(--surface-soft)}
+:root[data-farm-theme=night] .scene-area .map-controls>button:active{background:var(--surface-selected)}
+
+/* ===== Last caravan outcome: success strip (green tint, coin and XP like the footer) or a muted refund strip. */
+.caravan-result{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin:8px 0 10px;padding:9px 11px 9px 9px;border:1px solid #d5e2bd;border-radius:12px;background:#eef4e1}
+.caravan-result .cr-head{display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:7px;align-items:center;min-width:0}
+.caravan-result .cr-head::before{content:'✓';grid-row:1/3;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#6d986b;color:#fff;font-size:12px;font-weight:800;line-height:1}
+.caravan-result .cr-head strong{font-size:13px;font-weight:750;color:#2f5634;line-height:1.3}
+.caravan-result .cr-head small{font-size:12px;color:var(--muted);line-height:1.3}
+.caravan-result .cr-gains{display:flex;align-items:center;gap:10px;margin-left:auto}
+.caravan-result .cr-gain{display:inline-flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap}
+.caravan-result .cr-gain svg{width:20px;height:20px;flex:none}
+.caravan-result .cr-gain b{font-weight:800}
+.caravan-result .cr-coins{color:#94692a}.caravan-result .cr-xp{color:#55783f}
+.caravan-result .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.caravan-result.is-refund{background:#f4f0e4;border-color:#e2d9c2}
+.caravan-result.is-refund .cr-head::before{content:'↩';background:#b5a98f}
+.caravan-result.is-refund .cr-head strong{color:#615845}
+.caravan-result.is-refund .cr-coins{color:#7c6f57}
+.caravan-result.is-refund .cr-gain svg{filter:saturate(.35);opacity:.85}
+:root[data-farm-theme=night] .caravan-result{background:#24402f;border-color:#3b5c45}
+:root[data-farm-theme=night] .caravan-result .cr-head::before{background:#7fae6f;color:#132017}
+:root[data-farm-theme=night] .caravan-result .cr-head strong{color:#d6ecc0}
+:root[data-farm-theme=night] .caravan-result .cr-coins{color:var(--honey)}
+:root[data-farm-theme=night] .caravan-result .cr-xp{color:#b7d891}
+:root[data-farm-theme=night] .caravan-result.is-refund{background:var(--surface-soft);border-color:var(--line)}
+:root[data-farm-theme=night] .caravan-result.is-refund .cr-head::before{background:#6c6a5a;color:#f1ecdb}
+:root[data-farm-theme=night] .caravan-result.is-refund .cr-head strong{color:var(--ink)}
+:root[data-farm-theme=night] .caravan-result.is-refund .cr-coins{color:var(--muted)}

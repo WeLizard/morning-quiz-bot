@@ -1,4 +1,5 @@
 """Village errands and Dasha's server-timed presence rules."""
+import asyncio
 from copy import deepcopy
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ import pytest
 from qw_farm.catalog import NPCS
 from qw_farm.domain import FarmError, apply, make_order, new_farm, project, validate_state
 from qw_farm.expansion import upgrade_state
+from qw_farm.service import FarmService, Principal
 from qw_farm import village_quests
 
 
@@ -176,3 +178,76 @@ def test_theft_clamps_to_available_coins_and_owner_projection():
     assert 'village_errands' in project(owner, owner, 1050)
     owner['settings']['visibility'] = 'public'
     assert 'village_errands' not in project(owner, visitor, 1050)
+
+
+class PresenceUnit:
+    def __init__(self, state):
+        self.farm = deepcopy(state)
+        self.saves = 0
+        self.presence_writes = 0
+        self.records = []
+
+    async def lock(self, *keys):
+        pass
+
+    async def by_account(self, account_id):
+        return deepcopy(self.farm)
+
+    async def get(self, farm_id):
+        return deepcopy(self.farm)
+
+    async def save(self, farm, account_id=None):
+        self.saves += 1
+        self.farm = deepcopy(farm)
+
+    async def save_presence(self, farm_id, presence):
+        self.presence_writes += 1
+        self.farm['village_errands']['presence'] = deepcopy(presence)
+
+    async def record(self, *args):
+        self.records.append(args)
+
+
+def test_service_presence_heartbeat_does_not_rewrite_or_bump_revision():
+    async def scenario():
+        now = [1000]
+        unit = PresenceUnit(farm())
+        service = FarmService(unit, Principal(str(uuid4()), 'Village'), clock=lambda: now[0])
+        session = str(uuid4())
+
+        await service.village_presence('enter', session)
+        after_enter = deepcopy(unit.farm)
+        revision = after_enter['revision']
+        assert unit.saves == 1
+
+        unit.saves = 0
+        now[0] = 1010
+        reply = await service.village_presence('pulse', session)
+        assert reply['revision'] == revision
+        assert unit.saves == 0 and unit.presence_writes == 0
+        assert unit.farm == after_enter
+
+        now[0] = 1020
+        await service.village_presence('pulse', session)
+        assert unit.saves == 0 and unit.presence_writes == 1
+        assert unit.farm['village_errands']['presence']['last_at'] == 1020
+        assert unit.farm['revision'] == revision
+
+        now[0] = 1030
+        await service.village_presence('pulse', session)
+        assert unit.presence_writes == 1
+
+        now[0] = 1040
+        await service.village_presence('pulse', session)
+        assert unit.presence_writes == 2
+
+        now[0] = 1050
+        reply = await service.village_presence('pulse', session)
+        assert reply['stolen'] == 2
+        assert unit.saves == 1
+        assert unit.farm['revision'] == revision + 1
+        assert unit.farm['coins'] == after_enter['coins'] - 2
+        assert unit.farm['village_errands']['presence']['last_at'] == 1050
+        assert len(unit.records) == 1 and unit.records[0][2] == 'village_theft'
+
+    asyncio.run(scenario())

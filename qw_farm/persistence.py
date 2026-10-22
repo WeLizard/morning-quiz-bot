@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from copy import deepcopy
 from uuid import UUID, uuid4
 from hashlib import sha256
+import json
 import sqlalchemy as sa
 from .domain import FarmError, need
 
@@ -202,6 +203,21 @@ class Unit:
         if account_id is not None:
             await self.execute(sa.insert(t).values(id=UUID(farm['id']),account_id=UUID(str(account_id)),**values))
         else:await self.execute(sa.update(t).where(t.c.id==UUID(farm['id'])).values(**values))
+
+    async def save_presence(self, farm_id, presence):
+        """Heartbeat write: only the presence leaf, no revision bump or full aggregate rewrite."""
+        t=self.t['states'];uid=UUID(str(farm_id))
+        if self.dialect=='postgresql':
+            from sqlalchemy.dialects.postgresql import JSONB
+            statement=sa.update(t).where(t.c.id==uid).values(payload=sa.cast(sa.func.jsonb_set(
+                sa.cast(t.c.payload,JSONB),
+                sa.literal(['village_errands','presence'],type_=sa.ARRAY(sa.Text)),
+                sa.literal(presence,type_=JSONB),True),sa.JSON()))
+        else:
+            statement=sa.update(t).where(t.c.id==uid).values(payload=sa.func.json_set(
+                t.c.payload,'$.village_errands.presence',sa.func.json(json.dumps(presence))))
+        result=await self.execute(statement)
+        return result.rowcount==1
 
     async def receipt(self, account_id, key):
         t=self.t['receipts']

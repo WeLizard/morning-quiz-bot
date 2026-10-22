@@ -21,7 +21,7 @@ def test_forget_clears_last_recipe_and_queue_remembers_it_again():
     st['inventory'] = {'wheat': 10}
     rev = obj(st, 'm')['revision']
     text = cmd(st, 'forget_recipe', {'object': 'm'})
-    assert 'last_recipe' not in obj(st, 'm') and obj(st, 'm')['revision'] == rev + 1 and 'забыт' in text
+    assert 'last_recipe' not in obj(st, 'm') and obj(st, 'm')['recipes_memory'] == [] and obj(st, 'm')['revision'] == rev + 1 and 'забыт' in text
     assert err(st, 'forget_recipe', {'object': 'm'}) == 'no_recipe'
     queue_flour(st)
     assert obj(st, 'm')['last_recipe'] == 'flour'
@@ -129,18 +129,14 @@ def test_atomic_cancel_forget_preserves_refund_and_no_xp(elapsed, refunded):
     assert 'Рецепт забыт' in text
 
 
-@pytest.mark.parametrize('remembered,error', [(None, 'no_recipe'), ('oil', 'recipe_changed')])
-def test_atomic_cancel_requires_matching_remembered_recipe_before_mutation(remembered, error):
+def test_atomic_cancel_needs_the_job_recipe_to_be_remembered_before_mutation():
     st = farm()
     mill = add_building(st, 'mill', 'm', 0, 0)
     st['inventory'] = {'wheat': 2}
     batch = queue_flour(st)
-    if remembered is None:
-        mill.pop('last_recipe')
-    else:
-        mill['last_recipe'] = remembered
-    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, T0 + 1) == error
-    assert mill.get('last_recipe') == remembered
+    mill.update(recipes_memory=['oil'], last_recipe='oil')   # remembered something else, but not this batch's recipe
+    assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, T0 + 1) == 'no_recipe'
+    assert mill['recipes_memory'] == ['oil']
     assert mill['jobs'] == [batch] and st['inventory'] == {'wheat': 0}
 
 

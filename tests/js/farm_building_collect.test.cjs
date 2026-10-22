@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../../qw_farm/static/app.js'),'utf8');
-const code=source.slice(source.indexOf('function renderObject(p)'),source.indexOf('async function visit(id)'));
+const code=source.slice(source.indexOf('function renderObject(p)'),source.indexOf('async function visit(id)'))+source.slice(source.indexOf('function recipeMemory('),source.indexOf('function bulkCounts('));
 class Node{constructor(text){this.textContent=text;this.children=[];}append(...nodes){this.children.push(...nodes);}}
 function render(count,{guest=false,type='bakery'}={}){
  const o={id:'selected-workshop',type,jobs:Array.from({length:count+1},(_,i)=>({id:'j'+i,recipe:'bread',starts_at:0,ready_at:i<count?99:101})),level:1};

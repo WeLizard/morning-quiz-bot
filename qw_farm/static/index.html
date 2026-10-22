@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/app/shell/qw-shell.css">
 <link rel="stylesheet" href="/app/farm/assets/style.css">
 <link rel="stylesheet" href="/app/farm/assets/dasha-game.css">
+<link rel="stylesheet" href="/app/farm/assets/oleg-game.css">
 <script src="/app/shell/qw-shell.js"></script>
 <script type="module" src="/app/farm/assets/app.js"></script>
 </head>
@@ -54,7 +55,7 @@
       <span>Собрать урожай</span>
      </button>
     </div>
-    <div class="map-controls" data-qw-group><button id="zoom-in" title="Приблизить" aria-label="Приблизить">+</button><button id="zoom-out" title="Отдалить" aria-label="Отдалить">−</button><button id="center-map" title="Вся ферма" aria-label="Показать всю ферму">⌖</button></div>
+    <div class="map-controls" data-qw-group><button id="zoom-in" type="button" title="Приблизить" aria-label="Приблизить"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5.5v13M5.5 12h13"/></svg></button><button id="zoom-out" type="button" title="Отдалить" aria-label="Отдалить"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.5 12h13"/></svg></button><button id="center-map" type="button" title="Вся ферма" aria-label="Показать всю ферму"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 9V6a1.5 1.5 0 0 1 1.5-1.5h3M15 4.5h3A1.5 1.5 0 0 1 19.5 6v3M19.5 15v3a1.5 1.5 0 0 1-1.5 1.5h-3M9 19.5H6A1.5 1.5 0 0 1 4.5 18v-3"/><circle cx="12" cy="12" r="2"/></svg></button></div>
    </div>
    <div id="seedbar" class="seedbar" data-qw-group aria-label="Семена"></div>
   </div>
@@ -62,6 +63,7 @@
  </section>
  <aside id="panel" class="side-panel" aria-label="Панель управления"><div id="panel-head"></div><div id="panel-content" class="panel-content"></div></aside>
  <section id="dasha-game-view" class="dasha-game-view" aria-label="Лисий фокус" hidden></section>
+ <section id="oleg-game-view" class="oleg-game-view" aria-label="Перезвон с Олегом" hidden></section>
 </main>
 <section id="login" class="login-screen" hidden></section>
 <dialog id="dialog"><div id="dialog-body"></div></dialog>

@@ -26,7 +26,7 @@ def moscow_day(now):
 
 
 def blank():
-    return dict(rep={}, counts={}, caravan=None, caravan_next_at=0, caravan_seq=0, caravans_done=0, caravans_failed=0,
+    return dict(rep={}, counts={}, caravan=None, caravan_next_at=0, caravan_seq=0, caravans_done=0, caravans_failed=0, last_caravan=None,
                 contracts=dict(day=-1, items=[]), streak=dict(last_day=-1, count=0), decor_credits=[])
 
 
@@ -177,6 +177,7 @@ def settle_caravan(farm, now):
         refund = sum(ITEMS[c['item']]['price'] * c['qty'] for c in car['crates'] if c['done'])
         farm['coins'] += refund
         m['caravans_failed'] += 1
+        m['last_caravan'] = dict(ok=False, npc=car['npc'], refund=refund, at=car['deadline'])
         m['caravan'] = None
         m['caravan_next_at'] = car['deadline'] + CARAVAN['cooldown_hours'] * 3600
         event(farm, now, 'Обоз уехал: время вышло.' + (f' За привезённые ящики вернули {refund} монет.' if refund else ''), 'caravan')
@@ -264,6 +265,7 @@ def apply_market(farm, kind, data, now, command_id):
             xp = progression.grant_xp(farm, xp, 'caravan', now, True)
             add_rep(farm, car['npc'], CARAVAN['rep_points'])
             m['caravans_done'] += 1
+            m['last_caravan'] = dict(ok=True, npc=car['npc'], coins=coins, xp=xp, at=now)
             m['caravan'] = None
             m['caravan_next_at'] = now + CARAVAN['cooldown_hours'] * 3600
             text = f'Обоз собран! {car["npc"]} благодарит: +{coins} монет, +{xp} XP.'

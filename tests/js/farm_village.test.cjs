@@ -20,7 +20,7 @@ function setup(){
  const nodes=new Map(),area=new Node('section'),calls=[],pause=[],bodyClasses=new Set();
  const S={me:{id:'own',is_owner:true,orders:[{id:'one',npc:'Филиныч',title:'Чай',needs:{tea:2},coins:100,xp:10}],inventory:{tea:2},market:{}},farm:{id:'guest'},tab:'orders',catalog:{market:{tastes:{'Филиныч':['tea'],'Агата':['bread']}}},village:null};
  nodes.set('farm-canvas',new Node('canvas'));nodes.set('panel-content',new Node('div'));nodes.set('panel-head',new Node('div'));const sheetFocus=new Node('section'),title=new Node('h2');nodes.get('panel-content').querySelector=()=>sheetFocus;nodes.get('panel-head').querySelector=()=>title;
- const ctx={S,AVATARS:{},own:()=>S.me?.is_owner===true,openDashaGame:()=>calls.push('open-dasha'),dashaReasonText:reason=>({level:'Игра открывается с 3 уровня.',daily_limit:'Лимит ставок 200 монет в день исчерпан.',pending_payout:'Выигрыш ожидает места на балансе.',earned_balance:'Для ставки нужны заработанные монеты.',wallet_limit:'Баланс монет достиг предела.',active:'Раунд уже начат — выбери стаканчик.'}[reason]||'Игра сейчас недоступна.'),document:{activeElement:null,body:{classList:{toggle:(k,v)=>v?bodyClasses.add(k):bodyClasses.delete(k),add:k=>bodyClasses.add(k),remove:k=>bodyClasses.delete(k),contains:k=>bodyClasses.has(k)}},querySelector:()=>area},
+ const ctx={S,AVATARS:{},own:()=>S.me?.is_owner===true,openDashaGame:()=>calls.push('open-dasha'),openOlegGame:()=>calls.push('open-oleg'),dashaReasonText:reason=>({level:'Игра открывается с 3 уровня.',daily_limit:'Лимит ставок 200 монет в день исчерпан.',pending_payout:'Выигрыш ожидает места на балансе.',earned_balance:'Для ставки нужны заработанные монеты.',wallet_limit:'Баланс монет достиг предела.',active:'Раунд уже начат — выбери стаканчик.'}[reason]||'Игра сейчас недоступна.'),document:{activeElement:null,body:{classList:{toggle:(k,v)=>v?bodyClasses.add(k):bodyClasses.delete(k),add:k=>bodyClasses.add(k),remove:k=>bodyClasses.delete(k),contains:k=>bodyClasses.has(k)}},querySelector:()=>area},
  $:id=>nodes.get(id),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},icon:()=>new Node('svg'),
  button:(text,fn,cls,disabled)=>{const n=new Node('button');n.textContent=text;n.onclick=fn;n.disabled=disabled;return n;},
  scene:{setPaused:v=>pause.push(v),set:()=>calls.push('scene'),selected:'x',resize(){}},farmViewEpoch:4,requestAnimationFrame:fn=>fn(),
@@ -59,6 +59,17 @@ test('Dasha game action remains available for an active wager and calls the game
  const panel=new Node('div');h.ctx.appendDashaAction(panel);
  const play=panel.querySelectorAll('*').find(n=>n.textContent==='Играть с Дашей');assert.ok(play);play.onclick();
  assert.ok(h.calls.includes('open-dasha'),'existing active round opens even when new-round eligibility is false');
+});
+test('Oleg chime action shows the saved run or the daily reward and opens the game',()=>{
+ const h=setup();
+ h.S.me.oleg_game={active:{run_id:'run-1',round:1,rounds:3,notes:4,sequence:[0,1,2,3]},rewarded_today:false,next_reward:{coins:12,xp:4},rounds:[3,4,5],last_result:null};
+ const panel=new Node('div');h.ctx.appendOlegAction(panel);
+ const play=panel.querySelectorAll('*').find(n=>n.textContent==='Сыграть с Олегом');assert.ok(play);
+ assert.ok(panel.querySelectorAll('*').some(n=>/мелодия 2 из 3/.test(n.tagName||'')));
+ play.onclick();assert.ok(h.calls.includes('open-oleg'));
+ h.S.me.oleg_game={...h.S.me.oleg_game,active:null,rewarded_today:true};
+ const done=new Node('div');h.ctx.appendOlegAction(done);
+ assert.ok(done.querySelectorAll('*').some(n=>/сегодня получена/.test(n.tagName||'')));
 });
 test('presence uses one server lease, Dasha tap talks before walking, and leaving clears it',async()=>{
  const h=setup(),requests=[],listeners={},timers=[];let releaseEnter;
@@ -194,10 +205,11 @@ test('world keeps 44px targets without overlap at phone and desktop widths; walk
 test('drawn farm sign is the only native exit target and keyboard activation uses the existing route',()=>{
  const h=setup();h.S.tab='village';h.ctx.syncVillageScene();
  const world=h.nodes.get('village-scene').children[0],gates=world.children.filter(n=>n.dataset.villageGate),gate=gates[0],board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
- assert.equal(gates.length,1);assert.equal(gate.tagName,'button');assert.equal(gate.attrs['aria-label'],'На ферму: ворота деревни');assert.equal(gate.children.length,0,'SVG supplies the visible sign text');
+ assert.equal(gates.length,1);assert.equal(gate.tagName,'button');assert.equal(gate.attrs['aria-label'],'На ферму: ворота деревни');assert.equal(gate.children.length,0);assert.match(gate.innerHTML,/<svg class="vg-sign"/);assert.match(gate.innerHTML,/>Ферма<\/text>/,'the sign board is drawn inside the button');assert.doesNotMatch(fs.readFileSync(path.join(__dirname,'../../qw_farm/static/village.svg'),'utf8').slice(-4000),/На ферму|<text/,'village.svg no longer draws a second board');
  assert.equal(gate.style.left,`${board[0]}%`);assert.equal(gate.style.top,`${board[1]}%`);assert.equal(gate.style.width,`${board[2]}%`);assert.equal(gate.style.height,`${board[3]}%`);
  const left=(board[0]-board[2]/2)*24,right=(board[0]+board[2]/2)*24,top=(board[1]-board[3]/2)*18,bottom=(board[1]+board[3]/2)*18;
- for(const [x,y] of [[1159,1403],[1275,1346],[1275,1404],[1159,1460]])assert.ok(x>=left&&x<=right&&y>=top&&y<=bottom,'painted board sits inside its hit area');
+ const hit=gate.innerHTML.match(/class="vg-hit" d="M([^"]+)Z"/)[1].split('L').map(p=>p.split(' ').map(Number));assert.equal(hit.length,4);
+ for(const [x,y] of hit)assert.ok(x>=left-.5&&x<=right+.5&&y>=top-.5&&y<=bottom+.5,'the board-shaped hit area fits the button box');
  const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');assert.match(css,/\.village-gate\{[^}]*min-width:44px;min-height:44px/);assert.match(css,/\.village-gate\{[^}]*background:transparent/);assert.match(css,/\.village-gate:focus-visible\{/);
  gate.onclick({detail:0});assert.equal(h.S.tab,'orders');
 });
@@ -225,4 +237,60 @@ test('easter-egg guests are extra, rare, deterministic and complete',()=>{
  for(let d=0;d<120;d++){const t=Date.UTC(2026,9,1+d,9),a=today(t),b=today(t+5*3600e3);assert.deepEqual(a.map(x=>x.v[0]),b.map(x=>x.v[0]));assert.ok(a.length<=3);assert.ok(a.slice(0,2).every(x=>base.includes(x.v)),'daily guests unchanged');
   if(a.length===3){withEgg++;seen.add(a[2].v[0]);assert.ok(eggs.includes(a[2].v));assert.equal(new Set(a.map(x=>x.spot.join())).size,3,'distinct spots');}}
  assert.ok(withEgg>=15&&withEgg<=40,'egg guests are rare: '+withEgg);assert.equal(seen.size,eggs.length,'every egg appears');
+});
+
+test('countdown text never shows 60 minutes and drops zero minutes',()=>{
+ const m=source.match(/const timeText=.*\n/),s=source.match(/const seedTimeText=.*\n/);assert.ok(m&&s);
+ const c={};vm.createContext(c);vm.runInContext(`${m[0]}${s[0]}globalThis.t=timeText;globalThis.s=seedTimeText;`,c);
+ const expected={0:'0 с',59:'59 с',60:'1 мин',61:'2 мин',3599:'1 ч',3600:'1 ч',3601:'1 ч 1 мин',7140:'1 ч 59 мин',7199:'2 ч',7200:'2 ч',7201:'2 ч 1 мин'};
+ for(const [sec,text] of Object.entries(expected))assert.equal(c.t(Number(sec)),text,String(sec));
+ assert.equal(c.s(3601),'1ч 1м');assert.equal(c.s(7200),'2ч');assert.equal(c.s(59),'59с');
+ for(let sec=0;sec<20000;sec+=7)assert.doesNotMatch(c.t(sec),/(^|\D)60 мин/,String(sec));
+});
+test('a failed talk request releases the talk lock so presence pings resume; success keeps it',async()=>{
+ for(const fail of [true,false]){
+  const h=setup(),requests=[],timers=[];
+  h.ctx.crypto={randomUUID:()=> '11111111-1111-4111-8111-111111111111'};h.ctx.API='/api/farm/v1';
+  h.ctx.document.hidden=false;h.ctx.document.addEventListener=()=>{};h.ctx.setInterval=fn=>{timers.push(fn);return 1;};h.ctx.clearInterval=()=>{};
+  h.ctx.request=async(path,{data})=>{requests.push(data.action);if(data.action==='talk'&&fail)throw new Error('offline');return {stolen:0};};
+  h.ctx.selectTab('village');await new Promise(r=>setImmediate(r));
+  vm.runInContext('villagePresenceTalk()',h.ctx);await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));
+  assert.equal(requests.includes('talk'),true);
+  assert.equal(vm.runInContext('villageTalkPending',h.ctx),!fail);
+  timers[0]();await new Promise(r=>setImmediate(r));
+  assert.equal(requests.filter(a=>a==='pulse').length,fail?1:0,fail?'pulse resumes after failed talk':'talked visit stays quiet');
+ }
+});
+test('the Dasha theft warning shows once on village entry only while theft is possible',()=>{
+ const run=(mut)=>{const h=setup(),toasts=[];h.ctx.toast=t=>toasts.push(t);h.ctx.now=()=>1000;
+  h.ctx.crypto={randomUUID:()=> '11111111-1111-4111-8111-111111111111'};h.ctx.API='/api/farm/v1';h.ctx.document.hidden=false;h.ctx.document.addEventListener=()=>{};h.ctx.setInterval=()=>1;h.ctx.clearInterval=()=>{};h.ctx.request=async()=>({stolen:0});
+  h.S.me.coins=50;h.S.me.village_errands={quests:{},theft_next_at:0,theft_total:0};mut(h);h.ctx.selectTab('village');return toasts;};
+ assert.equal(run(()=>{}).filter(t=>/Даша.*стащить/.test(t)).length,1);
+ assert.equal(run(h=>{h.S.me.village_errands.theft_next_at=5000;}).length,0,'cooldown: no warning');
+ assert.equal(run(h=>{h.S.me.coins=0;}).length,0,'empty pocket: nothing to steal');
+ assert.equal(run(h=>{h.S.me.is_owner=false;}).length,0);
+ assert.doesNotMatch(source.slice(source.indexOf('function renderVillageResident'),source.indexOf('function renderVillage(p)')),/стащить/,'the useless card-only warning is gone');
+});
+test('a disabled errand delivery says what is missing',()=>{
+ const h=setup();h.S.catalog.market.village_quests={'Лиса Даша':{item:'carrot',qty:3,coins:12,xp:4,title:'Морковка'}};
+ h.S.catalog.items={carrot:{name:'Морковь'}};h.ctx.itemName=id=>h.S.catalog.items[id]?.name||id;h.ctx.stock=id=>h.S.me.inventory[id]||0;
+ h.S.me.village_errands={quests:{'Лиса Даша':'active'}};h.S.me.inventory={carrot:1};
+ h.ctx.selectTab('village');h.ctx.chooseVillageResident('Лиса Даша');const p=new Node('div');h.ctx.renderVillageResident(p);
+ const all=p.querySelectorAll('*'),deliver=all.find(n=>n.textContent==='Сдать задание');
+ assert.equal(deliver.disabled,true);assert.ok(all.some(n=>/Не хватает: Морковь ×2/.test(n.textContent||n.tagName)),all.map(n=>n.textContent).join('|'));
+});
+test('static targets (exit gate, place signs) stack above wandering residents across their whole drift',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');
+ const z=re=>Number((css.match(re)||[])[1]);
+ const zNpc=z(/\.village-npc,\.village-townhall\{[^}]*?z-index:(\d+)/),zNpcSel=z(/\.village-npc\[aria-pressed=true\]\{z-index:(\d+)/),zPlaces=z(/\.village-places\{[^}]*?z-index:(\d+)/),zGate=z(/\.village-gate\{[^}]*?z-index:(\d+)/),zSign=z(/\.village-place\{z-index:(\d+)/),zGuest=z(/\.village-visitor\{z-index:(\d+)/);
+ for(const v of [zNpc,zNpcSel,zPlaces,zGate,zSign,zGuest])assert.ok(Number.isFinite(v),'z-index parsed');
+ assert.ok(zPlaces>Math.max(zNpc,zNpcSel),'place layer above every resident');assert.ok(zGate>Math.max(zNpc,zNpcSel),'gate above every resident');assert.ok(zSign>zGuest,'signs above wandering guests inside their layer');
+ const W=1600,H=1200,ring=32; // smallest world; resident button 48px + inset:-8px ring => 32px half-size around the walking figure
+ const spots=JSON.parse(source.match(/const VILLAGE_SPOTS=(\{[^}]*\})/)[1].replace(/'/g,'"')),life=eval('('+source.match(/const VILLAGE_LIFE=(\{[^}]*\})/)[1]+')');
+ const board=eval(source.match(/const VILLAGE_GATE_BOARD=(\[[^\]]*\])/)[1]),places=eval(source.match(/const VILLAGE_PLACES=(\[.*\]);\n/)[1]);
+ const targets=[{id:'gate',x:board[0]*W/100,y:board[1]*H/100,hw:Math.max(22,board[2]*W/200),hh:Math.max(22,board[3]*H/200)}].concat(places.map(p=>({id:p[0],x:p[3]*W/100,y:p[4]*H/100,hw:22,hh:22})));
+ let overlaps=0;
+ for(const [npc,[sx,sy]] of Object.entries(spots)){const [,wx,wy]=life[npc];for(let k=0;k<=20;k++){const cx=sx*W/100+wx*k/20,cy=sy*H/100+wy*k/20;
+  for(const t of targets)if(Math.abs(t.x-cx)<=ring+t.hw&&Math.abs(t.y-cy)<=ring+t.hh){overlaps++;assert.ok(zGate>zNpcSel&&zPlaces>zNpcSel,`${npc} ring reaches ${t.id}: static target must win`);}}}
+ assert.ok(overlaps>0,'the drift range really reaches a static target, so the stacking assertion is not vacuous');
 });

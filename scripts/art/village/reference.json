@@ -1,0 +1,22 @@
+{
+ "rgba_sha256": "3248ba9675189bf69111895cbce65b9e8bad46d4c0d5d679d2f1d845212cb35e",
+ "webp_sha256": "064367a3f9d78a5dad6c2937a548c119711d45db47431194626f7fddbe31e77f",
+ "svg_sha256": "196ac32e0a94e45bc37d94fd97005e1b098eaee4af9c42ea6eb6f0a84e61c072",
+ "svg_bytes": 688894,
+ "versions": {
+  "chromium": "chromium_headless_shell-1194",
+  "pillow": "11.3.0",
+  "libwebp": "1.5.0"
+ },
+ "note": "Hashes of scripts/art/village/build_village.py output = qw_farm/static/village.svg as installed. Refresh on purpose after an approved art change.",
+ "inputs": {
+  "scripts/art/village/gate.js": "7b7a7a1f5f7f6db9",
+  "scripts/art/village/svg_ctx.js": "1f0006e48e7b3506",
+  "qw_farm/static/scene_buildings.js": "5ed07215099fdc4b",
+  "qw_farm/static/scene.js": "1f28a2f33ddbe063",
+  "qw_farm/static/scene_expansion.js": "7473fa6cdf1de9ff",
+  "qw_farm/static/scene_map.js": "8f910b470e431e7d",
+  "scripts/art/village/village.js": "49eb640bcf7300cc",
+  "scripts/art/village/common.js": "0d3fc65983694e63"
+ }
+}

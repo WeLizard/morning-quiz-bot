@@ -35,6 +35,10 @@ function epochScene(id,extra=''){
 function renderEpochHeading(){
  const id=state.settings.world||'origins',w=W.get(id);const holder=$('epochBanner');if(!holder||!w)return;
  holder.innerHTML=`${epochScene(id)}<button class="epoch-caption" data-epoch="${id}"><span class="eyebrow">Твоя мастерская</span><strong>${escapeHTML(w.name)}</strong><span>Сменить эпоху ${icon('arrow')}</span></button>`;
+ // Phone header: the same scene, faint, behind the era name and progress (own clip-path id).
+ const scene=$('topbarScene'),era=$('hudEra');
+ if(scene)scene.innerHTML=epochScene(id).replaceAll('riverClip','riverClipHud');
+ if(era){era.dataset.epoch=id;era.setAttribute('aria-label',`Эпоха: ${w.name}. Сменить эпоху`);$('hudEraName').textContent=w.name;}
 }
 function renderCampaignTracker(){
  const holder=$('campaignTracker');if(!holder)return;

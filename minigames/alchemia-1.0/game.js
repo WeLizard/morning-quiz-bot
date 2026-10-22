@@ -102,6 +102,7 @@ let undoStack=[],drag=null,suppressClickUntil=0,toastTimer=0,resizeFrame=0,modal
 let modalBack=null,focusBeforeModal=null,confirmAction=null,documentDisposed=false;
 let tokenSize={w:100,h:111},lastBoardSize={w:0,h:0};
 const board=$('board'),tokens=$('tokenLayer'),modal=$('modal');
+const phone=matchMedia('(max-width:760px)'); // phone workshop layout (style.css «Phone workshop»)
 
 function syncState(){state.discovered=[...found];state.recipeKeys=[...knownRecipes];state.tried=[...tried];state.favorites=[...favorites];state.achievements=[...badges];}
 function persist(){
@@ -189,7 +190,7 @@ function renderLatest(){
 }
 function renderProgress(){
  const n=found.size,total=E.size,pct=n/total*100;
- $('collectionCount').textContent=n;$('progressTotal').textContent=`${n} из ${total}`;$('progressPercent').textContent=Math.floor(pct)+'%';$('progressCircle').setAttribute('stroke-dashoffset',String(188.496*(1-n/total)));$('rankLabel').textContent=rank();$('mobileCount').textContent=`${n} / ${total}`;$('pathPillCount').textContent=`${n} / ${total}`;$('mobileProgressFill').style.width=pct+'%';$('attemptCount').textContent=tried.size;$('recipeCount').textContent=knownRecipes.size;
+ $('collectionCount').textContent=n;$('progressTotal').textContent=`${n} из ${total}`;$('progressPercent').textContent=Math.floor(pct)+'%';$('progressCircle').setAttribute('stroke-dashoffset',String(188.496*(1-n/total)));$('rankLabel').textContent=rank();$('mobileCount').textContent=`${n} / ${total}`;$('pathPillCount').textContent=`${n} / ${total}`;$('mobileProgressFill').style.width=pct+'%';$('hudCount').textContent=`${n} / ${total}`;$('hudFill').style.width=Math.max(2,pct)+'%';$('attemptCount').textContent=tried.size;$('recipeCount').textContent=knownRecipes.size;
  renderChapter();renderLatest();renderCampaignTracker();
 }
 function card(id,mode='pick',locked=false){
@@ -198,7 +199,7 @@ function card(id,mode='pick',locked=false){
 }
 function renderCategories(){
  const old=$('categoryStrip').scrollLeft;
- $('categoryStrip').innerHTML=`<button class="chip ${category==='all'?'active':''}" data-category="all">Все</button>`+DATA.categories.filter(c=>DATA.elements.some(e=>e.category===c.id&&found.has(e.id))).map(c=>`<button class="chip ${category===c.id?'active':''}" data-category="${c.id}">${c.name}</button>`).join('');
+ $('categoryStrip').innerHTML=`<button class="chip ${category==='all'?'active':''}" data-category="all">Все<span class="chip-count">${found.size}</span></button>`+DATA.categories.filter(c=>DATA.elements.some(e=>e.category===c.id&&found.has(e.id))).map(c=>`<button class="chip ${category===c.id?'active':''}" data-category="${c.id}">${c.name}</button>`).join('');
  $('categoryStrip').scrollLeft=old;
 }
 function filteredCollection(){
@@ -218,6 +219,7 @@ function renderCollection(){
  $('collectionGrid').scrollTop=y;
  $('collectionMeta').textContent=onlyFavorites?'Избранные элементы':list.length===4&&found.size===4?'4 первоэлемента':`${list.length} ${noun(list.length,'элемент','элемента','элементов')}`;
  $('favoriteFilter').classList.toggle('active',onlyFavorites);$('favoriteFilter').setAttribute('aria-pressed',String(onlyFavorites));
+ $('collectionMenuBtn').classList.toggle('active',onlyFavorites);
  $('clearSearch').classList.toggle('hidden',!$('collectionSearch').value);
  renderCategories();
 }
@@ -228,7 +230,9 @@ function measureTokens(){
   const fake=document.createElement('div');fake.className='token';fake.style.visibility='hidden';tokens.appendChild(fake);const style=getComputedStyle(fake);tokenSize={w:parseFloat(style.width),h:parseFloat(style.height)};fake.remove();
  }
 }
-function xy(t){return {x:clamp(t.u*Math.max(1,board.clientWidth-tokenSize.w),8,board.clientWidth-tokenSize.w-8),y:clamp(t.v*Math.max(1,board.clientHeight-tokenSize.h),26,board.clientHeight-tokenSize.h-16)};}
+// The compact phone table keeps a slightly taller free strip at the bottom for its «Materia prima» signature.
+function padBottom(){return phone.matches?24:16;}
+function xy(t){return {x:clamp(t.u*Math.max(1,board.clientWidth-tokenSize.w),8,board.clientWidth-tokenSize.w-8),y:clamp(t.v*Math.max(1,board.clientHeight-tokenSize.h),26,board.clientHeight-tokenSize.h-padBottom())};}
 function uv(x,y){return {u:clamp((x-tokenSize.w/2)/Math.max(1,board.clientWidth-tokenSize.w),0,1),v:clamp((y-tokenSize.h/2)/Math.max(1,board.clientHeight-tokenSize.h),0,1)};}
 function updateTokenPositions(){
  measureTokens();state.bench.forEach(t=>{const el=tokens.querySelector(`[data-token="${t.uid}"]`);if(el){const p=xy(t);el.style.left=p.x+'px';el.style.top=p.y+'px';}});
@@ -245,7 +249,7 @@ function renderSelection(){
  $('collectionGrid').querySelectorAll('.element-card').forEach(el=>el.classList.toggle('selected',!!t&&el.dataset.pick===t.id));
  $('mixStatus').classList.toggle('hidden',!t);
  $('mixStatus').innerHTML=t?`${art(t.id)}<span>Теперь выбери второй элемент</span><button class="ico-btn" data-action="deselect" aria-label="Отменить выбор">${icon('x')}</button>`:'';
- $('boardCaption').innerHTML=t?`<strong>${name(t.id)}</strong> + что-то ещё. Выбери элемент в коллекции или на столе.`:(state.bench.length?'Нажми на два элемента или перетащи один на другой':'Выбери первый элемент в коллекции ниже или слева');
+ $('boardCaption').innerHTML=t?`<strong>${name(t.id)}</strong> + что-то ещё${phone.matches?': выбери второй элемент':'. Выбери элемент в коллекции или на столе.'}`:(state.bench.length?'Нажми на два элемента или перетащи один на другой':'Выбери первый элемент в коллекции ниже или слева');
 }
 function renderAll(freshId=null,failed=[]){syncState();renderCollection();renderProgress();renderBoard(freshId,failed);}
 function freePosition(){
@@ -310,14 +314,19 @@ function arrangeBench(snapshot=true){
  measureTokens();const n=state.bench.length,w=board.clientWidth,h=board.clientHeight,gap=18;
  const maxCols=Math.max(1,Math.floor((w-10)/(tokenSize.w+6)));
  let cols=Math.min(maxCols,Math.ceil(Math.sqrt(n)));
- while(Math.ceil(n/cols)*(tokenSize.h+10)>h-37&&cols<maxCols)cols++;
+ const free=h-26-padBottom();
+ while(Math.ceil(n/cols)*(tokenSize.h+10)>free+5&&cols<maxCols)cols++;
  const rows=Math.ceil(n/cols);
  const stepX=Math.min(tokenSize.w+gap,(w-tokenSize.w-20)/Math.max(1,cols-1));
- const stepY=Math.min(tokenSize.h+gap,(h-tokenSize.h-42)/Math.max(1,rows-1));
+ const stepY=Math.min(tokenSize.h+gap,(free-tokenSize.h)/Math.max(1,rows-1));
  const startX=(w-((cols-1)*stepX+tokenSize.w))/2;
  const startY=Math.max(26,(h-((rows-1)*stepY+tokenSize.h))/2+5);
  state.bench.forEach((t,i)=>{const lastCount=n-(rows-1)*cols,lastRow=Math.floor(i/cols)===rows-1,offset=lastRow?(cols-lastCount)*stepX/2:0;Object.assign(t,uv(startX+(i%cols)*stepX+offset+tokenSize.w/2,startY+Math.floor(i/cols)*stepY+tokenSize.h/2));});
  selected=null;renderBoard();if(snapshot)persist();
+}
+function benchCrowded(){
+ const p=state.bench.map(xy);
+ return p.some((a,i)=>p.slice(i+1).some(b=>Math.abs(a.x-b.x)<tokenSize.w-4&&Math.abs(a.y-b.y)<tokenSize.h-4));
 }
 function clearBench(){if(!state.bench.length){showToast('Стол уже свободен','Все открытые элементы доступны в коллекции.',null,'failure',1700);return;}pushUndo();state.bench=[];selected=null;renderBoard();persist();dismissToast();}
 function undo(){if(!undoStack.length)return;cancelDrag();state.bench=undoStack.pop();selected=null;renderBoard();persist();dismissToast();announce('Изменение стола отменено. Открытия сохранены.');}
@@ -641,9 +650,22 @@ listen(window,'blur',cancelDrag);
 listen(document,'dragstart',e=>{if(e.target.closest('.token,.element-card'))e.preventDefault();});
 listen(document,'contextmenu',e=>{const el=e.target.closest('[data-pick],[data-token]');if(!el)return;e.preventDefault();const id=el.dataset.pick||state.bench.find(t=>t.uid===el.dataset.token)?.id;if(id)showDetail(id);});
 listen($('collectionSearch'),'input',()=>renderCollection());
-listen($('clearSearch'),'click',()=>{$('collectionSearch').value='';renderCollection();$('collectionSearch').focus();});
+/* Телефон: поиск свёрнут в иконку, порядок и избранное — в маленьком меню, чтобы
+ * коллекции хватало экрана. Непустой запрос никогда не прячется: поле остаётся открытым. */
+const shelf=document.querySelector('.collection');
+function setSearchOpen(open){
+ shelf.classList.toggle('search-open',open);$('searchToggle').setAttribute('aria-expanded',String(open));
+ if(open){setCollectionMenu(false);$('collectionSearch').focus();}
+}
+function setCollectionMenu(open){shelf.classList.toggle('menu-open',open);$('collectionMenuBtn').setAttribute('aria-expanded',String(open));}
+listen($('searchToggle'),'click',()=>setSearchOpen(true));
+listen($('collectionSearch'),'blur',()=>{if(!$('collectionSearch').value.trim())setTimeout(()=>{if(document.activeElement!==$('collectionSearch')&&!$('collectionSearch').value.trim())setSearchOpen(false);},150);});
+listen($('clearSearch'),'click',()=>{$('collectionSearch').value='';renderCollection();if(phone.matches)setSearchOpen(false);else $('collectionSearch').focus();});
+listen($('collectionMenuBtn'),'click',()=>setCollectionMenu(!shelf.classList.contains('menu-open')));
+listen(document,'click',e=>{if(shelf.classList.contains('menu-open')&&!e.target.closest('#collectionMenu,#collectionMenuBtn'))setCollectionMenu(false);});
+listen(document,'keydown',e=>{if(e.key==='Escape'&&shelf.classList.contains('menu-open')){setCollectionMenu(false);$('collectionMenuBtn').focus();}});
 listen($('favoriteFilter'),'click',()=>{onlyFavorites=!onlyFavorites;renderCollection();});
-listen($('sortSelect'),'change',()=>{state.settings.sort=$('sortSelect').value;persist();renderCollection();});
+listen($('sortSelect'),'change',()=>{state.settings.sort=$('sortSelect').value;persist();renderCollection();setCollectionMenu(false);});
 listen($('closeModal'),'click',closeModal);
 listen(modal,'cancel',e=>{e.preventDefault();closeModal();});
 listen(modal,'click',e=>{if(e.target===modal&&!inRect(e.clientX,e.clientY,modal.getBoundingClientRect()))closeModal();});
@@ -760,7 +782,9 @@ function initShell(){
   const host=$('topActions')||old?.parentElement;
   if(host){QW.header.mountGear(host);old?.remove();}
   const helpHidden=()=>{const b=$('helpBtn');return Boolean(b&&b.offsetParent!==null);};
+  const soundHidden=()=>{const b=$('soundBtn');return Boolean(b&&b.offsetParent!==null);};
   QW.menu.register([
+   {id:'alchemy-sound',icon:'sound',label:'Звуки превращений',hidden:soundHidden,toggle:()=>state.settings.sound,onSelect:()=>toggleSound()},
    {id:'alchemy-help',icon:'help',label:'Как играть',hidden:helpHidden,onSelect:()=>showHelp()},
    {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'анимации, экспорт, сброс',onSelect:()=>showSettings()}
   ],'Alchemia');
@@ -770,6 +794,7 @@ function initShell(){
 initShell();
 updateAchievements();applySettings();renderAll();sizeCanvas();
 if(!loaded)arrangeBench(false);
+else if(phone.matches&&benchCrowded())arrangeBench(false); // a table saved on a tall board would pile up on the compact phone table
 lastBoardSize={w:board.clientWidth,h:board.clientHeight};
 // Do not overwrite a malformed existing save without explicit gameplay input.
 if(!loadWarning)persist();

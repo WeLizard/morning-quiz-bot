@@ -45,7 +45,7 @@ def cmd(f, kind, data=None, at=D1 + 3600):
 def test_catalog_economy_tables():
     validate()
     assert validate_economy() == dict(decor_shop=15, reward_decor=4)
-    assert [income_ref(lv) for lv in (1, 4, 5, 10, 15, 20, 25, 30, 45, 50)] == [1100, 1100, 7000, 13000, 19000, 30000, 36000, 40000, 42000, 42000]
+    assert [income_ref(lv) for lv in (1, 4, 5, 10, 15, 20, 25, 30, 45, 50)] == [1100, 1100, 7000, 13000, 19000, 46000, 64000, 76000, 89000, 89000]
     assert [d['tier'] for d in DECOR_SHOP] == sorted(d['tier'] for d in DECOR_SHOP)
     assert {BUILDINGS[d['id']]['level'] for d in DECOR_SHOP} == {8, 15, 25, 35, 45}
     assert all(BUILDINGS[d['id']]['decor'] for d in DECOR_SHOP + REWARD_DECOR)

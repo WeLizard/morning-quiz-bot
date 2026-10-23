@@ -138,7 +138,13 @@ export function buildingPurpose(type,catalog){
  const animals=Object.values(catalog.animals||{}).filter(a=>a.building===type);
  if(animals.length){
   const a=animals[0],out=uniq(Object.keys(a.outputs||{}).map(nm)),feed=uniq(Object.keys(a.inputs||{}).map(nm));
-  return [`Здесь живут ${String(a.name).toLowerCase()}: дают ${short(out,4)}.`,`Корм: ${short(feed,4)}.`];
+  const houseHints={honey:{house:'пасек',name:'Мёд',verb:'нужен'},egg:{house:'курятников',name:'Яйца',verb:'нужны'},milk:{house:'коровников',name:'Молоко',verb:'нужно'}};
+  const needs=Object.keys(a.outputs||{}).flatMap(id=>{
+   const hint=houseHints[id];if(!hint)return [];
+   const count=Object.values(catalog.recipes||{}).filter(r=>r.inputs&&id in r.inputs).length;
+   return count?[`${hint.name} ${hint.verb} для ${count} рецептов; для цепочек может понадобиться несколько ${hint.house}`]:[];
+  });
+  return [`Здесь живут ${String(a.name).toLowerCase()}: дают ${short(out,4)}.`,`Корм: ${short(feed,4)}.${needs.length?` ${needs.join('. ')}.`:''}`];
  }
  if(!recipes.length)return [];
  const outIds=uniq(recipes.flatMap(r=>Object.keys(r.outputs||{}))),inIds=uniq(recipes.flatMap(r=>Object.keys(r.inputs||{})));

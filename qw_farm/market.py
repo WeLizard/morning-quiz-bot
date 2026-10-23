@@ -7,7 +7,7 @@ Old farms get an empty market on first load; nothing is granted retroactively.
 from hashlib import sha256
 import math
 from .catalog import (CROPS, ITEMS, RECIPES, NPCS, REP_NAMES, REP_POINTS, REP_BONUS, REP_SPECIAL_LEVEL, NPC_TASTES,
-                      MARKET, PLOT_LIMITS, level)
+                      MARKET, PLOT_LIMITS, level, income_ref, OLD_ORCHARD_PRICES)
 from .domain import need, find, inventory, event, unbound
 from . import progression, textile
 
@@ -34,6 +34,15 @@ def upgrade_market(farm):
     m = farm.setdefault('market', blank())
     for key, value in blank().items():
         m.setdefault(key, value)
+    car = m.get('caravan')
+    if car and any('unit_price' not in c for c in car['crates']):
+        # Old saves recorded the aggregate value, but no per-crate prices. Recognise the old orchard
+        # catalog by that exact total; otherwise use today's prices. Existing snapshots always win.
+        old_value = sum(OLD_ORCHARD_PRICES.get(c['item'], ITEMS[c['item']]['price']) * c['qty'] for c in car['crates'])
+        old_catalog = old_value == car['value']
+        for c in car['crates']:
+            price = OLD_ORCHARD_PRICES.get(c['item'], ITEMS[c['item']]['price']) if old_catalog else ITEMS[c['item']]['price']
+            c.setdefault('unit_price', price)
     return m
 
 
@@ -129,7 +138,7 @@ def _crop_prices(lv):
 
 # --- caravan ---------------------------------------------------------------------------------------------
 def caravan_target(lv):
-    return max(150, round(reference_daily_income(lv) * CARAVAN['value_share'] / 100))
+    return max(150, round(income_ref(lv) * CARAVAN['value_share'] / 100))
 
 
 def crate_count(lv):
@@ -154,7 +163,7 @@ def make_caravan(farm, now):
     if len(pool) < n:
         pool = sorted(i for i in products if ITEMS[i]['price'] >= 8) or sorted(products)
     chosen = sorted(pool, key=lambda i: _rng(rng, i))[:n]
-    crates = [dict(item=i, qty=max(1, min(12, round(each / ITEMS[i]['price']))), done=False) for i in chosen]
+    crates = [dict(item=i, qty=max(1, min(12, round(each / ITEMS[i]['price']))), done=False, unit_price=ITEMS[i]['price']) for i in chosen]
     value = sum(ITEMS[c['item']]['price'] * c['qty'] for c in crates)
     npc = NPCS[(rng // 5) % len(NPCS)][0]
     hours = CARAVAN['min_hours'] + (rng // 29) % (CARAVAN['max_hours'] - CARAVAN['min_hours'] + 1)
@@ -170,11 +179,11 @@ def caravan_payout(farm, car):
 
 
 def settle_caravan(farm, now):
-    m = farm['market']
+    m = upgrade_market(farm)
     car = m['caravan']
     if car and now >= car['deadline']:
-        # Time is up: delivered crates are paid at the plain shop price, so nothing is lost and nothing gained.
-        refund = sum(ITEMS[c['item']]['price'] * c['qty'] for c in car['crates'] if c['done'])
+        # Refund the shop value recorded on arrival, even if the catalog changed while the caravan waited.
+        refund = sum(c['unit_price'] * c['qty'] for c in car['crates'] if c['done'])
         farm['coins'] += refund
         m['caravans_failed'] += 1
         m['last_caravan'] = dict(ok=False, npc=car['npc'], refund=refund, at=car['deadline'])
@@ -312,6 +321,7 @@ def validate_market(farm):
     car = m['caravan']
     if car:
         need(3 <= len(car['crates']) <= 6 and all(c['item'] in ITEMS and type(c['qty']) is int and 1 <= c['qty'] <= 12
+                                                    and ('unit_price' not in c or (type(c['unit_price']) is int and c['unit_price'] >= 0))
                                                     for c in car['crates']), 'invalid_market', 'Некорректный обоз.', 500)
     need(len(m['contracts']['items']) <= 3 and len(m['decor_credits']) <= 5, 'invalid_market', 'Некорректные контракты.', 500)
 
@@ -341,6 +351,7 @@ def max_extra_daily(lv, orders_per_day=6):
     avg_order = 1.45 * (sum(top) / len(top)) * 2 + 6
     out['reputation'] = round(orders_per_day * avg_order * (REP_BONUS * MAX_REP_LEVEL / 100 + 0.25 * 0.20))
     out['total'] = sum(out.values())
-    out['reference'] = reference_daily_income(lv)
+    # The caravan and its share use the same late-game reference; retain the original pre-caravan model.
+    out['reference'] = income_ref(lv) if lv >= CARAVAN['level'] else reference_daily_income(lv)
     out['share'] = round(out['total'] / max(1, out['reference']), 3)
     return out

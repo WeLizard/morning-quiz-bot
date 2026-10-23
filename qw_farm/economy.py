@@ -16,7 +16,8 @@ next visit (``claim_village``): no background workers.
 """
 from .catalog import (BUILDINGS, ITEMS, level, income_ref, plot_upkeep, UPKEEP_PCT, FIELD_UPKEEP, UPKEEP_LEVEL, FUND_LEVEL,
                       SEASON_DAYS, FUND_TIERS, FUND_MARKUP, MIN_SHARE_PCT, DEBT_SLOW, DEBT_SLOW_DEN, FEAST_DAYS, FEAST_PCT,
-                      DECOR_SHOP, DECOR_EXTRA, REWARD_DECOR, TIER_DISCOUNT_PCT, MAX_CONTRIBUTION, FUND_REWARD_TEXT)
+                      DECOR_SHOP, DECOR_EXTRA, REWARD_DECOR, TIER_DISCOUNT_PCT, MAX_CONTRIBUTION, FUND_REWARD_TEXT,
+                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET)
 
 TZ_OFFSET = 10800
 DAY = 86400
@@ -66,13 +67,31 @@ def min_share(ref):
 
 
 # ---------------------------------------------------------------- upkeep
+def ordered_trees(farm):
+    """Stable planting order, including old saves whose trees have no planting timestamp."""
+    return sorted((obj for obj in farm['objects'] if obj['type'] == 'tree'),
+                  key=lambda obj: (obj.get('planted_at', 0), obj['id']))
+
+
+def tree_rent(size, index):
+    """Full daily land bill for tree ``index`` (one-based planting order)."""
+    return plot_upkeep(size) + TREE_RENT_STEP * max(0, index - max(0, size - TREE_RENT_FREE_OFFSET))
+
+
+def tree_upkeep(farm):
+    """Daily bill of the current orchard before any fund discount."""
+    return sum(tree_rent(farm['size'], index) for index, _ in enumerate(ordered_trees(farm), 1))
+
+
 def base_upkeep(farm):
-    """Daily bill U before any discount: beds by land size + 1% of the price x level of every non-decor building + fields."""
+    """Daily bill before discounts: beds, progressive orchard rent, 1% building price x level, and fields."""
     size = farm['size']
     per_plot = plot_upkeep(size)
-    total = 0
+    total = tree_upkeep(farm)
     for obj in farm['objects']:
-        if obj['type'] in ('plot', 'tree'):   # a tree stands on land like a bed: «земля под деревом»
+        if obj['type'] == 'tree':
+            continue
+        if obj['type'] == 'plot':
             total += per_plot
             continue
         spec = BUILDINGS.get(obj['type'])

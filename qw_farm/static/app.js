@@ -165,7 +165,7 @@ function updateGrowthMeter(bar){const width=`${Math.max(0,Math.min(100,100*(now(
 // Quiet notices at the top, under the counters: short, translucent, never over the seed strip, and identical ones merge
 // into one line with a counter. Errors stay longer and look stronger; only an error that carries a button takes clicks.
 const toastList=[];let toastTimer=0;
-function toast(text,error=false,action=null){const t=pushToast(toastList,text,error,Date.now());if(action)t.action=action;renderToasts();}
+function toast(text,error=false,action=null,ms=0){const t=pushToast(toastList,text,error,Date.now());if(action)t.action=action;if(ms)t.until=Math.max(t.until,Date.now()+ms);renderToasts();}
 function renderToasts(){
  clearTimeout(toastTimer);expireToasts(toastList,Date.now());
  $('toasts').replaceChildren(...toastList.map(t=>{const n=el('div',null,`toast-item${t.error?' error':''}`);n.append(el('span',toastText(t)));if(t.action){n.classList.add('has-action');n.append(button(t.action.label,()=>{toastList.splice(toastList.indexOf(t),1);renderToasts();t.action.fn();},'toast-action'));}return n;}));
@@ -354,9 +354,9 @@ async function refresh({render=true}={}){
  let farm=me.farm,lostAccess=false;
  if(id&&id!==identity){try{farm=(await request(API+'/farms/'+id)).farm;}catch(e){if(!current())return false;if([403,404].includes(e.status))lostAccess=true;else throw e;}}
  if(!current())return false;
- const beforeScene=sceneSnapshot(),beforeHUD=hudSnapshot(),beforeSeeds=seedsSnapshot();
+ const beforeScene=sceneSnapshot(),beforeHUD=hudSnapshot(),beforeSeeds=seedsSnapshot(),prevLevel=S.me?.level??null;
  S.form=me.address_form||'n';S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();
- queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();
+ queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();syncOrchardBadge();orchardNotices(prevLevel);
  if(lostAccess){farmViewEpoch++;S.tab='neighbors';toast(gf('Хозяин закрыл доступ. Ты вернулся на свою ферму.','Хозяин закрыл доступ. Ты вернулась на свою ферму.','Доступ закрыт владельцем. Открыта твоя ферма.'));}
  if(beforeScene!==sceneSnapshot())scene.set(S.farm,S.catalog);
  else scene.serverOffset=S.farm.server_time-Date.now()/1000;
@@ -411,7 +411,7 @@ async function enter(){
   // has entered Farm, returning to /app must not launch the same invite again.
   if(S.invite)try{sessionStorage.setItem('qw-farm.launch-consumed',S.invite);}catch{}
   try{S.pending=JSON.parse(sessionStorage.getItem(pendingKey(S.me.id))||'null');if(S.pending&&S.pending.actor!==S.me.id)S.pending=null;}catch{S.pending=null;}
- document.body.classList.remove('farm-login');$('game').hidden=false;$('login').hidden=true;if(S.invite&&S.invite!==S.me.id){S.tab='neighbors';showPanel();}renderRail();updateHUD();scene.set(S.farm,S.catalog);scene.resize();scene.fit();renderSeeds();renderPanel();updateReady();connection(S.config.demo?`Локальный сервер · темп ×${S.speed}`:'Сохранено в QuizzyWizzy',!!S.pending);queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();if(S.pending)setTimeout(()=>sendPending().catch(()=>{}),300);
+ document.body.classList.remove('farm-login');$('game').hidden=false;$('login').hidden=true;if(S.invite&&S.invite!==S.me.id){S.tab='neighbors';showPanel();}renderRail();updateHUD();scene.set(S.farm,S.catalog);scene.resize();scene.fit();renderSeeds();renderPanel();updateReady();connection(S.config.demo?`Локальный сервер · темп ×${S.speed}`:'Сохранено в QuizzyWizzy',!!S.pending);queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();orchardNotices();if(S.pending)setTimeout(()=>sendPending().catch(()=>{}),300);
   renewPlatformSession().catch(()=>{});
  }catch(e){if(epoch!==farmViewEpoch)return;if(e.status===401)showLogin(SESSION_ENDED);else{showLogin(e.message);toast(e.message,true);}}
 }
@@ -449,7 +449,7 @@ function renderRail(){
  const mainTabs=new Set(['orders','inventory','fields','build','production','team','forest','lake','neighbors']);
  const shown=tabs.filter(([id])=>id!=='festival'||festivalTab()),entries=mobile?[...shown.filter(([id])=>mainTabs.has(id)),['more','menu','Ещё']]:shown;
  const rail=$('rail');rail.replaceChildren();for(let [id,ic,title]of entries){let b=button(null,()=>selectTab(id),'',false);b.append(icon(ic),el('span',title));b.dataset.tab=id;b.setAttribute('aria-label',title);b.classList.toggle('active',id===S.tab||id==='more'&&!entries.some(([k])=>k===S.tab));rail.append(b);}
- FRIEND_REQUESTS.notify();syncNav();
+ FRIEND_REQUESTS.notify();syncOrchardBadge();syncNav();
  if(mobile)requestAnimationFrame(()=>{const active=rail.querySelector('.active');if(active)rail.scrollTo({left:Math.max(0,active.offsetLeft-(rail.clientWidth-active.offsetWidth)/2),behavior:'smooth'});});
 }
 function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
@@ -465,6 +465,8 @@ function hideSeedCard(){clearTimeout(seedCardTimer);seedCardVisible=false;$('see
 function renderSeeds(){const parent=$('seedbar'),scroll=parent.scrollLeft;parent.replaceChildren();parent.hidden=!own();$('quick-stack').hidden=!own();$('harvest-all').hidden=!own();updateSeedCard();updateRepeat();if(!own())return;parent.append(el('div','ПОСАДИТЬ','seedbar-label'));
  for(let c of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic&&!c.orchard),S.me.level)){let locked=c.level>S.me.level,st=seedStats(c,S.catalog.items[c.id].price,S.speed,S.catalog.crop_classes),b=button(null,()=>{S.seed=c.id;renderSeeds();showSeedCard(2600);document.body.classList.remove('panel-open');},`seed ${S.seed===c.id?'active':''} cls-${st.cls}`,locked);b.addEventListener('pointerenter',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('pointerleave',()=>{if(c.id===S.seed)hideSeedCard();});b.addEventListener('focus',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('blur',()=>{if(c.id===S.seed)hideSeedCard();});const details=el('small',null,'seed-details');if(locked)details.append(el('span',`С ${c.level} ур.`));else details.append(el('span',`${fmt(c.cost)} мон.`),el('span',seedTimeText(st.seconds)));b.append(icon(c.id),el('span',c.name),details);b.dataset.class=st.cls;b.setAttribute('aria-label',locked?`${c.name}: нужен уровень ${c.level}`:seedLine(c,st));parent.append(b);}
  for(const k of MERCH.seedPacks(S.catalog,stock,S.me.level)){const b=button(null,()=>{S.seed=k.id;renderSeeds();document.body.classList.remove('panel-open');},`seed ${S.seed===k.id?'active':''} cls-pack`);b.dataset.seedPack=k.id;const d=el('small',null,'seed-details');d.append(el('span','из пакета'),el('span',`осталось ${k.left}`));b.append(icon(k.id),el('span',k.name),d);b.setAttribute('aria-label',`${k.name}: посадить из пакета, осталось ${k.left}`);parent.append(b);}
+ // Fruit trees left the beds for the «Сад» tab: one card of the same size at the end of the strip leads there.
+ if(S.catalog.orchard){const b=button(null,openOrchard,'seed seed-orchard'),d=el('small',null,'seed-details');b.dataset.qwCrumb='seed-orchard';d.append(el('span','→ Сад'));b.append(icon('orchard'),el('span','Деревья'),d);b.setAttribute('aria-label','Фруктовые деревья сажают в разделе «Сад». Открыть Сад');parent.append(b);}
  parent.scrollLeft=scroll;}
 function seedLine(c,st){return `${c.name} — семена ${fmt(c.cost)} мон., ${st.label}, ${timeText(st.seconds)}, урожай ×${c.yield_qty}, ≈${fmt(st.perHour)} мон./ч, ≈${fmt(st.xpPerHour)} опыта/ч`+(st.cls==='long'?`. ${LONG_HINT}.`:'');}
 // The card of the chosen seed: class, time, income and XP per hour, and a hint for long crops.
@@ -721,15 +723,40 @@ function landExpansion(p){
 function renderBuild(p){heading('Обустройство','ЗДЕСЬ БУДЕТ ТВОЯ ИСТОРИЯ');landExpansion(p);note('Выбери объект, нажми на свободную клетку и нажми по ней ещё раз или «Поставить». Перемещение уже построенного бесплатно. Плодовые деревья сажают во вкладке «Сад».',p);let specs=[{id:'plot',name:'Новая грядка',cost:35,level:1,w:1,h:1},...Object.values(S.catalog.buildings)];for(let b of specs){if(b.curio&&!(S.me.merchant?.curios||[]).includes(b.id))continue;let c=card(b.name,`${b.w} × ${b.h} клеток · ${b.cost} монет`,b.id==='plot'?'wheat':'workshop');const purpose=buildingPurpose(b.id,S.catalog);if(purpose.length)note(purpose.join(' '),c);if(b.level>S.me.level)note(`Откроется на уровне ${b.level}`,c);if(b.secret&&!S.me.secrets.includes(b.secret))note('Найди эту пасхалку в разделе «Находки».',c);const locked=b.reward&&!(S.me.economy?.unlocked||[]).includes(b.id);if(locked)note(`Награда фонда деревни: ${b.source}`,c);const placed=S.farm.objects.filter(o=>o.type===b.id);if(placed.length){const row=el('div',null,'building-purpose-row');row.append(el('small',`Уже на ферме: ${placed.length}`));for(const o of placed){const pick=button(null,()=>{farmViewEpoch++;S.selected=o.id;S.tab='object';scene.focus(o,true,sheetInset());showPanel();renderRail();renderPanel();},'text-button building-purpose-pick');pick.append(icon(objIcon(o)),el('span',`${o.x+1}, ${o.y+1}`));row.append(pick);}c.append(row);}c.append(button('Разместить',()=>beginPlacement(b),'secondary wide',b.level>S.me.level||b.cost>S.me.coins||(b.secret&&!S.me.secrets.includes(b.secret))||locked));p.append(c);}}
 /* ---- fruit orchard (docs/tasks/FARM_ORCHARD.md): the «Сад» tab and the card of a tree. Every number comes from the server (S.catalog.orchard, S.me.orchard_view) ---- */
 const orchardInfo=o=>ORCH.view(S.me)?.trees?.[o.id]||null;
+// Every entry to the orchard (seed bar card, notices) goes through the one «Сад» tab.
+function openOrchard(){selectTab('orchard');}
+// A small counter on the «Сад» tab while saplings or talons wait to be planted. On a phone the tab lives under «Ещё»: the counter sits there too.
+function syncOrchardBadge(more=$('panel-content')){
+ const n=S.me&&S.catalog?ORCH.pendingCount(ORCH.view(S.me),S.me,S.catalog):0,rail=$('rail');
+ const hosts=[rail?.querySelector('[data-tab=orchard]')||rail?.querySelector('[data-tab=more]'),more?.querySelector('.more-item[data-more-tab=orchard]')].filter(Boolean);
+ for(const h of hosts){
+  let b=h.querySelector(':scope>.tab-badge');const title=h.dataset.tab==='more'?'Ещё':'Сад';
+  if(!n){b?.remove();if(h.dataset.tab)h.setAttribute('aria-label',title);else h.removeAttribute('aria-label');continue;}
+  if(!b){b=el('b',null,'tab-badge');b.setAttribute('aria-hidden','true');h.append(b);}
+  const text=n>9?'9+':String(n);if(b.textContent!==text)b.textContent=text;h.setAttribute('aria-label',`${title} · в Саду ждут посадки: ${n}`);
+ }
+}
+// One-time notice for farms whose fruit beds moved to the orchard, and the level-up line for a newly opened tree species.
+let orchardMovedShown=null;
+function orchardNotices(prevLevel=null){
+ if(!S.me||!S.catalog?.orchard)return;
+ const go={label:ORCH.OPEN_LABEL,fn:openOrchard};
+ if(prevLevel!=null&&S.me.level>prevLevel){const list=ORCH.treeUnlocks(S.catalog,prevLevel,S.me.level);if(list.length)toast(ORCH.unlockText(list),false,go,10000);}
+ if(orchardMovedShown===S.me.id||!ORCH.movedNotice(ORCH.view(S.me)))return;
+ orchardMovedShown=S.me.id;let seen=null;try{seen=localStorage.getItem('qw-farm.orchard-moved');}catch{}
+ if(seen===S.me.id)return;try{localStorage.setItem('qw-farm.orchard-moved',S.me.id);}catch{}
+ toast(ORCH.MOVED_TEXT,false,go,10000);
+}
 function renderOrchard(p){
  heading('Сад','ДЕРЕВО РАСТЁТ, УРОЖАЙ ВОЗВРАЩАЕТСЯ');
  const v=ORCH.view(S.me),rows=ORCH.saplingRows(S.catalog,S.me,v),mine=ORCH.treeSummary(S.catalog,S.me.objects);
- note('Саженец покупают один раз: дерево плодоносит снова и снова, каждый «садовый год» — это 20 часов. Грядок оно не занимает, но у участка есть лимит деревьев. Ничего не гибнет и не портится, а заходить обязательно не нужно.',p);
- if(v)note(`Деревьев: ${v.count} из ${v.limit}${mine?` · ${mine}`:''}`,p);
+ note('Саженец покупают один раз: дерево плодоносит снова и снова, каждый «садовый год» — это 24 часа. Грядок оно не занимает, но каждому дереву нужна своя свободная клетка. Ничего не гибнет и не портится, а заходить обязательно не нужно.',p);
+ if(v)note(`Деревьев: ${v.count}${mine?` · ${mine}`:''}`,p);
+ const rent=ORCH.rentSummary(v);if(rent)note(`Аренда сада: все деревья — ${fmt(rent.total)} монет в сутки · следующее дерево — ${fmt(rent.next)} монет в сутки. Без надбавки к аренде: деревьев — ${rent.freeCount}.`,p);
  if(v&&Object.keys(v.discounts||{}).length)note(`Талоны со скидкой: ${Object.entries(v.discounts).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ')}`,p);
  for(const r of rows){
   const c=card(r.sapling,`${r.name} · первый урожай через ${duration(r.first)}`,'sapling_'+r.id);
-  c.append(el('p',`Урожай ×${r.yield_qty} у молодого дерева, с годами больше · опыт за урожай ${r.xp}${r.potted?' · растёт в кадке':''}`,'note'));
+  c.append(el('p',`Урожай ×${r.yield_qty} у взрослого дерева, у молодого меньше · опыт за урожай ${r.xp}${r.potted?' · растёт в кадке':''}`,'note'));
   if(r.locked)note(`Откроется на уровне ${r.level}`,c);else if(r.blocked)note(r.blocked,c);
   const stack=el('div',null,'qw-btn-stack');
   r.options.forEach((opt,i)=>{
@@ -1229,7 +1256,7 @@ function festivalBanner(p){
  line.append(el('span',text,'reward'),button('Открыть',()=>selectTab('festival'),'qw-btn secondary'));
  row.append(line);p.prepend(row);
 }
-function renderMore(p){heading('Все разделы','ПОД РУКОЙ, НО НЕ ПЕРЕД ГЛАЗАМИ');let grid=el('div',null,'more-grid');for(let [id,ico,title]of tabs.filter(([id])=>id!=='festival'||festivalTab())){let b=button(null,()=>selectTab(id),'more-item');b.append(icon(ico),el('span',title));b.dataset.moreTab=id;grid.append(b);}p.append(grid,button('Список всех объектов',()=>selectTab('objects'),'secondary wide'));}
+function renderMore(p){heading('Все разделы','ПОД РУКОЙ, НО НЕ ПЕРЕД ГЛАЗАМИ');let grid=el('div',null,'more-grid');for(let [id,ico,title]of tabs.filter(([id])=>id!=='festival'||festivalTab())){let b=button(null,()=>selectTab(id),'more-item');b.append(icon(ico),el('span',title));b.dataset.moreTab=id;grid.append(b);}p.append(grid,button('Список всех объектов',()=>selectTab('objects'),'secondary wide'));syncOrchardBadge(grid);}
 function closeDashaGame(){if(!dashaGameOpen)return true;dashaGameOpen=false;document.body.classList.remove('dasha-game-open');dashaGame?.destroy();dashaGame=null;navPop('dasha-wager');requestAnimationFrame(()=>document.querySelector('[data-open-dasha]')?.focus({preventScroll:true}));return true;}
 async function openDashaGame(){
  if(!own()||!S.me)return;
@@ -1975,6 +2002,7 @@ function renderFields(p){
   p.append(c);return;
  }
  note('Поле проходит цикл: дикое → культивация → посев → рост → уборка. Каждую операцию можно '+gf('проехать самому','проехать самой','проехать вручную')+' (качество до 110%) или отдать автопилоту (95%). Маршрут проверяет сервер.',p);
+ note('Если заходишь раз в сутки, на полях окупаются культуры со сроком роста около 24 часов.',p);
  p.append(el('h3','Мои поля','subheading'));
  const mine=S.me.fields||[];
  if(!mine.length)note('Полей пока нет — купи первое ниже.',p);

@@ -4,7 +4,7 @@ A tree is a 1x1 object ``{id, type:'tree', species, planted_at, harvests, fruit,
 It bears fruit in cycles of ``TREE_CYCLE`` ("garden year", 20 h) like an animal house: ``fruit`` is the current cycle, frozen when it
 starts (``ready_at``, ``qty``, ``xp``, ``pest``, ``golden``), so a rebalance needs no migration. The first harvest comes after
 ``juvenile + 1`` cycles. A ripe harvest waits on the tree; the next cycle starts when the fruit is taken (like a bed). Nothing dies or
-spoils: care only adds or removes a bonus. Trees use ``TREE_LIMITS`` (not beds) and pay ``plot_upkeep`` like a bed.
+spoils: care only adds or removes a bonus. Trees take no beds and have no count limit (only free cells and ``object_limit``); they pay ``plot_upkeep`` like a bed.
 
 Commands (owner only, strict schemas; the fruit itself is taken with the ordinary ``harvest`` / ``collect_all`` / ``collect_group``):
   ``plant_tree {species, x, y, voucher}``  voucher: null | 'free' (a free sapling of ``farm['orchard']['vouchers']``) | the id of a discount
@@ -20,7 +20,7 @@ import math
 
 from .catalog import (CROPS, ITEMS, TREES, TREE_BY_FRUIT, GRAFTS, TREE_CYCLE, TREE_YOUNG_HARVESTS, TREE_ADULT_HARVESTS, TREE_CENTURY_HARVESTS,
                       TREE_PEST_PCT, TREE_GOLD_PERMILLE, TREE_PRUNE_EVERY, TREE_PRUNE_WOOD, TREE_WATER_CUT, TREE_HELP_PCT, TREE_BIRDHOUSE_RADIUS,
-                      TREE_VOUCHER_DISCOUNT_PCT, TREE_REFUND_WOOD, TREE_PESTS, VERSION, level, tick, tree_limit, object_limit)
+                      TREE_VOUCHER_DISCOUNT_PCT, TREE_REFUND_WOOD, TREE_PESTS, VERSION, level, tick, object_limit)
 from .domain import need, named, find, duration, inventory, pay, place, event
 from . import progression, market
 
@@ -50,8 +50,10 @@ def trees(farm):
 
 
 def yield_of(spec, n):
-    """Fruit of the n-th harvest (1-based): Y while young (up to 5), Y+1 while adult (up to 20), Y+2 later."""
-    return spec['yield_qty'] + (0 if n <= TREE_YOUNG_HARVESTS else 1 if n <= TREE_ADULT_HARVESTS else 2)
+    """Fruit of the n-th harvest (1-based). ``yield_qty`` is the ADULT yield A: a young tree (up to the 5th harvest) gives 60% of it,
+    an adult and an elder tree A, a century tree (from the 100th harvest) 125%."""
+    a = spec['yield_qty']
+    return (a * 6 + 5) // 10 if n <= TREE_YOUNG_HARVESTS else a * 125 // 100 if n >= TREE_CENTURY_HARVESTS else a
 
 
 def stage(obj):
@@ -170,7 +172,7 @@ def help_tree(obj, now):
 # State
 # ----------------------------------------------------------------------------------------------------------------------
 def blank():
-    return dict(vouchers={}, granted=[], seen=[])
+    return dict(vouchers={}, granted=[], seen=[], repriced=False)
 
 
 def state(farm):
@@ -208,11 +210,37 @@ def upgrade(farm, now=None):
             o['vouchers'][sp] = o['vouchers'].get(sp, 0) + 1
             o['granted'].append(sp)
             event(farm, at, f'Филиныч привёз саженец взамен {GEN[sp]}: «На грядке было тесно».', 'orchard')
+    reprice(farm, o, at)
     return o
 
 
+def reprice(farm, o, at):
+    """One-time compensation of the 2026-10-23 revision: every planted tree that was bought for coins at the old (higher) sapling price brings back
+    the difference to the current price. Free (voucher) saplings paid nothing and get nothing. ``o['repriced']`` is the flag and the audit record;
+    the tree's ``cost`` becomes the new price so an uproot inside the undo window cannot refund the difference twice. Deterministic, idempotent."""
+    if o.get('repriced'):
+        return
+    total, count = 0, 0
+    for obj in trees(farm):
+        f = obj.get('fruit')
+        if f:       # the fruit already growing takes the new yield and XP at once (age and progress stay)
+            f['qty'] = max(f['qty'], yield_of(TREES[obj['species']], obj['harvests'] + 1) + (1 if obj['harvests'] < obj.get('pruned_until', 0) else 0))
+            f.update(xp=TREES[obj['species']]['xp'])
+        new = sapling_price(obj['species'], obj.get('paid_with'))
+        diff = obj['cost'] - new if obj.get('paid_with') != 'free' and obj['cost'] > new else 0
+        if diff > 0:
+            obj['cost'] = new
+            obj['gift'] = min(obj.get('gift', 0), new)
+            total += diff
+            count += 1
+    o['repriced'] = dict(coins=total, trees=count)
+    if total:
+        farm['coins'] += total
+        event(farm, at, f'Перерасчёт сада: саженцы подешевели, возвращено {total} монет за деревьев: {count}.', 'orchard')
+
+
 def add_voucher(farm, species, n=1):
-    """A free sapling of a species (festivals and other sources call this; the tree limit is checked when it is planted)."""
+    """A free sapling of a species (festivals and other sources call this; only free space is checked when it is planted)."""
     need(species in TREES, 'unknown_item', 'Такого дерева нет.', 422)
     o = state(farm)
     o['vouchers'][species] = o['vouchers'].get(species, 0) + n
@@ -221,7 +249,8 @@ def add_voucher(farm, species, n=1):
 def validate(farm):
     o = farm.get('orchard')
     if o is not None:
-        need(isinstance(o, dict) and set(o) == {'vouchers', 'granted', 'seen'} and isinstance(o['vouchers'], dict)
+        need(isinstance(o, dict) and set(o) - {'repriced'} == {'vouchers', 'granted', 'seen'} and isinstance(o['vouchers'], dict)
+             and isinstance(o.get('repriced', False), (bool, dict))
              and all(k in TREES and type(v) is int and 0 <= v <= 1000 for k, v in o['vouchers'].items())
              and isinstance(o['granted'], list) and isinstance(o['seen'], list) and set(o['granted']) <= set(o['seen']) <= set(TREES)
              and len(set(o['granted'])) == len(o['granted']) and len(set(o['seen'])) == len(o['seen']),
@@ -273,8 +302,6 @@ def plant(farm, data, now, command_id, speed):
     voucher = data['voucher']
     need(voucher is None or isinstance(voucher, str), 'invalid_command', 'Некорректный талон.', 422)
     need(level(farm['xp']) >= spec['level'], 'locked', f'{spec["name"]} открывается с {spec["level"]} уровня.')
-    count, limit = len(trees(farm)), tree_limit(farm['size'])
-    need(count < limit, 'tree_limit', f'На таком участке доступно деревьев: {limit}. Расширь землю.' if limit else 'Сад начинается с участка 16 × 16: сначала расширь землю.')
     need(len(farm['objects']) < object_limit(farm['size']), 'object_limit', 'Достигнут лимит объектов для этого участка.')
     place(farm, data['x'], data['y'], 1, 1)
     o = state(farm)
@@ -412,7 +439,13 @@ def tree_view(farm, obj, now):
 def owner_view(farm, now):
     o = peek(farm)
     mine = trees(farm)
-    return dict(vouchers=dict(o['vouchers']), count=len(mine), limit=tree_limit(farm['size']), infusion=farm['inventory'].get(INFUSION, 0),
+    # Keep the UI read-only and use the same rent rules as the daily upkeep bill.
+    from . import economy
+    return dict(vouchers=dict(o['vouchers']), granted=list(o['granted']), count=len(mine),
+                tree_rent_next=economy.tree_rent(farm['size'], len(mine) + 1),
+                tree_rent_total=economy.tree_upkeep(farm),
+                tree_rent_free_count=max(0, farm['size'] - economy.TREE_RENT_FREE_OFFSET),
+                infusion=farm['inventory'].get(INFUSION, 0),
                 discounts={k: q for k, q in farm['inventory'].items() if q and discount_voucher(k)},
                 grafts={k: q for k, q in farm['inventory'].items() if q and graft_spec(k)},
                 trees={t['id']: tree_view(farm, t, now) for t in mine})

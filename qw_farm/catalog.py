@@ -518,7 +518,7 @@ MARKET=dict(
  tastes={k:list(v) for k,v in NPC_TASTES.items()},
  village_quests=VILLAGE_QUESTS,
  caravan=dict(level=10,min_hours=12,max_hours=24,cooldown_hours=24,premium=45,xp_div=5,decor_chance=15,
-              decor=['flowerbed','bench','lantern','scarecrow','basket'],value_share=12,rep_points=3),
+              decor=['flowerbed','bench','lantern','scarecrow','basket'],value_share=8,rep_points=3),
  contracts=dict(count=3,level=2,streak_step=4,streak_max=5,tz_offset=10800),
 )
 
@@ -610,9 +610,11 @@ for i,n,b,inputs,out,t,l in [
  RECIPES[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,xp=max(6,t//80))
 
 # ---- r9 stage 14: upkeep, village fund and paid decor (additive; no existing row changes) ----------------------------
-# INCOME_REF: reference net coins per Moscow day of the "active" balance-simulator profile (scripts/farm_balance_sim.py
-# --days 90 --profile active, before any sink; the L20-24 spike of the raw run is smoothed to keep the table monotone).
-INCOME_REF_BANDS=((1,4,1100),(5,9,7000),(10,14,13000),(15,19,19000),(20,24,30000),(25,29,36000),(30,34,40000),(35,39,42000),(40,44,42000),(45,50,42000))
+# INCOME_REF: active profile net value added before any sinks. L1-19 retain their existing onboarding reference.
+# L20+ recalibrated once after progressive orchard rent + edge placement (150 days, historical visit queues, no helpers,
+# one field operation per visit), before the workshop law / full queues / helper measurement. Rounded to 1,000 coins.
+# Raw L20+ bands: 45,705 / 63,736 / 75,544 / 82,952 / 87,269 / 88,779; FARM_ECONOMY_AUDIT.md.
+INCOME_REF_BANDS=((1,4,1100),(5,9,7000),(10,14,13000),(15,19,19000),(20,24,46000),(25,29,64000),(30,34,76000),(35,39,83000),(40,44,87000),(45,50,89000))
 
 def income_ref(lv):
     lv=max(1,min(50,lv))
@@ -735,6 +737,7 @@ for i,n,c,l in [('creamery','Молокозавод',6000,21),('sausage_shop','�
 ANIMALS['calf']=dict(id='calf',name='Бычки',building='cattle_barn',inputs={'hay':2,'feed':2,'beet':1},outputs={'meat':2},seconds=4800,level=25,cost=2600)
 
 def _xp_r9(b,t):
+    if b == 'cellar' and t > 3600:return max(6, int(45 * math.sqrt(t / 3600)))
     if b in ('creamery','sausage_shop','oil_press','juicery','energy_shop','cannery','smokehouse','tailor','confectionery','syrupery','soapery','noodle_shop','dryer','cellar'):return max(6,t//80)
     if b=='mill':return max(1,t//45)
     return max(4,t//90)
@@ -1183,7 +1186,7 @@ ORCHARD_WIRED = True
 ORCHARD_ROWS = [
     ('graft_apple_paradise', 'Прививка «Райская яблоня»', 'graft', 16, 10),
     ('graft_pear_bergamot', 'Прививка «Груша-бергамот»', 'graft', 16, 10),
-    ('voucher_orchard', 'Скидочный талон сада −25%', 'voucher', 16, 8),
+    ('voucher_orchard', 'Скидочный талон сада −25%', 'voucher', 16, 2),
 ]
 for _id, _n, _kind, _l, _k in ORCHARD_ROWS:
     ITEMS[_id] = dict(id=_id, name=_n, price=0, color='#8fb86a', kind=_kind, bound=True, orchard=True, wired=ORCHARD_WIRED, level=_l)
@@ -1217,7 +1220,9 @@ def merchant_catalog():
 # ---- Fruit orchard (docs/tasks/FARM_ORCHARD.md; rules: qw_farm/orchard.py) ------------------------------------------------------
 # A tree is a 1x1 object that bears fruit again and again ("garden year" = one cycle of TREE_CYCLE seconds). Fruit rows of CROPS stay (price,
 # old plantings, fields and recipes keep working); their NEW plantings on beds and fields are closed (``orchard`` = the species, ``field`` False).
-TREE_CYCLE = 72000                  # a garden year: 20 hours
+TREE_RENT_STEP = 25                 # progressive daily rent for each tree beyond the land allowance
+TREE_RENT_FREE_OFFSET = 13          # the first size - 13 trees pay only plot_upkeep
+TREE_CYCLE = 86400                  # a garden year: 24 hours (one visit a day; the fruit waits ripe, nothing spoils). Revised 2026-10-23, was 20 h
 TREE_YOUNG_HARVESTS, TREE_ADULT_HARVESTS, TREE_CENTURY_HARVESTS = 5, 20, 100   # harvest n: Y up to 5, Y+1 up to 20, Y+2 later; "century" from the 100th
 TREE_PEST_PCT = 20                  # per cycle, deterministic (hash of farm, tree and harvests); a pest never lowers the yield
 TREE_GOLD_PERMILLE = (20, 40)       # golden fruit per harvest of an adult tree / a century tree
@@ -1229,30 +1234,28 @@ TREE_BIRDHOUSE_RADIUS = 2           # a birdhouse within 2 cells treats a pest b
 TREE_VOUCHER_DISCOUNT_PCT = 25      # a discount voucher (the merchant's, a festival's)
 TREE_REFUND_WOOD = 2
 TREE_PESTS = (('caterpillar', 'Гусеница в кепке'), ('aphid', 'Тля'), ('moth', 'Плодожорка'))
-# species, name, sapling name, fruit id, level, juvenile cycles, base yield Y, XP per cycle, sapling price
-# first harvest after juvenile + 1 cycles; XP per cycle = 1/4 of crop_law(level, 12 h); sapling = 12 days of an adult tree's fruit sales
+# species, name, sapling name, fruit id, level, juvenile cycles, ADULT yield A, XP per cycle, sapling price (revised 2026-10-23 on player feedback)
+# A = clamp(round(640 / fruit price), 5, 10): cheaper fruit, more pieces; a tree earns A * price = 610-700 coins a day, within +-20% of the best bed of its era (2 visits a day). A young tree gives 60% of A, a century tree 125%. The first harvest comes after
+# juvenile + 1 cycles. Sapling = 3 days of an adult tree's fruit sales at the warehouse price (3 * A * price, rounded to 10). XP per cycle is 1-2
+# on purpose: the orchard is a coin and fruit source, not a levelling engine (balance simulator, FARM_ORCHARD.md section 9).
 _TREE_ROWS = [
-    ('apple', 'Яблоня', 'Саженец яблони', 'apple', 16, 2, 2, 20, 2300),
-    ('cherry', 'Вишня', 'Саженец вишни', 'cherry', 20, 2, 1, 25, 2700),
-    ('pear', 'Груша', 'Саженец груши', 'pear', 24, 3, 2, 27, 2400),
-    ('plum', 'Слива', 'Саженец сливы', 'plum', 28, 2, 2, 29, 2400),
-    ('apricot', 'Абрикос', 'Саженец абрикоса', 'apricot', 36, 3, 2, 34, 2500),
-    ('peach', 'Персик', 'Саженец персика', 'peach', 44, 2, 2, 40, 2600),
-    ('pomegranate', 'Гранат', 'Саженец граната (в кадке)', 'pomegranate', 47, 3, 1, 43, 3300),
+    ('apple', 'Яблоня', 'Саженец яблони', 'apple', 16, 1, 10, 1, 1920),
+    ('cherry', 'Вишня', 'Саженец вишни', 'cherry', 20, 1, 6, 1, 2000),
+    ('pear', 'Груша', 'Саженец груши', 'pear', 24, 1, 10, 1, 1980),
+    ('plum', 'Слива', 'Саженец сливы', 'plum', 28, 1, 9, 1, 1840),
+    ('apricot', 'Абрикос', 'Саженец абрикоса', 'apricot', 36, 2, 9, 2, 1860),
+    ('peach', 'Персик', 'Саженец персика', 'peach', 44, 1, 9, 2, 1920),
+    ('pomegranate', 'Гранат', 'Саженец граната (в кадке)', 'pomegranate', 47, 2, 5, 2, 2070),
 ]
+# Sapling prices before the revision: planted trees paid them, the farms get the difference back once (orchard.reprice).
+OLD_SAPLING_COSTS = {'apple': 2300, 'cherry': 2700, 'pear': 2400, 'plum': 2400, 'apricot': 2500, 'peach': 2600, 'pomegranate': 3300}
 TREES = {}
 for _sp, _n, _sn, _fruit, _l, _j, _y, _x, _c in _TREE_ROWS:
     TREES[_sp] = dict(id=_sp, name=_n, sapling=_sn, fruit=_fruit, level=_l, juvenile=_j, yield_qty=_y, xp=_x, cost=_c, potted=_sp == 'pomegranate')
     CROPS[_fruit]['orchard'] = _sp
     CROPS[_fruit]['field'] = False
 TREE_BY_FRUIT = {t['fruit']: t['id'] for t in TREES.values()}
-# Trees per land size (they take no beds): none up to 14, then 2 at 16 and +1 per step. Half of the table of FARM_ORCHARD.md 2.4: the balance simulator
-# (section 9) showed the full table too strong; decided on the recommendation, the owner may revise it.
-TREE_LIMITS = {s: (0 if s < 16 else (s - 12) // 2) for s in sorted(LAND_SIZES)}
-
-
-def tree_limit(size):
-    return TREE_LIMITS.get(size, 0)
+# There is no separate tree limit (owner decision 2026-10-23): a tree takes one free cell, the only limits are free space and object_limit.
 
 
 # Grafts change only the look of a planted tree (``obj['look']``). More grafts (festivals) register here: item id -> species, look, look name.
@@ -1309,10 +1312,18 @@ _ORCHARD_RECIPES = [
 ORCHARD_RECIPE_IDS = frozenset(r[0] for r in _ORCHARD_RECIPES)
 ORCHARD_ITEM_IDS = ORCHARD_RECIPE_IDS | {'rejuvenating_apple'}
 ORCHARD_BUILDING_IDS = frozenset({'dryer', 'cellar', 'birdhouse'})
+# Exact pre-audit prices are needed to preserve refunds for caravans already in progress.
+OLD_ORCHARD_PRICES = {}
 for _i, _rn, _b, _inp, _q, _min, _l, _col, _name in _ORCHARD_RECIPES:
     _t = _min * 60
+    _old_vin = sum(OLD_ORCHARD_PRICES.get(k, ITEMS[k]['price']) * q for k, q in _inp.items())
+    _old_av = math.ceil(round(_t / 60 * (2.5 + 0.1 * _l), 6))
+    OLD_ORCHARD_PRICES[_i] = math.ceil((_old_vin + _old_av) / _q)
     _vin = sum(ITEMS[k]['price'] * q for k, q in _inp.items())
-    ITEMS[_i] = dict(id=_i, name=_name, price=math.ceil((_vin + math.ceil(round(_t / 60 * (2.5 + 0.1 * _l), 6))) / _q), color=_col, kind='product')
+    # Only the sandbox-era orchard rows use the new law; older recipes retain their prices and XP.
+    _value_minutes = 60 * math.sqrt(_min / 60) if _min > 60 else _min
+    _av = math.ceil(round(_value_minutes * (2.5 + 0.1 * _l), 6))
+    ITEMS[_i] = dict(id=_i, name=_name, price=math.ceil((_vin + _av) / _q), color=_col, kind='product')
     RECIPES[_i] = dict(id=_i, name=_rn, building=_b, inputs=_inp, outputs={_i: _q}, seconds=_t, level=_l, xp=_xp_r9(_b, _t))
 # Shop-window texts (the drinks of the cellar: «0%» is always in the name or in this line; no drunkenness mechanics anywhere).
 ORCHARD_TEXT = dict(
@@ -1337,7 +1348,7 @@ def validate_orchard():
     assert [t['level'] for t in TREES.values()] == sorted(t['level'] for t in TREES.values())
     assert all(g['species'] in TREES for g in GRAFTS.values()) and all(i in ITEMS for i in GRAFTS)
     assert all(RECIPES[r]['level'] >= BUILDINGS[RECIPES[r]['building']]['level'] for r in ORCHARD_RECIPE_IDS)
-    assert tree_limit(14) == 0 and tree_limit(16) == 2 and tree_limit(20) == 4 and tree_limit(30) == 9 and tree_limit(32) == 10
+    assert all(t['cost'] <= 3.5 * t['yield_qty'] * ITEMS[t['fruit']]['price'] and t['cost'] < OLD_SAPLING_COSTS[t['id']] for t in TREES.values())
     return dict(trees=len(TREES), recipes=len(ORCHARD_RECIPE_IDS))
 
 
@@ -1345,7 +1356,7 @@ validate_orchard()
 
 
 def orchard_catalog():
-    return deepcopy(dict(trees=TREES, limits={str(k): v for k, v in TREE_LIMITS.items() if v}, grafts=GRAFTS, texts=ORCHARD_TEXT, motto=CELLAR_MOTTO,
+    return deepcopy(dict(trees=TREES, grafts=GRAFTS, texts=ORCHARD_TEXT, motto=CELLAR_MOTTO,
                          pests=[dict(id=i, name=n) for i, n in TREE_PESTS],
                          rules=dict(cycle=TREE_CYCLE, young=TREE_YOUNG_HARVESTS, adult=TREE_ADULT_HARVESTS, century=TREE_CENTURY_HARVESTS,
                                     prune_every=TREE_PRUNE_EVERY, birdhouse_radius=TREE_BIRDHOUSE_RADIUS, help_pct=TREE_HELP_PCT,

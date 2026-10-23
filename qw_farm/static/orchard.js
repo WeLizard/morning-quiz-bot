@@ -4,7 +4,9 @@
 export const STAGE_NAME={sapling:'Саженец',young:'Молодое дерево',adult:'Взрослое дерево',elder:'Старожил',century:'Вековое дерево'};
 export const isTree=o=>!!o&&o.type==='tree';
 export const view=me=>me?.orchard_view||null;
-export const rules=catalog=>catalog?.orchard?.rules||{cycle:72000,young:5,adult:20,century:100,prune_every:7,birdhouse_radius:2,help_pct:20,discount_pct:25,gold_permille:[20,40]};
+// Rent values are read from the owner snapshot, which uses the server's upkeep rules.
+export const rentSummary=v=>v?{next:v.tree_rent_next||0,total:v.tree_rent_total||0,freeCount:v.tree_rent_free_count||0}:null;
+export const rules=catalog=>catalog?.orchard?.rules||{cycle:86400,young:5,adult:20,century:100,prune_every:7,birdhouse_radius:2,help_pct:20,discount_pct:25,gold_permille:[20,40]};
 export const ripe=(o,t)=>isTree(o)&&!!o.fruit&&o.fruit.ready_at<=t;
 export const readyCount=(objects,t)=>(objects||[]).filter(o=>ripe(o,t)).length;
 export const species=(catalog,o)=>catalog?.orchard?.trees?.[o?.species]||null;
@@ -54,14 +56,14 @@ export function treeFacts(catalog,o,info,t,infusion=0,grafts={}){
 // Rows of the «Сад» tab: every species by level, with the price the player would pay for it right now.
 export function saplingRows(catalog,me,v){
  const orchard=catalog?.orchard;if(!orchard||!me)return [];
- const free=v?.vouchers||{},discounts=v?.discounts||{},limitReached=!!v&&v.count>=v.limit;
+ const free=v?.vouchers||{},discounts=v?.discounts||{};
  return Object.values(orchard.trees).sort((a,b)=>a.level-b.level).map(sp=>{
   const locked=me.level<sp.level,first=firstHarvestSeconds(catalog,sp.id),cut=orchard.rules.discount_pct;
   const options=[];
   if(free[sp.id])options.push({voucher:'free',label:'Бесплатный саженец от Филиныча',price:0,qty:free[sp.id]});
   for(const [id,qty] of Object.entries(discounts))options.push({voucher:id,label:`${catalog.items?.[id]?.name||'Талон'} −${cut}%`,price:Math.floor(sp.cost*(100-cut)/100),qty});
   options.push({voucher:null,label:'За монеты',price:sp.cost,qty:null});
-  const why=locked?`С ${sp.level} уровня`:(v&&v.limit===0)?'Сад начинается с участка 16 × 16':limitReached?`Лимит деревьев: ${v.count} из ${v.limit}`:'';
+  const why=locked?`С ${sp.level} уровня`:'';
   return {...sp,locked,first,options,blocked:why,free:free[sp.id]||0};
  });
 }
@@ -80,3 +82,22 @@ export const treeSummary=(catalog,objects)=>{
  const out={};for(const o of objects||[])if(isTree(o))out[o.species]=(out[o.species]||0)+1;
  return Object.entries(out).map(([id,n])=>`${catalog?.orchard?.trees?.[id]?.name||id} ×${n}`).join(', ');
 };
+// Discoverability after fruit left the beds: the seed bar card, the badge of the «Сад» tab, the one-time notice and the level-up line.
+// Saplings waiting to be planted: free ones of open species plus discount talons. Only free cells limit planting, the server checks them.
+export function pendingCount(v,me,catalog){
+ if(!v||!me)return 0;
+ const trees=catalog?.orchard?.trees||{},open=sp=>!!trees[sp]&&trees[sp].level<=me.level;
+ const free=Object.entries(v.vouchers||{}).reduce((n,[sp,q])=>n+(open(sp)?q:0),0);
+ const talons=Object.keys(trees).some(open)?Object.values(v.discounts||{}).reduce((n,q)=>n+q,0):0;
+ return free+talons;
+}
+// Species that open on a level-up from ``from`` to ``to``: from < level <= to.
+export const treeUnlocks=(catalog,from,to)=>Object.values(catalog?.orchard?.trees||{}).filter(t=>t.level>from&&t.level<=to).sort((a,b)=>a.level-b.level);
+export function unlockText(list){
+ const names=list.map(t=>`«${t.name}»`).join(', ');
+ return list.length>1?`Открылись деревья ${names}: их сажают в разделе «Сад».`:`Открылось дерево ${names}: его сажают в разделе «Сад».`;
+}
+// The farm had fruit on beds before the orchard: the server granted compensation saplings (qw_farm/orchard.py upgrade, ``granted``).
+export const movedNotice=v=>Array.isArray(v?.granted)&&v.granted.length>0;
+export const MOVED_TEXT='Фруктовые деревья переехали в Сад: там твои саженцы и талоны';
+export const OPEN_LABEL='Открыть Сад';

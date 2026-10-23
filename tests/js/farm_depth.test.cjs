@@ -126,7 +126,7 @@ test('hint card is always fully inside the box: above, below or pinned',()=>{
 const catalog={
  items:{wheat:{name:'Пшеница'},corn:{name:'Кукуруза'},clover:{name:'Клевер'},feed:{name:'Зерносмесь'},hay:{name:'Сено'},flour:{name:'Мука'},bread:{name:'Хлеб'},egg:{name:'Яйца'}},
  buildings:{feedmill:{name:'Кормоцех'},bakery:{name:'Пекарня'},coop:{name:'Курятник'},bench:{name:'Скамейка',decor:true}},
- recipes:{mixedfeed:{building:'feedmill',inputs:{corn:1,wheat:1},outputs:{feed:3}},hay:{building:'feedmill',inputs:{clover:2},outputs:{hay:2}},bread:{building:'bakery',inputs:{flour:2},outputs:{bread:1}}},
+ recipes:{mixedfeed:{building:'feedmill',inputs:{corn:1,wheat:1},outputs:{feed:3}},hay:{building:'feedmill',inputs:{clover:2},outputs:{hay:2}},bread:{building:'bakery',inputs:{flour:2},outputs:{bread:1}},omelet:{building:'kitchen',inputs:{egg:2},outputs:{omelet:1}}},
  animals:{chicken:{name:'Курочки',building:'coop',inputs:{feed:1},outputs:{egg:2}},cow:{name:'Бурёнки',building:'cowshed',inputs:{hay:1},outputs:{}}},
 };
 test('building purpose is generated from the catalog: what it makes, from what, who needs it',()=>{
@@ -134,7 +134,7 @@ test('building purpose is generated from the catalog: what it makes, from what, 
  for(const word of ['зерносмесь','сено','кукуруза','пшеница','клевер','курочки','бурёнки'])assert.ok(feedmill.includes(word),`feedmill hint mentions ${word}: ${feedmill}`);
  assert.equal(m.buildingPurpose('feedmill',catalog).length,2);
  const coop=m.buildingPurpose('coop',catalog).join(' ');
- assert.ok(coop.includes('курочки')&&coop.includes('яйца')&&coop.includes('зерносмесь'),coop);
+ assert.ok(coop.includes('курочки')&&coop.includes('яйца')&&coop.includes('зерносмесь')&&coop.includes('несколько курятников'),coop);
  assert.ok(m.buildingPurpose('bakery',catalog).join(' ').includes('мука'));
  assert.deepEqual(Array.from(m.buildingPurpose('bench',catalog)),[],'decor has no purpose line');
  assert.deepEqual(Array.from(m.buildingPurpose('unknown',catalog)),[]);

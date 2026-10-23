@@ -472,9 +472,9 @@ def test_split_festival_year_has_one_key_for_both_runs_and_the_magpie_comes_once
 # ---- content of the filled festivals: «Новый год», «Масленица», «Весенние цветы» --------------------------------------------------
 FILLED = ('new_year', 'maslenitsa', 'spring_flowers')
 FIRST_FAIR_DAY = {'new_year': ts(2026, 12, 30), 'maslenitsa': ts(2027, 3, 9), 'spring_flowers': ts(2027, 3, 6)}
-# value law bands (design 9.2/9.7: small things 0.5-2 days of income, big ones 5-10, scroll 0.25, graft/voucher 0.1)
+# Value law: small things 0.5-2 income days, big ones 5-10, scroll 0.25; audit vouchers 0.02.
 K_RANGE = {'decor': (50, 200), 'tree_decor': (50, 200), 'wall': (25, 100), 'roof': (25, 100), 'path': (50, 200), 'village': (25, 100),
-           'mascot': (100, 300), 'curio': (100, 300), 'decor_big': (500, 1000), 'scroll': (25, 25), 'graft': (8, 12), 'voucher': (8, 12)}
+           'mascot': (100, 300), 'curio': (100, 300), 'decor_big': (500, 1000), 'scroll': (25, 25), 'graft': (8, 12), 'voucher': (2, 2)}
 PREFIX = {'new_year': 'fest_ny_', 'maslenitsa': 'fest_mas_', 'spring_flowers': 'fest_flw_'}
 
 

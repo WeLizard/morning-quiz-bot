@@ -518,6 +518,22 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-fest-base .vf-night,.village-fest-glow .vf-decor,.village-fest-glow .vf-day{display:none}
 :root[data-farm-theme=night] .village-fest-base .vf-day{display:none}
 :root:not([data-farm-theme=night]) .village-fest-glow .vf-night{display:none}
+/* construction sites and the market rows (village-build.svg via app.js villageBuildPiece); the glow layer is the night windows */
+.village-build,.village-crew-layer{position:absolute;inset:0;pointer-events:none}
+.village-build>svg{position:absolute;display:block;overflow:visible}
+:root:not([data-farm-theme=night]) .village-build-glow{display:none}
+.village-crew{position:absolute;width:40px;height:60px;transform:translate(-50%,-92.6%);pointer-events:none}
+.village-crew .bc-art{display:block;width:100%;height:100%;overflow:visible}
+.village-crew .bc-plan,.village-crew .bc-hammer,.village-crew .bc-shovel{transform-box:view-box}
+.village-crew .bc-plan{transform-origin:7px -16px}.village-crew .bc-hammer{transform-origin:7px -17px}.village-crew .bc-shovel{transform-origin:1px -14px}
+@media(prefers-reduced-motion:no-preference){
+ .village-crew .bc-plan{animation:bc-nod 3.2s ease-in-out infinite}
+ .village-crew .bc-hammer{animation:bc-swing .9s ease-in-out infinite}
+ .village-crew .bc-shovel{animation:bc-dig 1.6s ease-in-out infinite}
+}
+@keyframes bc-nod{0%,100%{transform:rotate(0)}50%{transform:rotate(-7deg)}}
+@keyframes bc-swing{0%,100%{transform:rotate(0)}45%{transform:rotate(-34deg)}60%{transform:rotate(6deg)}}
+@keyframes bc-dig{0%,100%{transform:rotate(0) translate(0,0)}50%{transform:rotate(14deg) translate(1px,2px)}}
 @media(prefers-reduced-motion:no-preference){
  .vf-smoke{animation:vf-rise 6s ease-in-out infinite}.vf-s2{animation-delay:-2s}.vf-s3{animation-delay:-4s}
  @keyframes vf-rise{0%{opacity:0;transform:translateY(6px)}30%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
@@ -1089,4 +1105,21 @@ html .scene-area .map-controls{display:flex;flex-direction:column;border:1px sol
 @media(max-width:850px){
  html .compact .header-destinations{padding-right:12px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 14px),transparent 100%)}
  html .compact .header-destinations>.forest-door:not(.fields-door){flex:1 1 0;width:auto;min-width:64px;max-width:92px}
+}
+
+/* Friend requests use shell button groups and the existing farm cards. */
+.friend-requests-lane,.friend-requests-section{min-width:0;padding-block:var(--qw-s-3)}
+.friend-requests-section>.qw-btn-group{display:flex;flex-wrap:wrap}
+.friend-requests-section>.qw-btn-group .qw-btn{flex:1;min-width:0}
+.friend-request-card .qw-btn-stack{margin-top:var(--qw-s-3)}
+.friend-request-card .qw-btn.danger{margin-top:var(--qw-s-2)}
+.friend-request-form{display:grid;gap:var(--qw-s-2);min-width:0}
+.friend-request-form .qw-btn-group{display:flex;flex-wrap:wrap}
+.friend-request-form .qw-btn-group .qw-btn{flex:1;min-width:0}
+.friend-request-form .form-field{min-width:0;margin:0}
+.friend-request-form :is(input,select){max-width:100%;min-height:44px}
+.friend-request-form .subheading{margin-bottom:0}
+.friend-request-dialog .qw-btn-stack{align-items:stretch}
+@media(max-width:767px){
+ dialog.friend-request-dialog{margin:auto 0 0;width:100%;max-width:100%;border-radius:var(--qw-r-hero) var(--qw-r-hero) 0 0;padding:var(--qw-s-4) max(var(--qw-s-4),var(--qw-safe-right)) max(var(--qw-s-4),var(--qw-safe-bottom)) max(var(--qw-s-4),var(--qw-safe-left))}
 }

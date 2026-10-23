@@ -995,7 +995,7 @@
             } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
         }, 'danger'));
         box.append(guestExit);
-        guestMain.append(box);
+        guestMain.append(box, farmRequestNotificationsCard('guest'));
         if (focusLink) { linkAnchor.scrollIntoView?.({block: 'center'}); linkAnchor.nextElementSibling?.focus?.(); }
     }
     // Guest «Чаты» / «Рейтинг»: both depend on Telegram chats, so a guest sees one clear step instead of an empty list.
@@ -2156,6 +2156,40 @@
         haptics.setAttribute('aria-pressed', String(window.QuizTelegram.prefs.haptics)); preferences.append(haptics);
         return preferences;
     }
+    // Notification preferences have one entry point: Profile → Settings, for both sign-in methods.
+    function farmRequestNotificationsCard(identity) {
+        const version = generation, account = (identity === 'guest' ? state.guest : state.me)?.account_id;
+        const current = () => version === generation && account === (identity === 'guest' ? state.guest : state.me)?.account_id;
+        const box = el('section', undefined, 'card farm-request-notifications');
+        box.append(el('h2', 'Уведомления фермы'));
+        const label = el('label', undefined, 'setting-row'), input = el('input');
+        input.type = 'checkbox'; input.disabled = true; input.checked = true;
+        label.append(el('span', 'Уведомления о просьбах соседей'), input);
+        const message = el('p', 'Загрузка настройки…', 'muted'); box.append(label, message);
+        const endpoint = `/api/farm/v1/me?identity=${identity}`;
+        const farmRequest = (url, method = 'GET', body) => identity === 'guest'
+            ? guestRequest(url, method, {headers: {'Content-Type': 'application/json', 'X-QW-Farm': '1'}, ...(body ? {body: JSON.stringify(body)} : {})})
+            : request(url, {method, headers: {'Content-Type': 'application/json', 'X-QW-Farm': '1'}, ...(body ? {body: JSON.stringify(body)} : {})});
+        farmRequest(endpoint).then(result => {
+            if (!current()) return;
+            input.checked = result.farm.settings.notify_requests !== false; input.disabled = false;
+            message.textContent = 'Сводка в Telegram — раз в день; посылки — не чаще раза в час. Карточки и журнал остаются в игре.';
+        }).catch(error => { if (current()) message.textContent = error.status === 404 ? 'Настройка станет доступна после начала игры на ферме.' : error.message; });
+        input.addEventListener('change', async () => {
+            const checked = input.checked; input.disabled = true;
+            try {
+                const {farm} = await farmRequest(endpoint); if (!current()) return;
+                const commandId = globalThis.crypto?.randomUUID?.();
+                if (!commandId) throw new Error('Обнови браузер для безопасного сохранения настройки.');
+                const data = {name: farm.name, visibility: farm.settings.visibility, notify_requests: checked};
+                for (const key of ['allow_help', 'allow_gifts', 'allow_pranks', 'allow_trade', 'allow_requests']) data[key] = farm.settings[key] !== false;
+                await farmRequest(`/api/farm/v1/commands?identity=${identity}`, 'POST', {actor: farm.id, target: null, command_id: commandId, kind: 'settings', data});
+                if (current()) message.textContent = 'Настройка сохранена.';
+            } catch (error) { if (current()) { input.checked = !checked; message.textContent = error.message; } }
+            finally { if (current()) input.disabled = false; }
+        });
+        return box;
+    }
     // «Профиль → Настройки»: only the account (UI_RULES §11). Game and schedule settings live on the chat page.
     async function settings() {
         content.append(el('span', 'Профиль / Настройки', 'eyebrow settings-path'), el('h1', 'Настройки'));
@@ -2164,7 +2198,7 @@
         const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
         row.append(copy, el('span', '✓', 'badge')); via.append(row);
         content.append(via, devicesSection('telegram'));
-        content.append(appearanceCard());
+        content.append(appearanceCard(), farmRequestNotificationsCard('telegram'));
         const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}

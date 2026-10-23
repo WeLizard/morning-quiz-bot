@@ -224,7 +224,7 @@ SCHEMAS={
  'list':{'item','qty','unit_price'},'buy':{'listing'},'cancel_listing':{'listing'},
  'pay_upkeep':set(),'fund_contribute':{'coins','items'},
 }
-OPTIONAL_KEYS={'forget_recipe':{'recipe'}}  # forget one remembered recipe; without it the most recent one
+OPTIONAL_KEYS={'forget_recipe':{'recipe'},'settings':{'allow_requests','notify_requests'}}  # forget one remembered recipe; without it the most recent one
 SOCIAL={'request_neighbor','accept_neighbor','claim_neighbor_reward','remove_neighbor','block','unblock','help','prank','gift','buy'}
 
 
@@ -434,7 +434,9 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(isinstance(data['visibility'],str) and data['visibility'] in {'private','friends','public'},'invalid_privacy','Недопустимая приватность.',422)
         for k in ['allow_help','allow_gifts','allow_pranks','allow_trade']:
             need(type(data[k]) is bool,'invalid_flag','Настройка должна быть логической.',422)
-        me['name']=name.strip();me['settings']={k:data[k] for k in me['settings']};text='Настройки сохранены.'
+        for k in ['allow_requests','notify_requests']:
+            need(k not in data or type(data[k]) is bool,'invalid_flag','Настройка должна быть логической.',422)
+        me['name']=name.strip();me['settings']={k:data.get(k,me['settings'][k]) for k in me['settings']};text='Настройки сохранены.'
     elif kind=='claim_neighbor_reward':
         need(me['id']!=other['id'],'own_farm','Это твоя ферма.',422)
         need(other['id'] not in me['blocked'] and me['id'] not in other['blocked'] and
@@ -462,8 +464,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
                 event(other,now,f'{me["name"]}: приглашение в соседи.','social');text='Приглашение отправлено.'
             elif kind=='accept_neighbor':
                 need(me['neighbors'].get(b,{}).get('status')=='incoming' and other['neighbors'].get(a,{}).get('status')=='outgoing','no_invite','Приглашение не найдено.')
-                me['neighbors'][b]={'name':other['name'],'status':'accepted'}
-                other['neighbors'][a]={'name':me['name'],'status':'accepted'}
+                me['neighbors'][b]={'name':other['name'],'status':'accepted','accepted_at':now}
+                other['neighbors'][a]={'name':me['name'],'status':'accepted','accepted_at':now}
                 event(other,now,f'{me["name"]} принимает приглашение. Теперь вы соседи!','social');text='Теперь вы соседи!'
             else:
                 me['neighbors'].pop(b,None);other['neighbors'].pop(a,None);text='Соседство отменено.'
@@ -492,7 +494,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         social_allowed(me,other,'allow_gifts')
         item=named(ITEMS,data['item']);qty=number(data['qty'],1,10);unbound([item['id']])
         need(me['stats']['orders']>=1 and me['stats']['harvests']>=4,'gift_locked','Подарки откроются после первого заказа и четырёх сборов.')
-        daily(me,f'gift:{other["id"]}',now,3);daily(me,'gift_total',now,5)
+        from .request_rules import gift_daily
+        gift_daily(me,other['id'],now)
         inventory(me,{item['id']:qty},-1);inventory(other,{item['id']:qty});me['stats']['gifts']+=1
         event(other,now,f'{me["name"]} дарит {item["name"]} ×{qty}.','social');text='Подарок уже у соседа.'
     elif kind=='list':

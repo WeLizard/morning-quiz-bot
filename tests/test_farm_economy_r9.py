@@ -198,15 +198,19 @@ def test_personal_scale_tiers_rewards_and_season_aligned_record():
     cmd(f, 'fund_contribute', {'coins': 500, 'items': {}})
     assert rec['tiers'] == 1 and f['economy']['unlocked'] == ['fd_garland']
     cmd(f, 'fund_contribute', {'coins': 13000, 'items': {}})
-    assert rec['tiers'] == 2 and f['economy']['feast_until'] == D1 + 3600 + 3 * DAY
+    # FARM_VILLAGE_CONSTRUCTION.md 4.2: tier 2 is «Покупатель Сороки» (no more 3-day feast), tier 4 is early fair access
+    assert rec['tiers'] == 2 and f['economy']['feast_until'] == 0
+    assert economy.perk(f, 'magpie', D1 + 3600) and not economy.perk(f, 'early', D1 + 3600)
     cmd(f, 'fund_contribute', {'coins': 19500, 'items': {}})
     assert rec['tiers'] == 3 and economy.discount_active(f, D1 + 3600)
     assert economy.upkeep(f, D1) == economy.base_upkeep(f) * 75 // 100
     assert not economy.discount_active(f, D1 + 28 * DAY * 2)                    # a later season has no discount
     cmd(f, 'fund_contribute', {'coins': 26000, 'items': {}})
-    assert rec['tiers'] == 4 and 'fd_pinwheel' in f['economy']['unlocked']
+    assert rec['tiers'] == 4 and 'fd_pinwheel' in f['economy']['unlocked'] and economy.perk(f, 'early', D1 + 3600)
     cmd(f, 'fund_contribute', {'coins': 39000, 'items': {}})
     assert rec['tiers'] == 5 and 'fd_cup' in f['economy']['unlocked'] and f['economy']['titles'] == ['Староста деревни']
+    assert economy.perk(f, 'honor', D1 + 3600) and economy.perk(f, 'honor', D1 + 3600 + 28 * DAY)    # the season after
+    assert not economy.perk(f, 'honor', D1 + 3600 + 56 * DAY)
     cmd(f, 'fund_contribute', {'coins': 10, 'items': {}})
     assert rec['tiers'] == 5 and f['economy']['stats']['fund_village'] == rec['personal'] == 104010   # tiers are paid once
     assert f['coins'] == 300_000 - 104010

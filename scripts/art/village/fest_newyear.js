@@ -77,10 +77,11 @@ export function newYear(V) {
     const [[ax, ay], [bx, by], z] = r.ridge, n = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay) / .3));
     for (let i = 0; i <= n; i++) { const q = pt(ax + (bx - ax) * i / n, ay + (by - ay) * i / n, z + 2); if ([...r.cut].some(o => K.inHull(o.hull, q))) continue; ridgeBulbs.push([q, BULBS[i % BULBS.length]]); s.ellipse(q.x, q.y, 1.3, 1.3, BULBS[i % BULBS.length]) }
   }
-  // the big fir on the plaza: the free spot nearest the plaza's middle that nothing hides, up to its star
+  // the big fir on or by the plaza: the free spot nearest the plaza's middle that nothing hides, up to its star
   const [px0, py0, px1, py1] = V.plaza, mid = [(px0 + px1) / 2, (py0 + py1) / 2];
   const cands = [];
-  for (let x = px0 + .8; x <= px1 - .8; x += .25) for (let y = py0 + .8; y <= py1 - .8; y += .25) {
+  for (let x = px0 - 1.5; x <= px1 + 1.5; x += .25) for (let y = py0 - 1.5; y <= py1 + 1.5; y += .25) {   // on the plaza or right by it
+    if (V.ground && !V.ground(x, y)) continue;
     let ok = true; for (let a = 0; a < 8 && ok; a++) if (!V.free(x + Math.cos(a * Math.PI / 4) * .75, y + Math.sin(a * Math.PI / 4) * .75)) ok = false;
     if (!ok || !V.free(x, y)) continue;
     if ([0, 40, 80, 120, 150].some(z => hidden(x, y, z))) continue;

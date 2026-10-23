@@ -98,6 +98,17 @@ class NotificationQueue:
                      version=NotificationOutbox.version + 1))
             return result.rowcount == 1
 
+    async def skipped(self, item_id: str, worker_id: str, *, claim_version: int) -> bool:
+        """Close an obsolete notification without counting it as a sent message."""
+        async with self.database.transaction() as session:
+            result = await session.execute(update(NotificationOutbox).where(
+                NotificationOutbox.id == item_id,
+                NotificationOutbox.status == 'sending',
+                NotificationOutbox.claimed_by == worker_id,
+                NotificationOutbox.version == claim_version,
+            ).values(status='skipped', delivered_at=None, version=NotificationOutbox.version + 1))
+            return result.rowcount == 1
+
     async def retry_after(
         self, item_id: str, worker_id: str, seconds: float, *, claim_version: int,
     ) -> bool:

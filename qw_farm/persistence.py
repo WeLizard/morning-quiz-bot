@@ -15,9 +15,13 @@ from .domain import FarmError, need
 
 
 def tables(metadata: sa.MetaData):
+    from .friend_requests import table as request_table
+    from . import construction
     if 'farm_states' in metadata.tables:
         result={name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites','share_invite_uses']}
         result['wagers']=metadata.tables.get('farm_wager_rounds')
+        result['requests']=request_table(metadata)
+        result.update(construction.tables(metadata))
         return result
     states=sa.Table('farm_states',metadata,
         sa.Column('id',sa.Uuid,primary_key=True),
@@ -100,7 +104,7 @@ def tables(metadata: sa.MetaData):
     sa.Index('uq_farm_wager_active_account',wagers.c.account_id,unique=True,
              postgresql_where=wagers.c.settled_at.is_(None),sqlite_where=wagers.c.settled_at.is_(None))
     sa.Index('ix_farm_wager_daily',wagers.c.account_id,wagers.c.created_at)
-    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses,wagers=wagers)
+    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses,wagers=wagers,requests=request_table(metadata),**construction.tables(metadata))
 
 
 def unpack(row):

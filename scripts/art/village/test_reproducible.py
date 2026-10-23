@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE))
 import build_village  # noqa: E402
 
 WORK = ROOT / ".local" / "village-generator" / "test"
-KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256", "merchant_sha256")
+KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256", "merchant_sha256", "build_sha256")
 
 
 def _app_const(src: str, name: str):
@@ -42,6 +42,8 @@ def test_village_generator_is_reproducible():
     assert cart.read_bytes() == (WORK / "a" / "village-merchant.svg").read_bytes(), "village-merchant.svg: rebuild with --install"
     app = (ROOT / "qw_farm" / "static" / "app.js").read_text(encoding="utf-8")
     assert (WORK / "a" / "merchant-figure.svg").read_text(encoding="utf-8") in app, "app.js VILLAGE_MERCHANT.figure is the generated one"
+    sprite = ROOT / "qw_farm" / "static" / "village-build.svg"   # construction stages and stalls (build.js)
+    assert sprite.read_bytes() == (WORK / "a" / "village-build.svg").read_bytes(), "village-build.svg: rebuild with --install"
     ref = json.loads((HERE / "reference.json").read_text(encoding="utf-8"))
     changed = sorted(k for k in set(ref["inputs"]) | set(a["inputs"]) if ref["inputs"].get(k) != a["inputs"].get(k))
     if changed:
@@ -63,6 +65,14 @@ def test_live_layers_match_app():
     c = re.search(r"const VILLAGE_C=\[(\d+),(\d+)\].*?VILLAGE_HALL=\[([\d.]+),([\d.]+)\]", app)
     assert man["plaza_corner"] == [int(c.group(1)), int(c.group(2))]
     assert man["hall"] == [float(c.group(3)), float(c.group(4))]
+    # construction: the boxes and crew points of the pieces, the crew figures, the captions of the sites
+    build = _app_const(app, "VILLAGE_BUILD")
+    assert build["boxes"] == man["build"]["boxes"] and build["crew"] == man["build"]["crew"]
+    assert build["stalls"] == [st["id"] for st in man["stalls"]] and sorted(build["sites"]) == sorted(man["sites"])
+    for name in ("krot", "pooh", "kaya"):
+        assert (WORK / "a" / "build" / f"crew-{name}.svg").read_text(encoding="utf-8") in app, f"app.js VILLAGE_CREW.{name} is the generated one"
+    for sid, site in man["sites"].items():
+        assert f"['{sid}','{site['label']}',{site['sign'][0]},{site['sign'][1]}]" in app, f"app.js VILLAGE_SITES {sid}"
     # the live wheel sits on the painted axle, the gate board hangs between the painted posts
     wheel = re.search(r"function villageWaterWheel\(\)\{(.*?)return w;\}", app).group(1)
     box = [float(v) for v in re.findall(r"w\.style\.(?:left|top|width|height)='([\d.]+)%'", wheel)]

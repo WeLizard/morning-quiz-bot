@@ -49,7 +49,7 @@ test('Polling shows a new incoming neighbor without losing a draft or accepting 
   const panel=new Node('div'),document={hidden:false,activeElement:null};
   const S={me:{id},farm:{id,is_owner:true},tab:'neighbors',busy:false,config:{demo:true}};
   const requests=[];let commands=[];
-  const context={S,document,JSON,API:'/api/farm/v1',lastSessionRenewal:Date.now(),RENEW_AFTER:60000,navigator:{clipboard:{writeText:async()=>{}}},
+  const context={S,document,JSON,FRIEND_REQUESTS:{renderNeighbors(){},setNeighbors(){},notify(){}},API:'/api/farm/v1',lastSessionRenewal:Date.now(),RENEW_AFTER:60000,navigator:{clipboard:{writeText:async()=>{}}},
    own:()=>S.farm?.is_owner,el:(tag,text)=>new Node(tag,text),button:(text,fn)=>{const n=new Node('button',text);n.onclick=fn;return n;},
    card:(title,subtitle)=>{const n=new Node('section');n.append(new Node('strong',title),new Node('small',subtitle));return n;},
    field:()=>{const input=new Node('input');const wrap=new Node('label');wrap.append(input);return [wrap,input];},
@@ -101,7 +101,7 @@ test('Actual refresh discards late account and visit responses before changing t
  const calls=[],pending=[];
  const scene={set:farm=>calls.push(['scene',farm.id]),fit:()=>{}};
  const document={hidden:false,activeElement:null,body:{classList:{remove(){}}}};
- const context={S,API:'/api/farm/v1',Date,scene,document,dashaGame:{render(){}},dashaGameOpen:false,olegGame:null,olegGameOpen:false,closeOlegGame(){return true;},lastSessionRenewal:Date.now(),RENEW_AFTER:60000,now:()=>Date.now()/1000,
+ const context={S,FRIEND_REQUESTS:{notify(){}},API:'/api/farm/v1',Date,scene,document,dashaGame:{render(){}},dashaGameOpen:false,olegGame:null,olegGameOpen:false,closeOlegGame(){return true;},lastSessionRenewal:Date.now(),RENEW_AFTER:60000,now:()=>Date.now()/1000,
   request:path=>new Promise(resolve=>pending.push({path,resolve})),updateHUD:()=>calls.push(['hud']),renderSeeds:()=>{},updateReady:()=>{},renderPanel:()=>calls.push(['panel']),renderRail:()=>{},showPanel:()=>{},queueNeighborGifts:()=>{},connection:()=>{},toast:()=>{},showLogin:()=>{calls.push(['login']);S.me=S.farm=null;},
   '$':()=>({open:false}),JSON};
  vm.createContext(context);vm.runInContext(refresh+'\n'+navigation+'\n'+selectTab+'\n'+poll+'\nObject.assign(globalThis,{refresh,visit,backHome,selectTab,poll})',context);

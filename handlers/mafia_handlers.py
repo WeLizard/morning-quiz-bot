@@ -383,6 +383,7 @@ class MafiaHandlers:
                 kinds={'mafia.phase', 'classic.question', 'classic.finished',
                        'photo.question', 'photo.hint', 'photo.feedback',
                        'photo.result', 'photo.finished',
+                       'farm.request',
                        'problem_report.text', 'problem_report.images'},
             )
             if item is None:
@@ -395,6 +396,48 @@ class MafiaHandlers:
                     from handlers.problem_report_delivery import deliver as deliver_problem_report
                     await deliver_problem_report(context, self.database, item)
                     await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
+                    continue
+                if item['kind'] == 'farm.request':
+                    payload = item['payload']
+                    from sqlalchemy import text as sql_text
+                    async with self.database.transaction() as session:
+                        await session.execute(sql_text(
+                            "SELECT pg_advisory_xact_lock(728312, hashtext(CAST(:user_id AS text)))"
+                        ), {'user_id': str(item['user_id'])})
+                        allowed = await session.scalar(sql_text(
+                            "SELECT COALESCE((payload->'settings'->>'notify_requests')::boolean, true) "
+                            "FROM farm_states WHERE id=:farm_id"
+                        ), {'farm_id': payload.get('recipient_farm')})
+                        if not allowed:
+                            await queue.skipped(item['id'], worker_id, claim_version=item['claim_version'])
+                            continue
+                        last_sent = await session.scalar(sql_text(
+                            "SELECT EXTRACT(EPOCH FROM MAX(CASE "
+                            "WHEN status='delivered' THEN delivered_at "
+                            "WHEN status='uncertain' THEN claimed_at END)) "
+                            "FROM notification_outbox WHERE kind='farm.request' AND user_id=:user_id "
+                            "AND status IN ('delivered','uncertain')"
+                        ), {'user_id': item['user_id']})
+                        if last_sent is not None and time.time() - float(last_sent) < 3600:
+                            await queue.retry_after(item['id'], worker_id,
+                                                    3600 - (time.time() - float(last_sent)),
+                                                    claim_version=item['claim_version'])
+                            continue
+                        if payload.get('event') == 'reminder':
+                            still_pending = await session.scalar(sql_text(
+                                "SELECT 1 FROM farm_requests WHERE id=:id AND status='delivered' "
+                                "AND settle_by > :now"
+                            ), {'id': payload.get('request'), 'now': time.time()})
+                            if not still_pending:
+                                await queue.skipped(item['id'], worker_id, claim_version=item['claim_version'])
+                                continue
+                        url = payload.get('url')
+                        markup = InlineKeyboardMarkup([[Button('Открыть ферму', url=url)]]) if url else None
+                        await context.bot.send_message(
+                            item['chat_id'], escape(str(payload.get('text', 'Новости фермы'))),
+                            reply_markup=markup,
+                        )
+                        await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
                     continue
                 if item['kind'] == 'classic.question':
                     await self._deliver_classic_question(context, queue, worker_id, item)

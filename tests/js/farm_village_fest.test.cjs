@@ -23,7 +23,7 @@ for(const [id,[file,budget]] of Object.entries(LAYERS))test(`${id} layer: vector
 test('festival layers: fetched only for their festival, base under the night tint, glow above it',()=>{
  assert.match(app,/const VILLAGE_FEST=\{posidelki:'village-fest-posidelki\.svg',/);
  assert.match(app,/d\?\.festivalDecor==='on'\?d\.festival:''/,'nothing is fetched while the decor switch is off');
- assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),/,'base under the night tint, glow above it');
+ assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),/,'base under the night tint, glow above it');
  assert.match(app,/FEST\.applyWorld\(view\);syncVillageFest\(\);/);
  assert.match(css,/\.village-fest\{position:absolute;inset:0;pointer-events:none;display:none\}/);
  assert.match(css,/:root:not\(\[data-farm-theme=night\]\) \.village-fest-glow \.vf-night\{display:none\}/);

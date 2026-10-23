@@ -11,6 +11,8 @@ import {posidelki} from './fest_posidelki.js';
 import {newYear} from './fest_newyear.js';
 import {maslenitsa} from './fest_maslenitsa.js';
 import {springFlowers} from './fest_flowers.js';
+import {buildArt} from './build.js';
+import {crewSvgs} from './crew.js';
 import {merchantCart,magpieSvg} from './merchant.js';
 
 export async function render(opts={}){
@@ -131,12 +133,6 @@ function well(x,y){WELLS.push([x,y]);anchor(x,y,'well');claim(x-.5,y-.5,x+.5,y+.
  for(const d of [-1,1]){const q=P(x+d*.3,y-d*.3);s.line(q.x,q.y-12,q.x,q.y-40,'#9e8a60',3)}
  const a=P(x-.45,y+.45,40),b=P(x+.45,y-.45,40),tp=P(x,y,52);s.poly([{x:a.x-4,y:a.y+2},{x:tp.x,y:tp.y},{x:b.x+4,y:b.y+2},{x:b.x+4,y:b.y+6},{x:tp.x,y:tp.y+4},{x:a.x-4,y:a.y+6}],'#8aa98f');s.poly([{x:a.x-4,y:a.y+2},{x:tp.x,y:tp.y},{x:tp.x,y:tp.y+4},{x:a.x-4,y:a.y+6}],'#9db89f');
  const c=P(x,y,30);s.line(c.x-10,c.y,c.x+10,c.y,'#7a6046',2);s.line(c.x,c.y,c.x,c.y+8,'#8b7a60',.8);s.poly([{x:c.x-3,y:c.y+8},{x:c.x+3,y:c.y+8},{x:c.x+2.5,y:c.y+13},{x:c.x-2.5,y:c.y+13}],'#a98763')})}
-function stall(x,y,c1,goods){STALL_BOXES.push([x,y,x+1.4,y+1]);anchor(x,y,'stall');anchor(x+1.4,y+1,'stall');claim(x,y,x+1.4,y+1,'stall',34);add(x+y+2.4,()=>{const x1=x+1.4,y1=y+1;B.shadowAt(s,x,y,x1,y1,40,16);
- for(const [a,b] of [[x+.06,y+.06],[x1-.06,y+.06]])B.L(s,a,b,0,a,b,30,'#9c7d58',2.2);
- B.fullBox(s,'#c9a672',x,y+.35,x1,y1,0,11,'#d8b886');B.boards(s,'y',y1,x,x1,0,11,4,'rgba(80,55,30,.25)');
- goods.forEach((g,i)=>{const q=P(x+.3+i*.42,y+.68,11);s.ellipse(q.x,q.y-2,5,3,g);s.ellipse(q.x-1,q.y-3,2.4,1.6,'#ffffff55')});
- for(const [a,b] of [[x+.06,y1-.06],[x1-.06,y1-.06]])B.L(s,a,b,11,a,b,26,'#9c7d58',2.2);
- B.awning(s,x-.06,x1+.06,y,32,1.2,8,'#f4ece0',c1,6)})}
 function lamp(x,y){LAMPS.push([x,y]);anchor(x,y,'lamp');if(isRoad(x,y)||isPlaza(x,y)&&false)problems.push('lamp on road '+x+','+y);claim(x-.15,y-.15,x+.15,y+.15);add(x+y,()=>{const p=P(x,y);s.lantern(p);meta.lamps.push(scr({x:p.x,y:p.y-43}))})}
 function tree(x,y,k=1,fruit=null){anchor(x,y,'tree');add(x+y,()=>{s.treeSprite(x,y,k);if(fruit){const p=P(x,y);for(const [dx,dy] of [[-10,-44],[8,-50],[12,-36],[-2,-60],[-14,-54],[4,-40]])s.ellipse(p.x+dx*k,p.y+dy*k,2.4*k,2.4*k,fruit)}})}
 function pine(x,y,k=1){anchor(x,y,'pine');add(x+y,()=>{const p=P(x,y),c=ctx;c.save();c.translate(p.x,p.y);c.scale(k,k);s.shadow(0,0,17,7);s.line(0,0,0,-14,'#9e8a60',4);
@@ -213,18 +209,17 @@ function headrace(){const fu=3.45,v0=13.55,v1=16.35,za=62,zb=56;claim(-.3,12.7,4
   // water pouring from the open end onto the top of the wheel
   const e=P(fu,v1,zb),f=P(fu,v1+.35,zb-9);ctx.beginPath();ctx.moveTo(e.x-2,e.y);ctx.quadraticCurveTo(e.x-3,e.y+4,f.x,f.y);ctx.strokeStyle='#cfeee8';ctx.lineWidth=3;ctx.lineCap='round';ctx.stroke()});
 }
-function site(x,y,w,h,label){if(blockedArea(x,y,x+w,y+h))problems.push('site on road/water '+label);claim(x,y,x+w,y+h,'site',40);for(const [ax,ay] of [[x,y],[x+w,y+h]])anchor(ax,ay,'site');
- PADS2.push([x,y,w,h]);meta.sites.push({label,at:scr(P(x+w/2,y+h/2,46))});
- add(x+w+y+h,()=>{const x1=x+w,y1=y+h;
-  for(const [a,b] of [[x+.15,y+.15],[x1-.15,y+.15],[x+.15,y1-.15],[x1-.15,y1-.15]]){B.L(s,a,b,0,a,b,40,'#a98763',2.6)}
-  for(const z of [20,40]){B.L(s,x+.15,y1-.15,z,x1-.15,y1-.15,z,'#b9946a',2);B.L(s,x1-.15,y+.15,z,x1-.15,y1-.15,z,'#a98058',2);B.L(s,x+.15,y+.15,z,x1-.15,y+.15,z,'#b9946a',2)}
-  B.L(s,x+.15,y1-.15,0,x1-.15,y1-.15,40,'#9c7a54',1.4);
-  // stakes with ribbons at the corners
-  for(const [a,b] of [[x-.15,y1+.15],[x1+.15,y1+.15],[x1+.15,y-.15]]){B.L(s,a,b,0,a,b,14,'#8a6c4c',1.6);const q=P(a,b,13);s.poly([{x:q.x,y:q.y},{x:q.x+7,y:q.y+2},{x:q.x,y:q.y+4}],'#d96f5e')}
-  // planks and stones waiting for the builders
-  B.fullBox(s,'#c9a672',x+.3,y1-.9,x+1.3,y1-.55,0,5,'#dbb987');B.fullBox(s,'#c9a672',x+.35,y1-.85,x+1.35,y1-.6,5,9,'#e3c595');
-  B.fullBox(s,'#b9b3a0',x1-1,y1-.8,x1-.5,y1-.35,0,7,'#cfc9b6');B.fullBox(s,'#b9b3a0',x1-.9,y1-.75,x1-.6,y1-.45,7,12,'#d8d2c0');
-  const b=P(x1+.2,y+h/2,0);s.line(b.x,b.y,b.x,b.y-26,'#7a6046',2);s.poly([{x:b.x-14,y:b.y-38},{x:b.x+14,y:b.y-44},{x:b.x+14,y:b.y-30},{x:b.x-14,y:b.y-24}],'#efe2c2','#a88a62',1.4)})}
+// construction sites (FARM_VILLAGE_CONSTRUCTION.md): only the level trodden ground is painted; the stages (soon, pit, frame, done)
+// are vector layers of the game drawn by build.js over this ground
+const SITES={};
+function site(id,x,y,w,h,label){if(blockedArea(x,y,x+w,y+h))problems.push('site on road/water '+label);claim(x,y,x+w,y+h,'site',40);for(const [ax,ay] of [[x,y],[x+w,y+h]])anchor(ax,ay,'site');
+ PADS2.push([x,y,w,h]);SITES[id]=[x,y,x+w,y+h];meta.sites.push({id,label,at:scr(P(x+w/2,y+h/2,46))})}
+// the market rows: empty places for six stalls on the plaza (trodden ground and four stub posts); the stalls are layers of the game
+const STALL_SLOTS=[];
+function stallSlot(x,y){const x1=x+1.4,y1=y+1;if(!free(x+.7,y+.5,.6))problems.push(`stall slot on an object at ${x},${y}`);
+ STALL_BOXES.push([x,y,x1,y1]);STALL_SLOTS.push([x,y,x1,y1]);anchor(x,y,'stall');anchor(x1,y1,'stall');claim(x,y,x1,y1,'stall',34);
+ add(x+y+.2,()=>{s.poly([P(x,y),P(x1,y),P(x1,y1),P(x,y1)],'#d3c6a0');s.poly([P(x,y),P(x1,y),P(x1,y1),P(x,y1)],null,'#bcae86',1.2);
+  for(const [a,b] of [[x+.06,y+.06],[x1-.06,y+.06],[x+.06,y1-.06],[x1-.06,y1-.06]])B.fullBox(s,'#9c7d58',a-.04,b-.04,a+.04,b+.04,0,5,'#b79a72')})}
 function bearDen(X,Y){// Bear Pukh's den: a half-buried log house under a turf roof, round door toward the lane
  const x0=26.75,y0=38.0,x1=28.3,y1=39.75,Hd=22;claim(X,Y,X+2.6,Y+2.6,'building',50);for(const [ax,ay] of [[X,Y],[X+2.6,Y+2.6]])anchor(ax,ay,'den');
  add(X+2.6+Y+2.6,()=>{
@@ -326,12 +321,12 @@ field(44,24,48,28,'cabbage');field(39.6,26,43.6,30,'potato');building('feedmill'
 garden(6.4,18.4,8.4,19.0,'cabbage');garden(9.8,18.5,12.4,19.0,'carrot');garden(13,33.5,15.4,34.6,'cabbage');garden(19,33.6,21.6,34.6,'carrot');garden(33.6,22.6,35.2,24.2,'berry');garden(19.6,24.6,21.4,26,'potato');
 // plaza life
 well(21.8,20.8);
-stall(14.6,22.2,'#c97c5c',['#d9564b','#f2c45a','#8fbf5f']);stall(16.6,22.2,'#7c9d83',['#e6b86a','#d9564b','#f2e3b5']);stall(19.6,22.6,'#d9a24e',['#8fbf5f','#c97c5c','#f1dc8a']);
+for(let i=0;i<6;i++)stallSlot(14.3+i*1.6,22.3);meta.sites.push({id:'stalls',label:'Торговые ряды',at:scr(P(STALL_SLOTS[0][0]-1.2,23.6,20))});   // caption by the west end, off the stalls
 bench(18.2,20.8);bench(23.0,18.4,'y');bench(23.2,21.9,'y');
 for(const [x,y] of [[14.4,14.6],[23.6,14.4],[14.4,23.6],[23.6,23.6]])flowers(x,y);
 // streets: lamps on verges
 for(const [x,y] of [[13.6,18.6],[9,18.6],[6.9,18.6],[-1,18.6],[18.6,13.6],[18.6,9],[18.6,4],[18.6,-1],[15.6,24.6],[15.6,30],[15.6,33.4],[18.4,40],[24.6,15.6],[34,15.6],[39,15.6],[24.6,24.6],[24.6,30],[21.6,34.6],[27,34.6],[33,34.6],[40,34.6],[45,37.4],[29,18.4],[44,15.6],[11.6,21.4],[21.4,11.6],[10,21.4]])lamp(x,y);
-gate(36,36);site(27.4,42.2,2.8,2.4,'Трактир');site(4.8,9.4,2.6,2.4,'Рыбацкая хижина');site(44.2,29.4,2.6,2.4,'Ярмарка');
+gate(36,36);site('tavern',27.4,42.2,2.8,2.4,'Трактир');site('greenhouse',4.8,9.4,2.6,2.4,'Оранжерея');site('fairground',44.2,29.4,2.6,2.4,'Ярмарка');
 // village details
 bales(43,18.4);haystack(48.6,29);haystack(42.6,31);haystack(32.6,8.6);laundry(12.2,25.0);laundry(28.4,23.0);laundry(17.9,38.6);
 shed(9.4,28.4);shed(23.2,31.6);shed(32.4,22.2);shed(28,15);playground(36,29.6);well(29.6,24.8);
@@ -424,6 +419,9 @@ meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windo
  const xs=corners.map(c=>c[0]),ys=corners.map(c=>c[1]);
  meta.merchant={svg:merchantCart({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],box:CART}),figure:magpieSvg(),
   cart:[Math.min(...xs),Math.min(...ys),Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)].map(Math.round),foot:toWorld(...MAGPIE).map(Math.round)}}
+// construction (build.js): stages of the sites and the stalls of the rows, anchored to this render
+meta.build=buildArt({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],sites:SITES,slots:STALL_SLOTS});
+meta.build.figures=crewSvgs();
 meta.player=playerSvg();   // the player's figure (player.js), a live layer like the gate board
 return {world:cv.toDataURL('image/png'),meta,size:[W,H]};
 }

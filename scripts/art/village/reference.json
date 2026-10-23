@@ -1,8 +1,8 @@
 {
- "rgba_sha256": "3248ba9675189bf69111895cbce65b9e8bad46d4c0d5d679d2f1d845212cb35e",
- "webp_sha256": "064367a3f9d78a5dad6c2937a548c119711d45db47431194626f7fddbe31e77f",
- "svg_sha256": "196ac32e0a94e45bc37d94fd97005e1b098eaee4af9c42ea6eb6f0a84e61c072",
- "svg_bytes": 688894,
+ "rgba_sha256": "5518c31e27ab9619e82cdb1e2925228e4618ed8e8b3b7d5215793bbf49df30e4",
+ "webp_sha256": "ee1d4e772537b2384444b9ab750003c1af15785f4bb9a2dfa795d64aa6323475",
+ "svg_sha256": "cd08b6c107567f16f27626ae8c2ab3a447852a2a8e0a75d4fcb6b1f6bb07b1bf",
+ "svg_bytes": 677618,
  "versions": {
   "chromium": "chromium_headless_shell-1194",
   "pillow": "11.3.0",
@@ -17,22 +17,25 @@
   "scripts/art/village/fest_posidelki.js": "d7747d2c8a6d5740",
   "scripts/art/village/fest_kit.js": "6f64347d06d04925",
   "scripts/art/village/fest_snow.js": "181752fd82afb0f4",
-  "scripts/art/village/fest_newyear.js": "e4584f31df4b5a13",
-  "scripts/art/village/fest_maslenitsa.js": "91b546736d999845",
+  "scripts/art/village/fest_newyear.js": "3de47c7071ff0666",
+  "scripts/art/village/fest_maslenitsa.js": "d162335110670a43",
   "scripts/art/village/fest_flowers.js": "225257d3a178d362",
+  "scripts/art/village/build.js": "f0d88bfccaea7a07",
+  "scripts/art/village/crew.js": "bec6f84851fbccd3",
   "scripts/art/village/merchant.js": "c890c30c4bb04366",
   "qw_farm/static/scene_buildings.js": "a43f1b0e3c36f5a6",
   "qw_farm/static/scene.js": "b5db33210ef6ba52",
   "qw_farm/static/scene_expansion.js": "7473fa6cdf1de9ff",
   "qw_farm/static/scene_map.js": "3b3098f6663e0f12",
-  "scripts/art/village/village.js": "ec7f1743b7d87343",
+  "scripts/art/village/village.js": "66561cda71f252b3",
   "scripts/art/village/common.js": "3ba377144e786cca"
  },
  "fest_sha256": {
   "posidelki": "5ed29158fdf12fb0e17d6b96358428637dff1d298ed87c2b481be90ff463d6b6",
-  "new_year": "f2754af2b28084bd81b771c1315ac17d8848363eb982634d326ef9d1c5145775",
-  "maslenitsa": "0d2b2baf9267bfbc5031741ea482c9d65ec65ba8253ef0f70e0b1ddbec335725",
+  "new_year": "76e033e4107f398866f29f4cf2c3d9bd2e3e3165405972f518888c6223d16ae2",
+  "maslenitsa": "fb44d6082b5e9374918747937af23809db0f8a3c3dfb98757f6f60122217468e",
   "spring_flowers": "93d99c0d1c2eb962c7df92673c12ffb8db8ead48b9d6aec51b9f9cf855748cf7"
  },
- "merchant_sha256": "ba41bfafff67ec8d0f3780478ea81b37c14262686e871c89f12e66397633f27c"
+ "merchant_sha256": "ba41bfafff67ec8d0f3780478ea81b37c14262686e871c89f12e66397633f27c",
+ "build_sha256": "fe8a582c75f9af04e202b1157dcea76991addff51f82e846cb6474524379c1a3"
 }

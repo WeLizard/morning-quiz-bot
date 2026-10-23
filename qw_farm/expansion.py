@@ -67,6 +67,8 @@ def upgrade_state(farm, now=None):
     festivals.state(farm)       # festivals engine: empty mapping for old farms
     textile.upgrade(farm)       # lessons ledger, setdefault only
     merchant.state(farm)        # Сорока: empty record for old farms
+    from . import request_rules
+    request_rules.upgrade(farm, now)
     orchard.upgrade(farm, now)  # orchard record; one free sapling per fruit once grown on beds (decided once per species)
     trip_games.upgrade(farm)    # open v1 fishing games -> v2 plan (FARM_TRIP_MINIGAMES.md 10.6)
     from . import village_quests

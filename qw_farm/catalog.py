@@ -642,10 +642,10 @@ TIER_DISCOUNT_PCT=25            # personal tier 3: upkeep discount until the sea
 FEAST_DAYS,FEAST_PCT=3,10       # "Праздник": +10% XP for 3 days
 FUND_REWARD_TEXT={
  1:'Праздничная гирлянда (декор)',
- 2:'«Праздник»: +10% опыта на 3 дня',
+ 2:'«Покупатель Сороки»: +1 к лимиту в её визите',
  3:'−25% содержания до конца сезона',
- 4:'Вертушка — анимированный декор',
- 5:'Кубок старосты: трофей и титул',
+ 4:'Ранний доступ к праздничной ярмарке и вертушка',
+ 5:'Кубок, титул и «Почётный житель сезона»',
 }
 VILLAGE_GOAL_FLOOR=120000       # the common goal is never lower than this
 VILLAGE_ACTIVE_DAYS=14          # an "active" farm acted within this many Moscow days

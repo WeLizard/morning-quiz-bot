@@ -69,6 +69,10 @@ MERGE_POLICY = {
     ('farm_receipts', 'account_id'): 'special',
     ('farm_ledger', 'actor_account_id'): 'history',
     ('farm_wager_rounds', 'account_id'): 'special',
+    ('farm_requests', 'requester_account'): 'special',
+    ('farm_requests', 'giver_account'): 'special',
+    ('farm_village_contribs', 'account_id'): 'special',
+    ('farm_village_stall_lots', 'seller_account'): 'special',
     ('problem_reports', 'account_id'): 'history',
 }
 
@@ -290,6 +294,9 @@ class AccountMergeService:
             states = schema['states']
             farm_ids = [str(r[0]) for r in (await session.execute(
                 select(states.c.id).where(states.c.account_id.in_(ids)))).all()]
+            from qw_farm import friend_requests
+            farm_ids=await friend_requests.merge_participants(unit,farm_ids)
+            unit.friend_request_merge_farms=set(farm_ids)
             await unit.lock('account:' + str(main.id), 'account:' + str(secondary.id),
                             *('farm:' + f for f in farm_ids))
 
@@ -465,6 +472,10 @@ class AccountMergeService:
             # Preserve every settled record and its original farm reference across either merge shape.
             await session.execute(update(wagers).where(wagers.c.account_id == secondary.id)
                                   .values(account_id=main.id))
+        from qw_farm import friend_requests
+        await friend_requests.merge_close(unit,main.id,secondary.id,self.clock())
+        from qw_farm import construction
+        await construction.merge_prepare(unit, main.id, secondary.id, self.clock())
         theirs = await unit.by_account(secondary.id)
         mine = await unit.by_account(main.id)
         if theirs is None:

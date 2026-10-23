@@ -118,7 +118,11 @@ def manifest(meta: dict) -> dict:
         "hall": pc(*meta["hall"]),
         "gate": pc(meta["gate"][0], meta["gate"][1] - 70),
         "plaza_corner": u(*meta["plaza"][0]),
-        "sites": [[s["label"]] + pc(*s["at"]) for s in meta["sites"]],
+        # construction (build.js, FARM_VILLAGE_CONSTRUCTION.md §6): sites by id — caption point (% of the world), boxes of the stage
+        # pieces and the crew's foot points (world units); the stalls of the rows — owner, place (tiles) and boxes
+        "sites": {s["id"]: {"label": s["label"], "sign": pc(*s["at"])} for s in meta["sites"]},
+        "build": {"boxes": meta["build"]["boxes"], "crew": meta["build"]["crew"]},
+        "stalls": meta["build"]["stalls"],
         # the peddler (merchant.js): cart layer box and the magpie's foot point, world units
         "merchant": {"cart": meta["merchant"]["cart"], "foot": meta["merchant"]["foot"]},
         # walk graph (walk.js, README «Граф проходимости»): flat world-unit node pairs, flat index pairs, named anchors
@@ -129,7 +133,7 @@ def manifest(meta: dict) -> dict:
     }
 
 
-INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/merchant.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
+INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/build.js", "scripts/art/village/crew.js", "scripts/art/village/merchant.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
 
@@ -164,6 +168,12 @@ def build(out: Path, install: bool = False) -> dict:
                                                      "dropped": res["meta"]["walk"]["dropped"]}, ensure_ascii=False), encoding="utf-8")
     (out / "player.svg").write_text(res["meta"]["player"], encoding="utf-8", newline="")
     (out / "village-merchant.svg").write_text(res["meta"]["merchant"]["svg"], encoding="utf-8", newline="")
+    (out / "build").mkdir(exist_ok=True)   # construction pieces one by one (previews) and the sprite the game uses
+    for pid, svg_text in res["meta"]["build"]["files"].items():
+        (out / "build" / f"{pid}.svg").write_text(svg_text, encoding="utf-8", newline="")
+    (out / "village-build.svg").write_text(res["meta"]["build"]["sprite"], encoding="utf-8", newline="")
+    for name, svg_text in res["meta"]["build"]["figures"].items():   # the crew (crew.js): inline in app.js VILLAGE_CREW
+        (out / "build" / f"crew-{name}.svg").write_text(svg_text, encoding="utf-8", newline="")
     (out / "merchant-figure.svg").write_text(res["meta"]["merchant"]["figure"], encoding="utf-8", newline="")
     for fid, layer in res["meta"]["fest"].items():   # festival layers: qw_farm/static/village-fest-<id>.svg
         (out / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
@@ -174,7 +184,8 @@ def build(out: Path, install: bool = False) -> dict:
               "svg_sha256": hashlib.sha256(svg.encode()).hexdigest(),
               "svg_bytes": len(svg.encode()), "versions": versions(), "inputs": inputs(),
               "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()},
-              "merchant_sha256": hashlib.sha256((res["meta"]["merchant"]["svg"] + res["meta"]["merchant"]["figure"]).encode()).hexdigest()}
+              "merchant_sha256": hashlib.sha256((res["meta"]["merchant"]["svg"] + res["meta"]["merchant"]["figure"]).encode()).hexdigest(),
+              "build_sha256": hashlib.sha256(res["meta"]["build"]["sprite"].encode()).hexdigest()}
     (out / "hashes.json").write_text(json.dumps(hashes, indent=1), encoding="utf-8")
     if man["problems"]:
         print("layout problems:", *man["problems"], sep="\n  ")
@@ -183,6 +194,7 @@ def build(out: Path, install: bool = False) -> dict:
         for fid, layer in res["meta"]["fest"].items():
             (GAME_SVG.parent / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
         (GAME_SVG.parent / "village-merchant.svg").write_text(res["meta"]["merchant"]["svg"], encoding="utf-8", newline="")
+        (GAME_SVG.parent / "village-build.svg").write_text(res["meta"]["build"]["sprite"], encoding="utf-8", newline="")
         print("installed", GAME_SVG, "and festival layers", ", ".join(res["meta"]["fest"]))
     return hashes
 

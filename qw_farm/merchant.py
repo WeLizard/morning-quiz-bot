@@ -26,7 +26,7 @@ import math
 
 from .catalog import ITEMS, CURIOS, CURIO_SERIES, SCROLL_RECIPES, RECIPES, EXOTIC_CROPS, DYES, MERCHANT, ORCHARD_ROWS, ORCHARD_WIRED, TREE_VOUCHER_DISCOUNT_PCT, income_ref, level, tick
 from .domain import need, inventory, pay
-from . import economy, festivals
+from . import economy, festivals, construction
 
 DAY = 86400
 TZ_OFFSET = economy.TZ_OFFSET
@@ -310,11 +310,11 @@ def buy(farm, data, now):
         need(e['id'] not in m['curios'], 'already_owned', 'Эта диковинка уже в твоей коллекции.')
     if e['kind'] == 'scroll':
         need(e['recipe'] not in m['scrolls'], 'already_owned', 'Этот рецепт ты уже знаешь.')
-    need(bought + qty <= e['limit'], 'limit_reached', 'На этот визит больше не продам.')
+    need(bought + qty <= e['limit'] + construction.merchant_extra(farm, slot, now), 'limit_reached', 'На этот визит больше не продам.')
     if e['kind'] == 'graft':
         from . import orchard
         need(orchard.can_buy_graft(farm, e['item']), 'no_tree', 'Прививка нужна для посаженного дерева: сначала посади его.')
-    cost = e['price'] * qty
+    cost = construction.merchant_price(farm, e['price'] * qty)   # «помощник» торговых рядов: −10%
     pay(farm, cost)
     _enter(farm, visit)
     m['bought'][str(slot)] = bought + qty
@@ -381,13 +381,15 @@ def owner_view(farm, now):
     live = view['visit_id'] is not None and m['visit_id'] == view['visit_id']
     bought = m['bought'] if live else {}
     for s in view['slots']:
-        left = s['limit'] - bought.get(str(s['slot']), 0)
+        s['extra'] = construction.merchant_extra(farm, s['slot'], now)   # rows «мастер» / fund «Покупатель Сороки»
+        left = s['limit'] + s['extra'] - bought.get(str(s['slot']), 0)
+        s['pay'] = construction.merchant_price(farm, s['price'])
         owned = (s['kind'] == 'curio' and s['id'] in m['curios']) or (s['kind'] == 'scroll' and s['id'][7:] in m['scrolls'])
         s['left'] = max(0, left)
         from . import orchard
         s['status'] = ('soon' if not s['wired'] else 'owned' if owned else 'locked' if lv < s['min_level'] else 'sold' if left <= 0
                        else 'notree' if s['kind'] == 'graft' and not orchard.can_buy_graft(farm, s['id'])
-                       else 'poor' if farm['coins'] < s['price'] else 'ok')
+                       else 'poor' if farm['coins'] < s['pay'] else 'ok')
     sold = m['sold_value'] if live else 0
     view.update(bought=dict(bought), sold_value=sold, cap=cap(farm), curios=list(m['curios']), scrolls=list(m['scrolls']))
     if view['wants']:

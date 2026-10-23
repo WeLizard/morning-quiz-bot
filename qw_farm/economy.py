@@ -21,7 +21,8 @@ from .catalog import (BUILDINGS, ITEMS, level, income_ref, plot_upkeep, UPKEEP_P
 TZ_OFFSET = 10800
 DAY = 86400
 KEEP_SEASONS = 2
-TIER_REWARD = {1: 'garland', 2: 'feast', 3: 'discount', 4: 'pinwheel', 5: 'cup'}
+# Revised by FARM_VILLAGE_CONSTRUCTION.md 4.2: tier 2 -> «Покупатель Сороки», tier 4 -> early fair access (+ the pinwheel stays), tier 5 -> cup + «Почётный житель».
+TIER_REWARD = {1: 'garland', 2: 'magpie', 3: 'discount', 4: 'early', 5: 'cup'}
 TIER_TEXT = FUND_REWARD_TEXT
 TITLE = 'Староста деревни'
 REWARD_BY_TIER = {1: 'fd_garland', 4: 'fd_pinwheel', 5: 'fd_cup'}
@@ -80,6 +81,23 @@ def base_upkeep(farm):
             total += -(-spec['cost'] * (lvl if type(lvl) is int and lvl >= 1 else 1) // UPKEEP_PCT)
     total += FIELD_UPKEEP * sum(f.get('ha', 0) for f in farm.get('fields', []) if isinstance(f, dict))
     return total
+
+
+def perk(farm, name, at):
+    """Fund perks derived from the personal scale: ``magpie`` (tier 2) and ``early`` (tier 4) in the current season,
+    ``honor`` («Почётный житель сезона», tier 5) during the season after it was earned (and the season it was earned in)."""
+    seasons = (farm.get('economy') or {}).get('seasons') or {}
+    now = season_of(at)
+    def tiers(season):
+        rec = seasons.get(str(season))
+        return rec['tiers'] if rec else 0
+    if name == 'magpie':
+        return tiers(now) >= 2
+    if name == 'early':
+        return tiers(now) >= 4
+    if name == 'honor':
+        return tiers(now) >= 5 or tiers(now - 1) >= 5
+    return False
 
 
 def discount_active(farm, at):
@@ -193,13 +211,11 @@ def contribute(farm, coins, items, at):
         rec['tiers'] += 1
         tier = rec['tiers']
         kind = TIER_REWARD[tier]
-        if kind == 'feast':
-            _grant_feast(farm, at)
-        elif kind == 'cup':
+        if kind == 'cup':
             _unlock(farm, REWARD_BY_TIER[tier])
             if TITLE not in e['titles']:
                 e['titles'].append(TITLE)
-        elif kind in ('garland', 'pinwheel'):
+        elif kind in ('garland', 'early'):
             _unlock(farm, REWARD_BY_TIER[tier])
         got.append(TIER_TEXT[tier])
     text = f'В фонд деревни внесено: {value}.'
@@ -261,6 +277,7 @@ def status(farm, at):
         season=season, season_ends_at=season_end(season), ref=ref, thresholds=thresholds(ref),
         personal=rec['personal'] if rec else 0, tiers=rec['tiers'] if rec else 0, joined=bool(rec and rec['joined']),
         min_share=min_share(ref), common=bool(rec and rec['common']),
+        perks={n: perk(farm, n, at) for n in ('magpie', 'early', 'honor')},
         feast_until=e['feast_until'], unlocked=list(e['unlocked']), titles=list(e['titles']),
         pending_common=[s for s in claimable_seasons(farm)] if farm.get('economy') else [],
         stats=dict(e['stats']))

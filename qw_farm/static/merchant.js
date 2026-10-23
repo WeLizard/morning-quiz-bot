@@ -38,7 +38,7 @@ export function slotBlock(s,coins){
  if(s.status==='locked')return `С ${s.min_level} уровня`;
  if(s.status==='sold'||s.left<=0)return 'На этот визит всё';
  if(s.status==='notree')return 'Нужно посаженное дерево';
- if(coins<s.price)return 'Не хватает монет';
+ if(coins<(s.pay??s.price))return 'Не хватает монет';
  return '';
 }
 export function sellBlock(w,sold){
@@ -73,11 +73,11 @@ function slotRow(s,h){
  const {el,button,coins,fmt,command}=h,row=el('div',null,`mag-slot ${s.status}`);
  const info=el('div');
  info.append(itemMark(h,slotIcon(s)),el('strong',s.name),el('small',`${KIND_LABEL[s.kind]||s.kind}${s.series?` · «${s.series}»`:''} · ${s.note}`),
-             el('small',`Осталось ${s.left} из ${s.limit}${s.qty>1?` · в пакете ×${s.qty}`:''}`));
+             el('small',`Осталось ${s.left} из ${s.limit+(s.extra||0)}${s.qty>1?` · в пакете ×${s.qty}`:''}`));
  const block=slotBlock(s,coins());
  const actions=el('div',null,'qw-btn-stack');
  const send=n=>()=>command('merchant_buy',{visit_id:h.view().visit_id,slot:s.slot,qty:n});
- actions.append(button(`Купить · ${fmt(s.price)}`,send(1),'qw-btn secondary',!!block||h.busy?.()));
+ actions.append(button(`Купить · ${fmt(s.pay??s.price)}${s.pay!=null&&s.pay<s.price?' (−10% рядов)':''}`,send(1),'qw-btn secondary',!!block||h.busy?.()));
  if(!block&&s.kind==='dye'&&s.left>=5&&coins()>=s.price*5)actions.append(button(`Купить ×5 · ${fmt(s.price*5)}`,send(5),'qw-btn secondary',!!h.busy?.()));
  if(block)actions.append(el('p',block,'qw-btn-hint'));
  row.append(info,actions);

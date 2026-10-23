@@ -22,7 +22,7 @@ test('magpie figure and anchor: hidden until html[data-merchant], standing at th
  assert.match(css,/\.village-merchant,\.village-merchant-figure\{display:none\}/);
  assert.match(css,/:root\[data-merchant\] \.village-merchant,:root\[data-merchant\] \.village-merchant-figure\{display:block\}/);
  assert.match(css,/prefers-reduced-motion:no-preference\)\{\s*\.village-merchant-figure \.vm-figure-art\{animation:vm-sway/);
- assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageMerchantLayer\('glow'\),villageMerchantFigure\(\),/);
+ assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageBuildLayer\('glow'\),villageMerchantLayer\('glow'\),villageMerchantFigure\(\),/);
  assert.match(app,/const on=!!globalThis\.document\?\.documentElement\?\.dataset\?\.merchant/,'nothing is fetched outside her visit');
 });
 test('goods icons of the peddler exist in the sprite',()=>{

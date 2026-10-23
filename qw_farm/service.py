@@ -12,7 +12,7 @@ from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, oleg, progression, trip_games
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
-from . import wagers
+from . import wagers, friend_requests, construction
 
 # The client pulses every 10 s, the lease is 25 s: persistence every other pulse is enough to keep it live.
 PRESENCE_PERSIST_EVERY=15
@@ -40,6 +40,7 @@ class FarmService:
             validate_state(farm)
             await self.u.save(farm,self.p.account_id)
             await self.u.record(self.p.account_id,'bootstrap','bootstrap',None,farm,self.clock())
+        await friend_requests.expire(self.u,farm['id'],self.clock())
         await self.u.lock('farm:'+farm['id'])
         farm=await self.u.get(farm['id'])
         if invite:
@@ -48,7 +49,10 @@ class FarmService:
         await self._settle(farm,own=True)
         await wagers.expire(self.u,farm,self.p.account_id,self.clock())
         await wagers.claim_pending(self.u,farm,self.p.account_id,self.clock())
+        requests=await friend_requests.projection(self.u,farm,self.clock())
         projection=project(farm,farm,self.clock());projection['wager']=await wagers.projection(self.u,farm,self.p.account_id,self.clock())
+        projection['friend_requests']=requests
+        projection['village_build']=await construction.projection(self.u,farm,self.p.account_id,self.clock())
         return dict(farm=projection,catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
                     invites=await self._invites(farm),address_form=self.p.address_form)
 
@@ -156,8 +160,8 @@ class FarmService:
         await self._settle(other,await self.u.owner_account(other['id']))
         before=deepcopy(me); before_other=deepcopy(other)
         if not already:
-            me['neighbors'][other['id']]={'name':other['name'],'status':'accepted'}
-            other['neighbors'][me['id']]={'name':me['name'],'status':'accepted'}
+            me['neighbors'][other['id']]={'name':other['name'],'status':'accepted','accepted_at':now}
+            other['neighbors'][me['id']]={'name':me['name'],'status':'accepted','accepted_at':now}
             from .domain import event
             event(me,now,f'Ты стал(а) соседом с «{other["name"]}».','social')
             event(other,now,f'{me["name"]} принял(а) приглашение. Теперь вы соседи!','social')
@@ -250,13 +254,14 @@ class FarmService:
         baseline=upgrade_state(deepcopy(before))
         settle(farm,self.clock())
         if own:await self._claim_village(farm,self.clock())
+        if own:await construction.tick_account(self.u,farm,self.p.account_id,self.clock())  # shared stages, perk mirror, own stall rent
         if farm!=before:
             farm['revision']+=1
             validate_state(farm)
             await self.u.save(farm)
             # Market housekeeping (a caravan arriving, the daily contracts rolling over) changes no balance:
             # it is saved, but only real work leaves a receipt in the economic ledger.
-            quiet={'market','events','revision','economy','village_errands'}
+            quiet={'market','events','revision','economy','village_errands','village_bonus'}
             if any(farm.get(k)!=baseline.get(k) for k in set(farm)|set(baseline) if k not in quiet):
                 # Stable per-version economic receipt for automatically completed work.
                 key='auto:'+str(farm['revision'])
@@ -269,6 +274,7 @@ class FarmService:
         try: target_id=str(UUID(str(farm_id or me['id'])))
         except (ValueError,TypeError,AttributeError):
             raise FarmError('not_found','Ферма не найдена.',404)
+        await friend_requests.expire(self.u,[me['id'],target_id],self.clock())
         await self.u.lock('farm:'+me['id'],'farm:'+target_id)
         me=await self.u.get(me['id'])
         farm=me if target_id==me['id'] else await self.u.get(target_id)
@@ -278,8 +284,12 @@ class FarmService:
         await wagers.claim_pending(self.u,me,self.p.account_id,self.clock())
         if farm is not me:
             await self._settle(farm,await self.u.owner_account(farm['id']))
+        requests=await friend_requests.projection(self.u,me,self.clock()) if farm is me else None
         projected=project(farm,me,self.clock())
-        if farm is me:projected['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
+        if farm is me:
+            projected['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
+            projected['friend_requests']=requests
+            projected['village_build']=await construction.projection(self.u,me,self.p.account_id,self.clock())
         return dict(farm=projected,speed=self.speed,village=await self._village(me) if farm is me else None,
                     invites=await self._invites(me) if farm is me else None,
                     address_form=self.p.address_form)
@@ -388,6 +398,10 @@ class FarmService:
             # Receipt contains only the actor's acknowledgement, no secret
             # snapshot from a farm whose permissions could have since changed.
             return deepcopy(cached['result'])
+        if kind in friend_requests.COMMANDS:
+            result=await friend_requests.command(self,key,kind,data,target_id)
+            await self.u.remember(self.p.account_id,key,fingerprint,result,self.clock())
+            return result
         await self.u.lock('farm:'+me['id'],'farm:'+str(target_id))
         me=await self.u.get(me['id'])
         other=me if target_id==me['id'] else await self.u.get(target_id)
@@ -436,8 +450,15 @@ class FarmService:
                 return result
             progression.touch(me,now)
             economy.bill(me,now)
+        elif kind in construction.COMMANDS:
+            notice,ledger_kind=await construction.command(self.u,me,other,self.p.account_id,kind,data,now)
+            event(me,now,notice,kind)
+            progression.touch(me,now)
+            economy.bill(me,now)
         else:
             notice=apply(me,other,kind,data,now,key,self.speed,self.p.address_form)
+        if kind in {'remove_neighbor','block'}:
+            await friend_requests.break_pair(self.u,me,other,self.p.account_id,now)
         neighbor_reward_paid=False
         if kind in {'accept_neighbor','claim_neighbor_reward'}:
             reward_notice,neighbor_reward_paid=await self._neighbor_reward(me,other,now,strict=kind=='claim_neighbor_reward')

@@ -1,6 +1,6 @@
 // «Масленица» (FARM_FESTIVALS_DESIGN.md §9.2 №2): the village's festival layer, vector only (fest_kit.js).
-//   vf-decor  — the last snow in patches (fest_snow.js), the ice slide, the straw effigy of Winter, the «Проводы Зимы» stage with its flags, blini and a samovar on the
-//               market stalls, bright flag garlands between the plaza lamps, chimney smoke (under the night tint);
+//   vf-decor  — the last snow in patches (fest_snow.js), the ice slide, the straw effigy of Winter, the «Проводы Зимы» stage with its flags, pancake tables
+//               with a samovar on the plaza, bright flag garlands between the plaza lamps, chimney smoke (under the night tint);
 //   vf-day    — warm light in the windows;
 //   vf-night  — windows, stage lanterns, the samovar, garland glow above the night tint.
 // Every piece takes a free place found on this render (kit.place), the stage first: on free ground, in view, over no house,
@@ -99,19 +99,25 @@ export function maslenitsa(V) {
     }]);
   }
 
-  // ---------- blini on the market stalls: stacks with jam and sour cream on the counters, a samovar on the first stall ----------
-  // (on the counters, where the stalls show their goods: the ground in front of the stalls is the player's way to the market)
-  (V.stalls || []).forEach(([sx, sy], k) => {
-    pieces.push([sx + sy + 2.4 + .01, () => {
-      [[.3, '#c9473a'], [.72, '#f4ede0'], [1.14, '#c9473a']].forEach(([dx, top], i) => {
-        const p = pt(sx + dx, sy + .68, 11);
-        if (k === 0 && i === 1) { B.cyl(s, sx + dx, sy + .68, .08, 11, 13, '#a8714a'); B.cyl(s, sx + dx, sy + .68, .07, 13, 22, '#d9a650', '#e8bf6a');
-          B.cyl(s, sx + dx, sy + .68, .025, 22, 26, '#a8714a', '#6f5640'); glows.push([sx + dx, sy + .68, 18, 12]); return }
-        for (let n = 0; n < 4; n++) { s.ellipse(p.x, p.y - n * 1.3, 5.4, 2.8, '#c98a3a'); s.ellipse(p.x, p.y - n * 1.3 - .5, 5, 2.5, BLIN) }
-        s.ellipse(p.x + .4, p.y - 5.6, 2.2, 1.2, top);
-      });
+  // ---------- pancake tables on the plaza: stacks of blini, jam and sour cream, a samovar on the first ----------
+  // (the market rows are a layer of their own that may not be built yet, so the blini get tables of their own)
+  for (let k = 0; k < 2; k++) {
+    const tb = K.place({w: .7, d: .45, h: 30, near: [mid[0] + [-2.4, 1.6][k], mid[1] + 2.2], area: around, margin: .05, path: 0, what: `pancake table ${k + 1}`});
+    if (!tb) continue;
+    const [x, y] = tb, x1 = x + .7, y1 = y + .45;
+    pieces.push([x1 + y1, () => {
+      B.shadowAt(s, x, y, x1, y1, 24, 9);
+      for (const [a, b] of [[x + .06, y + .06], [x1 - .06, y + .06], [x + .06, y1 - .06], [x1 - .06, y1 - .06]]) B.L(s, a, b, 0, a, b, 10, WOOD_D, 1.6);
+      B.fullBox(s, WOOD, x, y, x1, y1, 10, 12, '#f4ede0');
+      B.Q(s, ['#d9553f', '#e8c25a'][k], [x, y1, 12, x1, y1, 12, x1, y1, 8, x, y1, 8]);                                          // tablecloth edge
+      for (const [dx, top] of [[.2, '#c9473a'], [.45, '#f4ede0']]) { const p = pt(x + dx, y + .22, 12);
+        for (let i = 0; i < 4; i++) { s.ellipse(p.x, p.y - i * 1.3, 5.4, 2.8, '#c98a3a'); s.ellipse(p.x, p.y - i * 1.3 - .5, 5, 2.5, BLIN) }
+        s.ellipse(p.x + .4, p.y - 5.6, 2.2, 1.2, top) }
+      if (k === 0) { const sx = x1 - .14, sy = y + .2; B.cyl(s, sx, sy, .08, 12, 14, '#a8714a'); B.cyl(s, sx, sy, .07, 14, 23, '#d9a650', '#e8bf6a');
+        B.cyl(s, sx, sy, .025, 23, 27, '#a8714a', '#6f5640'); glows.push([sx, sy, 18, 12]) }
+      else { const p = pt(x1 - .14, y + .22, 12); s.ellipse(p.x, p.y - 2, 4, 2.4, '#f4ede0'); s.ellipse(p.x, p.y - 2.6, 2.6, 1.4, '#c9473a') }   // a bowl of jam
     }]);
-  });
+  }
 
   c.group('vf-decor');
   // March: the last snow in patches on the grass, wide thaw by the walls and under the trees, the roads already bare

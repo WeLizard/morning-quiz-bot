@@ -122,3 +122,10 @@ def test_new_caravans_snapshot_prices_and_preserve_them_after_catalog_changes(mo
     monkeypatch.setitem(C.ITEMS['apricot_five_star'], 'price', 1)
     M.settle_caravan(farm, car['deadline'])
     assert farm['coins'] == before + expected
+
+
+def test_minigame_results_paid_before_the_income_reference_change_stay_valid():
+    from qw_farm import minigames
+    # A barn/house quiz reward of 400 was paid at the old L30-34 reference (40000 // 100); saved results must still validate.
+    assert 400 in minigames._STORED_COIN_REWARDS
+    assert minigames._COIN_REWARDS <= minigames._STORED_COIN_REWARDS

@@ -23,6 +23,9 @@ _SACK_CATEGORIES = {key: category for key, _, category in SACKS}
 _SACK_LABELS = {key: label for key, label, _ in SACKS}
 _STATE_ERROR = ('invalid_minigame_state', 'Некорректное состояние мини-игры.', 500)
 _COIN_REWARDS = {max(10, value // 100) for _, _, value in INCOME_REF_BANDS}
+# Rewards already paid under the income reference before the 2026-10-23 economy audit stay valid in saved results.
+_LEGACY_COIN_REWARDS = {max(10, value // 100) for value in (1100, 7000, 13000, 19000, 30000, 36000, 40000, 42000)}
+_STORED_COIN_REWARDS = _COIN_REWARDS | _LEGACY_COIN_REWARDS
 
 
 def next_reward(farm, game=None):
@@ -181,7 +184,7 @@ def validate(farm):
                 payout = active['reward']
                 need(type(payout) is dict and set(payout) in ({'kind', 'amount'}, {'kind', 'amount', 'bonus_feed'}) and
                      payout['kind'] == 'coins' and type(payout['amount']) is int and
-                     payout['amount'] in _COIN_REWARDS, *_STATE_ERROR)
+                     payout['amount'] in _STORED_COIN_REWARDS, *_STATE_ERROR)
                 need('bonus_feed' not in payout or
                      (game == 'barn' and type(payout['bonus_feed']) is int and payout['bonus_feed'] == 1),
                      *_STATE_ERROR)
@@ -219,7 +222,7 @@ def validate(farm):
                      result['bonus_feed'] == (1 if type(result['correct']) is bool and result['correct'] else 0),
                      *_STATE_ERROR)
             if 'reward_kind' in result:
-                allowed_rewards = (_COIN_REWARDS | ({10} if game == 'house' else set())
+                allowed_rewards = (_STORED_COIN_REWARDS | ({10} if game == 'house' else set())
                                    if result['reward_kind'] == 'coins' else
                                    {1} if result['reward_kind'] == 'feed' and game == 'barn' else set())
             else:

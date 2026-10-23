@@ -193,7 +193,7 @@ test('drawObject sends trees and birdhouses to their own drawing, and the title 
 test('the app wires the orchard: tab, seeds, counters, placement, card, asset list',()=>{
  const app=read('qw_farm/static/app.js'),api=read('qw_farm/api.py');
  assert.ok(app.includes("import * as ORCH from './orchard.js'"));
- assert.ok(app.includes("['orchard','orchard','Сад']")&&app.includes("orchard:typeof renderOrchard==='function'?renderOrchard:undefined"),'a «Сад» tab');
+ assert.ok(read('qw_farm/static/farm_nav.js').includes("['orchard','orchard','Сад']")&&app.includes("orchard:typeof renderOrchard==='function'?renderOrchard:undefined"),'«Сад» is a farm menu item');
  assert.equal((app.match(/!c\.exotic&&!c\.orchard/g)||[]).length,3,'the seed bar and both tractor lists hide the orchard fruit');
  assert.ok(app.includes('due(o.fruit?.ready_at)'),'a ripening tree refreshes the panel');
  assert.ok(app.includes("||ORCH.ripe(o,now())).length;$('harvest-all')")&&app.includes("||(o.type==='tree'&&o.fruit&&o.fruit.ready_at<=t)).length,animals"),'trees are counted in «Собрать урожай»');
@@ -213,23 +213,27 @@ test('the seed bar keeps saplings out and stays one row, the merchant explains a
  const seeds=app.slice(app.indexOf('function renderSeeds'),app.indexOf('function seedLine'));
  assert.ok(seeds.includes('!c.exotic&&!c.orchard'),'orchard saplings are not seeds');
  assert.ok(!seeds.includes('Плодовые деревья'),'no long hint in the seed bar: the vertical label class made it half a screen tall');
- assert.equal((seeds.match(/'seedbar-label'/g)||[]).length,1,'only the short «ПОСАДИТЬ» label is vertical');
- assert.equal((app.match(/selectTab\('orchard'\)/g)||[]).length,1,'every shortcut to the orchard goes through openOrchard() and the one «Сад» tab');
+ assert.equal((app.match(/'seedbar-label'/g)||[]).length,0,'no vertical label in the seed bar any more (AGENTS: never reuse .seedbar-label)');
+ assert.equal((app.match(/selectTab\('orchard'\)/g)||[]).length,1,'every shortcut to the orchard goes through openOrchard() and the one «Сад» menu item');
  assert.equal(M.slotBlock({status:'notree',left:1,price:10,kind:'graft'},1000),'Нужно посаженное дерево');
  const render=app.slice(app.indexOf('function renderOrchard'),app.indexOf('function renderTree'));
  assert.ok(render.includes("'secondary wide'")&&!render.includes("'primary wide'"));
+ assert.ok(render.includes("openCatalog('trees')"),'Сад plants through the catalogue section «Деревья»');
 });
 
-test('the seed bar ends with exactly one orchard card of seed size that opens the «Сад» tab, and no new vertical label',()=>{
- const app=read('qw_farm/static/app.js'),css=read('qw_farm/static/style.css');
+test('the seed bar ends with «Недавнее» and one pinned «Всё»; trees are planted from the catalogue section «Деревья»',()=>{
+ const app=read('qw_farm/static/app.js'),css=read('qw_farm/static/style.css'),nav=read('qw_farm/static/farm_nav.js');
  const seeds=app.slice(app.indexOf('function renderSeeds'),app.indexOf('function seedLine'));
- assert.equal((seeds.match(/seed-orchard/g)||[]).length,2,'one card (class + crumb), built once');
- assert.ok(seeds.includes("button(null,openOrchard,'seed seed-orchard')"),'a regular .seed card whose tap opens the orchard');
- assert.ok(seeds.indexOf('seed-orchard')>seeds.indexOf('MERCH.seedPacks'),'it comes after the crops and the packs');
- assert.ok(seeds.includes("el('span','Деревья')")&&seeds.includes("el('span','→ Сад')")&&seeds.includes("icon('orchard')"));
- assert.equal((app.match(/'seedbar-label'/g)||[]).length,1,'only «ПОСАДИТЬ» uses the vertical label class');
+ assert.ok(!seeds.includes('seed-orchard'),'the «Деревья → Сад» card left the strip');
+ assert.equal((seeds.match(/'seed seed-all'/g)||[]).length,1,'one «Всё» button, built once');
+ assert.ok(seeds.indexOf('seed seed-all')>seeds.indexOf('recentEntries()')&&seeds.indexOf('recentEntries()')>seeds.indexOf('MERCH.seedPacks'),'crops, packs, «Недавнее», then «Всё»');
+ assert.ok(seeds.includes("()=>openCatalog()"),'«Всё» opens the catalogue');
+ assert.ok(/\.seedbar \.seed\.seed-all\{position:sticky;right:-1px/.test(css),'«Всё» stays pinned at the right edge');
+ assert.ok(!/\.seed-(all|recent)(::after)?\{[^}]*\b(height|min-height|font-size)\s*:/.test(css),'the strip height does not change');
+ assert.ok(nav.includes("['trees','Деревья']")&&nav.includes("kind:'tree',section:'trees'"),'trees are a catalogue section');
+ assert.ok(app.includes('ORCH.plantSpec(e.row,NAV.bestOption(e.row),S.catalog)'),'a tree card goes to placement with the best way to pay');
+ assert.ok(app.includes("aria-label','Чем оплатить саженец'"),'placement keeps the choice: free sapling, talon or coins');
  assert.ok(app.includes("function openOrchard(){selectTab('orchard');}"));
- assert.ok(!/\.seed-orchard[^{]*\{[^}]*\b(height|min-height|padding|font-size)\s*:/.test(css),'the card keeps the seed size: the strip height does not change');
 });
 
 test('saplings waiting in the orchard: counter, one-time notice after the move and tree unlocks on a level-up',async()=>{
@@ -242,12 +246,12 @@ test('saplings waiting in the orchard: counter, one-time notice after the move a
  assert.deepEqual(O.treeUnlocks(catalog,23,24).map(t=>t.id),['pear']);
  assert.deepEqual(O.treeUnlocks(catalog,15,47).map(t=>t.id),['apple','pear','pomegranate']);
  assert.deepEqual(O.treeUnlocks(catalog,24,30),[]);
- assert.equal(O.unlockText([catalog.orchard.trees.pear]),'Открылось дерево «Груша»: его сажают в разделе «Сад».');
+ assert.equal(O.unlockText([catalog.orchard.trees.pear]),'Открылось дерево «Груша»: его сажают из ленты, «Всё» → «Деревья».');
  assert.ok(O.unlockText(O.treeUnlocks(catalog,15,24)).startsWith('Открылись деревья «Яблоня», «Груша»'));
  assert.equal(O.movedNotice(v),true);assert.equal(O.movedNotice({granted:[]}),false);assert.equal(O.movedNotice(null),false);
  assert.equal(O.MOVED_TEXT,'Фруктовые деревья переехали в Сад: там твои саженцы и талоны');assert.equal(O.OPEN_LABEL,'Открыть Сад');
  const app=read('qw_farm/static/app.js');
  assert.ok(app.includes("localStorage.getItem('qw-farm.orchard-moved')")&&app.includes('toast(ORCH.MOVED_TEXT,false,go,10000)'),'the notice is shown once per farm, with a button');
  assert.ok(app.includes('prevLevel=S.me?.level??null')&&app.includes('orchardNotices(prevLevel)'),'a level-up seen by refresh() announces new trees');
- assert.ok(app.includes('syncOrchardBadge();syncNav()')&&app.includes('syncOrchardBadge(grid)'),'the badge follows the rail and the «Ещё» tiles');
+ assert.ok(app.includes('saplings:ORCH.pendingCount(ORCH.view(me),me,S.catalog)')&&app.includes('FRIEND_REQUESTS.notify();syncMenuBadges();'),'the «Сад» counter lives in the farm menu and follows every refresh');
 });

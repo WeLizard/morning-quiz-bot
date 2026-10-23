@@ -23,11 +23,12 @@
   "scripts/art/village/build.js": "f0d88bfccaea7a07",
   "scripts/art/village/crew.js": "bec6f84851fbccd3",
   "scripts/art/village/merchant.js": "c890c30c4bb04366",
-  "qw_farm/static/scene_buildings.js": "a43f1b0e3c36f5a6",
-  "qw_farm/static/scene.js": "b5db33210ef6ba52",
+  "scripts/art/village/contrast_paths.js": "2c2924254b24d24a",
+  "qw_farm/static/scene_buildings.js": "0e1d7897a4fb3a64",
+  "qw_farm/static/scene.js": "ba4a09b3a4952d9a",
   "qw_farm/static/scene_expansion.js": "7473fa6cdf1de9ff",
-  "qw_farm/static/scene_map.js": "3b3098f6663e0f12",
-  "scripts/art/village/village.js": "66561cda71f252b3",
+  "qw_farm/static/scene_map.js": "998ff1a2874de964",
+  "scripts/art/village/village.js": "d6d99fbbc7a82247",
   "scripts/art/village/common.js": "3ba377144e786cca"
  },
  "fest_sha256": {
@@ -37,5 +38,6 @@
   "spring_flowers": "93d99c0d1c2eb962c7df92673c12ffb8db8ead48b9d6aec51b9f9cf855748cf7"
  },
  "merchant_sha256": "ba41bfafff67ec8d0f3780478ea81b37c14262686e871c89f12e66397633f27c",
- "build_sha256": "fe8a582c75f9af04e202b1157dcea76991addff51f82e846cb6474524379c1a3"
+ "build_sha256": "fe8a582c75f9af04e202b1157dcea76991addff51f82e846cb6474524379c1a3",
+ "contrast_paths_sha256": "39038be2419604cbe310caac7a83e329ebe744a8a416a5576438290df8a342a4"
 }

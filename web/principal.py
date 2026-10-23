@@ -28,6 +28,7 @@ class Principal:
     channel: str  # 'telegram' | 'guest' (password login shares the guest session)
     telegram_user_id: int | None = None
     address_form: str = 'n'  # 'm' | 'f' | 'n'; Account-level, see domain/address.py
+    contrast_mode: bool = False  # Account-level «Контрастный режим» (docs/design/UI_RULES.md §16)
 
 
 @asynccontextmanager
@@ -60,7 +61,8 @@ async def resolve_principal(request, *, database, guest_store, mini_store, lock=
             if gate is not None:
                 await gate(session, None)
             yield session, Principal(str(account.id), account.display_name, 'guest',
-                                     address_form=effective_address_form(account.address_form))
+                                     address_form=effective_address_form(account.address_form),
+                                     contrast_mode=bool(getattr(account, 'contrast_mode', False)))
         return
     if not telegram:
         raise PrincipalError('authentication', 'Сначала войди через QuizzyWizzy.')
@@ -77,4 +79,5 @@ async def resolve_principal(request, *, database, guest_store, mini_store, lock=
         except TelegramAccountUnavailable:
             raise PrincipalError('authentication', 'Аккаунт недоступен.') from None
         yield session, Principal(str(account.id), account.display_name, 'telegram', user.id,
-                                 effective_address_form(account.address_form))
+                                 effective_address_form(account.address_form),
+                                 bool(getattr(account, 'contrast_mode', False)))

@@ -89,8 +89,8 @@ test('app hooks the lane, missing goods, settings, notifications and existing di
 });
 test('notification preference lives in both Profile settings paths and persists through farm receipts',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'../../web/mini_client/app.js'),'utf8');
- assert.ok(source.includes("guestMain.append(box, farmRequestNotificationsCard('guest'))"));
- assert.ok(source.includes("content.append(appearanceCard(), farmRequestNotificationsCard('telegram'))"));
+ assert.ok(source.includes("guestMain.append(box, appearanceCard('guest'), farmRequestNotificationsCard('guest'))"));
+ assert.ok(source.includes("content.append(appearanceCard('telegram'), farmRequestNotificationsCard('telegram'))"));
  const code=source.slice(source.indexOf('    function farmRequestNotificationsCard('),source.indexOf('    // «Профиль → Настройки»: only the account'));
  for(const identity of ['guest','telegram']){
   const calls=[],farm={id:'farm-a',name:'Ферма',settings:{visibility:'friends',allow_help:false,allow_gifts:true,allow_trade:false,allow_pranks:false,allow_requests:true,notify_requests:false}};

@@ -168,6 +168,8 @@
                 telegramSession = response.ok;
                 if (response.ok) {
                     const profile = await response.json();
+                    // The Account's «Контрастный режим» (UI_RULES §16) wins over this device's cache.
+                    window.QW?.prefs?.applyAccount?.(profile);
                     const userId = String(profile.user_id || 'session');
                     if (miniUserId !== null && miniUserId !== userId) {
                         sessionGeneration += 1;

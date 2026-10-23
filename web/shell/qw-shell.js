@@ -44,7 +44,7 @@
     const config = {
         mode: 'hub', gameId: '', title: '', home: '/app', profileUrl: '/app#settings',
         fullscreen: 'auto', history: null, color: null, screen: '', identity: '',
-        onResize: null, onResume: null, onHome: null, onProfile: null, onTheme: null,
+        onResize: null, onResume: null, onHome: null, onProfile: null, onTheme: null, onContrast: null,
     };
     let booted = false;
 
@@ -160,13 +160,39 @@
     }
 
     /* ---------------- theme and preferences (hub palette; games keep their own) ---------------- */
-    const prefs = {haptics: true, theme: 'system'};
+    const prefs = {haptics: true, theme: 'system', contrast: false};
     try {
         const saved = JSON.parse(localStorage.getItem('mqb-ui-preferences') || '{}');
         if (typeof saved.haptics === 'boolean') prefs.haptics = saved.haptics;
         if (['system', 'dark', 'light'].includes(saved.theme)) prefs.theme = saved.theme;
+        if (typeof saved.contrast === 'boolean') prefs.contrast = saved.contrast;
     } catch {}
     const savePrefs = () => { try { localStorage.setItem('mqb-ui-preferences', JSON.stringify(prefs)); } catch {} };
+    /* «Контрастный режим» (UI_RULES §16) is an Account setting («Профиль → Настройки»). The device keeps the last known
+       value so every page (hub, Alchemy, Night City, farm) applies <html data-qw-contrast="1"> before its first paint;
+       a profile response from the server (QW.prefs.applyAccount) always wins over that cache. */
+    function applyContrast() {
+        if (prefs.contrast) root.setAttribute('data-qw-contrast', '1');
+        else root.removeAttribute('data-qw-contrast');
+    }
+    applyContrast();
+    function setContrast(value, {save = true} = {}) {
+        const on = Boolean(value), changed = on !== prefs.contrast;
+        prefs.contrast = on;
+        if (save) savePrefs();
+        applyContrast();
+        if (changed) {
+            syncChromeColors();
+            call(() => config.onContrast?.(on));
+            call(() => dispatchEvent(new CustomEvent('qw:contrast', {detail: {on}})));
+        }
+        return on;
+    }
+    // Another tab of the same app (hub ↔ game) switched the mode.
+    addEventListener('storage', event => {
+        if (event.key !== 'mqb-ui-preferences') return;
+        try { const saved = JSON.parse(event.newValue || '{}'); if (typeof saved.contrast === 'boolean') setContrast(saved.contrast, {save: false}); } catch {}
+    });
     function applyTheme() {
         if (config.mode === 'hub') {
             const scheme = prefs.theme === 'system'
@@ -1178,6 +1204,10 @@
             get() { return {...prefs}; },
             setTheme(value) { if (['system', 'dark', 'light'].includes(value)) { prefs.theme = value; savePrefs(); applyTheme(); } },
             setHaptics(value) { prefs.haptics = Boolean(value); savePrefs(); return prefs.haptics; },
+            /** Applies «Контрастный режим» on this device at once; the hub stores it on the Account (POST /api/account/contrast-mode). */
+            setContrast(value) { return setContrast(value); },
+            /** Applies the server value from a profile response ({contrast_mode}); a missing field changes nothing. */
+            applyAccount(profile) { if (typeof profile?.contrast_mode === 'boolean') setContrast(profile.contrast_mode); return prefs.contrast; },
         },
         refreshChrome() { syncChromeColors(); writeInsets(); },
     };

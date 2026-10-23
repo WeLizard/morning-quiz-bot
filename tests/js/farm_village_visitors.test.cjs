@@ -21,7 +21,8 @@ test('guest and place buttons route through selectTab to a section that exists',
  assert.ok(targets.length>=7+7+6,'visitors, easter eggs and place signs are all collected');
  assert.match(source,/villageSheet==='visitor'[\s\S]{0,400}button\(v\[4\],\(\)=>selectTab\(v\[5\]\)/);
  assert.match(source,/villageGo\(\[x,y\+2\.4\],\(\)=>selectTab\(tab\),e\)/);
- for(const [name,tab] of targets)assert.ok(source.includes(`['${tab}','`)||source.includes(`S.tab==='${tab}'`),`${name}: unknown section ${tab}`);
+ const nav=fs.readFileSync(path.join(path.dirname(require.resolve('../../qw_farm/static/app.js')),'farm_nav.js'),'utf8');
+ for(const [name,tab] of targets)assert.ok(nav.includes(`['${tab}','`)||source.includes(`${tab}:render`)||source.includes(`S.tab==='${tab}'`),`${name}: unknown section ${tab}`);
 });
 
 test('every guest and place sign leaves the village completely and opens its section',()=>{

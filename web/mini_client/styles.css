@@ -307,3 +307,50 @@ body{font-size:var(--qw-fs-body);line-height:1.5}
 #content[data-page=guest-stub]{--col:var(--qw-col-read)}
 #content[data-page=guest-settings] .profile-card>.address-card{margin-top:var(--s-4)}
 .address-example{margin:6px 0 12px;font-size:var(--qw-fs-h3);font-weight:700}.address-actions{display:flex;align-items:center;gap:var(--qw-s-3)}.address-snip{font-size:var(--qw-fs-small);opacity:.55;user-select:none;pointer-events:none}
+
+/* Form fields need a visible boundary (WCAG 1.4.11, ≥ 3:1 to the card behind them): --line-strong was 1.6–1.9:1. */
+:root{--field-line:#7d8793}:root[data-theme="light"]{--field-line:#7a8572}:root.qw-mode-game[data-theme]{--field-line:#7d8793}
+select,input:not([type=checkbox]):not([type=radio]),textarea,.guest-rooms input,.mafia-discussion textarea,.guest-invite-controls select,.game-input input,.play-answer-form input{border-color:var(--field-line)}
+
+/* ===== «Контрастный режим» (UI_RULES §16): <html data-qw-contrast="1">, Профиль → Настройки =====
+   Only additions over the regular look: solid surfaces, text ≥ 4.5:1, outlines ≥ 3:1 and 2px, captions +2px (tokens). */
+:root[data-qw-contrast="1"]{--bg:#0b0d10;--surface:#15181d;--surface-2:#1d2128;--field:#0b0d10;--text:#fff;--muted:#dfe4ea;--line:#9aa3ad;--line-strong:#c3cad2;--field-line:#c3cad2;
+  --lime:#d0fc50;--accent-ink:#141f00;--danger:#ffc2bc;--shadow:none;--glow:none;
+  --info-bg:var(--surface);--info-line:#d0fc50;--info-ink:var(--text);--warn-bg:var(--surface);--warn-line:#f0b45a;--warn-ink:#ffd9a0;--err-bg:var(--surface);--err-line:#ffaaa3;--err-ink:#ffc2bc;
+  --env-bg:var(--surface);--env-line:#d0fc50;--env-ink:#efffc8;--badge-bg:#d0fc50;--badge-ink:#141f00}
+:root[data-theme="light"][data-qw-contrast="1"]{--bg:#f6f7f2;--surface:#fff;--surface-2:#eef1e8;--field:#fff;--text:#0e150c;--muted:#26392d;--line:#4b5747;--line-strong:#4b5747;--field-line:#4b5747;
+  --lime:#2f4500;--accent-ink:#fff;--danger:#8a1d13;
+  --info-line:#2f4500;--warn-line:#8a5a00;--warn-ink:#5a3a00;--err-line:#8a1d13;--err-ink:#8a1d13;--env-line:#2f4500;--env-ink:#1f2e05;--badge-bg:#2f4500;--badge-ink:#fff}
+:root[data-qw-contrast="1"]{background:var(--bg)}
+:root[data-qw-contrast="1"] :is(.card,.game-card,.game-mode-card,.play-choice,.featured-game,.photo-choice,.hero,.metric,.answer-option,.answer-letter,.option-letter,.play-option,.settings-link,.resume-game,
+  .achievement,.badge,.environment,.empty,.notice,p.notice,p.error,.device-row,.list,.list li,.category-picker,.preparation-facts span,.question-clock,.play-clock,.result-facts,.podium-place,.keep-card,
+  .guest-room-item,.guest-invite-row,.guest-invite-created,.guest-room-invite,.mafia-case,.mafia-person,.mafia-player,.mafia-role,.mafia-role-card,.mafia-message,.mafia-history,.mafia-teaser,.mafia-boundary,
+  .play-verdict,.photo-hint,.mode-coming-status,.chat-alternative button,.login button.guest-entry,button,select,input,textarea){border-width:2px}
+:root[data-qw-contrast="1"] :is(.card,.game-card,.metric,.answer-option,.play-option,.settings-link,.resume-game,.device-row,.list li,.mafia-person,.mafia-player,.guest-room-item){border-color:var(--line)}
+:root[data-qw-contrast="1"] :is(.primary,button.primary,.qw-btn.primary),:root[data-theme="light"][data-qw-contrast="1"] .primary,:root.qw-mode-game[data-qw-contrast="1"] :is(.primary,.qw-btn.primary){border:2px solid #10231a;box-shadow:none}
+:root[data-qw-contrast="1"] button.quiet,:root[data-qw-contrast="1"] .home-shortcuts button{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+:root[data-qw-contrast="1"] :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline:var(--qw-focus-w) solid var(--lime);outline-offset:3px}
+:root[data-qw-contrast="1"] .tabbar,:root[data-theme="light"][data-qw-contrast="1"] .tabbar{background:var(--bg);border-top:2px solid var(--line);box-shadow:none}
+:root[data-qw-contrast="1"] .tabbar button{color:var(--text)}
+:root[data-qw-contrast="1"] .tabbar button[aria-current]{background:var(--surface);color:var(--lime);box-shadow:inset 0 0 0 2px var(--lime)}
+:root[data-qw-contrast="1"] .topbar{border-bottom-width:2px;border-bottom-color:var(--line)}
+:root[data-qw-contrast="1"] :is(.answer-option.correct,.play-option.correct){border-color:var(--lime);box-shadow:inset 0 0 0 1px var(--lime)}
+:root[data-qw-contrast="1"] :is(.answer-option.incorrect,.play-option.incorrect){border-color:var(--danger);border-style:dashed}
+:root[data-qw-contrast="1"] .play-option.selected,:root[data-qw-contrast="1"] .mafia-person.selected{box-shadow:inset 0 0 0 2px var(--lime)}
+:root[data-qw-contrast="1"] button:disabled{opacity:.7}
+/* Night City in the contrast mode: still dark with amber, whatever the hub theme is (beats both hub contrast palettes). */
+:root.qw-mode-game[data-theme][data-qw-contrast="1"]{color-scheme:dark;--bg:#0b0d10;--surface:#15181d;--surface-2:#1d2128;--field:#0b0d10;--text:#fff;--muted:#dfe4ea;--line:#9aa3ad;--line-strong:#c3cad2;--field-line:#c3cad2;
+  --lime:#d0fc50;--accent-ink:#141f00;--danger:#ffc2bc;--glow:none;--shadow:none;
+  --info-bg:var(--surface);--info-line:#d0fc50;--warn-bg:var(--surface);--warn-line:#f0b45a;--warn-ink:#ffd9a0;--err-bg:var(--surface);--err-line:#ffaaa3;--err-ink:#ffc2bc;
+  --qw-bg:#0b0d10;--qw-surface:#15181d;--qw-surface-2:#1d2128;--qw-line:#9aa3ad;--qw-text:#fff;--qw-muted:#dfe4ea;--qw-accent:#d0fc50;--qw-danger:#ffc2bc;--qw-scrim:rgb(0 0 0/.78);--qw-shadow:0 0 0 1px #9aa3ad;
+  --qw-game-header:#0b0d10;--qw-game-surface:#15181d;--qw-game-surface-2:#1d2128;--qw-game-line:#b9a68a;--qw-game-text:#fff;--qw-game-muted:#dfe4ea;--qw-game-danger:#ffc2bc;
+  --qw-game-accent:#f2b45a;--qw-game-accent-fill:#f2b45a;--qw-game-accent-ink:#1f1100}
+:root.qw-mode-game[data-qw-contrast="1"] :is(.primary,.qw-btn.primary){border-color:#1f1100}
+.contrast-setting{margin-top:var(--qw-s-3);cursor:pointer}.contrast-setting>span{min-width:0}.contrast-setting input{flex:none;width:24px;height:24px;margin:10px;accent-color:var(--lime)}
+:root[data-qw-contrast="1"] :is(.mafia-case,.mafia-teaser){border:2px solid var(--line)}
+:root[data-qw-contrast="1"] :is(.mafia-case p,.mafia-teaser p){color:#fff}
+:root[data-qw-contrast="1"] .mafia-case p{display:inline-block;padding:6px 10px;border-radius:10px;background:#090a0d}
+:root[data-qw-contrast="1"] :is(.mafia-teaser .eyebrow,.mafia-case .eyebrow){color:#f2b45a}
+/* Larger captions must never be clipped by the 16:9 game cards: the card grows instead. */
+:root[data-qw-contrast="1"] .card.game-mode-card{aspect-ratio:auto}
+:root[data-qw-contrast="1"] :is(.game-mode-card p,.featured-game p,.photo-choice p){color:#fff}

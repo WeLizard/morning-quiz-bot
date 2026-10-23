@@ -664,6 +664,7 @@
     }
     async function guestHome() {
         stopRoomClassic();
+        window.QW?.prefs?.applyAccount(state.guest); // the Account's «Контрастный режим» wins over this device's cache
         const version = ++generation, accountId = state.guest?.account_id;
         const nameImport = importGuestTelegramName();
         const pendingFarmInvite = (state.gameModes || []).some(mode => mode.id === 'farm' && mode.status === 'development')
@@ -995,7 +996,7 @@
             } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
         }, 'danger'));
         box.append(guestExit);
-        guestMain.append(box, farmRequestNotificationsCard('guest'));
+        guestMain.append(box, appearanceCard('guest'), farmRequestNotificationsCard('guest'));
         if (focusLink) { linkAnchor.scrollIntoView?.({block: 'center'}); linkAnchor.nextElementSibling?.focus?.(); }
     }
     // Guest «Чаты» / «Рейтинг»: both depend on Telegram chats, so a guest sees one clear step instead of an empty list.
@@ -1161,6 +1162,7 @@
             const [me, progress, chats, achievements] = await Promise.all([request('/api/mini/me'), request('/api/mini/progress'), request('/api/mini/chats?limit=50'), request('/api/mini/achievements')]);
             if (version !== generation || !state.authenticated) return;
             Object.assign(state, {me, progress, chats: chats.items, moreChats: chats.has_more, chatOffset: chats.items.length, achievements});
+            window.QW?.prefs?.applyAccount(me); // the Account's «Контрастный режим» wins over this device's cache
             if (resumeFarmInvite('telegram')) return;
             if (state.selected && !state.chats.some(c => c.chat_id === state.selected)) {
                 state.launchLost = true;      // чат из ссылки недоступен: не подменяем молча
@@ -2148,12 +2150,40 @@
         if (state.progress.last_activity) note(content, `Последняя активность: ${new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
         content.append(button('Обновить прогресс', load, 'text'));
     }
-    // Theme and haptics: per device, the same card for a Telegram player and a guest.
-    function appearanceCard() {
+    // «Контрастный режим»: an Account setting for the hub and every game (UI_RULES §16). The shell applies it on this
+    // device at once; the server keeps it for the other devices. channel: 'telegram' (Mini App session) | 'guest'.
+    function contrastSetting(channel) {
+        const wrap = el('div'), label = el('label', undefined, 'setting-row contrast-setting'), copy = el('span'), input = el('input');
+        copy.append(el('strong', 'Контрастный режим'), el('small', 'Чётче текст, рамки и кнопки во всех играх. Хранится в профиле.'));
+        input.type = 'checkbox'; input.name = 'contrast_mode'; input.setAttribute('role', 'switch');
+        input.checked = Boolean(window.QW?.prefs?.get().contrast);
+        const message = el('p', '', 'error'); message.hidden = true;
+        input.addEventListener('change', async () => {
+            const on = input.checked; input.disabled = true; message.hidden = true;
+            window.QW?.prefs?.setContrast(on);
+            try {
+                const path = `/api/account/contrast-mode?identity=${channel}`, headers = {'Content-Type': 'application/json'}, body = JSON.stringify({enabled: on});
+                const result = channel === 'guest'
+                    ? await guestRequest(path, 'POST', {headers, body})
+                    : await request(path, {method: 'POST', headers: {...headers, 'X-Guest-CSRF': '1'}, body});
+                const profile = channel === 'guest' ? state.guest : state.me;
+                if (profile) profile.contrast_mode = result.contrast_mode;
+                window.QW?.prefs?.applyAccount(result);
+                input.checked = Boolean(result.contrast_mode);
+            } catch (error) {
+                window.QW?.prefs?.setContrast(!on); input.checked = !on;
+                message.textContent = error.message; message.hidden = false;
+            } finally { input.disabled = false; }
+        });
+        label.append(copy, input); wrap.append(label, message); return wrap;
+    }
+    // Theme and haptics: per device, the same card for a Telegram player and a guest; the contrast mode follows the account.
+    function appearanceCard(channel) {
         const preferences = el('section', undefined, 'card'); preferences.append(el('h2', 'Внешний вид'), el('p', 'Тема', 'field-label'));
         preferences.append(segmented([['system', 'Как в системе'], ['dark', 'Тёмная'], ['light', 'Светлая']], window.QuizTelegram.prefs.theme, value => window.QuizTelegram.setTheme(value), 'Тема оформления'));
         const haptics = button(window.QuizTelegram.prefs.haptics ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл', () => { const enabled = window.QuizTelegram.toggleHaptics(); haptics.textContent = enabled ? 'Тактильный отклик: вкл' : 'Тактильный отклик: выкл'; haptics.setAttribute('aria-pressed', String(enabled)); }, 'secondary');
         haptics.setAttribute('aria-pressed', String(window.QuizTelegram.prefs.haptics)); preferences.append(haptics);
+        preferences.append(contrastSetting(channel));
         return preferences;
     }
     // Notification preferences have one entry point: Profile → Settings, for both sign-in methods.
@@ -2198,7 +2228,7 @@
         const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
         row.append(copy, el('span', '✓', 'badge')); via.append(row);
         content.append(via, devicesSection('telegram'));
-        content.append(appearanceCard(), farmRequestNotificationsCard('telegram'));
+        content.append(appearanceCard('telegram'), farmRequestNotificationsCard('telegram'));
         const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}

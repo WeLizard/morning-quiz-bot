@@ -463,22 +463,17 @@ def run_dasha(pw_browser, base, screenshots):
             page.set_viewport_size({'width': width, 'height': height})
             try:
                 page.goto(base + '/app/farm?identity=guest', wait_until='load', timeout=30000)
-                # The farm route hydrates the account before rendering its rail. Wait for
-                # a real navigation target instead of interpreting the empty rail as desktop.
-                page.wait_for_function("""() => ['village', 'more'].some(id => {
-                    const button = document.querySelector(`[data-tab="${id}"]`);
-                    return button && button.getClientRects().length > 0 && getComputedStyle(button).visibility !== 'hidden';
-                })""", timeout=30000)
-                direct_village = page.locator('[data-tab="village"]')
-                if direct_village.is_visible():
-                    direct_village.click()
-                else:
-                    more = page.locator('[data-tab="more"]')
-                    more.wait_for(state='visible', timeout=5000)
-                    more.click()
-                    village_option = page.locator('[data-more-tab="village"]')
-                    village_option.wait_for(state='visible', timeout=10000)
-                    village_option.click()
+                # The farm route hydrates the account before rendering its menu (UI_RULES §6.1): a permanent
+                # column on a PC, a bottom sheet behind «Меню» on a phone. Wait for a real navigation target.
+                page.wait_for_function("""() => {
+                    const visible = n => n && n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden';
+                    return visible(document.querySelector('#rail [data-tab="village"]')) || visible(document.getElementById('farm-menu-button'));
+                }""", timeout=30000)
+                direct_village = page.locator('#rail [data-tab="village"]')
+                if not direct_village.is_visible():
+                    page.locator('#farm-menu-button').click()
+                    direct_village.wait_for(state='visible', timeout=10000)
+                direct_village.click()
                 fox = page.locator('[data-village-npc="Лиса Даша"]').first
                 fox.wait_for(state='visible', timeout=15000)
                 fox.click()

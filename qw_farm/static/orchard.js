@@ -53,7 +53,7 @@ export function treeFacts(catalog,o,info,t,infusion=0,grafts={}){
   dry:mine&&!!info.dry,look:o.look||null,lookName:lookName(catalog,o.look),grafts:ownGrafts,helped:!!f?.helped
  };
 }
-// Rows of the «Сад» tab: every species by level, with the price the player would pay for it right now.
+// Rows of the catalogue section «Деревья»: every species by level, with the price the player would pay for it right now.
 export function saplingRows(catalog,me,v){
  const orchard=catalog?.orchard;if(!orchard||!me)return [];
  const free=v?.vouchers||{},discounts=v?.discounts||{};
@@ -82,7 +82,7 @@ export const treeSummary=(catalog,objects)=>{
  const out={};for(const o of objects||[])if(isTree(o))out[o.species]=(out[o.species]||0)+1;
  return Object.entries(out).map(([id,n])=>`${catalog?.orchard?.trees?.[id]?.name||id} ×${n}`).join(', ');
 };
-// Discoverability after fruit left the beds: the seed bar card, the badge of the «Сад» tab, the one-time notice and the level-up line.
+// Discoverability after fruit left the beds: the «Деревья» section of the catalogue, the «Сад» counter in the farm menu, the one-time notice and the level-up line.
 // Saplings waiting to be planted: free ones of open species plus discount talons. Only free cells limit planting, the server checks them.
 export function pendingCount(v,me,catalog){
  if(!v||!me)return 0;
@@ -95,7 +95,7 @@ export function pendingCount(v,me,catalog){
 export const treeUnlocks=(catalog,from,to)=>Object.values(catalog?.orchard?.trees||{}).filter(t=>t.level>from&&t.level<=to).sort((a,b)=>a.level-b.level);
 export function unlockText(list){
  const names=list.map(t=>`«${t.name}»`).join(', ');
- return list.length>1?`Открылись деревья ${names}: их сажают в разделе «Сад».`:`Открылось дерево ${names}: его сажают в разделе «Сад».`;
+ return list.length>1?`Открылись деревья ${names}: их сажают из ленты, «Всё» → «Деревья».`:`Открылось дерево ${names}: его сажают из ленты, «Всё» → «Деревья».`;
 }
 // The farm had fruit on beds before the orchard: the server granted compensation saplings (qw_farm/orchard.py upgrade, ``granted``).
 export const movedNotice=v=>Array.isArray(v?.granted)&&v.granted.length>0;

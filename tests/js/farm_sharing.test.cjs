@@ -102,7 +102,7 @@ test('Actual refresh discards late account and visit responses before changing t
  const scene={set:farm=>calls.push(['scene',farm.id]),fit:()=>{}};
  const document={hidden:false,activeElement:null,body:{classList:{remove(){}}}};
  const context={S,FRIEND_REQUESTS:{notify(){}},API:'/api/farm/v1',Date,scene,document,dashaGame:{render(){}},dashaGameOpen:false,olegGame:null,olegGameOpen:false,closeOlegGame(){return true;},lastSessionRenewal:Date.now(),RENEW_AFTER:60000,now:()=>Date.now()/1000,
-  request:path=>new Promise(resolve=>pending.push({path,resolve})),updateHUD:()=>calls.push(['hud']),renderSeeds:()=>{},updateReady:()=>{},renderPanel:()=>calls.push(['panel']),renderRail:()=>{},showPanel:()=>{},queueNeighborGifts:()=>{},syncOrchardBadge:()=>{},orchardNotices:()=>{},connection:()=>{},toast:()=>{},showLogin:()=>{calls.push(['login']);S.me=S.farm=null;},
+  request:path=>new Promise(resolve=>pending.push({path,resolve})),updateHUD:()=>calls.push(['hud']),renderSeeds:()=>{},updateReady:()=>{},renderPanel:()=>calls.push(['panel']),renderRail:()=>{},showPanel:()=>{},queueNeighborGifts:()=>{},syncOrchardBadge:()=>{},syncMenuBadges:()=>{},orchardNotices:()=>{},connection:()=>{},toast:()=>{},showLogin:()=>{calls.push(['login']);S.me=S.farm=null;},
   '$':()=>({open:false}),JSON};
  vm.createContext(context);vm.runInContext(refresh+'\n'+navigation+'\n'+selectTab+'\n'+poll+'\nObject.assign(globalThis,{refresh,visit,backHome,selectTab,poll})',context);
  const oldAccount=context.refresh({render:false});const first=pending.at(-1);assert.equal(first.path,'/api/farm/v1/me');

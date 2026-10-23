@@ -133,7 +133,7 @@ def manifest(meta: dict) -> dict:
     }
 
 
-INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/build.js", "scripts/art/village/crew.js", "scripts/art/village/merchant.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
+INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/build.js", "scripts/art/village/crew.js", "scripts/art/village/merchant.js", "scripts/art/village/contrast_paths.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
 
@@ -178,6 +178,8 @@ def build(out: Path, install: bool = False) -> dict:
     for fid, layer in res["meta"]["fest"].items():   # festival layers: qw_farm/static/village-fest-<id>.svg
         (out / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
     (out / "gate_board.svg").write_text(res["meta"]["gate_art"]["board"]["svg"], encoding="utf-8", newline="")
+    # «Контрастный режим» path edges (contrast_paths.js): a vector layer of the game, qw_farm/static/village-contrast-paths.svg
+    (out / "village-contrast-paths.svg").write_text(res["meta"]["contrast_paths"]["svg"], encoding="utf-8", newline="")
     (out / "manifest.json").write_text(json.dumps(man, ensure_ascii=False, indent=1), encoding="utf-8")
     hashes = {"rgba_sha256": hashlib.sha256(im.tobytes()).hexdigest(),
               "webp_sha256": hashlib.sha256(webp).hexdigest(),
@@ -185,7 +187,8 @@ def build(out: Path, install: bool = False) -> dict:
               "svg_bytes": len(svg.encode()), "versions": versions(), "inputs": inputs(),
               "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()},
               "merchant_sha256": hashlib.sha256((res["meta"]["merchant"]["svg"] + res["meta"]["merchant"]["figure"]).encode()).hexdigest(),
-              "build_sha256": hashlib.sha256(res["meta"]["build"]["sprite"].encode()).hexdigest()}
+              "build_sha256": hashlib.sha256(res["meta"]["build"]["sprite"].encode()).hexdigest(),
+              "contrast_paths_sha256": hashlib.sha256(res["meta"]["contrast_paths"]["svg"].encode()).hexdigest()}
     (out / "hashes.json").write_text(json.dumps(hashes, indent=1), encoding="utf-8")
     if man["problems"]:
         print("layout problems:", *man["problems"], sep="\n  ")
@@ -195,6 +198,7 @@ def build(out: Path, install: bool = False) -> dict:
             (GAME_SVG.parent / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
         (GAME_SVG.parent / "village-merchant.svg").write_text(res["meta"]["merchant"]["svg"], encoding="utf-8", newline="")
         (GAME_SVG.parent / "village-build.svg").write_text(res["meta"]["build"]["sprite"], encoding="utf-8", newline="")
+        (GAME_SVG.parent / "village-contrast-paths.svg").write_text(res["meta"]["contrast_paths"]["svg"], encoding="utf-8", newline="")
         print("installed", GAME_SVG, "and festival layers", ", ".join(res["meta"]["fest"]))
     return hashes
 

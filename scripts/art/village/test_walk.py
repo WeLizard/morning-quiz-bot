@@ -6,12 +6,14 @@
 - no edge crosses a building or prop footprint, a tree trunk, a fence or water (the bridge deck excepted) — checked here
   independently of walk.js, on the obstacle list the same render exported (out/walk_check.json, tile coordinates);
 - nearest_point (the reference snap of README.md) puts taps on houses and grass onto an edge;
-- app.js VILLAGE_WALK is exactly the generated graph.
+- app.js VILLAGE_WALK is exactly the generated graph;
+- the «Контрастный режим» path edges (village-contrast-paths.svg) run along the walked roads, not across the grass.
 """
 from __future__ import annotations
 
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -124,9 +126,23 @@ def test_app_uses_generated_graph():
     assert line == f"const VILLAGE_WALK={{n:{j(walk['nodes'])},e:{j(walk['edges'])},a:{j(walk['anchors'])},z:{j(walk['areas'])}}}"
 
 
+def test_contrast_edges_follow_the_paths():
+    walk, _ = _load()
+    svg = (OUT / "village-contrast-paths.svg").read_text(encoding="utf-8")
+    a, _, _, d, e, f = map(float, re.search(r"matrix\(([^)]*)\)", svg).group(1).split())
+    segs = [tuple(map(float, m)) for m in re.findall(r"M(-?[\d.]+) (-?[\d.]+)L(-?[\d.]+) (-?[\d.]+)", svg)]
+    assert len(segs) > 100, "the layer has path edges"
+    for x0, y0, x1, y1 in segs:
+        mx, my = a * (x0 + x1) / 2 + e, d * (y0 + y1) / 2 + f
+        if mx < 80 or mx > 2320 or my > 1700:   # roads leave the world past the last node of the graph
+            continue
+        assert nearest_point(walk, mx, my)[4] < 40, ("path edge away from the walked roads", round(mx), round(my))
+
+
 if __name__ == "__main__":
     test_connected_and_anchored()
     test_edges_avoid_houses_water_trees()
     test_taps_snap_to_paths()
     test_app_uses_generated_graph()
+    test_contrast_edges_follow_the_paths()
     print("ok")

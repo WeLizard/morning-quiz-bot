@@ -129,12 +129,12 @@ test('settings card toggles the hooks; the scares switch exists only on the Pump
  assert.equal(F.menuItems(()=>null,()=>{})[0].hidden(),true);
 });
 
-test('app wiring: module is served, imported, linked, in the rail, the menu and the orders banner',()=>{
+test('app wiring: module is served, imported, linked, in the farm menu, the ⚙ menu and the orders banner',()=>{
  const app=fs.readFileSync(path.join(STATIC,'app.js'),'utf8'),api=fs.readFileSync(path.join(STATIC,'../api.py'),'utf8'),html=fs.readFileSync(path.join(STATIC,'index.html'),'utf8');
  assert.match(app,/import \* as FEST from '\.\/festivals\.js'/);
  assert.match(api,/'festivals\.js'/);assert.match(api,/'festivals\.css'/);
  assert.match(html,/assets\/festivals\.css/);
- assert.match(app,/\['festival','coin','Праздник'\]/);assert.match(app,/renderFestivalTab/);
+ assert.match(fs.readFileSync(path.join(STATIC,'farm_nav.js'),'utf8'),/\['festival','coin','Праздник','festival'\]/,'«Праздник» is a farm menu item shown only while a festival runs');assert.match(app,/renderFestivalTab/);
  assert.match(app,/FEST\.menuItems\(/);assert.match(app,/festivalBanner\(p\)/);
  assert.ok(fs.existsSync(path.join(STATIC,'festivals.js'))&&fs.existsSync(path.join(STATIC,'festivals.css')));
  assert.match(app,/function festivalHelpers\(\)\{\s*return \{[^}]*\bicon,/);

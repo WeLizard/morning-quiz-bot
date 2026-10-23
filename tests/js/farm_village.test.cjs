@@ -103,7 +103,7 @@ test('hidden tab stops presence and resuming creates a fresh session',async()=>{
 });
 test('Farm return card shows its in-app caption and routes from a neighbor or Village',()=>{
  const h=setup(),start=source.indexOf('function addDestinationCard('),end=source.indexOf('\naddDestinationCard(',start),cards=[];
- const ctx={button:(text,run,cls)=>{const n=new Node('button');n.onclick=run;n.className=cls;return n;},headerCardArt:()=>new Node('svg'),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},$:()=>({before:n=>cards.push(n)})};
+ const ctx={button:(text,run,cls)=>{const n=new Node('button');n.onclick=run;n.className=cls;return n;},headerCardArt:()=>new Node('svg'),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},$:()=>({append:n=>cards.push(n)})};
  vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);ctx.addDestinationCard({id:'farm-card-door',label:'Ферма',art:'',run:h.ctx.returnToFarm});
  assert.equal(cards.length,1);assert.equal(cards[0].dataset.label,'Ферма');assert.equal(cards[0].attrs['aria-label'],'Ферма');assert.equal(cards[0].title,undefined);
  h.S.farm={id:'neighbor',is_owner:false};h.S.tab='neighbors';cards[0].onclick();assert.equal(h.calls.at(-1),'back-home');
@@ -142,7 +142,7 @@ test('panel refresh retains focused service, open section and scroll position',(
  panel.querySelectorAll=selector=>selector==='.village-services[open]'?panel.services.filter(n=>n.open):selector==='.village-services'?panel.services:panel.focuses;
  panel.querySelector=()=>null;h.nodes.set('panel-content',panel);
  h.ctx.own=()=>true;h.ctx.panelSnapshot=()=>'';h.ctx.panelRenderSignature='';
- for(const name of ['renderOrders','renderInventory','renderBuild','renderProduction','renderNeighbors','renderJournal','renderSettings','renderObject','renderObjects','renderTeam','renderForest','renderSecrets','renderMore','renderFields'])h.ctx[name]=()=>{};
+ for(const name of ['renderOrders','renderInventory','renderLand','renderCatalog','renderProduction','renderNeighbors','renderJournal','renderSettings','renderObject','renderObjects','renderTeam','renderForest','renderSecrets','renderFields'])h.ctx[name]=()=>{};
  h.ctx.renderVillage=()=>{const next=new Node('details');next.dataset.villageService='Фонд и праздник';panel.services=[next];const focus=new Node('summary');focus.dataset.villageFocus='service:Фонд и праздник';panel.focuses=[focus];};
  const code=source.slice(source.indexOf('function renderPanel()'),source.indexOf('/* ---- building upgrades'));
  vm.runInContext(code+'\nthis.renderPanel=renderPanel',h.ctx);h.ctx.renderPanel();
@@ -231,7 +231,7 @@ test('daily guests follow the date only, differ from each other, and place signs
 test('easter-egg guests are extra, rare, deterministic and complete',()=>{
  const h=setup();const today=vm.runInContext('villageVisitorsToday',h.ctx),eggs=vm.runInContext('VILLAGE_EGGS',h.ctx),base=vm.runInContext('VILLAGE_VISITORS',h.ctx);
  const ids=[...base,...eggs].map(v=>v[0]);assert.equal(new Set(ids).size,ids.length,'ids unique');
- const tabs=new Set(['orders','inventory','build','production','forest','lake','neighbors','secrets','journal']);
+ const tabs=new Set(['orders','inventory','catalog','production','forest','lake','neighbors','secrets','journal']);
  for(const v of eggs){assert.ok(v[1]&&v[2]&&v[3].length>20&&v[4],`${v[0]} has text`);assert.ok(tabs.has(v[5]),`${v[0]} leads to existing tab`);}
  let withEgg=0;const seen=new Set();
  for(let d=0;d<120;d++){const t=Date.UTC(2026,9,1+d,9),a=today(t),b=today(t+5*3600e3);assert.deepEqual(a.map(x=>x.v[0]),b.map(x=>x.v[0]));assert.ok(a.length<=3);assert.ok(a.slice(0,2).every(x=>base.includes(x.v)),'daily guests unchanged');

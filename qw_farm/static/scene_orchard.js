@@ -189,6 +189,12 @@ function sapling(s,kit,g,leaf,winter){
  if(g>.55){const r=4+g*6;s.ellipse(-1,-h-2,r,r*.82,leaf[1]);s.ellipse(-3,-h-4,r*.6,r*.5,leaf[2])}
 }
 function markers(s,o,p,top,L){
+ // Contrast mode (UI_RULES §16): the fruit icon over every tree, green ring and check when ripe, «Яблоня · 3 ч» when selected.
+ if(s.contrast&&s.cropBadge){
+  const ripe=L.phase==='ripe',r=s.badgeRadius(),y=p.y+top-r-2;s.cropBadge(p.x,y,o.species,ripe);
+  if(o.id===s.selected){const name=s.catalog?.orchard?.trees?.[o.species]?.name||'';s.label(p.x,y-r-4,(name?name+' · ':'')+(ripe?'урожай':o.fruit?s.timeLeft(o.fruit.ready_at):'растёт'))}
+  return;
+ }
  if(L.phase==='ripe')s.ready(p.x+14,p.y+top-6);
  else if(o.id===s.selected&&o.fruit)s.clockBubble(p.x,p.y+top-8,o.fruit.ready_at);
 }

@@ -1162,6 +1162,14 @@ export const BUILDING_TYPES=Object.keys(TYPES);
 
 /* Same earth surface as the permanent farm roads; full tiles join without seams. */
 export function drawRoad(s,o){
+ // Contrast mode (UI_RULES §16, E3): ochre path with a dark edge only where it meets grass or anything that is not path.
+ if(s.contrast){
+  s.tile(o.x,o.y,(s.lighting?.darkness||0)>.4?'#b39572':'#c8a677');
+  const R=s.roadCells?.()||new Set();
+  for(const [dx,dy,ax,ay,bx,by] of [[0,-1,o.x,o.y,o.x+1,o.y],[1,0,o.x+1,o.y,o.x+1,o.y+1],[0,1,o.x+1,o.y+1,o.x,o.y+1],[-1,0,o.x,o.y+1,o.x,o.y]])
+   if(!R.has((o.x+dx)+','+(o.y+dy)))s.line(px(ax,ay),py(ax,ay,0),px(bx,by),py(bx,by,0),'#3a2610',2.4);
+  return;
+ }
  s.tile(o.x,o.y,'#dbd3ae');
  const p={x:px(o.x+.4,o.y+.5),y:py(o.x+.4,o.y+.5,0)};
  s.ellipse(p.x,p.y,3,1,'#c5ba934c');

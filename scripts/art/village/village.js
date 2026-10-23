@@ -14,6 +14,7 @@ import {springFlowers} from './fest_flowers.js';
 import {buildArt} from './build.js';
 import {crewSvgs} from './crew.js';
 import {merchantCart,magpieSvg} from './merchant.js';
+import {contrastPaths} from './contrast_paths.js';
 
 export async function render(opts={}){
 const W=3200,H=2400,OX=1600,OY=300,K=1.3;
@@ -414,7 +415,9 @@ meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windo
   wells:WELLS,clear:(x,y,z,r)=>clearOfButtons(T2W(x,y,z),r),walk:(()=>{const n=meta.walk.nodes,e=meta.walk.edges,t=i=>toTile(n[2*i],n[2*i+1]),out=[];for(let i=0;i<e.length;i+=2)out.push([...t(e[i]),...t(e[i+1])]);return out})(),avoid:opts.badge?[[opts.badge[0]/.75,opts.badge[1]/.75,opts.badge[2]/.75,opts.badge[3]/.75].map((v,i)=>i%2?(v-OY)/K:(v-OX)/K)]:[],ground:(x,y)=>!inWater(x,y)&&(!isRoad(x,y)||isPlaza(x,y)),stalls:STALL_BOXES,
   // trees stand in front of things too: crowns as tall boxes
   tall:occupied.filter(r=>r.h>=20).map(r=>({r:[r[0],r[1],r[2],r[3]],h:r.h})).concat(trees.map(t=>({r:[t[0]-.3,t[1]-.3,t[0]+.3,t[1]+.3],h:80*t[2]})))};
- meta.fest.new_year=newYear(festV);meta.fest.maslenitsa=maslenitsa(festV);meta.fest.spring_flowers=springFlowers(festV)}
+ meta.fest.new_year=newYear(festV);meta.fest.maslenitsa=maslenitsa(festV);meta.fest.spring_flowers=springFlowers(festV);
+ // «Контрастный режим» (UI_RULES §16): vector path edges over the art, a game layer shown only in that mode (contrast_paths.js)
+ meta.contrast_paths=contrastPaths(festV)}
 {const corners=[];for(const [x,y] of [[CART[0],CART[1]],[CART[2],CART[1]],[CART[2],CART[3]],[CART[0],CART[3]]])for(const z of [0,64])corners.push(scr(P(x,y,z)).map(v=>v*.75));
  const xs=corners.map(c=>c[0]),ys=corners.map(c=>c[1]);
  meta.merchant={svg:merchantCart({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],box:CART}),figure:magpieSvg(),

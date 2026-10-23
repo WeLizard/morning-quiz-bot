@@ -44,13 +44,13 @@ test('construction.js: Сорока opens on her visit, Sonya shutters 23–7 Mo
  assert.deepEqual(C.stallStates(me,night),{magpie:'open',igor:'open',sonya:'closed',agata:'open',post:'open',player:'open'});
 });
 test('app.js: layers under and above the night tint, the crew, synced with the village scene; CSS keeps the motion optional',()=>{
- assert.match(app,/villageFestLayer\('base'\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageBuildLayer\('glow'\),/);
+ assert.match(app,/villageFestLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageBuildLayer\('glow'\),/);
  assert.match(app,/villageWaterWheel\(\),villageCrewLayer\(\),actors,/);
  assert.match(app,/syncVillageSites\(\);syncVillageBuild\(\);/);
  assert.match(app,/u\.setAttribute\('href',`\/app\/farm\/assets\/\$\{VILLAGE_BUILD\.asset\}#\$\{id\}`\)/);
  assert.match(css,/:root:not\(\[data-farm-theme=night\]\) \.village-build-glow\{display:none\}/);
  assert.match(css,/@media\(prefers-reduced-motion:no-preference\)\{\n \.village-crew \.bc-plan\{animation/);
 });
-test('api.py serves village-build.svg',{todo:'add village-build.svg to qw_farm/api.py ASSETS (qw_farm/*.py was held by another task)'},()=>{
+test('api.py serves village-build.svg',()=>{
  assert.match(api,/'village-build\.svg'/);
 });

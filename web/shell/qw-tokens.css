@@ -20,6 +20,9 @@
   --qw-r-control:12px;--qw-r-card:18px;--qw-r-hero:24px;--qw-r-pill:999px;
   --qw-header-h:56px;--qw-tabbar-h:64px;--qw-col-hub:1120px;--qw-col-read:760px;
 
+  /* Accessibility contract (UI_RULES §16). Defaults keep the regular look; :root[data-qw-contrast="1"] changes them. */
+  --qw-contrast:0;--qw-outline-w:1px;--qw-focus-w:2px;--qw-night-dim:1;--qw-scene-filter:none;
+
   --qw-tg-safe-top:0px;--qw-tg-safe-right:0px;--qw-tg-safe-bottom:0px;--qw-tg-safe-left:0px;
   --qw-tg-content-top:0px;--qw-tg-content-right:0px;--qw-tg-content-bottom:0px;--qw-tg-content-left:0px;
   --qw-safe-top:calc(max(env(safe-area-inset-top,0px),var(--qw-tg-safe-top)) + var(--qw-tg-content-top));
@@ -44,3 +47,21 @@
   --qw-btn-gap:12px;
   --qw-fs-caption:13px;--qw-fs-small:14px;--qw-fs-body:16px;--qw-fs-control:16px;
   --qw-fs-h3:19px;--qw-fs-h2:24px;--qw-fs-h1:32px;--qw-fs-display:88px;--qw-header-h:64px}
+
+/* ---------- «Контрастный режим» (UI_RULES §16): Профиль → Настройки, account setting ----------
+   The shell sets <html data-qw-contrast="1"> on every page (hub, Alchemy, Night City, farm). The mode only ADDS:
+   text ≥ 4.5:1 and outlines ≥ 3:1 to their background, 2px outlines, captions +2px / small text +1px, a 3px focus ring,
+   solid surfaces instead of translucent ones, a lighter night. The hub palette (--qw-*) is redefined here; games
+   keep their --qw-game-* palette and add their own [data-qw-contrast="1"] block (never redefine --qw-game-* here). */
+:root[data-qw-contrast="1"]{
+  --qw-bg:#0b0d10;--qw-surface:#15181d;--qw-surface-2:#1d2128;--qw-line:#9aa3ad;
+  --qw-text:#ffffff;--qw-muted:#dfe4ea;--qw-accent:#d0fc50;--qw-accent-fill:#d0fc50;--qw-accent-ink:#141f00;
+  --qw-danger:#ffc2bc;--qw-scrim:rgb(0 0 0/.78);--qw-shadow:0 0 0 1px #9aa3ad;
+  --qw-contrast:1;--qw-outline-w:2px;--qw-focus-w:3px;--qw-night-dim:.5;--qw-scene-filter:saturate(1.18) contrast(1.1);
+  --qw-fs-caption:14px;--qw-fs-small:14px}
+:root[data-theme="light"][data-qw-contrast="1"]{
+  --qw-bg:#f6f7f2;--qw-surface:#ffffff;--qw-surface-2:#eef1e8;--qw-line:#4b5747;
+  --qw-text:#0e150c;--qw-muted:#26392d;--qw-accent:#2f4500;--qw-accent-fill:#c6ef61;--qw-accent-ink:#10231a;
+  --qw-danger:#8a1d13;--qw-scrim:rgb(10 16 8/.6);--qw-shadow:0 0 0 1px #4b5747}
+@media (min-width:1024px){:root[data-qw-contrast="1"]{--qw-fs-caption:15px;--qw-fs-small:15px}}
+:root.qw-desktop[data-qw-contrast="1"]{--qw-fs-caption:15px;--qw-fs-small:15px}

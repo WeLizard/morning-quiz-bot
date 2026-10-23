@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE))
 import build_village  # noqa: E402
 
 WORK = ROOT / ".local" / "village-generator" / "test"
-KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256", "merchant_sha256", "build_sha256")
+KEYS = ("rgba_sha256", "webp_sha256", "svg_sha256", "fest_sha256", "merchant_sha256", "build_sha256", "contrast_paths_sha256")
 
 
 def _app_const(src: str, name: str):
@@ -44,6 +44,8 @@ def test_village_generator_is_reproducible():
     assert (WORK / "a" / "merchant-figure.svg").read_text(encoding="utf-8") in app, "app.js VILLAGE_MERCHANT.figure is the generated one"
     sprite = ROOT / "qw_farm" / "static" / "village-build.svg"   # construction stages and stalls (build.js)
     assert sprite.read_bytes() == (WORK / "a" / "village-build.svg").read_bytes(), "village-build.svg: rebuild with --install"
+    edges = ROOT / "qw_farm" / "static" / "village-contrast-paths.svg"   # «Контрастный режим» path edges (contrast_paths.js)
+    assert edges.read_bytes() == (WORK / "a" / "village-contrast-paths.svg").read_bytes(), "village-contrast-paths.svg: rebuild with --install"
     ref = json.loads((HERE / "reference.json").read_text(encoding="utf-8"))
     changed = sorted(k for k in set(ref["inputs"]) | set(a["inputs"]) if ref["inputs"].get(k) != a["inputs"].get(k))
     if changed:

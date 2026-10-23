@@ -23,6 +23,7 @@ class Principal:
     name: str
     authentication: str = 'account'  # transport identity label, never a credential
     address_form: str = 'n'  # Account-level 'm'|'f'|'n' (domain/address.py); never inferred
+    contrast_mode: bool | None = None  # Account «Контрастный режим» (UI_RULES §16); None = unknown (demo), not sent
 
 class FarmService:
     def __init__(self, unit, principal: Principal, *, clock=time.time, speed=1, question_provider=None):
@@ -54,7 +55,7 @@ class FarmService:
         projection['friend_requests']=requests
         projection['village_build']=await construction.projection(self.u,farm,self.p.account_id,self.clock())
         return dict(farm=projection,catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
-                    invites=await self._invites(farm),address_form=self.p.address_form)
+                    invites=await self._invites(farm),address_form=self.p.address_form,**self._account_prefs())
 
     async def share_link_status(self):
         """Read-only state of the current reusable link (no token is issued), or None."""
@@ -292,7 +293,11 @@ class FarmService:
             projected['village_build']=await construction.projection(self.u,me,self.p.account_id,self.clock())
         return dict(farm=projected,speed=self.speed,village=await self._village(me) if farm is me else None,
                     invites=await self._invites(me) if farm is me else None,
-                    address_form=self.p.address_form)
+                    address_form=self.p.address_form,**self._account_prefs())
+
+    def _account_prefs(self):
+        """Account display settings echoed to the client; the shell applies them over its device cache."""
+        return {} if self.p.contrast_mode is None else {'contrast_mode':bool(self.p.contrast_mode)}
 
     async def neighbors(self):
         me=await self.me()

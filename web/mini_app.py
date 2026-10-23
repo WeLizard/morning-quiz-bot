@@ -714,6 +714,26 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         except PrincipalError as error:
             raise MiniAppError(error.status, error.message, code=error.code) from None
 
+    @app.post('/api/account/contrast-mode')
+    async def account_contrast_mode(request: Request, identity: str | None = Query(None)):
+        """Accessibility «Контрастный режим»: one Account setting, applied by the shell in the hub and every game."""
+        from uuid import UUID
+        from storage.models import Account
+        from web.principal import PrincipalError, resolve_principal
+        value = await account_json(request, {'enabled'}, {'enabled'})
+        if not isinstance(value['enabled'], bool):
+            raise MiniAppError(400, 'Некорректные параметры')
+        if identity == 'guest':
+            guest_access()
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                account = await session.get(Account, UUID(who.account_id))
+                account.contrast_mode = value['enabled']
+                return {'contrast_mode': account.contrast_mode}
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
+
     @app.get('/api/account/problem-reports/meta')
     async def problem_report_meta():
         from storage import problem_reports

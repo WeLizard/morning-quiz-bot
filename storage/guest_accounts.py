@@ -46,6 +46,7 @@ class GuestAccounts:
                 'telegram_user_id': telegram_user_id,
                 'address_form': effective_address_form(account.address_form),
                 'address_form_chosen': account.address_form is not None,
+                'contrast_mode': bool(account.contrast_mode),
                 'capabilities': ['guest-profile']}
 
     async def projection_in(self, session, account, row):

@@ -327,6 +327,8 @@ class AccountMergeService:
             main.display_name = secondary.display_name
         if not main.address_form and secondary.address_form:
             main.address_form = secondary.address_form
+        # Accessibility: if either account asked for the contrast mode, the merged one keeps it.
+        main.contrast_mode = bool(main.contrast_mode or secondary.contrast_mode)
         secondary.archived = True
         secondary.merged_into_id = main.id
         secondary.merged_at = now

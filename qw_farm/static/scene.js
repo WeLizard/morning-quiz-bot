@@ -54,6 +54,9 @@ export class FarmScene {
   this.stats={objects:0,drawn:0,staticPaints:0,staticBlits:0,frames:0};
   this.mini=callbacks.minimap?new Minimap(callbacks.minimap,this):null;
   this.paused=false;this.raf=0;
+  // «Контрастный режим» (UI_RULES §16): <html data-qw-contrast="1"> set by qw-shell.js; the scene only reads it.
+  this.contrast=false;this.nightDim=1;this.applyContrast();
+  try{globalThis.addEventListener?.('qw:contrast',()=>this.applyContrast())}catch{}
   this.tick=this.tick.bind(this);
   new ResizeObserver(()=>this.resize()).observe(canvas);this.setupInput();this.resize();
   document.addEventListener('visibilitychange',()=>this.syncLoop());this.syncLoop();
@@ -63,9 +66,28 @@ export class FarmScene {
  set(farm,catalog){this.dirty=true;this.farmToken++;this.sorted=null;this.renderOrder=null;const before=this.grid();this.farm=farm;this.catalog=catalog;resetWalkingGeese(this);resetLivestock(this);this.serverOffset=farm.server_time-Date.now()/1000;if(!this.initialized){this.fit();this.initialized=true}else if(this.grid()!==before)this.fit()}
  projectStage(id){const stage=this.farm?.home_projects?.entries?.[id]?.stage;return stage===1||stage===2?stage:0}
  now(){return Date.now()/1000+this.serverOffset}
+ // Contrast mode: flag and night multiplier (--qw-night-dim) are read from <html> once and again on `qw:contrast`.
+ // Without a document (node tests, the village generator) the scene stays in the regular style.
+ readContrast(){
+  let on=false,dim=1;
+  try{
+   const root=globalThis.document?.documentElement;on=root?.getAttribute?.('data-qw-contrast')==='1';
+   if(on){dim=.5;if(typeof getComputedStyle==='function'){const v=parseFloat(getComputedStyle(root).getPropertyValue('--qw-night-dim'));if(Number.isFinite(v)&&v>=0&&v<=1)dim=v}}
+  }catch{}
+  return {on,dim};
+ }
+ applyContrast(){
+  const {on,dim}=this.readContrast();if(on===this.contrast&&dim===this.nightDim)return;
+  this.contrast=on;this.nightDim=dim;this.bg=null;this.thumbs=null;this.renderOrder=null;
+  if(this.cache)this.cache.key=null;
+  if(this.lightingRaw)this.setLighting(this.lightingRaw);
+  this.dirty=true;
+ }
  setLighting(state){
   if(!state||!Number.isFinite(state.darkness)||!Number.isFinite(state.warmth))return;
-  const next={...state,darkness:clamp(state.darkness,0,1),warmth:clamp(state.warmth,0,1)};
+  this.lightingRaw=state;
+  // The night tint of the scene only; the page theme (app.js data-farm-theme) keeps the undimmed darkness.
+  const next={...state,darkness:clamp(state.darkness,0,1)*(this.contrast?this.nightDim:1),warmth:clamp(state.warmth,0,1)};
   const at=performance.now();this.stepLighting(at);
   if(!this.lighting||!this.motion||this.isPaused()){this.lighting=next;this.lightingTransition=null}
   else if(this.lighting.darkness!==next.darkness||this.lighting.warmth!==next.warmth)this.lightingTransition={from:this.lighting,to:next,at};
@@ -191,9 +213,10 @@ export class FarmScene {
  footprint(o,color,stroke=null){this.poly([P(o.x,o.y,1),P(o.x+o.w,o.y,1),P(o.x+o.w,o.y+o.h,1),P(o.x,o.y+o.h,1)],color,stroke,2)}
  label(x,y,text,ready=false){
   if(this.lightMarkers){this.lightMarkers.push({kind:'label',x,y,text,ready});return}
+  if(this.contrast){const c=this.c;c.font='700 11px "Segoe UI", sans-serif';const w=c.measureText(text).width+16;c.fillStyle='#10231a';c.beginPath();c.roundRect(x-w/2,y-17,w,23,7);c.fill();c.lineWidth=1.5;c.strokeStyle='#ffffff';c.stroke();c.fillStyle='#ffffff';c.textAlign='center';c.fillText(text,x,y-1.5);return}
   const dark=(this.lighting?.darkness||0)>.25,c=this.c;c.font='600 10px "Segoe UI", sans-serif';let w=c.measureText(text).width+17;
   c.fillStyle=dark?'#24333b':ready?'#f9edbd':'#fdfcf1';c.beginPath();c.roundRect(x-w/2,y-17,w,23,7);c.fill();
-  c.fillStyle=dark?'#f3e5c5':ready?'#947439':'#617658';c.textAlign='center';c.fillText(text,x,y-2)
+  c.fillStyle=dark?'#f3e5c5':ready?'#745a20':'#617658';c.textAlign='center';c.fillText(text,x,y-2)
  }
  shadow(x,y,rx,ry){const d=this.inStatic?[0,.5,1][this.shadowLevel||0]:(this.lighting?.darkness||0);this.ellipse(x+6,y+3,rx,ry,d>.02?this.nightShadowColor(d):'#41623517')}
  nightShadowColor(d){const q=Math.round(d*12)/12,cache=this.shadowCache||(this.shadowCache={});return cache[q]||(cache[q]=`rgba(5,11,20,${(.12+.4*q).toFixed(2)})`)}
@@ -421,7 +444,30 @@ export class FarmScene {
   this.c=g;try{this.drawObject(o)}finally{this.c=main}
   main.save();main.filter=`brightness(1.12) drop-shadow(0 0 ${this.dpr}px #fffbd0) drop-shadow(0 0 ${this.dpr*2}px #fff2a0)`;main.drawImage(cv,b.x0,b.y0,w/k,h/k);main.restore();
  }
- path(G=12){this.poly([P(-3,3),P(-1,2),P(2,G+1),P(1,G+2)],'#e4dcc160');}
+ // Catalogue miniature (E1): one object painted by the scene's own drawObject into a cached canvas, in daylight,
+ // on its footprint of grass, without ready marks or clocks, then cropped to the painted pixels. The live map is untouched.
+ thumb(spec){
+  const tree=!!spec.species,key=tree?'tree:'+spec.species:spec.type,cache=this.thumbs||(this.thumbs=new Map());
+  if(cache.has(key))return cache.get(key);
+  const o={id:'\u0000thumb',type:tree?'tree':spec.type,x:0,y:0,w:spec.w||1,h:spec.h||1,revision:0,level:1,jobs:[],animal:null,animal_job:null};
+  if(tree)Object.assign(o,{species:spec.species,harvests:30,planted_at:0,fruit:{started_at:0,ready_at:1}});
+  const b=objectBounds(o),k=2,w=Math.ceil((b.x1-b.x0)*k),h=Math.ceil((b.y1-b.y0)*k),cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const g=cv.getContext('2d');g.setTransform(k,0,0,k,-b.x0*k,-b.y0*k);
+  const keep={c:this.c,lighting:this.lighting,selected:this.selected,lanternLights:this.lanternLights,lightMarkers:this.lightMarkers};
+  this.c=g;this.lighting={mode:'day',phase:'day',darkness:0,warmth:0};this.selected=null;this.lanternLights=null;this.lightMarkers=null;this.ready=()=>{};this.clockBubble=()=>{};this.cropBadge=()=>{};this.label=()=>{};
+  try{
+   this.poly([P(-.12,-.12),P(o.w+.12,-.12),P(o.w+.12,o.h+.12),P(-.12,o.h+.12)],'#c9dcae');
+   this.poly([P(0,0),P(o.w,0),P(o.w,o.h),P(0,o.h)],'#d6e6bd');
+   this.drawObject(o);
+  }catch{}finally{Object.assign(this,keep);delete this.ready;delete this.clockBubble;delete this.cropBadge;delete this.label}
+  // Crop to the painted pixels with a small margin, so a lantern and a mill fill their cards alike.
+  let x0=w,y0=h,x1=0,y1=0;try{const a=g.getImageData(0,0,w,h).data;for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(a[(y*w+x)*4+3]>24){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}catch{x0=0;y0=0;x1=w-1;y1=h-1}
+  if(x1<x0){cache.set(key,null);return null}
+  const m=Math.round(Math.max(x1-x0,y1-y0)*.05),out=document.createElement('canvas');x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(w-1,x1+m);y1=Math.min(h-1,y1+m);
+  out.width=x1-x0+1;out.height=y1-y0+1;out.getContext('2d').drawImage(cv,x0,y0,out.width,out.height,0,0,out.width,out.height);
+  cache.set(key,out);return out;
+ }
+ path(G=12){this.poly([P(-3,3),P(-1,2),P(2,G+1),P(1,G+2)],this.contrast?'#d3bf98':'#e4dcc160');}
  forestFog(G=12,view=null){
   const alpha=1-(this.lighting?.darkness||0);if(alpha<=0)return;
   const c=this.c,clouds=this.layout.fog;
@@ -726,9 +772,10 @@ export class FarmScene {
  drawAnimal(id,q){if(id==='cow')this.cow(q.x,q.y);else if(id==='sheep')this.sheep(q.x,q.y);else if(id==='bees')this.beehive(q.x,q.y);else smallAnimal(this,q.x,q.y,id)}
  drawObject(o){let p=P(o.x+o.w/2,o.y+o.h/2);if(o.id===this.selected)this.footprint(o,'#f8edb837','#f7f0c3');
   if(o.type==='plot'){this.plot(o);return}
-  if(o.type==='tree'){this.orchardTree(o,p);return}
+  if(o.type==='tree'){if(this.contrast)this.footprint(o,null,'#556447');this.orchardTree(o,p);return}
   if(o.type==='road'){drawRoad(this,o);return}
   if(o.type==='duckpond'){this.c.save();this.c.translate(p.x,p.y);this.c.scale(.48,.48);this.pond(0,0);this.c.restore();drawBadge(this,o);if(o.animal_job?.ready_at<=this.now())this.ready(p.x,p.y-30);return;}
+  if(this.contrast)this.footprint(o,null,'#556447');  // contrast mode: a ground outline under every building and decor
   if(specialDecor(this,o,p))return;
   if(o.type==='birdhouse'){this.birdhouse(o,p);return}
   if(['flowerbed','bench','lantern','scarecrow'].includes(o.type)){this.decor(o,p);return}
@@ -743,18 +790,57 @@ export class FarmScene {
  orchardTree(o,p){drawTree(this,o,p,this.catalog,this.now())}
  // Birdhouse decor (1x1): a pole with a little house and its starling (scene_buildings.js, same solids as the workshops).
  birdhouse(o,p){drawBirdhouse(this,o)}
- plotGround(o){this.footprint(o,'#b19a70','#a18a62');this.poly([P(o.x+.06,o.y+.06),P(o.x+.94,o.y+.06),P(o.x+.94,o.y+.94),P(o.x+.06,o.y+.94)],'#937f5d');for(let f of [.25,.48,.71]){let a=P(o.x+.1,o.y+f),b=P(o.x+.9,o.y+f);this.line(a.x,a.y,b.x,b.y,'#b19b73',2.4)}
+ plotGround(o){if(this.contrast)this.footprint(o,'#7a5a34','#1f1508');else this.footprint(o,'#b19a70','#a18a62');this.poly([P(o.x+.06,o.y+.06),P(o.x+.94,o.y+.06),P(o.x+.94,o.y+.94),P(o.x+.06,o.y+.94)],'#937f5d');for(let f of [.25,.48,.71]){let a=P(o.x+.1,o.y+f),b=P(o.x+.9,o.y+f);this.line(a.x,a.y,b.x,b.y,'#b19b73',2.4)}
   if(o.id===this.selected)this.footprint(o,'#f8edb837','#f7f0c3');
   if(!o.crop){let p=P(o.x+.5,o.y+.5);this.line(p.x-3,p.y,p.x+3,p.y,'#d3c49855',1);this.line(p.x,p.y-3,p.x,p.y+3,'#d3c49855',1)}
  }
  plotPlant(o,i,j){const crop=o.crop;if(!crop)return;const nowT=this.now(),f=crop.ready_at<=nowT?1:Math.max(.12,Math.min(.95,1-(crop.ready_at-nowT)/Math.max(1,crop.ready_at-crop.planted_at))),p=P(o.x+.24+i*.45,o.y+.15+j*.3);this.plant(p.x,p.y,crop.id,f,this.time+j*.5+i)}
  plotMarkers(o){const crop=o.crop;if(!crop)return;const ready=crop.ready_at<=this.now();
   let p=P(o.x+.5,o.y+.5);
+  if(this.contrast){this.contrastPlotMarkers(o,crop,ready,p);return}
   if(ready)this.ready(p.x,p.y-32);
   else if(o.id===this.selected)this.clockBubble(p.x,p.y-34,crop.ready_at);
   if(crop.helped){this.ellipse(p.x+24,p.y-5,3,4,'#9ecaca');this.line(p.x+24,p.y-10,p.x+24,p.y-5,'#9ecaca',2)}
  }
  plot(o){this.plotGround(o);if(o.crop)for(let i=0;i<2;i++)for(let j=0;j<3;j++)this.plotPlant(o,i,j);this.plotMarkers(o)}
+ // Contrast mode (E3): every growing bed shows its crop as an icon in a ringed disc, the ripe one a green ring and a check;
+ // the selected bed adds «Культура · 9 мин». Painted above the night tint like the ready badges.
+ contrastPlotMarkers(o,crop,ready,p){
+  const y=p.y-10,r=this.badgeRadius();
+  this.cropBadge(p.x,y,crop.id,ready);
+  if(o.id===this.selected){const name=this.catalog?.crops?.[crop.id]?.name||'';this.label(p.x,y-r-4,(name?name+' · ':'')+(ready?'готово':this.timeLeft(crop.ready_at)))}
+  if(crop.helped){this.ellipse(p.x+24,p.y-5,3,4,'#2f7d86');this.line(p.x+24,p.y-10,p.x+24,p.y-5,'#2f7d86',2)}
+ }
+ // About 13 px on screen at any zoom, never wider than half a bed.
+ badgeRadius(){return clamp(13/(this.scale||1),7,18)}
+ // Road cells of the current snapshot, for the contrast-mode path edges (scene_buildings.js drawRoad): built once per snapshot.
+ roadCells(){const objs=this.farm?.objects||[];if(this.roadSet?.src!==objs||this.roadSet.n!==objs.length){const set=new Set();for(const o of objs)if(o.type==='road')set.add(o.x+','+o.y);this.roadSet={src:objs,n:objs.length,set}}return this.roadSet.set}
+ timeLeft(at){const sec=Math.max(0,Math.ceil(at-this.now())),m=Math.ceil(sec/60);return sec>=3600?Math.floor(m/60)+' ч'+(m%60?' '+m%60+' мин':''):sec>=60?m+' мин':sec+' с'}
+ cropBadge(x,y,id,ready){
+  if(this.lightMarkers){this.lightMarkers.push({kind:'fn',fn:()=>this.cropBadge(x,y,id,ready)});return}
+  const c=this.c,r=this.badgeRadius(),img=this.cropIcon(id);
+  c.save();c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fillStyle='#ffffff';c.fill();c.lineWidth=Math.max(1.6,r*.17);c.strokeStyle=ready?'#1f7a3a':'#10231a';c.stroke();
+  if(img)c.drawImage(img,x-r*.7,y-r*.7,r*1.4,r*1.4);
+  else{const color=this.catalog?.crops?.[id]?.color||LATE_CROPS[id]?.[1]||'#7a9a5a';this.ellipse(x,y,r*.5,r*.5,color)}
+  if(ready){const bx=x+r*.72,by=y-r*.72,br=r*.46;c.beginPath();c.arc(bx,by,br,0,Math.PI*2);c.fillStyle='#1f7a3a';c.fill();c.lineWidth=Math.max(1,r*.09);c.strokeStyle='#ffffff';c.stroke();
+   c.beginPath();c.moveTo(bx-br*.45,by);c.lineTo(bx-br*.1,by+br*.38);c.lineTo(bx+br*.5,by-br*.4);c.lineWidth=Math.max(1.2,br*.32);c.lineCap='round';c.lineJoin='round';c.stroke()}
+  c.restore();
+ }
+ // Crop and fruit icons come from the same sprite as the seed bar (icons.svg#<id>), each rasterised once from a data: URL.
+ cropIcon(id){
+  const sym=(this.cb?.iconId||(v=>v))(id),cache=this.icons||(this.icons=new Map());
+  if(cache.has(sym))return cache.get(sym);
+  cache.set(sym,null);
+  if(typeof Image!=='function'||!/^[a-z0-9_-]+$/i.test(sym))return null;
+  this.iconSheet().then(text=>{
+   const m=text&&text.match(new RegExp('<symbol id="'+sym+'"([^>]*)>([\\s\\S]*?)</symbol>'));if(!m)return;
+   const vb=(m[1].match(/viewBox="([^"]+)"/)||[])[1]||'0 0 40 40',img=new Image();
+   img.onload=()=>{cache.set(sym,img);this.dirty=true};
+   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="96" height="96" color="#10231a">${m[2]}</svg>`);
+  });
+  return null;
+ }
+ iconSheet(){return this.iconText||(this.iconText=typeof fetch==='function'?fetch(this.cb?.iconSheet||'/app/farm/assets/icons.svg').then(r=>r.ok?r.text():'').catch(()=>''):Promise.resolve(''))}
  plant(x,y,id,f,t){
   // Zoomed far out (whole 20x20 land on a phone) a plant is a few pixels: draw a stem and a head in the crop colour.
   if(this.scale<PLANT_LOD_SCALE){const h=6+f*9;this.line(x,y,x,y-h,'#719856',1.8);if(f>.55)this.ellipse(x,y-h-1,2.6,2.8,f>.8?(this.catalog?.crops?.[id]?.color||'#d9c777'):'#8fb06a');return}
@@ -860,7 +946,9 @@ export class FarmScene {
   default:this.line(x,y,sx,top,G,1.2);this.leaf(sx,top+2,up-.7,3+g*2,1.3,G2);this.leaf(sx,top+2,up+.7,3+g*2,1.3,G3);
   }
  }
- ready(x,y){if(this.lightMarkers){this.lightMarkers.push({kind:'ready',x,y});return}const dark=(this.lighting?.darkness||0)>.25;this.ellipse(x,y,7,7,dark?'#d9bf7a':'#f8ebba');this.line(x-3,y,x-1,y+2,dark?'#29352f':'#a1864c',1.5);this.line(x-1,y+2,x+3,y-3,dark?'#29352f':'#a1864c',1.5)}
+ ready(x,y){if(this.lightMarkers){this.lightMarkers.push({kind:'ready',x,y});return}
+  if(this.contrast){this.ellipse(x,y,8.5,8.5,'#ffffff');this.ellipse(x,y,7,7,'#1f7a3a');this.line(x-3.2,y,x-1,y+2.4,'#ffffff',2);this.line(x-1,y+2.4,x+3.4,y-3,'#ffffff',2);return}
+  const dark=(this.lighting?.darkness||0)>.25;this.ellipse(x,y,7,7,dark?'#d9bf7a':'#f8ebba');this.line(x-3,y,x-1,y+2,dark?'#29352f':'#84692f',1.5);this.line(x-1,y+2,x+3,y-3,dark?'#29352f':'#84692f',1.5)}
  clockBubble(x,y,at){let sec=Math.max(0,Math.ceil(at-this.now())),text=sec>=3600?Math.ceil(sec/3600)+' ч':sec>=60?Math.ceil(sec/60)+' м':sec+' с';this.label(x,y,text)}
  chicken(x,y){this.shadow(x,y,7,3);this.line(x-3,y,x-3,y+4,'#c39b59',1);this.line(x+3,y,x+3,y+4,'#c39b59',1);this.ellipse(x,y-4,7,5,'#f2edcf');this.ellipse(x+5,y-9,3.5,4,'#f7f1d8');this.ellipse(x+6,y-13,2,2,'#bb7561');this.ellipse(x+6,y-10,1,1,'#435444');this.poly([{x:x+8,y:y-10},{x:x+12,y:y-8},{x:x+8,y:y-7}],'#d4a55e');this.poly([{x:x-5,y:y-5},{x:x-10,y:y-12},{x:x-9,y:y-3}],'#e5dbb9')}
  cow(x,y){this.shadow(x,y,17,6);for(let dx of [-10,-5,8,12])this.line(x+dx,y-5,x+dx,y+6,'#9e947a',3);this.ellipse(x,y-12,18,10,'#e8dfc6');this.ellipse(x-4,y-14,6,7,'#8c8778');this.ellipse(x+13,y-11,8,9,'#eee5cd');this.ellipse(x+18,y-6,7,4,'#d6b7a3');this.ellipse(x+15,y-13,1.2,1.2,'#455441');this.line(x+10,y-19,x+7,y-23,'#ab9f7f',2);this.line(x+16,y-20,x+19,y-24,'#ab9f7f',2)}

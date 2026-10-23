@@ -80,6 +80,9 @@ class Account(ModerationMixin, TimestampMixin, Base):
     merged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     # "Don't show me in the rating": the player still sees their own place.
     rating_hidden: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Accessibility «Контрастный режим» (Профиль → Настройки): one switch for the hub and every game,
+    # applied as <html data-qw-contrast="1"> by the shell (docs/design/UI_RULES.md §16).
+    contrast_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     __table_args__ = (
         CheckConstraint("merged_into_id IS NULL OR merged_into_id <> id",

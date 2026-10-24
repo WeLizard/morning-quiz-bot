@@ -46,25 +46,35 @@
 .qw-switch[data-on="true"]{background:var(--qw-game-accent)}.qw-switch[data-on="true"]::after{left:21px}
 
 /* ---------- buttons and button groups (UI_RULES §9) ---------- */
-.qw-btn{box-sizing:border-box;min-height:var(--qw-tap);display:inline-flex;align-items:center;justify-content:center;gap:var(--qw-s-2);
-  padding:10px var(--qw-s-4);border-radius:var(--qw-r-control);border:var(--qw-outline-w) solid var(--qw-game-line);background:transparent;color:var(--qw-game-text);
+.qw-btn{box-sizing:border-box;min-height:var(--qw-btn-h);display:inline-flex;align-items:center;justify-content:center;gap:var(--qw-s-2);
+  padding:var(--qw-btn-pad);border-radius:var(--qw-r-control);border:var(--qw-outline-w) solid var(--qw-game-line);background:transparent;color:var(--qw-game-text);
   font:650 var(--qw-fs-control)/1.25 var(--qw-font);text-align:center;cursor:pointer}
-.qw-btn.primary{min-height:48px;background:var(--qw-game-accent-fill);border-color:transparent;color:var(--qw-game-accent-ink)}
+.qw-btn.primary{min-height:var(--qw-btn-h-primary);background:var(--qw-game-accent-fill);border-color:transparent;color:var(--qw-game-accent-ink)}
 .qw-btn.secondary{background:transparent}
 .qw-btn.text{border-color:transparent;background:transparent;color:var(--qw-game-accent);padding-inline:var(--qw-s-2)}
 .qw-btn.danger{border-color:transparent;background:transparent;color:var(--qw-game-danger)}
 .qw-btn:disabled,.qw-btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.qw-btn.compact{min-height:var(--qw-btn-h-compact);padding:var(--qw-btn-pad-compact);font-size:var(--qw-fs-small)}
 .qw-btn-hint{display:block;margin-top:calc(var(--qw-s-1) - var(--qw-btn-gap));font-size:var(--qw-fs-small);color:var(--qw-game-muted);text-align:center}
 .qw-btn-stack{display:flex;flex-direction:column;gap:var(--qw-btn-gap)}
 .qw-btn-stack>.qw-btn{width:100%}
-.qw-btn-row{display:flex;flex-wrap:wrap;gap:var(--qw-btn-gap);align-items:center;justify-content:flex-end}
-@media (max-width:359px){.qw-btn-row{flex-direction:column;align-items:stretch}}
-.qw-btn-stack>.danger,.qw-btn-stack>.qw-danger-zone,.qw-btn-row>.danger{margin-top:calc(var(--qw-danger-gap) - var(--qw-btn-gap))}
+/* One group — one height: a row stretches its buttons to the tallest one, a stack with a full-size primary lifts the rest to it. */
+.qw-btn-row{display:flex;flex-wrap:wrap;gap:var(--qw-btn-gap);align-items:stretch;justify-content:flex-end}
+.qw-btn-stack:has(>.qw-btn.primary:not(.compact))>.qw-btn:not(.text,.danger,.compact){min-height:var(--qw-btn-h-primary)}
+@media (max-width:319px){.qw-btn-row{flex-direction:column;align-items:stretch}}
+.qw-btn-stack>.danger,.qw-btn-stack>.qw-danger-zone{margin-top:calc(var(--qw-danger-gap) - var(--qw-btn-gap))}
+.qw-btn-row>.danger{margin-inline-start:calc(var(--qw-danger-gap) - var(--qw-btn-gap))}
+/* Text and its action in one row (UI_RULES §9): the text takes the free width and wraps, the action keeps its own column on the
+   right, so it never covers the text. Used for order cards, recipes, shop slots, festival hand-ins. */
+.qw-action-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--qw-s-3)}
+.qw-action-row>:last-child:not(:first-child){justify-self:end;min-width:var(--qw-action-w);max-width:min(15rem,46vw)}
+.qw-action-row>.qw-btn:last-child:not(:first-child),.qw-action-row>:last-child:not(:first-child)>.qw-btn{width:100%}
 .qw-danger-zone{border-top:1px solid var(--qw-game-line);padding-top:var(--qw-s-2);display:flex;justify-content:center}
 .qw-btn-group{display:flex;border:var(--qw-outline-w) solid var(--qw-game-line);border-radius:var(--qw-r-control);overflow:hidden}
-.qw-btn-group>*{flex:1;min-height:var(--qw-tap);margin:0;border:0;border-radius:0;background:transparent;color:var(--qw-game-muted);
+/* :is(*,.qw-btn) lifts the specificity over a game's own button classes: a segment never gets its own rounded corners. */
+.qw-btn-group>:is(*,.qw-btn){flex:1;min-height:var(--qw-btn-h);margin:0;border:0;border-radius:0;background:transparent;color:var(--qw-game-muted);
   font:650 var(--qw-fs-small)/1.2 var(--qw-font);padding:8px 10px;cursor:pointer}
-.qw-btn-group>*+*{border-left:var(--qw-outline-w) solid var(--qw-game-line)}
+.qw-btn-group>:is(*,.qw-btn)+*{border-left:var(--qw-outline-w) solid var(--qw-game-line)}
 .qw-btn-group>[aria-pressed="true"],.qw-btn-group>[aria-checked="true"],.qw-btn-group>[aria-current]{background:var(--qw-game-surface-2);color:var(--qw-game-text)}
 /* The chosen option is marked by more than shade: accent fill, bold text and a ✓ (UI_RULES §9). */
 .qw-btn-group>[aria-pressed="true"],.qw-btn-group>[aria-checked="true"]{background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink);font-weight:800}

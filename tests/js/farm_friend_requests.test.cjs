@@ -83,7 +83,7 @@ test('notifications dedupe by identity and free thanks never promise coins or XP
 });
 test('app hooks the lane, missing goods, settings, notifications and existing dialog navigation',()=>{
  const app=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
- for(const hook of ['FRIEND_REQUESTS.lane(p)','FRIEND_REQUESTS.missing(c,o.needs)','FRIEND_REQUESTS.renderNeighbors(p)','FRIEND_REQUESTS.notify()','allow_requests'])assert.ok(app.includes(hook),hook);
+ for(const hook of ['FRIEND_REQUESTS.lane(p)','FRIEND_REQUESTS.missing(links,o.needs)','FRIEND_REQUESTS.renderNeighbors(p)','FRIEND_REQUESTS.notify()','allow_requests'])assert.ok(app.includes(hook),hook);
  assert.match(app,/navPush\('dialog'/);
  assert.ok(!app.includes('\r\n'),'app.js stays LF');
 });

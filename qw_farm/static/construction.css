@@ -4,12 +4,12 @@
 .build-timeline{list-style:none;margin:8px 0 12px;padding:0;display:grid;gap:4px}
 .build-step.now{font-weight:700}.build-step.later{opacity:.7}
 .build-need{display:grid;gap:4px;padding:8px 0}
-.build-need small,.build-bonus small{color:var(--qw-muted,#53604f);font-size:var(--qw-fs-small,13px)}
+.build-need small,.build-bonus small{color:var(--muted);font-size:var(--qw-fs-small,13px)}
 .build-bonus{display:grid;gap:6px}
 .build-perk{margin:0}.build-perk.got{font-weight:700}
 .build-form{display:grid;gap:12px}
 .build-form input,.stall-form input,.stall-form select{min-height:44px;box-sizing:border-box;width:100%}
 .stall-card .qw-btn,.stall-own .qw-btn,.build-form~.card-footer .qw-btn{min-height:44px}
 .stall-form{display:grid;gap:12px}
-.stall-own{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-top:1px solid var(--qw-line,#d4dbcd)}
+.stall-own{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-top:1px solid var(--line)}
 .stall-own small{flex:1 1 auto}

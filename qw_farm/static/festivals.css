@@ -1,9 +1,9 @@
 /* Festivals panel (FARM_FESTIVALS_DESIGN.md section 9): existing card/button components, UI_RULES tokens only. */
 .fest-banner .note{margin:6px 0 0}
-.fest-task,.fest-good{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--qw-line,#d4dbcd)}
+.fest-task,.fest-good{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
 .fest-task:first-of-type,.fest-group>.fest-good:first-of-type{border-top:0}
-.fest-task.done strong{color:var(--qw-muted,#53604f)}
-.fest-task small,.fest-good small,.fest-group>small{display:block;color:var(--qw-muted,#53604f);font-size:var(--qw-fs-small,13px)}
+.fest-task.done strong{color:var(--muted)}
+.fest-task small,.fest-good small,.fest-group>small{display:block;color:var(--muted);font-size:var(--qw-fs-small,13px)}
 .fest-option{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .fest-option .qw-btn,.fest-good .qw-btn{min-height:44px}
 .fest-group{display:grid;gap:4px;margin-top:12px}
@@ -11,4 +11,4 @@
 .fest-good.owned{opacity:.7}
 .fest-collection{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
 .fest-collection li{display:grid;gap:2px}
-.fest-collection small{color:var(--qw-muted,#53604f);font-size:var(--qw-fs-small,13px)}
+.fest-collection small{color:var(--muted);font-size:var(--qw-fs-small,13px)}

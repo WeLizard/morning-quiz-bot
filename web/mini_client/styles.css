@@ -250,7 +250,7 @@ body{font-size:var(--qw-fs-body);line-height:1.5}
 /* Core button classes next to the legacy rules */
 .qw-btn{text-decoration:none}.card .qw-btn-stack,.card .qw-btn-row{margin-top:var(--qw-s-3)}.qw-btn-stack>.qw-btn{margin:0}
 .card>.qw-btn.primary,.login>.qw-btn.primary{width:100%}
-.qw-btn-group{margin:var(--qw-s-3) 0}.qw-btn-group.seg-scroll{overflow-x:auto}.seg-scroll>*{flex:1 0 auto;padding-inline:var(--qw-s-3)}
+.qw-btn-group{margin:var(--qw-s-3) 0}.qw-btn-group.seg-scroll{overflow-x:auto}.seg-scroll>*,.qw-btn-group.seg-scroll>:is(*,.qw-btn){flex:1 0 auto;padding-inline:var(--qw-s-3)}
 .qw-btn-group>button[aria-checked="true"]{box-shadow:inset 0 0 0 1px var(--qw-line)}
 .qw-danger-zone{margin:var(--qw-s-4) 0 0}.card>.qw-danger-zone{margin-top:var(--qw-s-4)}
 .badge.admin{background:color-mix(in srgb,var(--qw-accent) 22%,transparent);color:var(--qw-accent)}

@@ -264,7 +264,7 @@ dialog.neighbor-reward-dialog{padding:0;overflow:visible;border:2px solid #f6dd9
 @media(max-width:850px){.compact .seedbar{bottom:calc(12px + var(--qw-safe-bottom));scrollbar-width:none;-ms-overflow-style:none}.compact .seedbar::-webkit-scrollbar,.compact .seedbar::-webkit-scrollbar-button{display:none;width:0;height:0}}
 /* Price and grow time stay on separate readable lines inside each narrow seed button. */
 .seedbar{cursor:grab}
-.seedbar.dragging,.seedbar.dragging .seed{cursor:grabbing}
+.seed-track.dragging,.seed-track.dragging .seed{cursor:grabbing}
 .seedbar .seed{height:74px}
 .seedbar .seed-details{display:flex;flex-direction:column;align-items:center;gap:0;line-height:13px;white-space:nowrap;font-size:12px;font-weight:500}
 .seedbar .seed-details span{font-size:inherit;font-weight:inherit}
@@ -1228,9 +1228,9 @@ html .scene-area .map-controls{display:flex;flex-direction:column;border:1px sol
 .seedbar .seed.seed-recent .seed-thumb{display:block;width:27px;height:20px;flex:none;border-radius:4px}
 .seedbar .seed.seed-recent>span:not(.seed-thumb){max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .seedbar .seed.seed-recent::after,.seedbar .seed.seed-all::after{display:none}
-.seedbar .seed.seed-all{position:sticky;right:-1px;z-index:2;flex:0 0 60px;min-width:60px;margin-left:auto;justify-content:center;gap:3px;border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);font-weight:700;box-shadow:-10px 0 10px -4px #fffdf2}
+.seedbar .seed.seed-all{position:relative;flex:0 0 60px;min-width:60px;justify-content:center;gap:3px;border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);font-weight:700}
 .seedbar .seed.seed-all svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9}
-:root[data-farm-theme=night] .seedbar .seed.seed-all{background:var(--surface-soft);box-shadow:-10px 0 10px -4px var(--panel)}
+:root[data-farm-theme=night] .seedbar .seed.seed-all{background:var(--surface-soft)}
 :root[data-farm-theme=night] .seedbar .seed.seed-recent{border-color:#5d7766}
 
 /* -- catalogue (side panel on a PC, full sheet on a phone) -- */
@@ -1296,8 +1296,6 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 @media(max-width:850px){:root[data-farm-theme=night] .rail.farm-menu{background:var(--panel)}:root[data-farm-theme=night] .rail.farm-menu .farm-menu-item{background:var(--surface)}:root[data-farm-theme=night] .rail.farm-menu .farm-menu-item.active{background:var(--surface-selected)}}
 @media(prefers-reduced-motion:reduce){.workspace>.rail.farm-menu{transition:none!important}}
 :root[data-farm-theme=night] .catalog-search input,.catalog-search input{background:transparent;border:0;box-shadow:none;padding:0}
-/* Only «Ферма» lives in the header strip now, and only in the village or on a neighbour's farm: an empty strip must not catch taps on the map. */
-body:not(.village-open):not(.farm-visit) .header-destinations{display:none!important}
 /* A narrow side panel (851–1150 px) shows the catalogue sections as a row of chips, so the cards keep two readable columns. */
 .catalog-card strong{overflow-wrap:break-word}
 @media(min-width:851px) and (max-width:1150px){
@@ -1312,6 +1310,105 @@ body:not(.village-open):not(.farm-visit) .header-destinations{display:none!impor
 .seedbar .seed.seed-recent .seed-thumb{touch-action:auto}
 .placement .qw-btn-group>button:not([aria-pressed=true]):not(:disabled){background:var(--surface);color:var(--ink)}
 
+/* ---------- Button rhythm (UI_RULES §9, E11/E12, 2026-10-24) ----------
+   The shell's .qw-* components get the farm palette (UI_RULES §3.1: the farm is light green, the night farm dark green).
+   Sizes from qw-tokens.css: a full-width button 48 px, a button in a row, card footer or list row 44 px — one height per group.
+   Neighbours keep --qw-btn-gap (8 px, PC 12). An action next to text keeps its own column (.qw-action-row) and never covers it.
+   On a phone things that fit in one row stay in one row: labels are shortened before anything wraps. */
+:root{--qw-game-header:var(--panel);--qw-game-surface:var(--panel);--qw-game-surface-2:#eef2e5;--qw-game-text:var(--ink);--qw-game-muted:var(--muted);
+ --qw-game-line:var(--line);--qw-game-accent:var(--green2);--qw-game-accent-fill:var(--green);--qw-game-accent-ink:#fffcec;--qw-game-danger:#9d251a}
+:root[data-farm-theme=night]{--qw-game-surface-2:var(--surface-soft);--qw-game-accent-ink:var(--accent-ink);--qw-game-danger:#ffaaa3}
+:root[data-qw-contrast="1"]{--qw-game-surface-2:var(--surface-soft);--qw-game-danger:#8a1d13}
+:root[data-qw-contrast="1"][data-farm-theme=night]{--qw-game-accent:var(--hc-pick);--qw-game-accent-fill:var(--hc-pick);--qw-game-accent-ink:var(--hc-pick-ink);--qw-game-danger:#ffc2bc}
+/* a shell secondary button looks like the farm's own secondary (soft fill), segments keep the shell look */
+.qw-btn.secondary:not(.qw-btn-group>*){background:#eaf0de;border-color:transparent;color:#52704c}
+.qw-btn.text{color:var(--green2);font-size:12px;text-decoration:underline;text-underline-offset:3px;padding-inline:4px}
+/* sizes: 44 in rows and cards, 48 for full width; text buttons keep the 44 px tap with compact padding */
+:is(.panel-content,dialog,.placement) :is(.primary,.secondary,.light,.qw-btn:not(.text)){min-height:var(--qw-btn-h)}
+:is(.panel-content,dialog,.placement) :is(.primary,.secondary,.light,.qw-btn).wide{min-height:var(--qw-btn-h-primary)}
+:is(.panel-content,dialog) :is(.text-button,.qw-btn.text){min-height:var(--qw-btn-h-compact)}
+.panel-content .small{padding:6px 12px}
+/* the night selection rule must not repaint a pressed segment */
+:root[data-farm-theme] .qw-btn-group>:is([aria-pressed="true"],[aria-checked="true"]){background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink)}
+:root[data-qw-contrast="1"] .qw-btn-group>:is([aria-pressed="true"],[aria-checked="true"]){background:var(--hc-pick);color:var(--hc-pick-ink)}
+.panel-content>.qw-btn-group,.panel-content .team-tabs{margin:0 0 12px}
+/* gaps between neighbours */
+.row-actions,.pill-row,.find-filters,.bulk-grid{gap:var(--qw-btn-gap)}
+.pill-row button,.find-filters button{min-height:var(--qw-btn-h)}
+.bulk-grid{grid-auto-rows:1fr}.bulk-grid>button{height:100%;padding:6px}
+.inv-filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.inv-filters::-webkit-scrollbar{display:none}
+.inv-filters button{flex:none;padding:5px 11px}
+.card>.code+:is(button,.qw-btn){margin-top:var(--qw-btn-gap)}
+.farm-menu-section.is-art .farm-menu-items{gap:var(--qw-btn-gap)}
+.invite-more summary,.invite-rules summary{min-height:var(--qw-tap)}
+/* order card (E11): goods and reward on the left, «Доставить» in its own column; ask links and «Другой заказ» share one row */
+.order-body,.quest-row{margin-top:10px}
+.order-info .goods{margin:0 0 4px}
+.order-info .reward{display:block;white-space:normal}
+.order-links{display:flex;flex-wrap:wrap;align-items:center;gap:var(--qw-btn-gap);margin:var(--qw-btn-gap) 0 -8px}
+.order-links>.fr-ask{display:contents}
+.order-links>.order-skip{margin-left:auto}
+.fr-ask{display:flex;flex-wrap:wrap;gap:var(--qw-btn-gap)}
+@media(max-width:850px){.rail.farm-menu .farm-menu-items:not(.is-art .farm-menu-items){grid-auto-rows:1fr}}
+/* workshop: recipe goods and time left, «В очередь» right; queue rows the same; remembered recipes as one wrapping row */
+.recipe-info .goods{margin:0 0 2px}.recipe-info .recipe-time{margin:2px 0 0}
+.queue-job{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--qw-s-3);align-items:center}
+.queue-job>button{float:none;margin:0;grid-column:2;grid-row:1/span 2;min-width:6.5rem}
+.queue-job>strong,.queue-job>small{grid-column:1}
+.forget-recipes.qw-btn-stack{flex-direction:row;flex-wrap:wrap;margin:0 0 12px}
+/* object panel: «Переместить» and «Снести» apart in one row; plot: «Выкопать» and «Собрать» side by side */
+.object-actions{justify-content:space-between;margin-top:8px}
+.plot-actions{margin-top:12px}.plot-actions>button,.trip-row>.qw-btn{flex:1 1 0;min-width:0}
+/* house projects on the warehouse page: the button next to the text */
+.project-inventory-shelf{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--qw-s-3);align-items:center}
+.project-inventory-shelf>*{grid-column:1}
+.project-inventory-shelf>.subheading{grid-column:1/-1}
+.project-inventory-shelf>button{grid-column:2;grid-row:2/span 4;margin-top:0;max-width:44vw}
+/* shop slots, festival goods and hand-ins: the action column on the right */
+.mag-slot,.fest-good{grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--qw-s-3)}
+.mag-slot>.qw-btn-stack,.fest-good>.qw-btn-stack{min-width:var(--qw-action-w);max-width:min(13rem,44vw)}
+.fest-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--qw-s-3)}
+.fest-option .goods{margin:0}.fest-option>.qw-btn{min-width:var(--qw-action-w)}
+.stall-own>.qw-btn{margin-left:auto}
+.friend-requests-section>.qw-btn-group .qw-btn,.mag-tabs .qw-btn{flex:1 1 auto;padding-inline:6px;white-space:nowrap}
+:root[data-farm-theme=night] .project-inventory-shelf>button{box-shadow:inset 0 0 0 1px var(--line)}
+/* contrast mode outlines every seed: outlined rounded tiles keep the 8 px gap */
+:root[data-qw-contrast="1"] .seedbar{gap:var(--qw-btn-gap)}
+/* ---------- «(i)» details of a catalogue entry (FARM_FEEDBACK E13) ----------
+   Catalogue: the (i) is a sibling of the card button (no button inside a button), over the picture's top-right corner, a 28 px
+   mark inside a 44 px target; the lock moves to the picture's bottom-right. Seed strip: long press or right click on a seed.
+   The sheet is the farm dialog: a bottom sheet on a phone, a centred panel on PC. */
+.catalog-cell{position:relative;display:grid;min-width:0}
+.catalog-cell>.catalog-card{height:100%}
+.entry-info-btn{position:absolute;top:2px;right:2px;display:grid;place-items:center;width:var(--qw-tap);height:var(--qw-tap);min-height:var(--qw-tap);padding:0;border:0;background:transparent;color:var(--ink);z-index:1}
+.entry-info-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#fffdf2;box-shadow:0 1px 3px #2a412f40;font:italic 800 15px/1 Georgia,'Times New Roman',serif;color:var(--green2)}
+.entry-info-btn:focus-visible{outline:var(--qw-focus-w) solid var(--green2);outline-offset:-4px;border-radius:12px}
+.catalog-cell .catalog-lock{top:auto;bottom:5px}
+.seedbar .seed{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+dialog.entry-info-dialog{max-width:520px}
+.entry-info-head{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center;margin:4px 0 10px}
+.entry-info-pic{display:grid;place-items:center;aspect-ratio:4/3;border-radius:12px;background:var(--catalog-pic,#e3ecd3);overflow:hidden}
+.entry-info-pic>canvas{display:block;width:100%;height:100%}.entry-info-pic>.is-icon svg{width:44px;height:44px}
+.entry-info-lead{margin:0;font-size:13px;line-height:1.45;color:var(--muted)}.entry-info-lock{margin:4px 0 0;font-size:13px;font-weight:700;color:#a3402c}
+.entry-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:0 0 6px;font-size:14px}
+.entry-facts dt{color:var(--muted)}.entry-facts dd{margin:0;font-weight:650}
+.entry-info-title{margin:12px 0 4px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--green2)}
+.entry-list{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
+@media(max-width:767px){
+ dialog.entry-info-dialog{margin:auto 0 0;width:100%;max-width:100%;max-height:85dvh;overflow:auto;border-radius:var(--qw-r-hero) var(--qw-r-hero) 0 0;padding:var(--qw-s-4) max(var(--qw-s-4),var(--qw-safe-right)) max(var(--qw-s-4),var(--qw-safe-bottom)) max(var(--qw-s-4),var(--qw-safe-left))}
+}
+:root[data-farm-theme=night] .entry-info-mark{background:var(--surface-soft);color:var(--ink)}
+:root[data-qw-contrast="1"] .entry-info-mark{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+:root[data-qw-contrast="1"] :is(.entry-info-lead,.entry-facts dt){color:var(--ink)}
+:root[data-farm-theme=night] .entry-info-lock{color:#ffb4a3}
+/* Seed strip as [лента][Всё] (tester feedback 2026-10-24): the bar itself no longer scrolls; the seeds scroll inside #seed-track,
+   which ends one gap before «Всё». «Всё» keeps its place on the right and takes the height of the strip. */
+.seedbar{overflow:hidden}
+.seed-track{display:flex;flex:1 1 auto;min-width:0;gap:inherit;align-items:stretch;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none}
+.seed-track::-webkit-scrollbar{display:none;width:0;height:0}
+.seedbar>.seed.seed-all{margin-left:6px}  /* + the bar gap (6 PC / 3 phone / 8–12 contrast) = the button gap 8, PC 12 */
+@media(max-width:850px){.compact .seedbar>.seed.seed-all{margin-left:5px}}
+:root[data-qw-contrast="1"] .seedbar>.seed.seed-all{margin-left:0}
 /* ==== «Контрастный режим» (UI_RULES §16, E3 .local/mockups-2026-10-23) ====
    Only with <html data-qw-contrast="1">, set by qw-shell.js from the Account setting; the regular style is untouched.
    Solid backings (white by day, dark at night), 2 px outlines (--qw-outline-w), text 1–2 px larger,

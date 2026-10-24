@@ -17,6 +17,10 @@
 
   --qw-s-1:4px;--qw-s-2:8px;--qw-s-3:12px;--qw-s-4:16px;--qw-s-5:24px;--qw-s-6:32px;--qw-s-7:48px;
   --qw-gutter:16px;--qw-btn-gap:8px;--qw-danger-gap:16px;--qw-tap:44px;
+  /* Button sizes (UI_RULES §9): one height per group. Full width / main action of a sheet — 48; a button in a row or a card — 44;
+     compact (inside a list row) — 44 high too, only smaller padding and type. Never below the 44 px tap. */
+  --qw-btn-h:44px;--qw-btn-h-primary:48px;--qw-btn-h-compact:44px;--qw-btn-pad:10px 16px;--qw-btn-pad-compact:6px 12px;
+  --qw-action-w:7rem;
   --qw-r-control:12px;--qw-r-card:18px;--qw-r-hero:24px;--qw-r-pill:999px;
   --qw-header-h:56px;--qw-tabbar-h:64px;--qw-col-hub:1120px;--qw-col-read:760px;
 

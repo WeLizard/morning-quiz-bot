@@ -71,7 +71,7 @@ export function createFriendRequests(h){
  function missing(p,needs){
   const ids=Object.keys(needs).filter(id=>(h.me()?.inventory?.[id]||0)<needs[id]&&!h.isBound(id));
   if(!ids.length)return;
-  const actions=group(...ids.map(id=>btn(`Попросить: ${h.itemName(id)}`,()=>create(id,Math.min(20,needs[id]-(h.me()?.inventory?.[id]||0))),'text')));p.append(actions);
+  const actions=h.el('div',null,'fr-ask');actions.append(...ids.map(id=>btn(`Попросить: ${h.itemName(id)}`,()=>create(id,Math.min(20,needs[id]-(h.me()?.inventory?.[id]||0))),'text compact')));p.append(actions);
  }
  async function create(initialItem,initialQty=1){
   const me=h.me();if(!me)return;

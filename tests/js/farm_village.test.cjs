@@ -103,7 +103,7 @@ test('hidden tab stops presence and resuming creates a fresh session',async()=>{
 });
 test('Farm return card shows its in-app caption and routes from a neighbor or Village',()=>{
  const h=setup(),start=source.indexOf('function addDestinationCard('),end=source.indexOf('\naddDestinationCard(',start),cards=[];
- const ctx={button:(text,run,cls)=>{const n=new Node('button');n.onclick=run;n.className=cls;return n;},headerCardArt:()=>new Node('svg'),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},$:()=>({append:n=>cards.push(n)})};
+ const ctx={button:(text,run,cls)=>{const n=new Node('button');n.onclick=run;n.className=cls;return n;},headerCardArt:()=>new Node('svg'),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},$:()=>({before:n=>cards.push(n)})};
  vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);ctx.addDestinationCard({id:'farm-card-door',label:'Ферма',art:'',run:h.ctx.returnToFarm});
  assert.equal(cards.length,1);assert.equal(cards[0].dataset.label,'Ферма');assert.equal(cards[0].attrs['aria-label'],'Ферма');assert.equal(cards[0].title,undefined);
  h.S.farm={id:'neighbor',is_owner:false};h.S.tab='neighbors';cards[0].onclick();assert.equal(h.calls.at(-1),'back-home');

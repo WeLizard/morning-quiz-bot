@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 from hashlib import sha256
 import json
 import sqlalchemy as sa
-from .domain import FarmError, need
+from .domain import FarmError, need, order_recent
 
 
 def tables(metadata: sa.MetaData):
@@ -111,6 +111,7 @@ def unpack(row):
     if row is None:return None
     value=deepcopy(row['payload'])
     value.update(id=str(row['id']),coins=row['coins'],xp=row['xp'],revision=row['revision'],name=row['name'])
+    order_recent(value)
     return value
 
 

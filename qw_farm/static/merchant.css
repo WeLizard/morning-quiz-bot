@@ -2,9 +2,9 @@
 .mag-head .reward{margin:6px 0 0}
 .mag-head .village-dialogue{margin:6px 0 0}
 .mag-shelf,.mag-fair,.mag-sell{display:grid;gap:0}
-.mag-slot{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--qw-line,#d4dbcd)}
+.mag-slot{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
 .mag-shelf .mag-slot:first-of-type{border-top:0}
-.mag-slot small,.mag-want small{display:block;color:var(--qw-muted,#53604f);font-size:var(--qw-fs-small,13px)}
+.mag-slot small,.mag-want small{display:block;color:var(--muted);font-size:var(--qw-fs-small,13px)}
 .mag-slot .qw-btn{min-height:44px}
 .mag-slot.owned,.mag-slot.sold,.mag-slot.soon{opacity:.7}
 .mag-want{display:grid;gap:4px;margin:8px 0 12px}

@@ -194,7 +194,7 @@ test('an unbought scroll recipe says what is needed instead of a million levels'
  assert.equal(M.scrollLock(r,{merchant:{scrolls:['pumpkin_latte']}}),null);
  assert.equal(M.scrollLock({id:'bread',level:2},{}),null);
  const app=read('qw_farm/static/app.js');
- assert.ok(app.includes('const lock=recipeLock(r);c.append(button(lock?lock.label:recipeLevel(r)>S.me.level')&&app.includes('MERCH.scrollLock(r,S.me)'));
+ assert.ok(app.includes('const lock=recipeLock(r);row.append(info,button(lock?lock.label:recipeLevel(r)>S.me.level')&&app.includes('MERCH.scrollLock(r,S.me)'));
  assert.ok(app.includes('if(lock)note(lock.hint,c)'));
 });
 

@@ -3,7 +3,8 @@
     python tests/ui/ui_check.py nav                 # core shell: navigation, BackButton, menu, safe-area (no server)
     python tests/ui/ui_check.py errors              # automatic error reports: capture, limits, sanitising, breadcrumbs, toast (no server)
     python tests/ui/ui_check.py gaps-selftest       # the button-gap scanner catches glued buttons (no server)
-    python tests/ui/ui_check.py gaps --base URL     # real screens of a running app: glued buttons, tap height
+    python tests/ui/ui_check.py gaps --base URL     # real screens of a running app: glued buttons, rounded buttons touching,
+                                                    # uneven heights in one row, tap height
     python tests/ui/ui_check.py dasha --base URL    # real guest game view at 320/390/desktop, with screenshots
 
 Prints "SKIP: ..." and exits 0 when no browser is available (Playwright Chromium, Edge or Chrome).
@@ -18,7 +19,9 @@ HARNESS = (ROOT / 'tests' / 'ui' / 'shell_harness.html').as_uri()
 MIN_GAP = 8
 MIN_TAP = 44
 
-# Scans visible buttons: neighbours closer than MIN_GAP (outside an explicit group) and controls below MIN_TAP.
+# Scans visible buttons: neighbours closer than MIN_GAP (outside an explicit group), separately drawn rounded buttons that touch
+# inside a group (a segmented control has square inner corners, a list has no fill), buttons of one row with different heights
+# (UI_RULES §9: one group — one height) and controls below MIN_TAP.
 SCANNER = r"""
 ([minGap, minTap]) => {
   const grouped = '.qw-btn-group,[data-qw-group],[role="tablist"],[role="radiogroup"],nav,canvas,svg,[data-qw-ui-ignore]';
@@ -48,6 +51,41 @@ SCANNER = r"""
       } else if (vOverlap > 8) {
         const gap = Math.max(br.left - ar.right, ar.left - br.right);
         if (gap > -2 && gap < minGap - 0.5) issues.push({kind: 'gap', gap: Math.round(gap * 10) / 10, a: name(a), b: name(b)});
+      }
+    }
+  }
+  const alpha = c => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const v = m[1].split(/[\s,\/]+/).filter(Boolean); return v.length > 3 ? parseFloat(v[3]) : 1; };
+  // A button that is drawn as a shape (fill, border or inset outline), not a plain list row or link.
+  const drawn = el => { const cs = getComputedStyle(el);
+    return alpha(cs.backgroundColor) > .05 || cs.backgroundImage !== 'none' || /inset/.test(cs.boxShadow) ||
+      (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none' && alpha(cs.borderTopColor) > .05); };
+  const corner = (el, side) => { const cs = getComputedStyle(el);
+    const k = {left: ['TopLeft', 'BottomLeft'], right: ['TopRight', 'BottomRight'], top: ['TopLeft', 'TopRight'], bottom: ['BottomLeft', 'BottomRight']}[side];
+    return Math.max(...k.map(c => parseFloat(cs['border' + c + 'Radius']) || 0)); };
+  const inGroup = all.filter(el => el.parentElement?.closest(grouped) && !el.closest('canvas,svg,[data-qw-ui-ignore]'));
+  for (let i = 0; i < inGroup.length; i++) {
+    for (let j = i + 1; j < inGroup.length; j++) {
+      const a = inGroup[i], b = inGroup[j];
+      if (a.parentElement !== b.parentElement || !drawn(a) || !drawn(b)) continue;
+      const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
+      const hOverlap = Math.min(ar.right, br.right) - Math.max(ar.left, br.left);
+      const vOverlap = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top);
+      let gap = null, sa, sb;
+      if (hOverlap > 8) [gap, sa, sb] = br.top >= ar.top ? [br.top - ar.bottom, 'bottom', 'top'] : [ar.top - br.bottom, 'top', 'bottom'];
+      else if (vOverlap > 8) [gap, sa, sb] = br.left >= ar.left ? [br.left - ar.right, 'right', 'left'] : [ar.left - br.right, 'left', 'right'];
+      if (gap === null || gap <= -2 || gap >= minGap - 0.5) continue;
+      if (corner(a, sa) > 2 || corner(b, sb) > 2) issues.push({kind: 'rounded-touch', gap: Math.round(gap * 10) / 10, a: name(a), b: name(b)});
+    }
+  }
+  const rows = new Map();
+  for (const el of all) { if (!drawn(el) || el.closest('canvas,svg,[data-qw-ui-ignore]')) continue; const k = el.parentElement; if (!rows.has(k)) rows.set(k, []); rows.get(k).push(el); }
+  for (const [, list] of rows) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const ar = list[i].getBoundingClientRect(), br = list[j].getBoundingClientRect();
+        const vOverlap = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top);
+        if (vOverlap > 8 && Math.abs(ar.height - br.height) > 2.5)
+          issues.push({kind: 'uneven', a: name(list[i]) + ' ' + Math.round(ar.height), b: name(list[j]) + ' ' + Math.round(br.height)});
       }
     }
   }
@@ -307,12 +345,18 @@ def run_gaps_selftest(pw_browser):
     page.evaluate("""() => { document.getElementById('main').innerHTML = `
       <div class="gap-bad" id="bad"><button>Пройтись самому</button><button>Разобрать корзину</button><button>Отменить</button></div>
       <div class="qw-btn-stack" id="good" style="margin-top:40px"><button class="qw-btn primary">Главное</button><button class="qw-btn">Второе</button><button class="qw-btn danger">Отменить</button></div>
-      <div class="qw-btn-group" style="margin-top:40px"><button aria-pressed="true">Он</button><button>Она</button><button>Не указывать</button></div>`; }""")
+      <div class="qw-btn-group" style="margin-top:40px"><button aria-pressed="true">Он</button><button>Она</button><button>Не указывать</button></div>
+      <div class="qw-btn-group" style="margin-top:40px"><button style="border-radius:10px;background:#eaf0de">Мне пишут</button><button style="border-radius:10px;background:#eaf0de">Я прошу</button></div>
+      <div class="qw-btn-row" style="margin-top:40px;align-items:center"><button class="qw-btn">Ниже</button><button class="qw-btn" style="min-height:56px">Выше</button></div>`; }""")
     result = page.evaluate(SCANNER, [MIN_GAP, MIN_TAP])
     gaps = [issue for issue in result['issues'] if issue['kind'] == 'gap']
     c.ok(len(gaps) == 2, f'scanner finds both glued pairs in the bad stack, got {gaps}')
     c.ok(all('Главное' not in issue['a'] + issue['b'] for issue in gaps), '.qw-btn-stack passes')
     c.ok(all('Она' not in issue['a'] + issue['b'] for issue in result['issues']), '.qw-btn-group is allowed to be glued')
+    rounded = [issue for issue in result['issues'] if issue['kind'] == 'rounded-touch']
+    c.ok(len(rounded) == 1 and 'Мне пишут' in rounded[0]['a'] + rounded[0]['b'], f'rounded buttons touching inside a group are caught, got {rounded}')
+    uneven = [issue for issue in result['issues'] if issue['kind'] == 'uneven']
+    c.ok(len(uneven) == 1 and 'Выше' in uneven[0]['b'], f'buttons of one row with different heights are caught, got {uneven}')
     page.close()
     return c
 
@@ -394,7 +438,17 @@ def gap_scenarios(base):
         ('farm-forest', base + '/app/farm', "window.__qwOpenFarmTab?.('forest') ?? document.querySelector('[data-tab=forest]')?.click()"),
         # The active trip card (owner's bad example: three glued buttons) appears only after a trip starts.
         ('farm-forest-active', base + '/app/farm', "(window.__qwOpenFarmTab?.('forest') ?? document.querySelector('[data-tab=forest]')?.click()); "
-                                                   "await wait(1200); click(/Сам, без игры/); await wait(2500)"),
+                                                   "await wait(1200); click(/^\\s*(Без игры|Сам, без игры)\\s*$/); await wait(2500)"),
+        # Every farm panel with buttons (E11/E12): orders with the neighbours' lane, warehouse, team, workshops, a workshop, lake, catalog,
+        # neighbours, the farm menu sheet and a village resident with an errand.
+        *[(f'farm-{tab}', base + '/app/farm', f"document.querySelector('#rail [data-tab={tab}]')?.click()")
+          for tab in ('orders', 'inventory', 'team', 'production', 'orchard', 'lake', 'neighbors', 'land', 'secrets')],
+        ('farm-workshop', base + '/app/farm', "document.querySelector('#rail [data-tab=production]')?.click(); await wait(800); "
+                                              "document.querySelector('#panel-content .object-card')?.click()"),
+        ('farm-catalog', base + '/app/farm', "document.querySelector('#catalog-button')?.click()"),
+        ('farm-menu-sheet', base + '/app/farm', "document.querySelector('#farm-menu-button')?.click()"),
+        ('farm-village-errand', base + '/app/farm', "document.querySelector('#rail [data-tab=village]')?.click(); await wait(1200); "
+                                                    "document.querySelector('[data-village-npc=\"Петух Олег\"]')?.click(); await wait(1500)"),
         ('alchemy', base + '/app/alchemy', None),
         ('alchemy-menu', base + '/app/alchemy', "document.querySelector('[data-qw-gear]')?.click()"),
     ]
@@ -426,8 +480,10 @@ def run_gaps(pw_browser, base, only=None):
                 continue
             report[f'{name}@{width}'] = result
             for issue in result['issues']:
-                if issue['kind'] == 'gap':
+                if issue['kind'] in ('gap', 'rounded-touch'):
                     detail = f"{issue['a']} ↔ {issue['b']} gap {issue['gap']}px"
+                elif issue['kind'] == 'uneven':
+                    detail = f"{issue['a']} ≠ {issue['b']} px in one row"
                 elif issue['kind'] == 'height':
                     detail = f"{issue['a']} height {issue['height']}px"
                 else:

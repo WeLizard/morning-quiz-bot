@@ -88,10 +88,14 @@ test('«Недавнее»: newest first, no repeats, four at most, per farm, su
  assert.equal(N.bestOption(rows[0]).voucher,'free','a free sapling first');assert.equal(N.bestOption(rows[1]).voucher,null);
 });
 
-test('app wiring: one menu in #rail, «Меню» on a phone, header cards gone, catalogue and placement',()=>{
+test('app wiring: one menu in #rail, «Меню» on a phone, header picture cards kept, catalogue and placement',()=>{
  const app=read('app.js'),html=read('index.html'),css=read('style.css'),api=read('../api.py');
  assert.ok(api.includes("'farm_nav.js'"),'the module is served');assert.ok(app.includes("import * as NAV from './farm_nav.js'"));
- for(const id of ['forest-door','lake-door','fields-door','village-card-door','village-door'])assert.ok(!html.includes(`id="${id}"`)&&!app.includes(`'${id}'`),`${id} left the header`);
+ // The owner asked to keep the picture cards in the header (2026-10-24): «За околицей» is reachable from the menu and the header.
+ for(const id of ['forest-door','fields-door'])assert.ok(html.includes(`id="${id}"`),`${id} is in the header`);
+ for(const id of ['lake-door','village-card-door','farm-card-door'])assert.ok(app.includes(`'${id}'`),`${id} is built into the header`);
+ assert.ok(!/body:not\(\.village-open\):not\(\.farm-visit\) \.header-destinations\{display:none/.test(css),'the header strip is not hidden on the own farm');
+ assert.ok(!html.includes('id="village-door"')&&!app.includes("'village-door'"),'no extra village chip on the map');
  assert.ok(html.includes('id="farm-menu-button"')&&html.includes('aria-controls="rail"'),'«Меню» next to «Собрать урожай»');
  assert.ok(html.indexOf('id="farm-menu-button"')<html.indexOf('id="harvest-all"'));
  assert.ok(!app.includes("['more','menu','Ещё']")&&!app.includes('function renderMore'),'no «Ещё»');
@@ -103,4 +107,43 @@ test('app wiring: one menu in #rail, «Меню» on a phone, header cards gone,
  assert.ok(/@media\(min-width:851px\)\{\n body\{--menu-w:248px\}/.test(css),'PC: a 248 px column');
  assert.ok(!app.includes("'seedbar-label'"),'the vertical label class is not reused');
  assert.ok(read('scene.js').includes(' thumb(spec){'),'catalogue miniatures come from the scene drawing');
+});
+
+// «(i)» details (FARM_FEEDBACK E13): only catalogue numbers, missing fields are left out, nothing is chosen or placed.
+test('entry details: crop, building with recipes and upgrades, animal house, decor — from the catalogue only',async()=>{
+ const N=await load(),cat={...catalog,
+  crops:{...catalog.crops,wheat:{id:'wheat',name:'Пшеница',level:1,cost:2,seconds:30,yield_qty:3,xp:1}},
+  items:{...catalog.items,wheat:{name:'Пшеница',price:2}},
+  recipes:{...catalog.recipes,flour:{name:'Смолоть муку',building:'mill',inputs:{wheat:3},outputs:{flour:1},seconds:60}},
+  upgrades:{costs:{mill:{'2':{coins:200,items:{flour:4},level:4}}},kinds:{mill:'workshop'}},
+  orchard:{rules:{cycle:86400,young:5,adult:20,century:100},trees:{apple:{id:'apple',name:'Яблоня',fruit:'apple',level:16,juvenile:1,yield_qty:10,cost:1920}},grafts:{g1:{species:'apple',name:'Райская яблоня'},g2:{species:'pear',name:'Бергамот'}}}};
+ const h={duration:s=>`${s}с`,purpose:t=>t==='mill'?['Мелет урожай.']:[],levelEffect:(k,l)=>`${k}:${l}`,rent:{next:25}};
+ const crop=N.entryInfo({kind:'crop',id:'wheat',name:'Пшеница'},cat,{...me,orders:[{title:'Хлеб',npc:'Ёж',needs:{wheat:2}}]},h);
+ assert.deepEqual(crop.facts,[['Растёт','30с'],['Урожай','×3'],['Семена','2 мон.'],['Продажа','2 мон. за штуку'],['Опыт','+1 за сбор'],['Открывается','с 1 ур.']]);
+ assert.deepEqual(crop.sections.map(s=>s.title),['Где используется','Нужно в заказах']);assert.ok(crop.sections[0].lines.includes('Смолоть муку (Мельница)'));
+ assert.equal(crop.action.label,'Посадить');
+ const mill=N.entryInfo({kind:'building',id:'mill',name:'Мельница',have:2},cat,me,h);
+ assert.equal(mill.lead,'Мелет урожай.');assert.ok(mill.facts.some(([k,v])=>k==='На ферме'&&v==='2'));assert.ok(mill.facts.some(([k,v])=>k==='Размер'&&v==='2×2'));
+ assert.ok(mill.sections.find(s=>s.title==='Рецепты').lines.includes('Смолоть муку: Пшеница ×3 → Мука ×1 · 60с'));
+ assert.deepEqual(mill.sections.find(s=>s.title==='Улучшения').lines,['Ур. 2: 200 мон. и Мука ×4, с 4 ур. фермы — workshop:2']);
+ const coop=N.entryInfo({kind:'building',id:'coop',name:'Курятник'},cat,me,h);
+ assert.ok(coop.sections.find(s=>s.title==='Животные').lines[0].startsWith('hens'),'animal line from the catalogue (name falls back to the record)');
+ const bed=N.entryInfo({kind:'building',id:'flowerbed',name:'Клумба'},cat,me,{});
+ assert.equal(bed.lead,'Декор');assert.ok(bed.facts.some(([k])=>k==='Содержание'));assert.equal(bed.action.label,'Поставить');
+ const tree=N.entryInfo({kind:'tree',id:'apple',name:'Яблоня'},cat,me,h);
+ assert.ok(tree.facts.some(([k,v])=>k==='Первый урожай'&&v==='через 172800с'));assert.ok(tree.facts.some(([k,v])=>k==='Аренда'&&v.includes('25')));
+ assert.deepEqual(tree.sections.find(s=>s.title==='Прививки').lines,['Райская яблоня'],'only grafts of this species');
+ assert.ok(!N.entryInfo({kind:'tree',id:'apple',name:'Яблоня'},cat,me,{}).facts.some(([k])=>k==='Аренда'),'no rent line without rent data');
+ assert.equal(N.entryInfo({kind:'crop',id:'nope',name:'?'},cat,me,h),null);
+});
+test('entry details wiring: (i) is a sibling of the card, a long press opens details without choosing or placing',()=>{
+ const app=read('app.js'),css=read('style.css');
+ assert.ok(app.includes("const cell=el('div',null,'catalog-cell');cell.append(b,infoButton(e));return cell;"),'no button inside a button');
+ const info=app.slice(app.indexOf('function showEntryInfo('),app.indexOf('function bindInfoPress('));
+ assert.ok(!/S\.seed=|beginPlacement\(/.test(info.replace("()=>{$('dialog').close();placeEntry(e);}",'')),'opening details neither picks a seed nor starts placement');
+ assert.ok(info.includes("ev.stopPropagation();showEntryInfo(e)"),'the (i) does not reach the card');
+ const press=app.slice(app.indexOf('function bindInfoPress('),app.indexOf('\n}\n',app.indexOf('function bindInfoPress(')));
+ assert.ok(press.includes('ev.stopImmediatePropagation()')&&press.includes("'contextmenu'"),'the click after a long press is swallowed; right click opens details');
+ assert.ok(app.includes("bindInfoPress(b,()=>({kind:'crop'")&&app.includes('bindInfoPress(b,()=>e)'),'crops and «Недавнее» in the strip');
+ assert.ok(/\.entry-info-btn\{[^}]*width:var\(--qw-tap\);height:var\(--qw-tap\)/.test(css),'the (i) target is 44 px');
 });

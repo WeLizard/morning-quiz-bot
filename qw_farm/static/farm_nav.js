@@ -113,3 +113,67 @@ export function loadRecent(store,farmId){try{const v=JSON.parse(store?.getItem('
 export function saveRecent(store,farmId,list){try{store?.setItem('qw-farm.recent.'+farmId,JSON.stringify(list));}catch{}}
 /** The best way to plant a tree right now: a free sapling, then a talon, then coins. */
 export const bestOption=row=>row?.options?.find(o=>o.voucher==='free'&&o.qty)||row?.options?.find(o=>o.voucher&&o.qty)||row?.options?.[row.options.length-1]||null;
+
+/* «(i)» — details of a catalogue entry without choosing it (FARM_FEEDBACK E13). Only numbers from the server catalogue:
+   a line whose field is missing is left out, nothing is guessed. `h` gives the formatting the app already uses:
+   duration(seconds), cropSeconds(crop) — growth time at the server speed, purpose(type) — buildingPurpose() lines,
+   rent — orchard rent summary or null, levelEffect(kind,level) — the upgrade effect text. */
+export function entryInfo(e,catalog,me,h={}){
+ if(!e||!catalog)return null;
+ const items=catalog.items||{},nm=id=>items[id]?.name||id,dur=s=>h.duration?h.duration(s):`${s} с`;
+ const list=m=>Object.entries(m||{}).map(([id,q])=>`${nm(id)} ×${q}`).join(', ');
+ const recipeLine=r=>`${r.name}: ${list(r.inputs)} → ${list(r.outputs)} · ${dur(r.seconds)}`;
+ const usedIn=id=>{
+  const out=[];
+  for(const r of Object.values(catalog.recipes||{}))if(r.inputs&&id in r.inputs)out.push(`${r.name} (${catalog.buildings?.[r.building]?.name||r.building})`);
+  for(const a of Object.values(catalog.animals||{}))if(a.inputs&&id in a.inputs)out.push(`Корм: ${a.name}`);
+  return out;
+ };
+ const ordersFor=id=>(me?.orders||[]).filter(o=>o.needs&&id in o.needs).map(o=>`${o.title} · ${o.npc}`);
+ const info={title:e.name,lead:'',facts:[],sections:[],action:null};
+ const fact=(k,v)=>{if(v!==undefined&&v!==null&&v!=='')info.facts.push([k,String(v)]);};
+ const section=(title,lines)=>{if(lines.length)info.sections.push({title,lines});};
+ if(e.kind==='crop'){
+  const c=catalog.crops?.[e.id];if(!c)return null;
+  info.lead='Культура для грядки';
+  fact('Растёт',dur(h.cropSeconds?h.cropSeconds(c):c.seconds));
+  fact('Урожай',c.yield_qty!=null?`×${c.yield_qty}`:null);
+  fact('Семена',c.cost!=null?`${c.cost} мон.`:null);
+  fact('Продажа',items[c.id]?.price!=null?`${items[c.id].price} мон. за штуку`:null);
+  fact('Опыт',c.xp!=null?`+${c.xp} за сбор`:null);
+  fact('Открывается',`с ${c.level||1} ур.`);
+  section('Где используется',usedIn(c.id));section('Нужно в заказах',ordersFor(c.id));
+  info.action={label:'Посадить',kind:'crop'};
+  return info;
+ }
+ if(e.kind==='tree'){
+  const t=catalog.orchard?.trees?.[e.id];if(!t)return null;
+  const r=catalog.orchard?.rules||{},cycle=r.cycle;
+  info.lead='Дерево для сада, плодоносит каждый садовый год';
+  if(cycle&&t.juvenile!=null)fact('Первый урожай',`через ${dur((t.juvenile+1)*cycle)}`);
+  if(cycle)fact('Урожай',`×${t.yield_qty} за ${dur(cycle)}`);
+  fact('Саженец',t.cost!=null?`${t.cost} мон.`:null);
+  if(h.rent)fact('Аренда',`следующее дерево — ${h.rent.next} мон. в сутки`);
+  fact('Открывается',`с ${t.level||1} ур.`);
+  if(r.young&&r.adult&&r.century)section('Стадии',[`Саженец — до первого урожая`,`Молодое дерево — урожаи 1–${r.young}`,`Взрослое — до ${r.adult}-го урожая`,
+   `Старожил — после ${r.adult}-го`,`Вековое — с ${r.century}-го урожая`]);
+  section('Прививки',Object.values(catalog.orchard?.grafts||{}).filter(g=>g.species===e.id).map(g=>g.name));
+  section('Где используются плоды',usedIn(t.fruit));
+  info.action={label:'Посадить',kind:'tree'};
+  return info;
+ }
+ const b=e.id==='plot'?{id:'plot',name:e.name,cost:e.cost,level:1,w:1,h:1}:catalog.buildings?.[e.id];if(!b)return null;
+ const animals=Object.values(catalog.animals||{}).filter(a=>a.building===b.id),recipes=Object.values(catalog.recipes||{}).filter(r=>r.building===b.id);
+ info.lead=b.id==='plot'?'Грядка для любой культуры':b.id==='road'?'Дорожка':b.decor?'Декор':animals.length?'Дом для животных':recipes.length?'Мастерская':'Постройка';
+ const purpose=h.purpose?h.purpose(b.id):[];if(purpose.length)info.lead=purpose.join(' ');
+ fact('Размер',`${b.w||1}×${b.h||1}`);fact('Цена',b.cost!=null?`${b.cost} мон.`:null);fact('Открывается',`с ${b.level||1} ур.`);
+ if(e.have)fact('На ферме',String(e.have));
+ if(b.decor)fact('Содержание','не стоит ничего');
+ if(b.source)fact('Откуда',b.source);
+ section('Животные',animals.map(a=>`${a.name||a.id}: корм ${list(a.inputs)} → ${list(a.outputs)} · ${dur(a.seconds)}${a.cost!=null?` · поселить за ${a.cost} мон.`:''}`));
+ section('Рецепты',recipes.map(recipeLine));
+ const up=catalog.upgrades,costs=up?.costs?.[b.id],kind=up?.kinds?.[b.id];
+ if(costs)section('Улучшения',Object.entries(costs).sort((x,y)=>x[0]-y[0]).map(([lv,c])=>`Ур. ${lv}: ${c.coins} мон.${Object.keys(c.items||{}).length?` и ${list(c.items)}`:''}, с ${c.level} ур. фермы${h.levelEffect&&kind?` — ${h.levelEffect(kind,Number(lv))}`:''}`));
+ info.action={label:'Поставить',kind:'place'};
+ return info;
+}

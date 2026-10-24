@@ -228,7 +228,7 @@ test('the seed bar ends with «Недавнее» and one pinned «Всё»; tre
  assert.equal((seeds.match(/'seed seed-all'/g)||[]).length,1,'one «Всё» button, built once');
  assert.ok(seeds.indexOf('seed seed-all')>seeds.indexOf('recentEntries()')&&seeds.indexOf('recentEntries()')>seeds.indexOf('MERCH.seedPacks'),'crops, packs, «Недавнее», then «Всё»');
  assert.ok(seeds.includes("()=>openCatalog()"),'«Всё» opens the catalogue');
- assert.ok(/\.seedbar \.seed\.seed-all\{position:sticky;right:-1px/.test(css),'«Всё» stays pinned at the right edge');
+ assert.ok(seeds.includes('bar.append(all)')&&!/\.seed-all\{position:sticky/.test(css)&&/\.seed-track\{[^}]*overflow-x:auto/.test(css),'[лента][Всё]: the seeds scroll in their own track, «Всё» is a block next to it, not an overlay');
  assert.ok(!/\.seed-(all|recent)(::after)?\{[^}]*\b(height|min-height|font-size)\s*:/.test(css),'the strip height does not change');
  assert.ok(nav.includes("['trees','Деревья']")&&nav.includes("kind:'tree',section:'trees'"),'trees are a catalogue section');
  assert.ok(app.includes('ORCH.plantSpec(e.row,NAV.bestOption(e.row),S.catalog)'),'a tree card goes to placement with the best way to pay');

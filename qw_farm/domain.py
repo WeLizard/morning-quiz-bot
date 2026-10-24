@@ -151,35 +151,74 @@ def reachable(farm):
     return sorted(result)
 
 
+def order_recent(farm):
+    """Keep the last four item sets per resident, including active legacy orders."""
+    if 'order_recent' not in farm:
+        recent={}
+        for order in sorted(farm.get('orders', []), key=lambda o: int(o['id'].rsplit('_', 1)[-1])):
+            entries=recent.setdefault(order['npc'], [])
+            entries.append(list(order['needs']))
+            del entries[:-4]
+        farm['order_recent']=recent
+    return farm['order_recent']
+
+
 def make_order(farm, slot, now):
-    seq=farm['order_seq']; farm['order_seq']+=1
+    seq=farm['order_seq']
     rng=int(sha256(f'{farm["id"]}:{seq}:{slot}'.encode()).hexdigest()[:16],16)
     products=reachable(farm)
-    a=products[rng % len(products)]
+    recent=order_recent(farm)
+    active=[o for o in farm['orders'] if o['slot']!=slot]
+    occupied={item for order in active for item in order['needs']}
+    available=[item for item in products if item not in occupied]
+    counts={name:sum(o['npc']==name for o in active) for name,_ in NPCS}
+    from .catalog import NPC_SIGNATURE, SIGNATURE_PCT, NPC_SIGNATURE_PCT, SIGNATURE_MAX_VALUE
+    sigs={name:[i for i in NPC_SIGNATURE.get(name,()) if i in available] for name,_ in NPCS}   # signature goods ignore the cooldown
+    candidates={}
+    for name,_ in NPCS:
+        cooling={item for items in recent.get(name, []) for item in items}
+        goods=[item for item in available if item not in cooling]
+        if counts[name]<2 and (goods or sigs[name]):
+            candidates[name]=goods or sigs[name]
+    relaxed=not candidates
+    if relaxed:
+        # A demolished production chain can leave every reachable good cooling or taken.
+        # Keep the board usable: a rare repeat is fine, a duplicate in active slots only if nothing else exists.
+        pool=available or products
+        candidates={name:pool for name,_ in NPCS if counts[name]<2 and pool}
+        if not candidates and pool:
+            candidates={name:pool for name,_ in NPCS}
+    need(any(candidates.values()),'no_order_goods','Пока нет доступных товаров для нового заказа.',500)
+    start=rng % len(NPCS)
+    npc,subtitle=next((name,title) for name,title in (NPCS[(start+i)%len(NPCS)] for i in range(len(NPCS))) if candidates.get(name))
+    eligible=candidates[npc]
+    a=eligible[rng % len(eligible)]
     needs={a:1+(rng//17)%3}
-    if seq>2 and len(products)>1:
-        b=products[(rng//31) % len(products)]
+    if seq>2 and len(eligible)>1:
+        b=eligible[(rng//31) % len(eligible)]
         if a!=b: needs[b]=1+(rng//73)%2
     if seq==0: needs={'wheat':6}
     if seq==1: needs={'carrot':3}
     if seq==2: needs={'flour':1,'egg':2}
     price=sum(ITEMS[k]['price']*q for k,q in needs.items())
-    npc,subtitle=NPCS[rng % len(NPCS)]
-    if seq>2:   # a resident with a signature theme (Медведь Пух: energy drinks) mostly asks for it, when it is reachable
-        from .catalog import NPC_SIGNATURE, SIGNATURE_PCT, NPC_SIGNATURE_PCT, SIGNATURE_MAX_VALUE
-        sig=[i for i in NPC_SIGNATURE.get(npc,()) if i in products]
+    if seq>2 and not relaxed:   # a resident with a signature theme (Медведь Пух: energy drinks) mostly asks for it, when it is reachable
+        sig=sigs[npc]
         if sig and (rng//41)%100<NPC_SIGNATURE_PCT.get(npc,SIGNATURE_PCT):
             pick=sig[(rng//43)%len(sig)];qty=1+(rng//47)%3
             needs={pick:1 if ITEMS[pick]['price']*qty>SIGNATURE_MAX_VALUE else qty}
             price=sum(ITEMS[k]['price']*q for k,q in needs.items())
     special=None
-    if seq>2:
+    if seq>2 and not relaxed and not any(o.get('special') for o in active):
         from . import market
-        special=market.special_needs(farm,rng,npc,products)
+        special=market.special_needs(farm,rng,npc,eligible)
     if special:
         needs=special;price=sum(ITEMS[k]['price']*q for k,q in needs.items());subtitle='Особая просьба: любимая вещь' if set(needs)<=WEARABLE_ITEM_IDS else 'Особая просьба: любимое лакомство'
     coins=math.ceil(price*1.45)+6
     if special:coins=math.ceil(coins*1.2)
+    farm['order_seq']+=1
+    history=recent.setdefault(npc, [])
+    history.append(list(needs))
+    del history[:-4]
     return dict(id=f'order_{seq}',slot=slot,npc=npc,title=subtitle,needs=needs,
                 coins=coins,xp=max(5,price//5),skip_at=now+15,**({'special':True} if special else {}))
 
@@ -189,7 +228,7 @@ def new_farm(farm_id, name, now):
     farm=dict(id=farm_id,name=f'Ферма {name}'[:28],catalog=VERSION,created_at=now,revision=0,
         coins=250,starter_credit=250,xp=0,size=8,inventory={'wheat':6,'feed':2},
         settings={'visibility':'friends','allow_help':True,'allow_gifts':True,'allow_pranks':False,'allow_trade':True},
-        objects=[],neighbors={},blocked=[],events=[],pranks=[],listings=[],orders=[],order_seq=0,
+        objects=[],neighbors={},blocked=[],events=[],pranks=[],listings=[],orders=[],order_seq=0,order_recent={},
         stats={'harvests':0,'crafts':0,'orders':0,'helps':0,'builds':0,'gifts':0},
         home_projects=projects.initial_state(),
         claimed_quests=[],daily={'day':int(now//86400),'counts':{}})
@@ -537,6 +576,8 @@ def validate_state(farm):
     need(0<=farm['starter_credit']<=farm['coins'],'invalid_credit','Некорректное состояние средств.',500)
     need(farm['xp']>=0 and is_land_size(farm['size']),'invalid_state','Некорректное состояние фермы.',500)
     need(all(k in ITEMS and type(q) is int and 0<=q<=10**9 for k,q in farm['inventory'].items()),'invalid_inventory','Некорректное состояние склада.',500)
+    recent=farm.get('order_recent',{})
+    need(type(recent) is dict and all(type(n) is str and type(v) is list and len(v)<=4 and all(type(e) is list and all(type(i) is str and i in ITEMS for i in e) for e in v) for n,v in recent.items()),'invalid_order_recent','Некорректная история заказов.',500)
     used=set()
     for obj in farm['objects']:
         need(type(obj.get('level',1)) is int and 1<=obj.get('level',1)<=4,'invalid_level','Некорректный уровень постройки.',500)

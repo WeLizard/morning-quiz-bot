@@ -1,5 +1,9 @@
 # 📋 CHANGELOG — Morning Quiz
 
+> **Исторический журнал выпущенных изменений.** Последняя запись — 2026-09-04;
+> октябрьские работы сюда не внесены. Текущий статус — [STATUS.md](STATUS.md),
+> навигация — [INDEX.md](INDEX.md).
+
 ## 2026-09-04 — Общий Photo lifecycle для Telegram и Mini App
 
 - Фото-загадки перенесены из `quiz_sessions` и in-memory Telegram timers в

@@ -4,15 +4,41 @@
 здесь или в реестре задач, его актуальность необходимо проверить по коду перед
 использованием.
 
+## Роли документов
+
+| Роль | Канонический источник | Что там искать |
+|---|---|---|
+| Правила | [AGENTS.md](../AGENTS.md), [DEVELOPMENT](engineering/DEVELOPMENT.md) | Что обязательно, как вести работу |
+| Карта | этот файл | Куда идти за тем или иным знанием |
+| Статус | [STATUS.md](STATUS.md) | Что проверено, что нет, блокеры, delete-zone |
+| Задачи | [tasks/README.md](tasks/README.md) | Планируемая и текущая работа, статусы задач |
+| История | [decisions/README.md](decisions/README.md), [CHANGELOG.md](CHANGELOG.md) | Принятые решения и выпущенные изменения |
+
+Статус задачи не считается закрытым по обзорному документу: проверяй критерии,
+код, git и свежие тесты. `STATUS.md` не меняет статусы задач.
+
+## Куда идти
+
+| Нужно | Куда |
+|---|---|
+| Узнать текущее состояние и блокеры | [STATUS.md](STATUS.md) |
+| Начать или проверить задачу | [tasks/README.md](tasks/README.md) |
+| Понять архитектуру и долг | [аудит 2026-10-15](audits/2026-10-15/ARCHITECTURE_AUDIT.md) |
+| Проверить критерии выпуска | [RELEASE_CRITERIA](engineering/RELEASE_CRITERIA.md) |
+| Заняться фермой | [FARM_FEEDBACK_2026-10-21](tasks/FARM_FEEDBACK_2026-10-21.md), [FARM_GROWTH_PLAN](tasks/FARM_GROWTH_PLAN.md), [FARM_ECONOMY_AUDIT](tasks/FARM_ECONOMY_AUDIT.md) |
+| Заняться «Ночным городом» | [MQB-010](tasks/MQB-010-night-city-weekly-stages.md), [дизайн](tasks/NIGHT_CITY_WEEKLY_DESIGN.md), [черновики дел](tasks/night_city/drafts/README.md) |
+| Понять UI-правила | [UI_RULES](design/UI_RULES.md) |
+
 ## Быстрый вход
 
+- [Текущий статус, блокеры и границы проверенного](STATUS.md)
 - [Текущий dev-контур: все разделы, тестовый бот, архивы и ограничения](DEV_FEATURES.md)
 - [Полный dev-backlog: сохранение всех функций оригинала](tasks/MQB-002-dev-feature-parity.md)
 - [Первый локальный комплект: запуск и приёмка одной командой](LOCAL_MILESTONE.md)
 - [Быстрый старт](QUICK_START.md)
 - [Локальная разработка и перенос на сервер](LOCAL_DEVELOPMENT.md)
-- [Обзор проекта](PROJECT_OVERVIEW.md)
-- [Проверенная по коду карта функций](CODE_VERIFIED_FEATURE_MAP.md)
+- [Обзор проекта](PROJECT_OVERVIEW.md) — исторический, не текущий статус
+- [Проверенная по коду карта функций](CODE_VERIFIED_FEATURE_MAP.md) — baseline 2026-08-30, не текущий статус
 - [PostgreSQL: локальный запуск и импорт JSON](POSTGRESQL_MIGRATION.md)
 - [PostgreSQL: транзакционные баллы, локальная админка и тесты](POSTGRESQL_ADMIN.md)
 - [Локальная админка: вход, готовые экраны и безопасный preview](ADMIN_AUTH.md)
@@ -76,4 +102,5 @@
 4. профильный документ из `docs/`;
 5. исторические отчёты и аудиты.
 
-Последняя проверка индекса: 2026-10-08.
+Последняя проверка индекса: 2026-10-23. Текущее состояние и блокеры — в
+[STATUS.md](STATUS.md); статусы задач — в [реестре](tasks/README.md).

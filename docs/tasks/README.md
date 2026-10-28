@@ -22,6 +22,39 @@
 | MQB-010 | [«Ночной город»: недельный режим, этапы](MQB-010-night-city-weekly-stages.md) (дизайн: [NIGHT_CITY_WEEKLY_DESIGN](NIGHT_CITY_WEEKLY_DESIGN.md)) | `proposed` | high | 2026-10-15 |
 | MQB-011 | [Форма обращения к игроку (он / она / не указывать)](MQB-011-address-form.md) | `in_progress` | medium | 2026-10-15 |
 
+## Дополнительные направления (вне MQB-реестра)
+
+Эти работы ведутся отдельными документами. Их статус не обновляется в таблице
+MQB автоматически: перед изменением сверяй документ с git, кодом и свежими
+проверками.
+
+| Направление | Где смотреть | Что проверить |
+|---|---|---|
+| **Следующая задача фермы — плантация (`queued`)** | [FARM_PLANTATIONS](FARM_PLANTATIONS.md) | Самостоятельная механика рядом с полями для массового выращивания винограда, кофе, чая и хлопка; параметры дизайна ещё не согласованы |
+| Ферма: обратная связь, рост, экономика | [FARM_FEEDBACK_2026-10-21](FARM_FEEDBACK_2026-10-21.md), [FARM_GROWTH_PLAN](FARM_GROWTH_PLAN.md), [FARM_ECONOMY_AUDIT](FARM_ECONOMY_AUDIT.md) | Какие пункты уже в git/песочнице, какие локальны, какие только дизайн |
+| Ферма: стройка, просьбы, сад, текстиль | [FARM_VILLAGE_CONSTRUCTION](FARM_VILLAGE_CONSTRUCTION.md), [FARM_FRIEND_REQUESTS](FARM_FRIEND_REQUESTS.md), [FARM_ORCHARD](FARM_ORCHARD.md), [FARM_TEXTILE_CHAIN](FARM_TEXTILE_CHAIN.md) | Шапка документа может отставать от git — сверить перед правкой |
+| UI-аудит web shell и фермы (2026-10-25) | [UI_AUDIT_2026-10-25](UI_AUDIT_2026-10-25.md) | Публичная песочница обновлена; приёмка Пуха ожидается, фото-маска остаётся P2 |
+| Ферма: новый экран поля, этап 1 | [FARM_FIELD_REDESIGN_INTEGRATION](FARM_FIELD_REDESIGN_INTEGRATION.md) | Старый overlay заменён на текущих правилах; проверить фиксированную выгрузку, 1/2/3 га и живую песочницу |
+| Ферма: поле, этап 2A | [FARM_FIELD_TURN_PER_CELL](FARM_FIELD_TURN_PER_CELL.md) | Поворот `2×1↔1×2` и per-cell посев; сохраняется для открытых заходов `rules=2` |
+| Ферма: поле, этапы 2B/2C | [FARM_FIELD_SPRAY_AND_TRANSFER](FARM_FIELD_SPRAY_AND_TRANSFER.md) | Опрыскиватель, урон/ремонт, экономика 85–125/90, частичная перекачка для новых заходов `rules=3`; chain не включён |
+| Привязка и перенос аккаунтов | [ACCOUNT_LINKING_PLAN](ACCOUNT_LINKING_PLAN.md), [ACCOUNT_FIRST_MIGRATION](ACCOUNT_FIRST_MIGRATION.md) | Живая проверка Telegram и миграции на целевых базах |
+| «Ночной город»: дизайн и черновики | [MQB-010](MQB-010-night-city-weekly-stages.md), [черновики дел](night_city/drafts/README.md) | Черновики — только документация; кода режима нет |
+| Текущий локальный срез | [FARM_FEEDBACK_2026-10-21](FARM_FEEDBACK_2026-10-21.md), [MQB-011](MQB-011-address-form.md) | `git status`: E1/E8/контрастный режим ещё не закоммичены |
+
+## Известные расхождения статусов
+
+Это не новые статусы и не отметки о завершении, а места, где текст документа
+может расходиться с git. Перед изменением статуса нужна проверка.
+
+| Документ | Расхождение |
+|---|---|
+| [MQB-011](MQB-011-address-form.md) | В шапке «не закоммичено», но код в git (`dfb33a1`) |
+| [FARM_VILLAGE_CONSTRUCTION](FARM_VILLAGE_CONSTRUCTION.md) | В шапке «без коммита», но `qw_farm/construction.py` отслеживается git |
+| [FARM_TEXTILE_CHAIN](FARM_TEXTILE_CHAIN.md) | В одной шапке одновременно «проект» и «реализация» |
+
+Текущая картина и блокеры — в [STATUS](../STATUS.md). Статус `done` ставится
+только по выполненным критериям и проверке, а не по обзорному документу.
+
 ## Как добавить задачу
 
 1. Скопировать [шаблон](TASK_TEMPLATE.md).

@@ -208,7 +208,7 @@ p{margin:0 0 var(--qw-s-3)}.muted{color:var(--qw-muted)}.small{font-size:var(--q
    <div class="counts"><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span class="on">10</span><span>11</span><span>12</span></div>
    <div class="roles"><div><b>3</b>Мафия</div><div><b>5</b>Мирные</div><div><b>1</b>Детектив</div><div><b>1</b>Доктор</div></div></section>
   <section class="card"><h3>Стол игроков</h3><p class="muted small">Лобби собирается в групповом чате, где бот видит участников.</p>
-   <div class="seat"><span class="avatar" style="width:32px;height:32px">И</span>Илья <span class="badge acc">ведущий</span></div>
+   <div class="seat"><span class="avatar" style="width:32px;height:32px">И</span>Игрок <span class="badge acc">ведущий</span></div>
    <div class="seat muted">Свободное место</div><div class="seat muted">Свободное место</div>
    <button class="btn wide" style="margin-top:12px">Пригласить из чата</button></section>
  </div>
@@ -268,11 +268,11 @@ p{margin:0 0 var(--qw-s-3)}.muted{color:var(--qw-muted)}.small{font-size:var(--q
  </section>
  <button class="btn wide ghost" style="margin-top:12px">Показать ещё</button>
 </div></main>
-<div class="me-bar"><div class="in"><span class="rank" style="color:var(--qw-accent)">14</span><span class="avatar" style="width:36px;height:36px">И</span><span style="flex:1">Ты · Илья</span><span>3 450</span></div></div></template>
+<div class="me-bar"><div class="in"><span class="rank" style="color:var(--qw-accent)">14</span><span class="avatar" style="width:36px;height:36px">И</span><span style="flex:1">Ты · Игрок</span><span>3 450</span></div></div></template>
 
 <template id="s-profile" data-mode="hub" data-tab="profile" data-title="Профиль">
 <main class="qw-main"><div class="narrow">
- <section class="card" style="display:flex;align-items:center;gap:14px"><span class="avatar" style="width:56px;height:56px;font-size:22px">И</span><div style="flex:1"><h2 style="margin:0">Илья</h2><p class="muted small" style="margin:0">Telegram · играет с марта</p></div><button class="btn">Настройки</button></section>
+ <section class="card" style="display:flex;align-items:center;gap:14px"><span class="avatar" style="width:56px;height:56px;font-size:22px">И</span><div style="flex:1"><h2 style="margin:0">Игрок</h2><p class="muted small" style="margin:0">Telegram · играет с марта</p></div><button class="btn">Настройки</button></section>
  <div class="grid2" style="margin-top:16px">
   <section><div class="metrics"><div class="metric"><b>3 450</b><span>очков всего</span></div><div class="metric"><b>412</b><span>ответов</span></div><div class="metric"><b>78%</b><span>точность</span></div><div class="metric"><b>7,4</b><span>средний балл <span class="newtag">как /mystats</span></span></div><div class="metric"><b>5 🔥</b><span>серия · рекорд 12</span></div><div class="metric"><b>3</b><span>чата</span></div></div></section>
   <section class="card"><div style="display:flex;justify-content:space-between"><h3>Достижения</h3><span class="badge acc">14 / 71</span></div>
@@ -336,7 +336,7 @@ if(shot){const big=W>=768;shot.style.backgroundImage=`url(${big?shot.dataset.sho
 if(d.menu){
  const core=game?`<h4>QuizzyWizzy</h4><div class="mi core"><svg class="i"><use href="#home"/></svg><span class="grow">Главное меню</span></div>`+(inTelegram?'':`<div class="mi"><svg class="i"><use href="#full"/></svg><span class="grow">Во весь экран</span></div>`):(W>=768?`<h4>QuizzyWizzy</h4><div class="mi"><svg class="i"><use href="#full"/></svg><span class="grow">Во весь экран</span></div>`:'');
  app.insertAdjacentHTML('beforeend',`<div class="qw-scrim"></div><div class="qw-menu" role="menu"><div class="handle"></div>
- <div class="acct"><span class="avatar">И</span><div style="flex:1"><b>Илья</b><br><small class="muted">Профиль и настройки</small></div><svg class="i chev"><use href="#chev"/></svg></div>
+ <div class="acct"><span class="avatar">И</span><div style="flex:1"><b>Игрок</b><br><small class="muted">Профиль и настройки</small></div><svg class="i chev"><use href="#chev"/></svg></div>
  ${document.getElementById('m-'+d.menu).innerHTML}${core}</div>`);
 }
 </script>

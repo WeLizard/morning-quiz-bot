@@ -1,0 +1,5362 @@
+{
+ "cases": [
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 ",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 down",
+   "path": "DDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 turn",
+   "path": "T",
+   "result": null,
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 turn-down",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 bump3",
+   "path": "uuu",
+   "result": {
+    "condition": 91,
+    "hits": 3,
+    "repair": 45,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 bump34",
+   "path": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+   "result": {
+    "condition": 0,
+    "hits": 34,
+    "repair": 510,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 lie",
+   "path": "d",
+   "result": null,
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 bump-down",
+   "path": "uDDDDDDDUUUUUUU",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w1 rocks reference",
+   "path": "DDDDDDDRUUUUUUURDRDDDLDDDURURUUUUULRRDDDDDDLDRRUUUUUUURDDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 1000
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [
+     18,
+     26,
+     59
+    ],
+    "rules": 3,
+    "weeds": [
+     10,
+     12,
+     16,
+     33,
+     39,
+     43,
+     44,
+     46,
+     56,
+     61
+    ],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 ",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 down",
+   "path": "DDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 turn",
+   "path": "T",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 turn-down",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 bump3",
+   "path": "uuu",
+   "result": {
+    "condition": 91,
+    "hits": 3,
+    "repair": 45,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 bump34",
+   "path": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+   "result": {
+    "condition": 0,
+    "hits": 34,
+    "repair": 510,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 lie",
+   "path": "d",
+   "result": null,
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 bump-down",
+   "path": "uDDDDDDDUUUUUUU",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w2 rocks reference",
+   "path": "RDDLDDDDDRRUUUUUUURRDDDDLDDRDRRUUULUURUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 1000
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [
+     8,
+     31,
+     45
+    ],
+    "rules": 3,
+    "weeds": [
+     2,
+     3,
+     5,
+     11,
+     17,
+     35,
+     46,
+     49,
+     58,
+     60
+    ],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 ",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 down",
+   "path": "DDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 turn",
+   "path": "T",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 turn-down",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 bump3",
+   "path": "uuu",
+   "result": {
+    "condition": 91,
+    "hits": 3,
+    "repair": 45,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 bump34",
+   "path": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+   "result": {
+    "condition": 0,
+    "hits": 34,
+    "repair": 510,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 lie",
+   "path": "d",
+   "result": null,
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 bump-down",
+   "path": "uDDDDDDDUUUUUUU",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate w3 rocks reference",
+   "path": "DDRRDDLLDDDRRRULUURUUUURRLLDDRRDDLLLDDRRRD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 839
+   },
+   "run": {
+    "op": "cultivate",
+    "rocks": [
+     14,
+     25,
+     45
+    ],
+    "rules": 3,
+    "weeds": [
+     0,
+     7,
+     8,
+     9,
+     30,
+     35,
+     52,
+     54,
+     55,
+     57
+    ],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 ",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 down",
+   "path": "DDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 turn",
+   "path": "T",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 turn-down",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 bump3",
+   "path": "uuu",
+   "result": {
+    "condition": 91,
+    "hits": 3,
+    "repair": 45,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 bump34",
+   "path": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+   "result": {
+    "condition": 0,
+    "hits": 34,
+    "repair": 510,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 lie",
+   "path": "d",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 bump-down",
+   "path": "uDDDDDDDUUUUUUU",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w1 rocks reference",
+   "path": "DDDRDDLDDRRUUUUUUURRDDDDDDDRRUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 1000
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     32,
+     43
+    ],
+    "rules": 3,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 ",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 down",
+   "path": "DDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 turn",
+   "path": "T",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 turn-down",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 bump3",
+   "path": "uuu",
+   "result": {
+    "condition": 91,
+    "hits": 3,
+    "repair": 45,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 bump34",
+   "path": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+   "result": {
+    "condition": 0,
+    "hits": 34,
+    "repair": 510,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 lie",
+   "path": "d",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 bump-down",
+   "path": "uDDDDDDDUUUUUUU",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 rocks reference",
+   "path": "DDDDDDDRRRUURRRUULLLUUURRRDDLDDDDRD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 496
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     36,
+     42
+    ],
+    "rules": 3,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 ",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 down",
+   "path": "DDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 turn",
+   "path": "T",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 turn-down",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 bump3",
+   "path": "uuu",
+   "result": {
+    "condition": 91,
+    "hits": 3,
+    "repair": 45,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 bump34",
+   "path": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+   "result": {
+    "condition": 0,
+    "hits": 34,
+    "repair": 510,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 lie",
+   "path": "d",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 bump-down",
+   "path": "uDDDDDDDUUUUUUU",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 rocks reference",
+   "path": "RRRDDLLLDDDDDRRRRUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 172
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     10,
+     39
+    ],
+    "rules": 3,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 1,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 8,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 one-x",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 3,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 four-x",
+   "path": "DDDDDDDUUUUUUUXXXX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 zone-x",
+   "path": "RRRRX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z0 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 1,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 1,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 8,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 one-x",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 four-x",
+   "path": "DDDDDDDUUUUUUUXXXX",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 zone-x",
+   "path": "RRRRX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 z1 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w1 rocks reference",
+   "path": "DDDDDDDRUUUUUUUXRDDDDDDDRUUUUUUUXRRDDLDDDDDURUUURUUUXRDDDDLDDDRUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 13,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [
+     12,
+     61
+    ],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 2,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 16,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 one-x",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 7,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 four-x",
+   "path": "DDDDDDDUUUUUUUXXXX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 zone-x",
+   "path": "RRRRX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 6,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 2,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 16,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 one-x",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 four-x",
+   "path": "DDDDDDDUUUUUUUXXXX",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 zone-x",
+   "path": "RRRRX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 6,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w2 rocks reference",
+   "path": "DDDDDDDRRUUUUUUUXRRDDDDDDRRDLULUURRUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 27,
+    "repair": 0,
+    "score": 328
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [
+     46,
+     60
+    ],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 3,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 3,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 24,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 one-x",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 10,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 four-x",
+   "path": "DDDDDDDUUUUUUUXXXX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 zone-x",
+   "path": "RRRRX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 8,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 3,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 3,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 24,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 one-x",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 four-x",
+   "path": "DDDDDDDUUUUUUUXXXX",
+   "result": null,
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 zone-x",
+   "path": "RRRRX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 8,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 3,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest w3 rocks reference",
+   "path": "DDDDDDDRRRULUURUURUULXRRDDDDLLLDDRRRD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 46,
+    "repair": 0,
+    "score": 935
+   },
+   "run": {
+    "op": "harvest",
+    "rocks": [
+     11,
+     45
+    ],
+    "rules": 3,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 46,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 46,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 25,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 37,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 46,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 46,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 25,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind-1 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 46,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 46,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 25,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 37,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 46,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 46,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 25,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind0 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 45,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 45,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 42,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 17,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 29,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 45,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 45,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 42,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 17,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 turn",
+   "path": "TDDD",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 wind1 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w1 rocks reference",
+   "path": "DDDDDDDRUUUUUUURDDRDDLDDDRUURUUUULURRDDDDDDLDRRUUUUUUURDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [
+     26,
+     63
+    ],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 1,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 44,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 40,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 14,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 34,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 13,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 44,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 40,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 34,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind-1 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 44,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 40,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 14,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 34,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 13,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 44,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 40,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 34,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind0 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 44,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 40,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 14,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 30,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 13,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 44,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 44,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 40,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 2,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 30,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 wind1 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w2 rocks reference",
+   "path": "DDDDDDDRRUURUULUUURRDDDDDDDRRUUUUULLUURR",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 1,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [
+     14,
+     34
+    ],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 2,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 42,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 42,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 36,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 28,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 42,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 42,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 36,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 28,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind-1 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": -1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 42,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 42,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 36,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 28,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 42,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 42,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 36,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 28,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind0 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 0
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 41,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 41,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 34,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 22,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z0 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 12,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 none",
+   "path": "",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 41,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 bump",
+   "path": "u",
+   "result": {
+    "condition": 97,
+    "hits": 1,
+    "load": 41,
+    "repair": 15,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 down",
+   "path": "D",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 34,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 top",
+   "path": "DDDDDDDUUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 refill",
+   "path": "DDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 turn",
+   "path": "TDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 22,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 wind1 z1 run",
+   "path": "DDDDDDDUUUUUUURRDDDDDDDUUUUUUUX",
+   "result": null,
+   "run": {
+    "op": "spray",
+    "rocks": [],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "spray w3 rocks reference",
+   "path": "DDDDDDDRRRURUULUUUURRDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "load": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "spray",
+    "rocks": [
+     43,
+     62
+    ],
+    "rules": 3,
+    "tank": 48,
+    "unload_zone": false,
+    "weeds": [],
+    "width": 3,
+    "wind": 1
+   }
+  }
+ ],
+ "constants": {
+  "cond_penalty": 4,
+  "hit_damage": 3,
+  "hit_repair": 15,
+  "hopper": 18,
+  "tank": 48,
+  "tank_chunks": 4
+ }
+}

@@ -1,0 +1,131 @@
+{
+ "cases": [
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow per-cell",
+   "path": "DDDDDDDRRUUUUUUURRRDDDDDDD",
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 2,
+    "weeds": [],
+    "width": 2
+   },
+   "score": 164
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow legacy anchor-only",
+   "path": "DDDDDDDRRUUUUUUURRRDDDDDDD",
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow turn",
+   "path": "TDRR",
+   "run": {
+    "op": "sow",
+    "rocks": [],
+    "rules": 2,
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate turn",
+   "path": "TD",
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "rules": 2,
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "cultivate legacy rejects T",
+   "path": "TD",
+   "run": {
+    "op": "cultivate",
+    "rocks": [],
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest vertical unload at fixed truck",
+   "path": "TRRRRX",
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 2,
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest legacy rejects T",
+   "path": "TRRRRX",
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "unload_zone": true,
+    "weeds": [],
+    "width": 2
+   },
+   "score": null
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "harvest vertical top edge without zone marker",
+   "path": "TRRRRX",
+   "run": {
+    "op": "harvest",
+    "rocks": [],
+    "rules": 2,
+    "weeds": [],
+    "width": 2
+   },
+   "score": 0
+  }
+ ]
+}

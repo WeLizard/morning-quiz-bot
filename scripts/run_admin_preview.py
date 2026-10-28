@@ -1,18 +1,60 @@
 """Loopback-only UI preview using synthetic data in persistent compose.dev.yml."""
 import asyncio
+from hashlib import sha256
+import json
 import os
 from pathlib import Path
+import re
 import sys
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+async def seed_photo_catalog(database, image_dir, metadata_path, media_root):
+    """Seed only explicitly curated image/answer pairs; filenames are never answers."""
+    from storage.photo_media import create_photo
+    from storage.photos import PhotoCatalog, metadata_version
+
+    catalog = json.loads(Path(metadata_path).read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("Photo metadata must be an object keyed by image name.")
+    photo_catalog = PhotoCatalog(database)
+    seeded = 0
+    for source in sorted(Path(image_dir).glob("*.webp")):
+        metadata = catalog.get(source.stem)
+        if metadata is None:
+            continue
+        if not isinstance(metadata, dict):
+            raise ValueError(f"Invalid photo metadata for {source.stem!r}.")
+        answer = metadata.get("correct_answer")
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError(f"Photo metadata has no correct answer for {source.stem!r}.")
+        if re.fullmatch(r"sha256-[a-f0-9]{64}", answer.strip()):
+            raise ValueError(f"Photo answer for {source.stem!r} is an image digest, not a curated answer.")
+        hints = metadata.get("hints", {})
+        if not isinstance(hints, dict):
+            raise ValueError(f"Photo hints must be an object for {source.stem!r}.")
+        enabled = metadata.get("enabled", True)
+        if type(enabled) is not bool:
+            raise ValueError(f"Photo enabled flag must be a boolean for {source.stem!r}.")
+
+        raw = source.read_bytes()
+        media_key, saved, _ = await create_photo(
+            database, sha256(raw).hexdigest()[:32], raw, answer.strip(), enabled, root=media_root,
+        )
+        if hints != saved.get("hints", {}):
+            await photo_catalog.patch(
+                media_key, {"hints": hints}, expected_version=metadata_version(saved),
+            )
+        seeded += 1
+    return seeded
+
+
 async def seed():
-    from hashlib import sha256
     from storage.database import Database, DatabaseSettings
     from storage.repositories import OperationalRepository
-    from storage.photo_media import create_photo, images_root
+    from storage.photo_media import images_root
     from storage.question_bank import PostgresQuestionBank
     from storage.settings import SettingsService
     from storage.models import Chat
@@ -37,19 +79,12 @@ async def seed():
             workspace / 'data' / 'questions',
             metadata_path=workspace / 'data' / 'global' / 'categories.json',
         )
-        # Dev-only, repeatable media seed. Runtime never discovers files or
-        # derives answers from filenames; this explicit import creates PG rows
-        # and content-addressed immutable copies in the mounted preview volume.
-        for source in sorted((workspace / 'data' / 'images').glob('*.webp')):
-            raw = source.read_bytes()
-            await create_photo(
-                database,
-                sha256(raw).hexdigest()[:32],
-                raw,
-                source.stem,
-                True,
-                root=images_root(),
-            )
+        # Dev seed is source-of-truth driven: unlisted image files (especially
+        # content-addressed sha256-* assets) are not playable questions.
+        await seed_photo_catalog(
+            database, workspace / 'data' / 'images',
+            workspace / 'data' / 'photo_quiz_metadata.json', images_root(),
+        )
     finally:
         await database.dispose()
 

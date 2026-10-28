@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import json
+import asyncio
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from decimal import Decimal
@@ -33,6 +34,12 @@ from storage.photos import PhotoCatalog, PhotoMetadataConflict, metadata_version
 Score = Annotated[Decimal, Query(
     ge=Decimal("-99999999999.999"), le=Decimal("99999999999.999"), decimal_places=3,
 )]
+
+
+def _verified_photo_keys(catalog, root):
+    from storage.photo_media import verified_image_path
+    return {key for key, value in catalog.items()
+            if verified_image_path(root, key, value) is not None}
 
 
 class DailyTime(BaseModel):
@@ -194,10 +201,11 @@ def make_router() -> APIRouter:
     @router.get("/api/photo-quiz")
     async def pg_photos(request: Request):
         catalog = await PhotoCatalog(request.app.state.admin_database).load()
+        from storage.photo_media import images_root
+        valid_keys = await asyncio.to_thread(_verified_photo_keys, catalog, images_root())
         photos = []
         for key, value in sorted(catalog.items()):
-            from storage.photo_media import images_root, verified_image_path
-            has_image = verified_image_path(images_root(), key, value) is not None
+            has_image = key in valid_keys
             from urllib.parse import quote
             photos.append({**value, "name": key, "version": metadata_version(value), "has_image": has_image,
                            "image_url": f"/api/images/{quote(key, safe='')}.webp" if has_image else None})
@@ -259,7 +267,7 @@ def make_router() -> APIRouter:
         if value is None:
             raise HTTPException(404, "Изображение не найдено")
         from storage.photo_media import images_root, verified_image_path
-        path = verified_image_path(images_root(), key, value)
+        path = await asyncio.to_thread(verified_image_path, images_root(), key, value)
         if path is None:
             raise HTTPException(404, "Изображение не найдено")
         return FileResponse(path, media_type="image/webp")

@@ -11,8 +11,11 @@ const root = path.resolve(__dirname, '..', '..');
 const script = path.join(root, 'tests', 'ui', 'ui_check.py');
 
 function run(...args) {
+    // gaps visits 28 screens at three widths; a measured complete local run takes about seven minutes.
+    // Keep the per-page UI criteria intact and allow the whole matrix ten minutes.
+    const timeout = args[0] === 'gaps' ? 600000 : 240000;
     for (const python of process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python']) {
-        const result = spawnSync(python, [script, ...args], {cwd: root, encoding: 'utf8', timeout: 240000, env: {...process.env, PYTHONUTF8: '1'}});
+        const result = spawnSync(python, [script, ...args], {cwd: root, encoding: 'utf8', timeout, env: {...process.env, PYTHONUTF8: '1'}});
         if (result.error?.code === 'ENOENT') continue;
         return result;
     }
@@ -23,6 +26,8 @@ function check(t, ...args) {
     const result = run(...args);
     if (!result) { t.skip('python is not available'); return; }
     const output = (result.stdout || '') + (result.stderr || '');
+    assert.notEqual(result.error?.code, 'ETIMEDOUT', `${args[0]} exceeded its whole-command timeout; UI thresholds were not changed.\n${output}`);
+    assert.ok(!result.error, `${args[0]} could not run: ${result.error?.message || ''}\n${output}`);
     if (/^SKIP:/m.test(output)) { t.skip(output.trim()); return; }
     assert.equal(result.status, 0, output);
 }

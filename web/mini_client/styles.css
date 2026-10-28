@@ -1,6 +1,6 @@
 :root{color-scheme:dark;--bg:#101317;--surface:#1a1e24;--text:#f6f8f2;--muted:#b2b9c2;--line:#333941;--lime:#d0fc50;--accent-ink:#172300;--danger:#ffaaa3;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
 .game-input[hidden]{display:none}
-.previous-answer{font-size:var(--qw-fs-caption);color:var(--muted);margin:-12px 0 20px}.photo-mask{text-align:center;letter-spacing:.15em;font-size:var(--qw-fs-h3);font-weight:700}
+.previous-answer{font-size:var(--qw-fs-caption);color:var(--muted);margin:-12px 0 20px}.photo-mask{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 3px;width:100%;max-width:100%;margin:12px auto;font-weight:700}.photo-mask-cell{box-sizing:border-box;display:inline-flex;flex:0 0 clamp(22px,6.2vw,24px);width:clamp(22px,6.2vw,24px);height:clamp(22px,6.2vw,24px);align-items:center;justify-content:center;border:1px solid var(--qw-line,var(--line));border-radius:calc(var(--qw-r-control,12px) / 2);background:var(--qw-surface-2,var(--surface));color:var(--qw-text,var(--text));font-size:var(--qw-fs-body);line-height:1}.photo-mask-space{flex:0 0 clamp(5px,2vw,9px);height:1px}.photo-mask-punctuation{padding:0 2px;color:var(--qw-text,var(--text));font-size:var(--qw-fs-h3);line-height:1}
 .preparation-facts{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}.preparation-facts span{padding:9px 12px;border:1px solid var(--line);border-radius:12px;font-size:var(--qw-fs-caption);color:var(--muted)}
 .home-hero,.player-rhythm{text-align:center;justify-content:center}.choice-copy .eyebrow,.choice-copy h2{text-align:center}.play-stage>h1,.play-stage>.eyebrow,.game-heading h1,.game-heading>.eyebrow{text-align:center}.play-stage>.eyebrow,.game-heading>.eyebrow{display:block}
 .player-rhythm{display:flex;gap:18px;color:var(--muted);font-size:var(--qw-fs-caption);margin:4px 0 26px}.player-rhythm span+span{border-left:1px solid var(--line);padding-left:18px}
@@ -251,6 +251,8 @@ body{font-size:var(--qw-fs-body);line-height:1.5}
 .qw-btn{text-decoration:none}.card .qw-btn-stack,.card .qw-btn-row{margin-top:var(--qw-s-3)}.qw-btn-stack>.qw-btn{margin:0}
 .card>.qw-btn.primary,.login>.qw-btn.primary{width:100%}
 .qw-btn-group{margin:var(--qw-s-3) 0}.qw-btn-group.seg-scroll{overflow-x:auto}.seg-scroll>*,.qw-btn-group.seg-scroll>:is(*,.qw-btn){flex:1 0 auto;padding-inline:var(--qw-s-3)}
+#content[data-page=rating] .qw-btn-group[aria-label="Раздел рейтинга"]>button{padding-inline:var(--qw-s-2)}
+:root:not([data-qw-contrast="1"]) #content[data-page=rating] .qw-btn-group[aria-label="Раздел рейтинга"]>button[aria-checked="true"]{box-shadow:none}
 .qw-btn-group>button[aria-checked="true"]{box-shadow:inset 0 0 0 1px var(--qw-line)}
 .qw-danger-zone{margin:var(--qw-s-4) 0 0}.card>.qw-danger-zone{margin-top:var(--qw-s-4)}
 .badge.admin{background:color-mix(in srgb,var(--qw-accent) 22%,transparent);color:var(--qw-accent)}

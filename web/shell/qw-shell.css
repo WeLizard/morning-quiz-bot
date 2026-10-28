@@ -14,9 +14,9 @@
 /* ---------- ⚙ menu: bottom sheet on phones, popover from 768px ---------- */
 .qw-menu-scrim{position:fixed;inset:0;z-index:2147483000;background:var(--qw-scrim);opacity:0;transition:opacity .16s ease}
 .qw-menu-scrim.qw-open{opacity:1}
-.qw-menu{position:fixed;z-index:2147483001;left:0;right:0;bottom:0;box-sizing:border-box;max-height:min(85vh,calc(var(--qw-vh) - var(--qw-safe-top) - 24px));
+.qw-menu{position:fixed;z-index:2147483001;left:0;right:0;bottom:var(--qw-safe-bottom);box-sizing:border-box;max-height:min(85vh,calc(var(--qw-vh) - var(--qw-safe-top) - var(--qw-safe-bottom) - 24px));
   overflow:auto;overscroll-behavior:contain;margin:0;border:0;
-  padding:10px calc(var(--qw-gutter) + var(--qw-safe-right)) calc(var(--qw-s-4) + var(--qw-safe-bottom)) calc(var(--qw-gutter) + var(--qw-safe-left));
+  padding:10px calc(var(--qw-gutter) + var(--qw-safe-right)) var(--qw-s-4) calc(var(--qw-gutter) + var(--qw-safe-left));
   background:var(--qw-game-surface);color:var(--qw-game-text);border-radius:var(--qw-r-hero) var(--qw-r-hero) 0 0;box-shadow:var(--qw-shadow);
   font:400 var(--qw-fs-body)/1.4 var(--qw-font);transform:translateY(16px);opacity:0;transition:transform .18s ease,opacity .18s ease}
 .qw-menu.qw-open{transform:none;opacity:1}

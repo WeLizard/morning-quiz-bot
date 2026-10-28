@@ -47,6 +47,9 @@
         node.type = 'button'; node.addEventListener('click', action); return node;
     };
     const notice = (parent, text) => parent.appendChild(element('p', text, 'pg-note'));
+    const moscowDayDate = day => new Intl.DateTimeFormat('ru-RU', {
+        timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', year: 'numeric',
+    }).format(new Date((day * 86400 - 3 * 3600) * 1000));
     async function api(path, options) {
         let response;
         try { response = await fetch(path, options); }
@@ -453,6 +456,35 @@
                     await systemSettings();
                 };
             }, systemSettings)));
+            try {
+                const {data: upkeep} = await api('/api/control/farm-upkeep');
+                const upkeepCard = card(body, 'Налог и содержание фермы');
+                const values = upkeep.values;
+                notice(upkeepCard, `Порог: с ${values.upkeep_level} уровня · земля: ${values.land_rate_pct}% от текущей шкалы участка · здания: ${values.building_rate_pct}% цены за уровень · поля: ${values.field_per_hectare} мон./га · деревья: +${values.tree_rate_per_extra_tree} мон. за каждое дерево сверх бесплатного лимита.`);
+                if (upkeep.pending) {
+                    notice(upkeepCard, `Новые ставки начнут действовать с ${moscowDayDate(upkeep.pending.effective_from_moscow_day)} по Москве. До этого используется текущая ставка.`);
+                } else {
+                    notice(upkeepCard, 'Изменение применяется со следующих московских суток. Уже выставленный счёт и долг не пересчитываются.');
+                }
+                upkeepCard.append(button('Настроить ставки', () => modal('Налог и содержание фермы', form => {
+                    notice(form, `Версия ${upkeep.revision}. Новые ставки вступят в силу со следующих московских суток; выставленный счёт и долг сохранят сумму.`);
+                    const level = field(form, 'Уровень начала содержания', values.upkeep_level, 'number', {min: 1, max: 50, required: true});
+                    const land = field(form, 'Земля · процент текущей шкалы участка', values.land_rate_pct, 'number', {min: 0, max: 500, required: true});
+                    const building = field(form, 'Здания · процент цены за уровень', values.building_rate_pct, 'number', {min: 0, max: 100, required: true});
+                    const fields = field(form, 'Поля · монет за гектар в сутки', values.field_per_hectare, 'number', {min: 0, max: 100000, required: true});
+                    const trees = field(form, 'Деревья · надбавка за каждое дерево сверх бесплатного лимита', values.tree_rate_per_extra_tree, 'number', {min: 0, max: 100000, required: true});
+                    const actionId = crypto.randomUUID();
+                    return async () => {
+                        await put('/api/control/farm-upkeep', {
+                            upkeep_level: Number(level.value), land_rate_pct: Number(land.value),
+                            building_rate_pct: Number(building.value), field_per_hectare: Number(fields.value),
+                            tree_rate_per_extra_tree: Number(trees.value), expected_revision: upkeep.revision,
+                            action_id: actionId,
+                        });
+                        await systemSettings();
+                    };
+                }, systemSettings, 'Сохранить ставки')));
+            } catch (error) { fail(body, error); }
             const notifications = card(body, 'Уведомления · проверка доставки');
             notice(notifications, 'Общий ключ админки обозначает оператора local-admin. Решение закрывает неопределённость и не отправляет сообщение повторно.');
             const notificationStatus = selectField(notifications, 'Статус уведомлений', 'uncertain', [

@@ -178,7 +178,7 @@
                     facts.append(el('span', `${photoSetup.question_count} картинки`),
                         el('span', `${photoSetup.open_seconds} секунд на картинку`),
                         el('span', photoSetup.hints_enabled ? 'Подсказки включены' : 'Без подсказок'),
-                        el('span', `Доступно загадок: ${photoSetup.available_questions}`));
+                        el('span', `Записей в каталоге: ${photoSetup.available_questions}`));
                     stage.append(facts);
                     stage.append(button('Начать фото-серию', startPhotoDirect, 'primary play-primary'));
                     if (photoSetup.available_questions < photoSetup.question_count) {
@@ -344,7 +344,26 @@
                 const head = el('div', undefined, 'question-top');
                 head.append(el('span', 'УЗНАЁШЬ?', 'eyebrow'), countdown(seconds(question.ends_at), question.closed)); stage.append(head);
                 stage.append(el('h1', 'Что скрывается\nна картинке?', 'play-question'), picture(question));
-                if (question.mask) stage.append(el('p', question.mask, 'photo-mask'));
+                if (question.mask) {
+                    const mask = el('div', undefined, 'photo-mask');
+                    mask.setAttribute('role', 'group');
+                    mask.setAttribute('aria-label', 'Подсказка по буквам');
+                    Array.from(question.mask).forEach(character => {
+                        if (character === '□' || character === '⬜') {
+                            const cell = el('span', undefined, 'photo-mask-cell is-hidden');
+                            cell.setAttribute('role', 'img');
+                            cell.setAttribute('aria-label', 'Неизвестная буква');
+                            mask.append(cell);
+                        } else if (/\s/u.test(character)) {
+                            const separator = el('span', character, 'photo-mask-space');
+                            separator.setAttribute('aria-hidden', 'true');
+                            mask.append(separator);
+                        } else if (/\p{L}|\p{N}/u.test(character)) {
+                            mask.append(el('span', character, 'photo-mask-cell is-revealed'));
+                        } else mask.append(el('span', character, 'photo-mask-punctuation'));
+                    });
+                    stage.append(mask);
+                }
                 if (view.last_result) {
                     const result = view.last_result, verdict = el('section', undefined, `play-verdict ${result.correct ? 'is-correct' : ''}`);
                     verdict.append(el('strong', result.correct ? 'Верно! Следующая картинка уже здесь.' : 'Время вышло. Идём дальше.'),

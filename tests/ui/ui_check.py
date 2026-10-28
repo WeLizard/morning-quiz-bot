@@ -12,6 +12,7 @@ Wrapped by tests/js/ui_layout.test.cjs so it runs with the common `node --test t
 """
 import json
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,10 +123,26 @@ ZONE_SCANNER = r"""
       const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
       if (r.width < 1 || r.height < 1 || cs.visibility === 'hidden' || cs.display === 'none') continue;
       if (r.bottom <= 0 || r.top >= innerHeight || !pinned(el)) continue;
+      // Check painted pixels, not the offscreen box of a child clipped by a scrolling sheet.
+      const painted = {left: Math.max(0, r.left), right: Math.min(innerWidth, r.right), top: Math.max(0, r.top), bottom: Math.min(innerHeight, r.bottom)};
+      // Positioned descendants escape overflow ancestors up to their actual containing block.
+      const fixedBlock = s => s.transform !== 'none' || s.perspective !== 'none' || s.filter !== 'none' ||
+        (s.backdropFilter && s.backdropFilter !== 'none') || ['translate','rotate','scale'].some(k => s[k] && s[k] !== 'none') ||
+        /layout|paint|strict|content/.test(s.contain) || /transform|perspective|filter/.test(s.willChange) || s.contentVisibility === 'auto';
+      let escapes = ['fixed','absolute'].includes(cs.position) ? cs.position : null;
+      for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+        const ps = getComputedStyle(parent), pr = parent.getBoundingClientRect();
+        if (escapes && !fixedBlock(ps) && !(escapes === 'absolute' && ps.position !== 'static')) continue;
+        escapes = null;
+        if (/(auto|scroll|hidden|clip)/.test(ps.overflowX)) { painted.left = Math.max(painted.left, pr.left + parent.clientLeft); painted.right = Math.min(painted.right, pr.left + parent.clientLeft + parent.clientWidth); }
+        if (/(auto|scroll|hidden|clip)/.test(ps.overflowY)) { painted.top = Math.max(painted.top, pr.top + parent.clientTop); painted.bottom = Math.min(painted.bottom, pr.top + parent.clientTop + parent.clientHeight); }
+        if (['fixed','absolute'].includes(ps.position)) escapes = ps.position;
+      }
+      if (painted.right <= painted.left || painted.bottom <= painted.top) continue;
       const name = ((el.innerText || el.getAttribute('aria-label') || el.className || el.tagName) + '').trim().replace(/\s+/g, ' ').slice(0, 40);
       // A pinned control must not sit under the status bar or under the system navigation.
-      if (r.top < top - 0.5) issues.push({kind: 'safe-top', a: name, y: Math.round(r.top)});
-      if (r.bottom > innerHeight - bottom + 0.5) issues.push({kind: 'safe-bottom', a: name, y: Math.round(r.bottom)});
+      if (painted.top < top - 0.5) issues.push({kind: 'safe-top', a: name, y: Math.round(painted.top)});
+      if (painted.bottom > innerHeight - bottom + 0.5) issues.push({kind: 'safe-bottom', a: name, y: Math.round(painted.bottom)});
     }
     root.style.removeProperty('--qw-tg-safe-top');
     root.style.removeProperty('--qw-tg-safe-bottom');
@@ -357,6 +374,38 @@ def run_gaps_selftest(pw_browser):
     c.ok(len(rounded) == 1 and 'Мне пишут' in rounded[0]['a'] + rounded[0]['b'], f'rounded buttons touching inside a group are caught, got {rounded}')
     uneven = [issue for issue in result['issues'] if issue['kind'] == 'uneven']
     c.ok(len(uneven) == 1 and 'Выше' in uneven[0]['b'], f'buttons of one row with different heights are caught, got {uneven}')
+    page.evaluate("""() => { document.getElementById('main').innerHTML = `
+      <div style="position:fixed;left:0;top:600px;width:180px;height:152px;overflow:auto">
+        <button style="margin-top:180px;height:44px">Clipped overflow child</button>
+      </div>
+      <button style="position:fixed;right:0;bottom:20px;height:44px">Visible unsafe button</button>`; }""")
+    zones = page.evaluate(ZONE_SCANNER, [47, 48])
+    c.ok(not any('Clipped overflow child' in issue['a'] for issue in zones), 'safe-area scanner ignores fully clipped scrolling descendants')
+    c.ok(any(issue['kind'] == 'safe-bottom' and 'Visible unsafe button' in issue['a'] for issue in zones), 'safe-area scanner still catches visible controls in the system navigation zone')
+    page.evaluate("""() => { document.getElementById('main').innerHTML = `
+      <div style="position:absolute;left:0;top:100px;width:40px;height:40px;overflow:hidden">
+        <button id="fixed-escape" style="position:fixed;right:0;bottom:20px;height:44px">Fixed visible unsafe</button>
+      </div>
+      <div style="position:fixed;left:0;top:300px;width:100px;height:40px;overflow:hidden;transform:translateX(0)">
+        <button style="position:fixed;left:0;top:500px;height:44px">Fixed truly clipped</button>
+      </div>`; }""")
+    c.ok(page.evaluate("document.elementFromPoint(320,770)?.id") == 'fixed-escape', 'the fixed overflow child is actually visible outside its untransformed ancestor')
+    zones = page.evaluate(ZONE_SCANNER, [47, 48])
+    c.ok(any(issue['kind'] == 'safe-bottom' and 'Fixed visible unsafe' in issue['a'] for issue in zones), 'fixed children escaping overflow still fail the safe-area check')
+    c.ok(not any('Fixed truly clipped' in issue['a'] for issue in zones), 'a transformed containing block really clips its fixed child')
+    page.evaluate("""() => { document.getElementById('main').innerHTML = `
+      <div style="position:fixed;right:0;bottom:20px;width:140px;height:44px">
+        <div style="overflow:hidden;width:20px;height:10px">
+          <button id="absolute-escape" style="position:absolute;right:0;bottom:0;width:140px;height:44px">Absolute visible unsafe</button>
+        </div>
+      </div>
+      <div style="position:relative;overflow:hidden;top:300px;width:100px;height:20px">
+        <button style="position:absolute;top:400px;height:44px">Absolute truly clipped</button>
+      </div>`; }""")
+    c.ok(page.evaluate("document.elementFromPoint(320,770)?.id") == 'absolute-escape', 'the absolute overflow child is actually visible outside a static ancestor')
+    zones = page.evaluate(ZONE_SCANNER, [47, 48])
+    c.ok(any(issue['kind'] == 'safe-bottom' and 'Absolute visible unsafe' in issue['a'] for issue in zones), 'absolute children escaping static overflow still fail the safe-area check')
+    c.ok(not any('Absolute truly clipped' in issue['a'] for issue in zones), 'a relative containing block really clips its absolute child')
     page.close()
     return c
 
@@ -383,13 +432,18 @@ def run_startup(pw_browser, base):
     context.route('**/*', guard)
     page = context.new_page()
     for path, ready in (('/app', '[data-qw-gear]'), ('/app/farm', '[data-qw-gear], #login:not([hidden])'), ('/app/alchemy', '[data-qw-gear]')):
-        started = page.evaluate('performance.now()') if page.url.startswith('http') else 0
+        started = time.perf_counter()
         page.goto(base + path, wait_until='commit')
+        committed = time.perf_counter()
         try:
             page.wait_for_selector(ready, timeout=2500)
             shown = True
         except Exception:  # noqa: BLE001 - reported below
             shown = False
+        ready_ms = round((time.perf_counter() - committed) * 1000)
+        resources = page.evaluate("""() => performance.getEntriesByType('resource').sort((a,b)=>b.duration-a.duration).slice(0,5)
+            .map(r=>({path:new URL(r.name,location.href).pathname,ms:Math.round(r.duration)}))""")
+        print('startup-timing:', json.dumps({'path': path, 'commit_ms': round((committed-started)*1000), 'ready_ms': ready_ms, 'ready': shown, 'slow_resources': resources}, ensure_ascii=False), flush=True)
         c.ok(shown, f'{path}: rendered within 2.5 s with every other host blocked')
         c.ok(page.evaluate('window.QW?.sdkState') in ('not-needed', None), f"{path}: browser does not request the SDK (state {page.evaluate('window.QW?.sdkState')})")
         # The splash must give way within 2.5 s (polling via evaluate: the production CSP forbids string evaluation).

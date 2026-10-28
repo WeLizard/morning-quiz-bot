@@ -1509,7 +1509,7 @@ test('photo preparation uses the backend setup projection and starts without run
         throw new Error('Unexpected path ' + path);
     };
     await ui.mount({host, request, chatId: '42', command: '/photo_quiz', selection() {}, onHome() {}, onReplay() {}, onProfile() {}, onSettings() {}, media: async () => new Blob()});
-    assert.match(host.textContent, /2 картинки.*75 секунд на картинку.*Без подсказок.*Доступно загадок: 8/);
+    assert.match(host.textContent, /2 картинки.*75 секунд на картинку.*Без подсказок.*Записей в каталоге: 8/);
     findButton(host, 'Начать фото-серию').click(); await flush(); await flush();
     assert.equal(calls.includes('/api/mini/runtime'), false);
     assert.equal(calls.includes('/api/mini/photo/chats/42/start'), true);
@@ -1547,6 +1547,31 @@ test('Photo gameplay loads the next round image through its own protected URL', 
         '/api/mini/photo/chats/-1001/current/image?round_id=photo-round',
         '/api/mini/photo/chats/-1001/current/image?round_id=next-round',
     ]);
+    ui.stop();
+});
+
+test('photo mask wraps one cell per answer letter and keeps revealed letters and separators in place', async () => {
+    const ui = player(), host = new Element('main'), maskText = `С□ □□-Р${'□'.repeat(65)}`;
+    await ui.mount({host, command: '/photo_quiz', chatId: '-1001', request: async path => {
+        if (path.endsWith('/setup')) return {question_count: 1, open_seconds: 60, hints_enabled: true, available_questions: 1, can_start: true};
+        if (path.endsWith('/sync')) return {status: 'active', revision: 1, phase: 'active', score: '0', correct: 0, game: {current: 1, total: 1}, question: {
+            question_number: 1, question_count: 1, round_id: 'long-mask-round', ends_at: new Date(Date.now() + 60000).toISOString(), closed: false,
+            mask: maskText, image_url: '/api/mini/photo/chats/-1001/current/image?round_id=long-mask-round',
+        }};
+        throw new Error('Unexpected path ' + path);
+    }, media: async () => new Blob(['shared-image']), selection() {}, onHome() {}});
+    await flush();
+    const mask = host.querySelector('.photo-mask');
+    assert.equal(mask.getAttribute('role'), 'group');
+    assert.equal(mask.children.length, Array.from(maskText).length, 'one rendered item keeps each source position');
+    assert.equal(mask.querySelectorAll('.photo-mask-cell').length, 70, 'every answer letter retains one square');
+    const cells = mask.querySelectorAll('.photo-mask-cell');
+    assert.equal(cells.filter(cell => cell.className.includes('is-hidden')).length, 68);
+    assert.equal(cells.filter(cell => cell.className.includes('is-revealed')).length, 2, 'hint letters are shown in their own cells');
+    assert.equal(cells[0].textContent, 'С');
+    assert.equal(cells[1].getAttribute('aria-label'), 'Неизвестная буква');
+    assert.equal(mask.querySelectorAll('.photo-mask-punctuation').length, 1, 'the hyphen remains in sequence without becoming a letter cell');
+    assert.equal(mask.querySelectorAll('.photo-mask-space').length, 1, 'word spacing remains in sequence without becoming a letter cell');
     ui.stop();
 });
 

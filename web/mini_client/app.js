@@ -1105,6 +1105,7 @@
             // Вход выбирает игрок: гостевой профиль не объединяется с Telegram автоматически.
         }
         if (guestAllowed) {
+            const guestButtonClass = state.demo || initData ? 'quiet' : 'primary';
             const guest = button('Продолжить как гость', async () => {
                 guest.disabled = true; feedback.textContent = '';
                 try {
@@ -1130,7 +1131,7 @@
                         fresh.dataset.newGuest = '1'; box.append(fresh);
                     }
                 }
-            }, 'quiet');
+            }, guestButtonClass);
             guest.classList.add('guest-entry'); box.append(guest);
             note(box, 'Гостевой вход работает без Telegram. Открытия «Алхимии» сохраняются на сервере и привязаны к гостевой сессии этого браузера.', 'muted');
             const panel = el('div', undefined, 'account-panel');

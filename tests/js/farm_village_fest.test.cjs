@@ -10,6 +10,21 @@ const api=fs.readFileSync(path.join(__dirname,'../../qw_farm/api.py'),'utf8');
 const LAYERS={posidelki:['village-fest-posidelki.svg',120000],new_year:['village-fest-new_year.svg',450000],
  maslenitsa:['village-fest-maslenitsa.svg',120000],spring_flowers:['village-fest-spring_flowers.svg',160000]};
 
+test('Pumpkin Night village art and Jack are served, gated by the server projection and remain independent of decor',()=>{
+ const file='village-fest-pumpkin_night.svg',svg=fs.readFileSync(path.join(stat,file),'utf8');
+ assert.match(svg,/^<svg [^>]*viewBox="0 0 2400 1800"/);
+ for(const cls of ['vf-decor','vf-day','vf-night'])assert.ok(svg.includes(`class="${cls}"`));
+ assert.ok(svg.length<160000);
+ assert.ok(api.includes(`'${file}'`)&&api.includes("'pumpkin-jack.svg'"));
+ assert.ok(app.includes(`pumpkin_night:'${file}'`));
+ assert.ok(css.includes(':root[data-festival=pumpkin_night][data-festival-decor=on] .village-fest[data-fest=pumpkin_night]'));
+ assert.match(app,/jack=own\(\)&&horsemanDisplay\(S\.me\.horseman,now\(\)\)\?\.stale===false&&S\.me\.horseman\?\.active===true/);
+ assert.match(app,/villageWalk\(\[1176\/24,605\/18\],\(\)=>openHorsemanDialog\(festivalHelpers\(\)\)/);
+ assert.match(app,/rider\.style\.left=`\$\{\(1090\.8\/24\)\.toFixed\(3\)\}%`;rider\.style\.top=`\$\{\(467\.48\/18\)\.toFixed\(3\)\}%`/);
+ assert.match(css,/\.village-horseman\{[^}]*min-width:44px;min-height:44px/);
+ assert.doesNotMatch(css,/\.village-horseman\{[^}]*translate/,'no transform may lift the approved foot from the road');
+});
+
 for(const [id,[file,budget]] of Object.entries(LAYERS))test(`${id} layer: vector only, CSP-safe, day / night / decor groups over the 2400x1800 world`,()=>{
  const svg=fs.readFileSync(path.join(stat,file),'utf8');
  assert.match(svg,/^<svg [^>]*viewBox="0 0 2400 1800"/);

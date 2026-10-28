@@ -147,3 +147,56 @@ def test_telegram_delivery_distinguishes_retry_after_from_uncertain_failure(pg_e
                 assert row.last_error == 'TelegramError'
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('flag, enabled', [(None, True), ('1', True), ('0', False)])
+def test_farm_request_delivery_flag_filters_before_claim(monkeypatch, flag, enabled):
+    if flag is None:
+        monkeypatch.delenv('MQB_FARM_REQUEST_DELIVERY_ENABLED', raising=False)
+    else:
+        monkeypatch.setenv('MQB_FARM_REQUEST_DELIVERY_ENABLED', flag)
+    claim = AsyncMock(return_value=None)
+    monkeypatch.setattr(NotificationQueue, 'claim', claim)
+    bot = SimpleNamespace(send_message=AsyncMock())
+    asyncio.run(MafiaHandlers(object())._deliver_notifications(SimpleNamespace(bot=bot)))
+    claim.assert_awaited_once()
+    expected = {'mafia.phase', 'classic.question', 'classic.finished',
+                'photo.question', 'photo.hint', 'photo.feedback', 'photo.result',
+                'photo.finished', 'problem_report.text', 'problem_report.images'}
+    if enabled:
+        expected.add('farm.request')
+    assert claim.await_args.kwargs['kinds'] == expected
+    bot.send_message.assert_not_awaited()
+
+
+def test_paused_farm_requests_stay_untouched_while_other_notifications_deliver(pg_env, monkeypatch):
+    monkeypatch.setenv('MQB_FARM_REQUEST_DELIVERY_ENABLED', '0')
+
+    async def run():
+        async with isolated_database(pg_env) as (database, _):
+            async with database.transaction() as session:
+                # Deliberately lacks farm delivery payload: it must never reach that handler.
+                await NotificationQueue.enqueue_in(
+                    session, kind='farm.request', dedupe_key='farm:paused',
+                    payload={'event': 'request'}, chat_id=-102,
+                )
+                await NotificationQueue.enqueue_in(
+                    session, kind='mafia.phase', dedupe_key='phase:unpaused',
+                    payload={'lobby': _lobby()}, chat_id=-103,
+                )
+            async with database.transaction() as session:
+                row = await session.scalar(select(NotificationOutbox).where(NotificationOutbox.kind == 'farm.request'))
+                before = {column.name: getattr(row, column.name) for column in NotificationOutbox.__table__.columns}
+            bot = SimpleNamespace(username='MorningQuizTestBot', send_message=AsyncMock())
+            await MafiaHandlers(database)._deliver_notifications(SimpleNamespace(bot=bot))
+            bot.send_message.assert_awaited_once()
+            assert bot.send_message.await_args.args[0] == -103
+            async with database.transaction() as session:
+                row = await session.scalar(select(NotificationOutbox).where(NotificationOutbox.kind == 'farm.request'))
+                after = {column.name: getattr(row, column.name) for column in NotificationOutbox.__table__.columns}
+                assert after == before
+                assert row.status == 'pending' and row.attempts == 0 and row.claimed_at is None
+                other = await session.scalar(select(NotificationOutbox).where(NotificationOutbox.kind == 'mafia.phase'))
+                assert other.status == 'delivered' and other.attempts == 1
+
+    asyncio.run(run())

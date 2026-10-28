@@ -198,7 +198,11 @@ export function createConstruction(h){
   stallCard(p,'Семенной ларёк','Суслик Игорь','Обмен урожая на сортовые семена — скоро.','',null,'');
   stallCard(p,'Ткацкая лавка','Кошка Соня','Узоры, уроки и красители. Ставни закрыты с 23 до 7, покупка работает.','К лавке Сони',()=>h.resident('Кошка Соня'));
   stallCard(p,'«Лавка прошлых праздников»','Агата','Вещи прошлых праздников; в дни праздника — праздничный шатёр.','К лавке Агаты',h.festival);
-  stallCard(p,'Почтовое окно','Почтальон Ёж','Просьбы к соседям и «Вестник» на стене.','Записка для Ежа',h.post);
+  const post=h.card('Почтальон Ёж','Почтовое окно');post.classList.add('stall-card');
+  h.note('Просьбы к соседям и «Вестник» на стене.',post);
+  const postActions=h.el('div',null,'qw-btn-stack');
+  const news=h.button('Деревенский вестник',h.bulletin,'qw-btn secondary');news.dataset.villageFocus='bulletin';
+  postActions.append(news,h.button('Записка для Ежа',h.post,'qw-btn secondary'));post.append(postActions);p.append(post);
   p.append(h.button('Продать со склада',h.warehouse,'qw-btn secondary'));
   p.append(h.el('h3','Лавки игроков','subheading'));
   if(!rows.lots.length)h.note('Пока на площади нет чужих лотов.',p);

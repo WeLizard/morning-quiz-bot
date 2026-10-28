@@ -1,6 +1,8 @@
 """Signature share, empty-candidate fallback and order_recent validation for farm orders."""
 from __future__ import annotations
 
+from copy import deepcopy
+
 import pytest
 
 from qw_farm import domain
@@ -47,13 +49,20 @@ def test_sonya_signature_share_uses_its_own_percentage(monkeypatch):
     assert 0.45 <= hits / seen <= 0.55, (hits, seen)
 
 
-def test_tiny_farm_every_item_taken_never_crashes(monkeypatch):
-    monkeypatch.setattr(domain, 'reachable', lambda farm: ['wheat', 'carrot'])
+@pytest.mark.parametrize('legacy_recent', [False, True])
+def test_tiny_farm_with_no_unique_goods_returns_clean_error_without_mutation(monkeypatch, legacy_recent):
     farm = new_farm('tiny', 'T', NOW)
-    for n in range(300):
-        slot = n % 3
-        farm['orders'][slot] = make_order(farm, slot, NOW)
-        assert farm['orders'][slot]['needs']
+    if legacy_recent:
+        farm.pop('order_recent')
+    monkeypatch.setattr(domain, 'reachable', lambda farm: ['wheat', 'carrot'])
+    before = deepcopy(farm)
+
+    with pytest.raises(FarmError) as exc:
+        make_order(farm, 2, NOW)
+
+    assert exc.value.code == 'no_order_goods'
+    assert exc.value.status == 409
+    assert farm == before
 
 
 def test_real_demolished_level_one_farm(monkeypatch):

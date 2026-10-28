@@ -10,7 +10,7 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const source=read('qw_farm/static/oleg-game.js').replace(/export /g,'');
 const context={Number,Array,Object,Math,Boolean,String,Set,Map,Promise,setTimeout,clearTimeout};
 vm.createContext(context);
-vm.runInContext(`${source}\nglobalThis.api={olegPlural,olegViewState,olegAnswerOutcome,olegResultText,olegMood,olegSceneSvg,mountOlegGame};`,context);
+vm.runInContext(`${source}\nglobalThis.api={olegExpectedNotes,olegPlaybackTiming,olegPlural,olegViewState,olegAnswerOutcome,olegResultText,olegMood,olegSceneSvg,mountOlegGame};`,context);
 const {olegPlural,olegViewState,olegAnswerOutcome,olegResultText,olegMood,olegSceneSvg,mountOlegGame}=context.api;
 const RUN='5b3f8f8e-4c1a-4b52-9d6e-0f0a6c1d2e3f';
 const game=overrides=>({active:null,rewarded_today:false,next_reward:{coins:12,xp:4},rounds:[3,4,5],last_result:null,...overrides});
@@ -44,6 +44,35 @@ context.matchMedia=()=>({matches:true});   // reduced motion: the melody plays i
 
 test('plural forms of "нота" follow Russian rules',()=>{
  assert.deepEqual([1,2,3,4,5,11,21,22,25].map(olegPlural),['нота','ноты','ноты','ноты','нот','нот','нота','ноты','нот']);
+});
+
+test('day rules transform answers, accelerate playback and preserve bell identities',()=>{
+ const {olegExpectedNotes,olegPlaybackTiming}=context.api;
+ const echo=olegViewState(game({active:{...active(0,[0,2,1]),modifier:'echo'}})).active;
+ assert.deepEqual([...olegExpectedNotes(echo)],[1,2,0]);
+ const odd=olegViewState(game({active:{...active(0,[0,3,2,0]),modifier:'false_note',notes:1,reference_sequence:[0,2,0]}})).active;
+ assert.equal(odd.notes,1);assert.deepEqual([...olegExpectedNotes(odd)],[3]);
+ const shuffled=olegViewState(game({active:{...active(0,[0,2,1]),modifier:'shuffle',bell_order:[2,3,0,1]}})).active;
+ assert.deepEqual([...shuffled.bellOrder],[2,3,0,1]);assert.deepEqual([...olegExpectedNotes(shuffled)],[0,2,1]);
+ assert.ok(olegPlaybackTiming({modifier:'acceleration',round:2}).lit<olegPlaybackTiming({modifier:'acceleration',round:0}).lit);
+ assert.ok(olegPlaybackTiming({modifier:'acceleration',round:2}).gap<olegPlaybackTiming({modifier:'acceleration',round:0}).gap);
+});
+
+for(const modifier of ['echo','false_note','shuffle'])test(`client submits the ${modifier} answer with the original run and round`,async()=>{
+ const raw={...active(0,modifier==='false_note'?[0,3,1,2]:[0,1,2]),modifier,reference_sequence:[0,1,2],bell_order:[2,3,0,1]};
+ let state=game({active:raw}),sent=[];
+ const {host,nodes,bells,sceneBells}=fakeHost();
+ const mounted=mountOlegGame(host,{getState:()=>state,command:async(kind,data)=>{sent.push([kind,JSON.parse(JSON.stringify(data))]);state=game({active:{...raw,round:1}});return true;},onBack(){}});
+ nodes['[data-role="action"]'].emit('click');
+ await waitFor(()=>!bells[0].disabled,5000);
+ if(modifier==='shuffle'){
+  assert.equal(bells[2].style.order,'0');assert.equal(sceneBells[2].style.translate,'-208px');
+ }
+ const expected=modifier==='echo'?[2,1,0]:modifier==='false_note'?[3]:[0,1,2];
+ for(const n of expected)bells[n].emit('click');
+ await waitFor(()=>sent.length===1);
+ assert.deepEqual(sent[0],['oleg_answer',{run_id:RUN,round:0,notes:expected}]);
+ mounted.destroy();
 });
 
 test('view state trusts only a well-formed server projection',()=>{

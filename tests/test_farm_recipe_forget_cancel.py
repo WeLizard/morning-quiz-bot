@@ -15,7 +15,7 @@ def queue_flour(st, at=T0, recipe='flour'):
     return obj(st, 'm')['jobs'][-1]
 
 
-def test_forget_clears_last_recipe_and_queue_remembers_it_again():
+def test_forget_clears_last_recipe_and_new_queue_waits_for_explicit_repeat():
     st = farm()
     add_building(st, 'mill', 'm', 0, 0, last_recipe='flour')
     st['inventory'] = {'wheat': 10}
@@ -24,6 +24,8 @@ def test_forget_clears_last_recipe_and_queue_remembers_it_again():
     assert 'last_recipe' not in obj(st, 'm') and obj(st, 'm')['recipes_memory'] == [] and obj(st, 'm')['revision'] == rev + 1 and 'забыт' in text
     assert err(st, 'forget_recipe', {'object': 'm'}) == 'no_recipe'
     queue_flour(st)
+    assert obj(st, 'm').get('recipes_memory', []) == [] and 'last_recipe' not in obj(st, 'm')
+    cmd(st, 'set_recipe_repeat', {'object': 'm', 'recipe': 'flour', 'enabled': True})
     assert obj(st, 'm')['last_recipe'] == 'flour'
 
 
@@ -75,7 +77,7 @@ def test_cancel_running_in_window_is_full_and_next_batch_starts_now():
     text = cmd(st, 'cancel_job', {'object': 'm', 'job': a['id']}, at)
     assert st['inventory'] == {'sunflower': 2} and 'полностью' in text
     assert b['starts_at'] == at and b['ready_at'] == at + b['seconds']
-    assert obj(st, 'm')['last_recipe'] == 'oil'
+    assert obj(st, 'm').get('recipes_memory', []) == [] and 'last_recipe' not in obj(st, 'm')
 
 
 def test_cancel_running_after_window_is_half_floor_no_xp_no_products():
@@ -121,6 +123,7 @@ def test_atomic_cancel_forget_preserves_refund_and_no_xp(elapsed, refunded):
     mill = add_building(st, 'mill', 'm', 0, 0)
     st['inventory'] = {'sunflower': 2}
     batch = queue_flour(st, recipe='oil')
+    cmd(st, 'set_recipe_repeat', {'object': 'm', 'recipe': 'oil', 'enabled': True})
     xp, rev = st['xp'], mill['revision']
     text = cmd(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, T0 + elapsed)
     assert mill['jobs'] == [] and 'last_recipe' not in mill
@@ -134,7 +137,7 @@ def test_atomic_cancel_needs_the_job_recipe_to_be_remembered_before_mutation():
     mill = add_building(st, 'mill', 'm', 0, 0)
     st['inventory'] = {'wheat': 2}
     batch = queue_flour(st)
-    mill.update(recipes_memory=['oil'], last_recipe='oil')   # remembered something else, but not this batch's recipe
+    mill.update(recipes_memory=['oil'], last_recipe='oil', recipe_cursor=0)   # remembered something else, but not this batch's recipe
     assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, T0 + 1) == 'no_recipe'
     assert mill['recipes_memory'] == ['oil']
     assert mill['jobs'] == [batch] and st['inventory'] == {'wheat': 0}
@@ -145,6 +148,7 @@ def test_atomic_cancel_errors_leave_batch_and_recipe_unchanged():
     add_building(st, 'mill', 'm', 0, 0)
     st['inventory'] = {'wheat': 2}
     batch = queue_flour(st)
+    cmd(st, 'set_recipe_repeat', {'object': 'm', 'recipe': 'flour', 'enabled': True})
     assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': 'missing'}) == 'not_found'
     assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm'}) == 'invalid_command'
     assert err(st, 'cancel_job_and_forget_recipe', {'object': 'm', 'job': batch['id']}, batch['ready_at']) == 'job_done'
@@ -158,6 +162,7 @@ def test_atomic_cancel_through_service_does_not_let_artisan_requeue_refund():
         mill = add_building(st, 'mill', 'm', 0, 0)
         st['inventory'] = {'wheat': 2}
         batch = queue_flour(st)
+        cmd(st, 'set_recipe_repeat', {'object': 'm', 'recipe': 'flour', 'enabled': True})
         hire_and_start(st, 'beaver_artisan', 'day')
         clock = [T0 + 10]
         unit = MemoryUnit('acc', st)

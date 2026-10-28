@@ -14,10 +14,11 @@ personal season scale AND into the village counter. Personal tiers pay rewards i
 the season goal, every farm that put in at least ``MIN_SHARE_PCT`` of its reference income gets the common reward lazily, on its
 next visit (``claim_village``): no background workers.
 """
-from .catalog import (BUILDINGS, ITEMS, level, income_ref, plot_upkeep, UPKEEP_PCT, FIELD_UPKEEP, UPKEEP_LEVEL, FUND_LEVEL,
+from .catalog import (BUILDINGS, ITEMS, level, income_ref, FUND_LEVEL,
                       SEASON_DAYS, FUND_TIERS, FUND_MARKUP, MIN_SHARE_PCT, DEBT_SLOW, DEBT_SLOW_DEN, FEAST_DAYS, FEAST_PCT,
                       DECOR_SHOP, DECOR_EXTRA, REWARD_DECOR, TIER_DISCOUNT_PCT, MAX_CONTRIBUTION, FUND_REWARD_TEXT,
                       TREE_RENT_STEP, TREE_RENT_FREE_OFFSET)
+from .upkeep_config import land_plot_rate, settings_for
 
 TZ_OFFSET = 10800
 DAY = 86400
@@ -73,21 +74,26 @@ def ordered_trees(farm):
                   key=lambda obj: (obj.get('planted_at', 0), obj['id']))
 
 
-def tree_rent(size, index):
+def tree_rent(size, index, upkeep_config=None):
     """Full daily land bill for tree ``index`` (one-based planting order)."""
-    return plot_upkeep(size) + TREE_RENT_STEP * max(0, index - max(0, size - TREE_RENT_FREE_OFFSET))
+    settings = settings_for(upkeep_config)
+    return land_plot_rate(size, settings) + settings['tree_rate_per_extra_tree'] * max(
+        0, index - max(0, size - TREE_RENT_FREE_OFFSET),
+    )
 
 
-def tree_upkeep(farm):
+def tree_upkeep(farm, upkeep_config=None):
     """Daily bill of the current orchard before any fund discount."""
-    return sum(tree_rent(farm['size'], index) for index, _ in enumerate(ordered_trees(farm), 1))
+    return sum(tree_rent(farm['size'], index, upkeep_config)
+               for index, _ in enumerate(ordered_trees(farm), 1))
 
 
-def base_upkeep(farm):
-    """Daily bill before discounts: beds, progressive orchard rent, 1% building price x level, and fields."""
+def base_upkeep(farm, upkeep_config=None):
+    """Daily bill before discounts using the effective land, building, field, and orchard rates."""
+    settings = settings_for(upkeep_config)
     size = farm['size']
-    per_plot = plot_upkeep(size)
-    total = tree_upkeep(farm)
+    per_plot = land_plot_rate(size, settings)
+    total = tree_upkeep(farm, settings)
     for obj in farm['objects']:
         if obj['type'] == 'tree':
             continue
@@ -97,8 +103,11 @@ def base_upkeep(farm):
         spec = BUILDINGS.get(obj['type'])
         if spec and not spec.get('decor'):
             lvl = obj.get('level', 1)
-            total += -(-spec['cost'] * (lvl if type(lvl) is int and lvl >= 1 else 1) // UPKEEP_PCT)
-    total += FIELD_UPKEEP * sum(f.get('ha', 0) for f in farm.get('fields', []) if isinstance(f, dict))
+            cost_per_level = settings['building_rate_pct']
+            total += (spec['cost'] * (lvl if type(lvl) is int and lvl >= 1 else 1) * cost_per_level + 99) // 100
+    total += settings['field_per_hectare'] * sum(
+        f.get('ha', 0) for f in farm.get('fields', []) if isinstance(f, dict)
+    )
     return total
 
 
@@ -124,8 +133,8 @@ def discount_active(farm, at):
     return bool(rec and rec['tiers'] >= 3)
 
 
-def upkeep(farm, at):
-    u = base_upkeep(farm)
+def upkeep(farm, at, upkeep_config=None):
+    u = base_upkeep(farm, upkeep_config)
     return u * (100 - TIER_DISCOUNT_PCT) // 100 if discount_active(farm, at) else u
 
 
@@ -141,18 +150,19 @@ def stretch(seconds, farm):
     return seconds
 
 
-def bill(farm, at):
+def bill(farm, at, upkeep_config=None):
     """Charge today's bill once per Moscow day (L10+). Returns the coins paid (0 when nothing was charged)."""
+    settings = settings_for(upkeep_config)
     e = state(farm)
     day = moscow_day(at)
-    if level(farm['xp']) < UPKEEP_LEVEL or e['billed_day'] >= day:
+    if level(farm['xp']) < settings['upkeep_level'] or e['billed_day'] >= day:
         return 0
     first = e['billed_day'] < 0
     e['billed_day'] = day
     if first:
         e['debt'] = 0            # the day the farm becomes liable is a free grace day
         return 0
-    due = upkeep(farm, at)
+    due = upkeep(farm, at, settings)
     paid = min(due, max(0, farm['coins'] - farm['starter_credit']))
     farm['coins'] -= paid
     e['debt'] = due - paid
@@ -282,16 +292,18 @@ def note_decor_spend(farm, typ, cost):
 
 
 # ---------------------------------------------------------------- projection / validation
-def status(farm, at):
+def status(farm, at, upkeep_config=None):
     """Read-only owner view for the client (does not mutate the farm)."""
+    settings = settings_for(upkeep_config)
     e = {**blank(), **(farm.get('economy') or {})}
     lv = level(farm['xp'])
     season = season_of(at)
     rec = (e.get('seasons') or {}).get(str(season))
     ref = rec['ref'] if rec else income_ref(max(lv, FUND_LEVEL))
     return dict(
-        active=lv >= UPKEEP_LEVEL, fund_open=lv >= FUND_LEVEL,
-        upkeep=upkeep(farm, at) if lv >= UPKEEP_LEVEL else 0, base_upkeep=base_upkeep(farm),
+        active=lv >= settings['upkeep_level'], fund_open=lv >= FUND_LEVEL,
+        upkeep=upkeep(farm, at, settings) if lv >= settings['upkeep_level'] else 0,
+        base_upkeep=base_upkeep(farm, settings),
         discount=discount_active(farm, at), debt=e['debt'], slow=e['debt'] > 0, billed_today=e['billed_day'] >= moscow_day(at),
         season=season, season_ends_at=season_end(season), ref=ref, thresholds=thresholds(ref),
         personal=rec['personal'] if rec else 0, tiers=rec['tiers'] if rec else 0, joined=bool(rec and rec['joined']),

@@ -3,6 +3,7 @@
 from html import escape
 import logging
 import math
+import os
 import time
 
 from telegram import InputPollOption, InlineKeyboardButton as Button, InlineKeyboardMarkup, Poll, Update
@@ -377,15 +378,15 @@ class MafiaHandlers:
         from storage.notifications import NotificationQueue
         queue = NotificationQueue(self.database)
         worker_id = 'telegram:mafia-deadlines'
+        kinds = {'mafia.phase', 'classic.question', 'classic.finished',
+                 'photo.question', 'photo.hint', 'photo.feedback',
+                 'photo.result', 'photo.finished', 'farm.request',
+                 'problem_report.text', 'problem_report.images'}
+        # Pause this delivery kind before claiming: pending rows and their deadlines stay intact.
+        if os.getenv('MQB_FARM_REQUEST_DELIVERY_ENABLED', '1') == '0':
+            kinds.discard('farm.request')
         for _ in range(20):
-            item = await queue.claim(
-                worker_id,
-                kinds={'mafia.phase', 'classic.question', 'classic.finished',
-                       'photo.question', 'photo.hint', 'photo.feedback',
-                       'photo.result', 'photo.finished',
-                       'farm.request',
-                       'problem_report.text', 'problem_report.images'},
-            )
+            item = await queue.claim(worker_id, kinds=kinds)
             if item is None:
                 return
             if not item['chat_id']:

@@ -1,4 +1,3 @@
-from copy import deepcopy
 from uuid import uuid4
 
 import pytest
@@ -29,7 +28,7 @@ def _start(farm, now=NOW):
 
 def _solve(farm, run=None, now=NOW):
     run = run or farm['oleg_game']['run']
-    run_id, sequences = run['id'], deepcopy(run['sequences'])
+    run_id, sequences = run['id'], [oleg.expected_notes(run, i) for i in range(oleg.ROUNDS)]
     for number, notes in enumerate(sequences):
         message, changed = oleg.answer(farm, {'run_id': run_id, 'round': number, 'notes': notes}, now)
         assert changed
@@ -40,6 +39,44 @@ def _wrong(notes):
     return [(notes[0] + 1) % oleg.BELLS] + list(notes[1:])
 
 
+@pytest.mark.parametrize('modifier', oleg.MODIFIERS)
+def test_daily_modifiers_are_fixed_at_start_and_verified_by_server(modifier):
+    farm = _farm()
+    day = DAY + (oleg.MODIFIERS.index(modifier) - DAY) % len(oleg.MODIFIERS)
+    now = day * 86400 - 10800
+    run = _start(farm, now)
+    assert run['modifier'] == modifier
+    assert oleg.public(farm, now + 86400)['active']['modifier'] == modifier
+    assert oleg.modifier_for_day(now) == modifier
+    seen = oleg.public(farm, now)['active']
+    expected = oleg.expected_notes(run, 0)
+    if modifier == 'echo':
+        assert expected == run['sequences'][0][::-1]
+    elif modifier == 'false_note':
+        assert len(seen['sequence']) == len(seen['reference_sequence']) + 1
+        assert expected[0] not in seen['reference_sequence']
+    elif modifier == 'shuffle':
+        assert sorted(seen['bell_order']) == list(range(oleg.BELLS))
+        assert expected == seen['sequence']
+    _, changed = oleg.answer(farm, {'run_id': run['id'], 'round': 0,
+                                   'notes': _wrong(expected)}, now)
+    assert not changed and run['round'] == 0
+    _solve(farm, run, now)
+    assert farm['coins'] == 12
+    oleg.validate(farm)
+
+
+def test_legacy_saved_run_keeps_classic_rules():
+    farm = _farm()
+    run = _start(farm)
+    run.pop('modifier')
+    run.pop('false_notes', None)
+    assert oleg.public(farm, NEXT_DAY)['active']['modifier'] == 'classic'
+    oleg.validate(farm)
+    _solve(farm, run, NEXT_DAY)
+    assert farm['coins'] == 12
+
+
 def test_public_projection_exposes_only_the_current_round():
     farm = _farm()
     run = _start(farm)
@@ -47,15 +84,15 @@ def test_public_projection_exposes_only_the_current_round():
 
     assert [len(sequence) for sequence in run['sequences']] == list(oleg.NOTES) == [3, 4, 5]
     assert all(0 <= note < oleg.BELLS for sequence in run['sequences'] for note in sequence)
-    assert set(seen['active']) == {'run_id', 'round', 'rounds', 'notes', 'sequence', 'started_at'}
-    assert seen['active']['sequence'] == run['sequences'][0] and seen['active']['round'] == 0
+    assert set(seen['active']) == {'run_id', 'round', 'rounds', 'notes', 'sequence', 'started_at', 'modifier', 'reference_sequence'}
+    assert seen['active']['reference_sequence'] == run['sequences'][0] and seen['active']['round'] == 0
     assert seen['rounds'] == [3, 4, 5] and seen['next_reward'] == {'coins': 12, 'xp': 4}
     assert seen['rewarded_today'] is False and seen['last_result'] is None
 
-    oleg.answer(farm, {'run_id': run['id'], 'round': 0, 'notes': run['sequences'][0]}, NOW + 1)
+    oleg.answer(farm, {'run_id': run['id'], 'round': 0, 'notes': oleg.expected_notes(run, 0)}, NOW + 1)
     seen = oleg.public(farm, NOW + 1)
-    assert seen['active']['round'] == 1 and seen['active']['sequence'] == run['sequences'][1]
-    assert seen['active']['notes'] == 4
+    assert seen['active']['round'] == 1 and seen['active']['reference_sequence'] == run['sequences'][1]
+    assert seen['active']['notes'] == 1
     oleg.validate(farm)
 
 
@@ -63,7 +100,7 @@ def test_wrong_notes_keep_the_round_and_pay_nothing():
     farm = _farm()
     run = _start(farm)
     message, changed = oleg.answer(farm, {'run_id': run['id'], 'round': 0,
-                                          'notes': _wrong(run['sequences'][0])}, NOW + 1)
+                                          'notes': _wrong(oleg.expected_notes(run, 0))}, NOW + 1)
 
     assert changed is False and 'Не совпало' in message
     assert farm['oleg_game']['run']['round'] == 0
@@ -201,13 +238,13 @@ def test_service_replay_refreshes_state_without_a_second_reward_and_wrong_answer
         started = await service.command('oleg-start-01', 'oleg_start', {})
         started_revision = started['revision']
         run = farm['oleg_game']['run']
-        wrong = {'run_id': run['id'], 'round': 0, 'notes': _wrong(run['sequences'][0])}
+        wrong = {'run_id': run['id'], 'round': 0, 'notes': _wrong(oleg.expected_notes(run, 0))}
         missed = await service.command('oleg-wrong-01', 'oleg_answer', wrong)
         assert missed['oleg_game']['active']['round'] == 0
         assert missed['revision'] == started_revision
         assert farm['coins'] == 1_000 and unit.farm['oleg_game']['run']['round'] == 0
 
-        for number, notes in enumerate(deepcopy(run['sequences'])):
+        for number, notes in enumerate([oleg.expected_notes(run, i) for i in range(oleg.ROUNDS)]):
             clock[0] = NOW + number + 1
             result = await service.command(f'oleg-round-{number:02}', 'oleg_answer',
                                            {'run_id': run['id'], 'round': number, 'notes': notes})
@@ -223,7 +260,7 @@ def test_service_replay_refreshes_state_without_a_second_reward_and_wrong_answer
         assert replay_wrong['oleg_game']['active'] is None
         assert replay_wrong['revision'] == completed_revision
         replay_complete = await service.command('oleg-round-02', 'oleg_answer',
-                                                {'run_id': run['id'], 'round': 2, 'notes': deepcopy(run['sequences'])[2]})
+                                                {'run_id': run['id'], 'round': 2, 'notes': oleg.expected_notes(run, 2)})
         assert replay_complete['revision'] == completed_revision
         assert farm['coins'] == 1_012 and farm['xp'] == LEVELS[10] + 4
 

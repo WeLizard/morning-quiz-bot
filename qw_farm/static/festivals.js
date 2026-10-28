@@ -66,6 +66,8 @@ export function renderFestival(p,view,h){
  if(view.birthday)head.append(el('p',`У фермы день рождения: ${view.birthday.years} г.`,'note'));
  head.append(el('p','Праздник ничего не отнимает: украшения и ярмарка — только радость. Памятный предмет года не возвращается, остальное можно найти в «Лавке прошлых праздников».','note'));
  p.append(head);
+ // The gift stays in the festival panel even when the optional decor and scares are hidden.
+ if(cur?.id==='pumpkin_night')h.horsemanCard?.(p);
  if(fair){
   if(fair.todo){p.append(card('Ярмарка готовится','Содержимое этого праздника ещё в работе','coin'));}
   if(fair.tasks.length){

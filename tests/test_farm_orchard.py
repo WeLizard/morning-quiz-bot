@@ -867,7 +867,8 @@ def test_an_apple_crop_growing_on_a_field_ripens_and_is_harvested_and_an_open_so
     assert fld['state'] == 'ripe' and 'apple' in orchard.fruits_in_reach(f)
     cmd(f, 'field_start', dict(field=fld['id'], op='harvest', crop='', revision=fld['revision']), T0 + 3600)
     settle(f, T0 + 3600 + TTL + 5)
-    assert fld['state'] == 'wild' and f['inventory']['apple'] == fields.yield_qty(96, 950, 950) > 0
+    # A harvest run opened now follows the current field rules: on expiry the server closes it at the full-economy autopilot quality.
+    assert fld['state'] == 'wild' and f['inventory']['apple'] == fields.yield_qty(96, 950, catalog.Q_AUTO_FULL) > 0
     validate_state(f)
     # (b) a sowing run opened for the fruit before the release: new runs are closed, the open one is still finished by the server
     at = T0 + 10 * 86400

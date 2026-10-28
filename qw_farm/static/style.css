@@ -62,7 +62,7 @@ dialog{border:0;border-radius:23px;max-width:440px;width:calc(100vw - 40px);padd
 .compact .seedbar .seed span{display:block;flex:none;line-height:14px;min-height:14px}
 .compact .seedbar .seed small{display:block;flex:none;line-height:13px;min-height:13px}
 @media(max-width:850px){.compact .seedbar .seed{height:64px;flex-basis:63px}}
-.bulk-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0}.bulk-grid button{min-height:44px;text-align:center}.zone-custom{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}.zone-custom[hidden]{display:none}.shift-box .progress-bar{margin:8px 0}
+.bulk-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--qw-btn-gap);margin:10px 0}.bulk-grid button{min-height:44px;text-align:center}.bulk-plans{display:grid;gap:8px;margin:8px 0}.bulk-action{position:relative;border:var(--qw-outline-w,1px) solid var(--line);border-radius:var(--qw-r-control,12px);padding:10px}.bulk-action h4{display:flex;align-items:center;min-height:44px;margin:0;padding-right:44px}.bulk-action p{margin:4px 0}.bulk-action>.bulk-plan{margin:8px 0}.bulk-action>button{min-height:44px}.bulk-info-copy p{color:var(--muted)}.bulk-plan{border:var(--qw-outline-w,1px) solid var(--line);border-radius:var(--qw-r-control,12px);padding:8px 10px}.bulk-plan summary{cursor:pointer;font-weight:650;min-height:44px;display:flex;align-items:center}.bulk-plan ul{margin:4px 0 8px;padding-left:22px}.bulk-plan li{margin:4px 0}.bulk-plan summary::after{content:'⌄';margin-left:auto;padding-left:8px;font-size:18px;line-height:1}.bulk-plan[open] summary::after{transform:rotate(180deg)}.zone-custom{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}.shift-box .progress-bar{margin:8px 0}
 
 /* r8: reputation, caravan and daily contracts */
 .rep-bar{margin:2px 0 8px}.rep-line{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}.rep-name{font-size:12px;font-weight:700;color:var(--green2)}.rep-line small{font-size:12px;color:var(--muted)}.rep-bar .progress-bar{height:4px;margin:4px 0 0}.rep-bar .progress-bar i{background:var(--honey)}
@@ -102,8 +102,6 @@ dialog{border:0;border-radius:23px;max-width:440px;width:calc(100vw - 40px);padd
 .fund-goods{max-height:52vh;overflow:auto;padding-right:4px}.tier-title{margin:14px 0 6px;font-size:12px;letter-spacing:.04em;color:var(--green2,#4f7a43)}.hud .hud-debt{cursor:pointer;color:#9a4b2a;font-weight:700}.hud .hud-debt span{white-space:nowrap}
 
 /* r9 stage 15B: fields door, field cards and the full-screen top-down minigames */
-.fields-door{top:106px}
-@media(max-width:850px){.fields-door{top:98px}}
 .panel-content select{width:100%;min-height:44px;margin:6px 0;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fffef6;color:var(--ink)}
 body.fg-open{overflow:hidden}
 .fg-overlay{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:#eef0dc;color:var(--ink);padding-top:var(--qw-safe-top,0px);padding-bottom:var(--qw-safe-bottom,0px);padding-left:max(10px,var(--qw-safe-left,0px));padding-right:max(10px,var(--qw-safe-right,0px))}
@@ -201,13 +199,11 @@ body.fg-open{overflow:hidden}
  .compact .topbar{gap:6px}
  .compact .brand-icon{width:27px;height:27px;border-radius:8px;font-size:18px}
  .compact .brand-icon span{font-size:12px;margin-top:5px}
- .compact .header-return-home{flex:0 0 auto;min-height:30px;padding:4px 8px;font-size:12px}
  .compact .header-destinations{display:flex;align-items:center;gap:12px;flex:0 0 auto}
  .compact .lighting-toggle{margin-right:4px}
  .compact .header-destinations .forest-door{position:relative;top:auto;left:auto;width:104px;height:44px;min-height:44px;flex:0 0 auto;border-radius:9px;box-shadow:none}
  .compact .header-destinations .lake-door{width:104px;height:44px;min-height:44px}
  .compact .header-destinations .forest-door>span{left:4px;bottom:3px;padding:2px 4px;font-size:12px}
- .compact .header-destinations .fields-door{display:flex;align-items:center;justify-content:center;width:56px;padding:0 5px;background:#edf3e5;color:#3a644a;font-size:12px}
  .compact .scene-heading{display:none}
  .compact .hud{gap:10px}
  .compact .hud-token svg{width:20px;height:20px}
@@ -217,9 +213,6 @@ body.fg-open{overflow:hidden}
  .compact .header-destinations{display:contents}
  .compact .header-destinations .forest-door{position:fixed;top:calc(var(--bar) + var(--qw-safe-top) + 8px);left:calc(var(--qw-safe-left) + 11px);width:92px;height:42px;border-radius:11px}
  .compact .header-destinations .forest-door>.sr-only{left:auto;bottom:auto}
- .compact .header-destinations .fields-door{top:calc(var(--bar) + var(--qw-safe-top) + 120px);display:flex;align-items:center;justify-content:center;width:68px;height:32px;min-height:32px;padding:0 6px;border-radius:9px;background:#f9faedee;font-size:12px}
- .compact .header-return-home{flex:0 0 34px;width:34px;min-height:34px;padding:0;font-size:0}
- .compact .header-return-home::before{content:'↶';font-size:19px;line-height:1}
  .compact .map-tools{top:8px}
  .compact .map-tools-row{gap:7px}
  .compact .map-chip{display:grid;place-items:center;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;border-radius:12px}
@@ -293,6 +286,12 @@ body{height:var(--qw-vh,100dvh);display:grid;grid-template-columns:minmax(0,1fr)
 .panel-content .card,.panel-content .form-field{min-width:0;overflow-wrap:anywhere}
 .bulk-grid,.zone-custom{grid-template-columns:repeat(2,minmax(0,1fr))}
 .card-footer{flex-wrap:wrap}
+.horseman-card{border-color:var(--qw-game-accent,var(--qw-accent));background:var(--qw-game-surface,var(--qw-surface));color:var(--qw-game-text,var(--qw-text))}
+.horseman-card .card-header small,.horseman-status,.horseman-next{color:var(--qw-game-muted,var(--qw-muted));font-size:var(--qw-fs-small);line-height:1.5}
+.horseman-card .qw-btn,.horseman-dialog .qw-btn{min-height:44px;font-size:var(--qw-fs-control)}
+.horseman-dialogue{color:var(--qw-game-text,var(--qw-text));font-size:var(--qw-fs-body);line-height:1.5}
+.horseman-gifts{list-style:none;margin:var(--qw-s-4) 0;padding:0;display:grid;gap:var(--qw-s-2)}
+.horseman-gifts li{padding:var(--qw-s-3);border:1px solid var(--qw-line);border-radius:var(--qw-r-control);background:var(--qw-game-surface-2,var(--qw-surface-2));color:var(--qw-game-text,var(--qw-text));font-size:var(--qw-fs-body)}
 .workspace>.rail{grid-column:1;grid-row:1}
 .workspace>.scene-area{height:auto;grid-column:2;grid-row:1}
 .workspace>.side-panel{grid-column:3;grid-row:1}
@@ -328,7 +327,6 @@ body{height:var(--qw-vh,100dvh);display:grid;grid-template-columns:minmax(0,1fr)
  .compact .scene-dock .quick-stack,.compact .scene-dock .map-controls{position:relative;inset:auto}
  .header-destinations,.compact .header-destinations{display:flex;position:absolute;top:calc(100% + 8px);left:calc(var(--qw-safe-left) + 11px);align-items:center;gap:7px;z-index:3}
  .header-destinations .forest-door,.compact .header-destinations .forest-door{position:relative;inset:auto;top:auto;left:auto;right:auto;bottom:auto;width:92px;height:42px;border-radius:11px}
- .header-destinations .fields-door,.compact .header-destinations .fields-door{width:68px;height:32px;min-height:32px;display:flex;align-items:center;justify-content:center}
  .immersive .workspace{grid-template-rows:minmax(0,1fr);padding-bottom:var(--qw-safe-bottom)}
  .immersive .workspace>.scene-area{height:auto;width:auto;margin:0}
  .immersive .workspace>.rail{display:none!important}
@@ -357,6 +355,10 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .fg-stage{flex:1 0 120px}
 .fg-result{max-height:calc(var(--qw-vh,100dvh) - var(--qw-safe-top) - var(--qw-safe-bottom) - 20px);overflow-y:auto}
 .topbar>.toasts{position:absolute;top:calc(100% + 6px)}
+/* Phones: destination cards sit 8px below the header and are 42px tall. Place
+   notices below them, and reserve the right map-tools lane so action toasts
+   cannot cover its buttons. The header height already includes Telegram safe-top. */
+@media(max-width:850px){.topbar>.toasts{top:calc(100% + 82px);left:calc(var(--qw-safe-left,0px) + 8px);right:calc(var(--qw-safe-right,0px) + (var(--bar,56px) - 36px)/2 + 104px);width:auto;max-width:none;transform:none}.topbar>.toasts>.toast-item{box-sizing:border-box;max-width:100%}.topbar>.toasts>.toast-item>span{min-width:0;overflow-wrap:anywhere}}
 /* Desktop with the side panel open: notices stand over the middle of the map, clear of the map tools (a notice can carry a button) */
 @media(min-width:851px){body:not(.panel-collapsed):not(.immersive) .topbar>.toasts{left:calc(34px + (100% - 318px)/2);max-width:min(440px,calc(100vw - 620px))}}
 
@@ -367,8 +369,6 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  .topbar>.brand{flex:0 0 30px;min-width:30px;gap:0}
  .topbar>.brand>span:last-child{display:none}
  .topbar>.brand .brand-icon{width:30px;height:30px;border-radius:9px;font-size:20px}
- .topbar>.header-return-home{flex:0 0 34px;width:34px;min-width:34px;height:34px;min-height:34px;padding:0;font-size:0}
- .topbar>.header-return-home::before{content:'↶';font-size:19px;line-height:1}
  .topbar>.header-actions{flex:0 0 auto;gap:2px}
  .topbar>.header-actions button{flex:0 0 36px;width:36px;min-width:36px;height:36px;min-height:36px}
  .topbar>.hud{flex:0 0 auto;display:flex;flex-wrap:nowrap;justify-content:flex-end;gap:6px;width:auto;min-width:0;margin:0}
@@ -386,7 +386,6 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  .topbar,.compact .topbar{gap:3px;padding-left:calc(6px + var(--qw-safe-left));padding-right:calc(5px + var(--qw-safe-right))}
  .topbar>.brand{flex-basis:28px;min-width:28px}
  .topbar>.brand .brand-icon{width:28px;height:28px}
- .topbar>.header-return-home{flex-basis:30px;width:30px;min-width:30px}
  .topbar>.header-actions{gap:2px}
  .topbar>.hud{gap:4px}
  .topbar .hud-token{gap:2px;font-size:12px}
@@ -414,6 +413,10 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-npc[aria-pressed=true]{background:#faf5dbb0;box-shadow:0 0 0 2px #8aab70}
 .village-npc-name{position:absolute;top:100%;left:50%;transform:translateX(-50%);max-width:120px;min-width:72px;padding:4px 7px;background:#fffbedf0;border-radius:8px;text-align:center;font-size:12px;line-height:1.15;box-shadow:0 2px 8px #42523a20;pointer-events:none}
 .village-npc:focus-visible,.village-townhall:focus-visible,.village-services summary:focus-visible{outline:3px solid #79975b;outline-offset:2px}
+.village-horseman{position:absolute;z-index:4;width:4.063%;height:6.717%;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;cursor:pointer}
+.village-horseman img{display:block;width:100%;height:100%;pointer-events:none;filter:drop-shadow(0 4px 4px #2b251a66)}
+.village-horseman:hover img,.village-horseman:focus-visible img{filter:drop-shadow(0 0 8px #ffd680)}
+.village-horseman:focus-visible{outline:3px solid var(--qw-game-accent,var(--qw-accent));outline-offset:3px;border-radius:8px}
 .village-request-dot{position:absolute;right:0;top:0;width:16px;height:16px;background:#f1d28a;color:#725c39;border:1px solid #faf3cf;border-radius:50%;font:800 12px/15px system-ui;text-align:center;font-style:normal;box-shadow:0 2px 3px #566b3430}
 .village-townhall{width:62px;height:44px;background:#f8f2d8dd;border-radius:12px;flex-direction:column;gap:1px;box-shadow:0 3px 7px #52643c20;font-size:12px}
 .village-townhall svg{width:23px;height:23px}.village-townhall[aria-pressed=true]{box-shadow:0 0 0 2px #8aab70}
@@ -523,7 +526,8 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-fest{position:absolute;inset:0;pointer-events:none;display:none}
 .village-fest>svg{display:block;width:100%;height:100%}
 :root[data-festival=posidelki][data-festival-decor=on] .village-fest[data-fest=posidelki],:root[data-festival=new_year][data-festival-decor=on] .village-fest[data-fest=new_year],
-:root[data-festival=maslenitsa][data-festival-decor=on] .village-fest[data-fest=maslenitsa],:root[data-festival=spring_flowers][data-festival-decor=on] .village-fest[data-fest=spring_flowers]{display:block}
+:root[data-festival=maslenitsa][data-festival-decor=on] .village-fest[data-fest=maslenitsa],:root[data-festival=spring_flowers][data-festival-decor=on] .village-fest[data-fest=spring_flowers],
+:root[data-festival=pumpkin_night][data-festival-decor=on] .village-fest[data-fest=pumpkin_night]{display:block}
 .village-fest-base .vf-night,.village-fest-glow .vf-decor,.village-fest-glow .vf-day{display:none}
 :root[data-farm-theme=night] .village-fest-base .vf-day{display:none}
 :root:not([data-farm-theme=night]) .village-fest-glow .vf-night{display:none}
@@ -590,7 +594,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 :root[data-farm-theme=night] .village-sky{display:block}
 .vs-stars{position:absolute;inset:0;background:radial-gradient(1.6px 1.6px at 9% 30%,#fff,transparent),radial-gradient(1.2px 1.2px at 21% 62%,#fff,transparent),radial-gradient(1.8px 1.8px at 34% 22%,#fff6c8,transparent),radial-gradient(1.2px 1.2px at 47% 70%,#fff,transparent),radial-gradient(1.6px 1.6px at 58% 18%,#fff,transparent),radial-gradient(1.2px 1.2px at 69% 58%,#fff6c8,transparent),radial-gradient(1.6px 1.6px at 77% 34%,#fff,transparent),radial-gradient(1.2px 1.2px at 90% 66%,#fff,transparent),radial-gradient(1.2px 1.2px at 15% 82%,#fff,transparent),radial-gradient(1.2px 1.2px at 96% 14%,#fff,transparent);mask-image:linear-gradient(#000 40%,transparent)}
 .vs-moon{position:absolute;right:18px;top:12px;width:34px;height:34px;border-radius:50%;background:#f7f0c6;box-shadow:inset -7px -3px 0 #d8cf9f,0 0 16px 6px #f3e8a850}
-.village-minimap{position:absolute;right:10px;bottom:10px;width:150px;aspect-ratio:4/3;min-height:44px;padding:0;border:2px solid #fff9e5;border-radius:12px;background:url(/app/farm/assets/village.svg) center/100% 100% #bdd0a2;box-shadow:0 4px 14px #2d4f3744;overflow:hidden;cursor:pointer}
+.village-minimap{position:absolute;right:10px;bottom:calc(10px + var(--qw-safe-bottom));width:150px;aspect-ratio:4/3;min-height:44px;padding:0;border:2px solid #fff9e5;border-radius:12px;background:url(/app/farm/assets/village.svg) center/100% 100% #bdd0a2;box-shadow:0 4px 14px #2d4f3744;overflow:hidden;cursor:pointer}
 .village-minimap:focus-visible{outline:3px solid #79975b;outline-offset:2px}
 .vm-mark{position:absolute;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;box-sizing:border-box}
 .vm-hall{width:9px;height:9px;background:#e9c25c;border:1.5px solid #fff;border-radius:3px}
@@ -641,7 +645,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-visitor{position:absolute;box-sizing:border-box;width:48px;height:48px;margin:-24px 0 0 -24px;padding:0;background:transparent;border:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .village-visitor-face{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#fff6dc;border:2px solid #d9c58e;box-shadow:0 3px 4px #52643c35;font-size:21px;line-height:1}
 :root[data-farm-theme=night] :is(.village-place,.village-site){background:var(--float);border-color:var(--line);color:var(--ink)}
-@media(max-width:480px){.village-minimap{width:112px;right:8px;bottom:8px}}
+@media(max-width:480px){.village-minimap{width:112px;right:8px;bottom:calc(8px + var(--qw-safe-bottom))}}
 @media(prefers-reduced-motion:no-preference){
  .is-walking .vp-stand{display:none}
  .is-walking :is(.vp-stepA,.vp-stepB){display:inline;animation:vp-frame .36s steps(1,end) infinite}.is-walking .vp-stepB{animation-delay:-.18s}
@@ -798,7 +802,6 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 :root[data-farm-theme=night] .village-scene{background:#203329}
 :root[data-farm-theme=night] .village-art{filter:none}
 :root[data-farm-theme=night] .village-npc[aria-pressed=true]{background:#d8c77740}
-:root[data-farm-theme=night] .header-destinations .fields-door{background:var(--surface-soft);color:var(--ink)}
 @media(max-width:850px){.lighting-toggle{width:44px;min-width:44px;padding:4px;position:relative}.topbar,.compact .topbar{gap:5px}.header-actions,.hud{flex:0 0 auto}}
 @media(max-width:420px){.header-actions{gap:0}.header-actions button{width:36px;min-width:36px}.compact .hud{gap:6px}.compact .hud-token{font-size:12px!important}.compact .hud-token svg{width:17px!important;height:17px!important}.compact .brand-icon{width:26px;height:28px;font-size:19px}.topbar,.compact .topbar{gap:3px;padding-left:calc(7px + var(--qw-safe-left));padding-right:calc(5px + var(--qw-safe-right))}}
 @media(prefers-reduced-motion:reduce){body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-controls button,.lighting-toggle,.login-screen{transition:none}}
@@ -848,7 +851,7 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 .village-card-door,.farm-card-door{display:none}
 @media(min-width:851px){
  .compact .header-destinations{gap:10px}
- .compact .header-destinations .forest-door:not(.fields-door){width:92px;height:36px;min-height:36px}
+ .compact .header-destinations .forest-door{width:92px;height:36px;min-height:36px}
  .compact .header-destinations .village-card-door{display:flex;position:relative;top:auto;left:auto;flex:0 0 auto;padding:0;border-radius:9px;box-shadow:none;overflow:hidden}
  .compact .header-destinations .farm-card-door{display:none;position:relative;top:auto;left:auto;flex:0 0 auto;padding:0;border-radius:9px;box-shadow:none;overflow:hidden}
  .village-open .header-destinations .village-card-door{display:none}
@@ -881,7 +884,6 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
  .compact .header-destinations{display:flex;position:fixed;z-index:9;top:calc(var(--bar) + var(--qw-safe-top) + 6px);left:calc(var(--qw-safe-left) + 6px);right:calc(var(--qw-safe-right,0px) + 104px);gap:8px;padding:2px 22px 17px 5px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 10px,#000 calc(100% - 26px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 10px,#000 calc(100% - 26px),transparent 100%)}
  .compact .header-destinations::-webkit-scrollbar{display:none}
  .compact .header-destinations .forest-door,.compact .header-destinations .lake-door,.compact .header-destinations .village-card-door,.compact .header-destinations .farm-card-door{position:relative;top:auto;left:auto;flex:0 0 auto;width:92px;height:42px;min-height:42px;scroll-snap-align:start}
- .compact .header-destinations .fields-door{position:relative;top:auto;left:auto;flex:0 0 auto;width:68px;height:42px;min-height:42px;scroll-snap-align:start}
  .village-open .header-destinations{left:calc(var(--qw-safe-left) + 6px)}
  .village-open .header-destinations .farm-card-door{z-index:30}
 }
@@ -994,12 +996,11 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 .side-panel .text-button,.panel-content .text-button{min-height:44px}
 
 /* Header destination cards (UI_RULES §9, §3.2): the touch box is 44px; the painted art keeps its old size inside it, and captions are 12px (13px on desktop). */
-.compact .header-destinations>.forest-door:not(.fields-door){height:44px;min-height:44px}
-.compact .header-destinations .fields-door{height:44px;min-height:44px}
+.compact .header-destinations>.forest-door{height:44px;min-height:44px}
 .header-destinations .forest-door .forest-door-art,.header-destinations .forest-door .lake-door-art{inset:auto;left:0;top:1px;width:100%;height:42px;border-radius:11px}
 .header-destinations .forest-door[data-label]::after{font:700 12px/1.2 system-ui,sans-serif}
 @media(min-width:851px){
- .compact .header-destinations>.forest-door:not(.fields-door){height:44px;min-height:44px;margin:-4px 0}
+ .compact .header-destinations>.forest-door{height:44px;min-height:44px;margin:-4px 0}
  .header-destinations .forest-door .forest-door-art,.header-destinations .forest-door .lake-door-art{top:4px;height:36px;border-radius:9px}
  .header-destinations .forest-door[data-label]::after{top:calc(100% + 5px)}
 }
@@ -1111,22 +1112,23 @@ html .scene-area .map-controls{display:flex;flex-direction:column;border:1px sol
 :root[data-farm-theme=night] .caravan-result.is-refund .cr-coins{color:var(--muted)}
 /* ===== Phone header hotfix (UI_RULES §3.3/§4). The XP status is one line: phones show the first bonus word,
    the full text stays in title/aria-label, so the HUD never grows the 56px bar. The destination cards share the
-   row left of the map tools: they shrink to fit (3 cards fit from 360px) and only scroll when there are more. */
+   row left of the map tools; fixed card widths preserve horizontal scrolling on phones. */
 @media(max-width:520px) and (orientation:portrait){
  html .topbar .hud-bonus{display:block;max-width:64px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
  html .topbar .hud-bonus span+span{display:none}
 }
 @media(max-width:850px){
  html .compact .header-destinations{padding-right:12px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 14px),transparent 100%)}
- html .compact .header-destinations>.forest-door:not(.fields-door){flex:1 1 0;width:auto;min-width:64px;max-width:92px}
+ html .compact .header-destinations>.forest-door{flex:0 0 92px;width:92px;min-width:92px;max-width:92px}
 }
 
 /* Friend requests use shell button groups and the existing farm cards. */
-.friend-requests-lane,.friend-requests-section{min-width:0;padding-block:var(--qw-s-3)}
+.friend-requests-section{min-width:0;padding-block:var(--qw-s-3)}
 .friend-requests-section>.qw-btn-group{display:flex;flex-wrap:wrap}
 .friend-requests-section>.qw-btn-group .qw-btn{flex:1;min-width:0}
-.friend-request-card .qw-btn-stack{margin-top:var(--qw-s-3)}
-.friend-request-card .qw-btn.danger{margin-top:var(--qw-s-2)}
+.friend-request-card .reward{white-space:normal;overflow-wrap:anywhere}
+.friend-request-card .card-header strong{overflow-wrap:anywhere}
+.friend-request-card .order-info .note:last-child{margin-bottom:0}
 .friend-request-form{display:grid;gap:var(--qw-s-2);min-width:0}
 .friend-request-form .qw-btn-group{display:flex;flex-wrap:wrap}
 .friend-request-form .qw-btn-group .qw-btn{flex:1;min-width:0}
@@ -1168,6 +1170,12 @@ html .scene-area .map-controls{display:flex;flex-direction:column;border:1px sol
 .farm-menu-art>.tab-badge{position:absolute!important;top:2px;right:2px}
 .farm-menu-head{display:none}
 .farm-menu-foot{margin:14px 8px 0;font-size:12px;line-height:1.4;color:var(--muted)}
+.farm-menu-visit{margin:4px 4px 10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px;line-height:1.35;color:var(--text)}
+:root[data-qw-contrast="1"] .farm-menu-visit{border-width:2px;font-size:15px}
+/* Guest view: no «Найти» chip, so the picture-card row may use its place; the «Ферма» card (the same one that brings you
+   back from the village) leads the row and takes you home — it replaces the old ↶ button. */
+html body.compact.farm-visit .header-destinations>.farm-card-door{order:-1}
+html body.compact.farm-visit .header-destinations{right:calc(var(--qw-safe-right,0px) + (var(--bar) - 36px) / 2 + 52px)}
 .farm-menu-scrim{display:none}
 .farm-menu-button{display:none}
 
@@ -1247,7 +1255,7 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 .catalog-clear svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .catalog-body{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;align-items:start}
 .catalog-body.is-search{display:block}
-.catalog-sections{position:sticky;top:0;display:flex;flex-direction:column;gap:6px}
+.catalog-sections{position:sticky;top:0;display:flex;flex-direction:column;gap:var(--qw-btn-gap)}
 .catalog-section{display:flex;flex-direction:column;align-items:center;gap:1px;min-height:44px;padding:6px 2px;border:2px solid transparent;border-radius:14px;background:transparent;color:var(--ink);text-align:center}
 .catalog-section strong{font-size:12px;font-weight:700;line-height:1.15;overflow-wrap:anywhere}
 .catalog-section small{font-size:12px;color:var(--muted)}
@@ -1258,6 +1266,8 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 .catalog-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
 .catalog-card{display:flex;flex-direction:column;align-items:stretch;gap:1px;min-width:0;min-height:44px;padding:5px 5px 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);text-align:left}
 .catalog-card:disabled{opacity:1}
+/* Hover must not reduce the measured 8px row gap by moving a card into its neighbour. */
+.catalog-card:hover:not(:disabled){transform:none}
 .catalog-card strong{margin:5px 3px 0;font-size:14px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
 .catalog-card small{margin:0 3px;font-size:12px;line-height:1.3;color:var(--muted)}
 .catalog-card small.is-short{color:#a3402c}
@@ -1300,7 +1310,7 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 .catalog-card strong{overflow-wrap:break-word}
 @media(min-width:851px) and (max-width:1150px){
  .catalog-body{grid-template-columns:minmax(0,1fr)}
- .catalog-sections{position:static;flex-direction:row;flex-wrap:wrap;gap:6px}
+ .catalog-sections{position:static;flex-direction:row;flex-wrap:wrap;gap:var(--qw-btn-gap)}
  .catalog-section{flex-direction:row;gap:5px;min-height:44px;padding:4px 10px;border-width:1px;border-color:var(--line);border-radius:999px}
  .catalog-section-pic{display:none}
  .catalog-section small::before{content:'· '}
@@ -1350,12 +1360,23 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 .order-links>.order-skip{margin-left:auto}
 .fr-ask{display:flex;flex-wrap:wrap;gap:var(--qw-btn-gap)}
 @media(max-width:850px){.rail.farm-menu .farm-menu-items:not(.is-art .farm-menu-items){grid-auto-rows:1fr}}
-/* workshop: recipe goods and time left, «В очередь» right; queue rows the same; remembered recipes as one wrapping row */
+/* Workshop batches share one repeat switch; the repeat intent waits for a master when no shift is running. */
 .recipe-info .goods{margin:0 0 2px}.recipe-info .recipe-time{margin:2px 0 0}
-.queue-job{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--qw-s-3);align-items:center}
-.queue-job>button{float:none;margin:0;grid-column:2;grid-row:1/span 2;min-width:6.5rem}
-.queue-job>strong,.queue-job>small{grid-column:1}
-.forget-recipes.qw-btn-stack{flex-direction:row;flex-wrap:wrap;margin:0 0 12px}
+.queue-job{display:grid;grid-template-columns:48px minmax(0,1fr) auto;column-gap:var(--qw-btn-gap);align-items:center}
+.queue-job>button:not(.repeat-toggle){float:none;margin:0;grid-column:3;grid-row:1/span 2;min-width:6.5rem;height:48px;min-height:48px}
+.queue-job>strong,.queue-job>small{grid-column:2;min-width:0;overflow-wrap:anywhere}
+.queue-job>.repeat-toggle{grid-column:1;grid-row:1/span 2}
+.repeat-toggle{width:48px;height:48px;min-width:48px;flex:0 0 48px;padding:0;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--ink);cursor:pointer}
+.repeat-toggle svg{width:23px;height:23px;fill:currentColor}
+.repeat-toggle.is-on{background:var(--green);border-color:var(--green);color:var(--paper)}
+.repeat-toggle:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.repeat-chips.qw-btn-stack{flex-direction:row;flex-wrap:wrap;margin:0 0 12px}
+.repeat-chips .repeat-toggle{width:auto;min-width:48px;min-height:48px;height:auto;flex:0 1 auto;grid-auto-flow:column;gap:7px;padding:0 12px;border-radius:var(--qw-r-control);font-size:var(--qw-fs-control);font-weight:650}
+.repeat-chips .repeat-toggle svg{flex:0 0 23px}
+.animal-production-actions{align-items:center;margin-top:8px}
+.animal-production-actions>button:not(.repeat-toggle){flex:1 1 auto;min-width:0;min-height:48px}
+:root[data-qw-contrast="1"] .repeat-toggle{background:var(--surface);border:var(--qw-outline-w) solid var(--ink);color:var(--ink)}
+:root[data-qw-contrast="1"] .repeat-toggle.is-on{background:var(--hc-pick);border-color:var(--ink);color:var(--hc-pick-ink)}
 /* object panel: «Переместить» and «Снести» apart in one row; plot: «Выкопать» and «Собрать» side by side */
 .object-actions{justify-content:space-between;margin-top:8px}
 .plot-actions{margin-top:12px}.plot-actions>button,.trip-row>.qw-btn{flex:1 1 0;min-width:0}
@@ -1409,6 +1430,31 @@ dialog.entry-info-dialog{max-width:520px}
 .seedbar>.seed.seed-all{margin-left:6px}  /* + the bar gap (6 PC / 3 phone / 8–12 contrast) = the button gap 8, PC 12 */
 @media(max-width:850px){.compact .seedbar>.seed.seed-all{margin-left:5px}}
 :root[data-qw-contrast="1"] .seedbar>.seed.seed-all{margin-left:0}
+/* «Подкормка» (FARM_FERTILIZERS §7): the bed switch is the strip's own first block, [Подкормка][лента][Всё]. It takes the strip's
+   height (align-self:stretch, no height of its own), uses only its own classes (never .seed or .seedbar-label) and writes the state
+   («вкл»/«выкл») and the stock on itself. The margin plus the bar gap is the button gap: 8 px on a phone, 12 on PC. */
+.seedbar>.fert-toggle{flex:0 0 auto;align-self:stretch;min-width:66px;min-height:44px;margin-right:6px;padding:3px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft);color:var(--ink);-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+@media(max-width:850px){.compact .seedbar>.fert-toggle{margin-right:5px}}
+.fert-toggle-top{display:flex;align-items:center;gap:3px}
+.fert-toggle-top svg{width:20px;height:20px;flex:none}
+.fert-state{min-width:32px;padding:0 5px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;line-height:15px;font-weight:700;text-align:center}
+.fert-toggle.is-on .fert-state{background:var(--green2);border-color:var(--green2);color:#fffcec}
+.fert-toggle-name{font-size:12px;line-height:14px;font-weight:700;letter-spacing:-.01em}
+.fert-toggle-stock{font-size:12px;line-height:13px;font-weight:500;white-space:nowrap;color:var(--muted)}
+.fert-toggle.is-empty .fert-toggle-top svg{opacity:.55;filter:grayscale(.6)}
+.fert-toggle:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+:root[data-farm-theme=night] .fert-toggle.is-on .fert-state{color:var(--accent-ink)}
+.fert-garden-toggle{min-height:44px;align-items:center;margin:4px 0 2px}
+.fert-garden-toggle input{width:20px;height:20px;margin:0}
+.fert-garden-toggle span{font-size:13px;font-weight:650}
+/* Keep the remaining quick actions separate. Grass is collected on the map. */
+.scene-area .quick-stack{gap:8px}
+.grass-feed-toggle{min-height:44px;align-items:center}
+.grass-feed-toggle input{width:20px;height:20px;margin:0}
+.bulk-plan summary::after{content:'⌄';margin-left:auto;padding-left:8px;font-size:18px;line-height:1}.bulk-plan[open] summary::after{transform:rotate(180deg)}
+.bulk-info-preview ul{margin:4px 0 8px;padding-left:22px}
+.bulk-info-preview li{margin:4px 0;overflow-wrap:anywhere}
+.bulk-action>button:not(.bulk-info-btn){margin-block-start:var(--qw-btn-gap)}
 /* ==== «Контрастный режим» (UI_RULES §16, E3 .local/mockups-2026-10-23) ====
    Only with <html data-qw-contrast="1">, set by qw-shell.js from the Account setting; the regular style is untouched.
    Solid backings (white by day, dark at night), 2 px outlines (--qw-outline-w), text 1–2 px larger,
@@ -1417,42 +1463,54 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"]{--paper:#f6f7f2;--panel:#ffffff;--surface:#ffffff;--surface-soft:#f1f4ea;--surface-selected:#e3ecd6;--float:#ffffff;
  --ink:#10231a;--muted:#26392d;--line:#4b5747;--green:#245c3c;--green2:#1b4630;--hc-dew:#6b4a00;--hc-pick:#10231a;--hc-pick-ink:#ffffff;--hc-focus:#8a5a00}
 :root[data-qw-contrast="1"][data-farm-theme=night]{--paper:#0f1d16;--panel:#0f1d16;--surface:#16281f;--surface-soft:#1c3127;--surface-selected:#2a4535;--float:#0f1d16;
- --ink:#ffffff;--muted:#dfe8d6;--line:#9fb3a5;--honey:#ffd34d;--accent-ink:#10231a;--hc-dew:#ffd34d;--hc-pick:#ffd34d;--hc-pick-ink:#10231a;--hc-focus:#ffd34d}
+ --ink:#ffffff;--muted:#dfe8d6;--green:#8fbd87;--green2:#b0d59e;--line:#9fb3a5;--honey:#ffd34d;--accent-ink:#10231a;--hc-dew:#ffd34d;--hc-pick:#ffd34d;--hc-pick-ink:#10231a;--hc-focus:#ffd34d}
 :root[data-qw-contrast="1"] #farm-canvas,:root[data-qw-contrast="1"] .village-art,:root[data-qw-contrast="1"][data-farm-theme=night] .village-art{filter:var(--qw-scene-filter,none)}
 :root[data-qw-contrast="1"] .vn-tint{opacity:var(--qw-night-dim,1)}
 :root[data-qw-contrast="1"] :is(button,a,input,select,textarea,canvas):focus-visible{outline:var(--qw-focus-w,3px) solid var(--hc-focus);outline-offset:2px}
 /* header */
 :root[data-qw-contrast="1"] .topbar{background:var(--surface);border-bottom:var(--qw-outline-w) solid var(--ink)}
-:root[data-qw-contrast="1"] .hud-token{font-size:15px}
-:root[data-qw-contrast="1"] .hud small{font-size:14px;font-weight:700}
+:root[data-qw-contrast="1"] .hud-token{font-size:var(--qw-fs-control,15px)}
+:root[data-qw-contrast="1"] .hud small{font-size:var(--qw-fs-small,14px);font-weight:700}
 :root[data-qw-contrast="1"] .hud .hud-bonus,:root[data-qw-contrast="1"][data-farm-theme=night] .hud .hud-bonus{color:var(--hc-dew)}
 :root[data-qw-contrast="1"] :is(.lighting-toggle,.header-actions button){background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 var(--qw-outline-w) var(--ink)}
+/* Narrow Telegram Desktop is still a PC-size target; beat the mobile 12px !important HUD fallback only in contrast mode. */
+@media(max-width:850px){
+ :root.qw-desktop[data-qw-contrast="1"] .topbar .hud-token,:root.qw-desktop[data-qw-contrast="1"] .compact .hud-token{font-size:var(--qw-fs-control,16px)!important}
+}
 /* map tools, dock and seed bar */
 :root[data-qw-contrast="1"] :is(.seedbar,.seedcard,.map-chip,.map-controls,.placement,.scene-heading>div,.farm-menu-button,.harvest-all,.repeat-run,.object-list-button,.scene-status){background:var(--float);color:var(--ink);border:var(--qw-outline-w) solid var(--ink);backdrop-filter:none;-webkit-backdrop-filter:none}
 /* zoom group: the ink background shows through 2 px gaps as separators, in a column and in a row alike */
 :root[data-qw-contrast="1"] .map-controls{gap:var(--qw-outline-w);background:var(--ink)}
 :root[data-qw-contrast="1"] .map-controls button,:root[data-qw-contrast="1"] .scene-dock .map-controls button{background:var(--float);color:var(--ink);border:0}
-:root[data-qw-contrast="1"] .harvest-all{font-size:15px;font-weight:700}
+:root[data-qw-contrast="1"] .harvest-all{font-size:var(--qw-fs-control,15px);font-weight:700}
 :root[data-qw-contrast="1"] .minimap{background:var(--float);border:var(--qw-outline-w) solid var(--ink)}
-:root[data-qw-contrast="1"] .farm-menu-button span{font-size:14px;font-weight:700}
-:root[data-qw-contrast="1"] .seedbar-label{color:var(--ink);font-size:13px;font-weight:700}
+:root[data-qw-contrast="1"] .farm-menu-button span{font-size:var(--qw-fs-small,14px);font-weight:700}
+:root[data-qw-contrast="1"] .seedbar-label{color:var(--ink);font-size:var(--qw-fs-caption,14px);font-weight:700}
 :root[data-qw-contrast="1"] .seedbar .seed{color:var(--ink);border:var(--qw-outline-w) solid var(--line);background:var(--surface)}
-:root[data-qw-contrast="1"] .seedbar .seed span,:root[data-qw-contrast="1"] .compact .seedbar .seed span{font-size:13px;font-weight:800}
+:root[data-qw-contrast="1"] .seedbar .seed span,:root[data-qw-contrast="1"] .compact .seedbar .seed span{font-size:var(--qw-fs-caption,14px);font-weight:800}
 :root[data-qw-contrast="1"] .seedbar .seed:not(.seed-all){min-width:80px}
-:root[data-qw-contrast="1"] :is(.seedbar .seed small,.seedbar .seed-details,.compact .seedbar .seed-details,.compact .seedbar .seed-details span){font-size:13px;line-height:15px;font-weight:600;color:var(--ink)}
+:root[data-qw-contrast="1"] :is(.seedbar .seed small,.seedbar .seed-details,.compact .seedbar .seed-details,.compact .seedbar .seed-details span){font-size:var(--qw-fs-caption,14px);line-height:15px;font-weight:600;color:var(--ink)}
 :root[data-qw-contrast="1"] .compact .seedbar .seed{height:auto;min-height:72px}
 :root[data-qw-contrast="1"] .compact .seedbar .seed span{max-width:78px}
 :root[data-qw-contrast="1"] .seedbar .seed:is(.selected,.active),:root[data-qw-contrast="1"][data-farm-theme=night] .seedbar .seed:is(.selected,.active){border:3px solid var(--hc-pick);background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--hc-pick)}
 :root[data-qw-contrast="1"] .seedbar .seed.seed-recent{border:var(--qw-outline-w) dashed var(--ink)}
 :root[data-qw-contrast="1"] .seedbar .seed.seed-all,:root[data-qw-contrast="1"][data-farm-theme=night] .seedbar .seed.seed-all{background:var(--surface);border:var(--qw-outline-w) solid var(--ink);color:var(--ink)}
 :root[data-qw-contrast="1"] .seedbar .seed-divider{background:var(--ink)}
+:root[data-qw-contrast="1"] .seedbar>.fert-toggle{margin-right:0;min-width:80px;padding:3px 5px;background:var(--surface);border:var(--qw-outline-w) solid var(--ink);color:var(--ink)}
+:root[data-qw-contrast="1"] :is(.fert-toggle-name,.fert-toggle-stock){font-size:var(--qw-fs-caption,14px);line-height:15px;color:var(--ink)}
+:root[data-qw-contrast="1"] .fert-toggle-name{font-weight:800;letter-spacing:-.02em}
+:root[data-qw-contrast="1"] .fert-toggle-stock{font-weight:600}
+:root[data-qw-contrast="1"] .fert-state{font-size:var(--qw-fs-caption,14px);line-height:17px;border:var(--qw-outline-w) solid var(--ink);background:var(--surface);color:var(--ink)}
+:root[data-qw-contrast="1"] .fert-toggle.is-on .fert-state,:root[data-qw-contrast="1"][data-farm-theme=night] .fert-toggle.is-on .fert-state{background:var(--hc-pick);border-color:var(--hc-pick);color:var(--hc-pick-ink)}
+:root[data-qw-contrast="1"] .fert-toggle.is-empty .fert-toggle-top svg{opacity:.8;filter:none}
+:root[data-qw-contrast="1"] .fert-garden-toggle span{font-size:var(--qw-fs-control,15px);color:var(--ink)}
 /* menu (rail on a PC, bottom sheet on a phone) */
 :root[data-qw-contrast="1"] .rail.farm-menu,:root[data-qw-contrast="1"][data-farm-theme=night] .rail.farm-menu{background:var(--surface);border-color:var(--ink)}
 :root[data-qw-contrast="1"] .workspace>.rail.farm-menu{border-right:var(--qw-outline-w) solid var(--ink)}
-:root[data-qw-contrast="1"] .farm-menu-title{color:var(--ink);font-size:13px}
+:root[data-qw-contrast="1"] .farm-menu-title{color:var(--ink);font-size:var(--qw-fs-caption,14px)}
 :root[data-qw-contrast="1"] .rail.farm-menu .farm-menu-item{color:var(--ink)}
-:root[data-qw-contrast="1"] .farm-menu-copy strong{font-size:15px}
-:root[data-qw-contrast="1"] .farm-menu-copy small,:root[data-qw-contrast="1"] .farm-menu-foot{font-size:14px;color:var(--muted)}
+:root[data-qw-contrast="1"] .farm-menu-copy strong{font-size:var(--qw-fs-control,15px)}
+:root[data-qw-contrast="1"] .farm-menu-copy small,:root[data-qw-contrast="1"] .farm-menu-foot{font-size:var(--qw-fs-small,14px);color:var(--muted)}
 :root[data-qw-contrast="1"] .rail.farm-menu .farm-menu-item.active,:root[data-qw-contrast="1"][data-farm-theme=night] .rail.farm-menu .farm-menu-item.active{background:var(--hc-pick);color:var(--hc-pick-ink);border-color:var(--hc-pick);box-shadow:none}
 :root[data-qw-contrast="1"] .rail.farm-menu .farm-menu-item.active small{color:var(--hc-pick-ink)}
 :root[data-qw-contrast="1"] .rail.farm-menu .farm-menu-item.farm-menu-art{border:var(--qw-outline-w) solid var(--ink);background:var(--surface)}
@@ -1468,6 +1526,7 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"] .panel-title{border-bottom:var(--qw-outline-w) solid var(--ink)}
 :root[data-qw-contrast="1"] .panel-title .eyebrow{color:var(--muted)}
 :root[data-qw-contrast="1"] :is(.card,.home-project-card,.caravan,.minigame-card,.login-card,dialog,.fg-result,.catalog-card,.catalog-search,.callout,.shift-box,.queue-job,.object-card,.more-item,.land-expansion,.tag,.event,.crate,.fund-tier){background:var(--surface);border:var(--qw-outline-w) solid var(--line);color:var(--ink)}
+:root[data-qw-contrast="1"] :is(.bulk-action,.bulk-plan){border-color:var(--ink)}
 :root[data-qw-contrast="1"] :is(.secondary,.light,.panel-close,.pill-row button,.find-filters button,.building-purpose-pick,.catalog-section,.catalog-clear,.village-back,.village-townhall){background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 var(--qw-outline-w) var(--ink)}
 :root[data-qw-contrast="1"] :is(.primary,.pill-row button.active){background:var(--hc-pick);color:var(--hc-pick-ink);border-color:var(--hc-pick)}
 :root[data-qw-contrast="1"] :is(.find-filters button[aria-pressed=true],.map-chip[aria-pressed=true],.catalog-section[aria-pressed=true],.home-project-card.is-active,.object-card.is-selected){background:var(--surface);color:var(--ink);border-color:var(--hc-pick);box-shadow:inset 0 0 0 3px var(--hc-pick);outline:0}
@@ -1475,15 +1534,15 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"] .catalog-search input{border:0}
 :root[data-qw-contrast="1"] :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
 :root[data-qw-contrast="1"] :is(.rail button,.note,.empty,.text-button,.subheading,.recipe-time,.lock-text,.event small,.card .tag,.login-card details,.login-card .eyebrow,.scene-heading .eyebrow,.scene-heading p,.reward small,.scene-status,.seedcard-class,.seedcard-hint,.resident-note,.invite-more summary,.invite-rules summary,.catalog-card small,.catalog-section small,.catalog-group,.placement-copy small){color:var(--muted)}
-:root[data-qw-contrast="1"] :is(.catalog-card small,.catalog-section small,.placement-copy small,.panel-content small,.note){font-size:14px}
-:root[data-qw-contrast="1"] .catalog-card strong{font-size:15px}
-:root[data-qw-contrast="1"] .catalog-section strong{font-size:13px}
+:root[data-qw-contrast="1"] :is(.catalog-card small,.catalog-section small,.placement-copy small,.panel-content small,.note){font-size:var(--qw-fs-small,14px)}
+:root[data-qw-contrast="1"] .catalog-card strong{font-size:var(--qw-fs-control,15px)}
+:root[data-qw-contrast="1"] .catalog-section strong{font-size:var(--qw-fs-caption,14px)}
 :root[data-qw-contrast="1"] .catalog-card.is-locked strong{color:var(--ink)}
 :root[data-qw-contrast="1"] .catalog-card.is-locked .catalog-pic>canvas,:root[data-qw-contrast="1"] .catalog-card.is-locked .catalog-pic>.is-icon{opacity:.75}
 :root[data-qw-contrast="1"] .catalog-chip{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 var(--qw-outline-w) var(--ink)}
 :root[data-qw-contrast="1"] .tab-badge{box-shadow:0 0 0 2px var(--surface)}
 /* village: solid name tags and outlined buttons over the picture */
-:root[data-qw-contrast="1"] .village-npc-name,:root[data-qw-contrast="1"][data-farm-theme=night] .village-npc-name{background:var(--surface);color:var(--ink);border:var(--qw-outline-w) solid var(--ink);font-size:13px}
+:root[data-qw-contrast="1"] .village-npc-name,:root[data-qw-contrast="1"][data-farm-theme=night] .village-npc-name{background:var(--surface);color:var(--ink);border:var(--qw-outline-w) solid var(--ink);font-size:var(--qw-fs-caption,14px)}
 :root[data-qw-contrast="1"] .village-npc svg{filter:drop-shadow(0 0 1px var(--ink)) drop-shadow(0 0 1px var(--ink))}
 :root[data-qw-contrast="1"] :is(.village-place,.village-site,.village-stage-badge,.village-thought,.village-townhall){background:var(--surface);color:var(--ink);border:var(--qw-outline-w) solid var(--ink)}
 :root[data-qw-contrast="1"] .village-gate .vg-sign{filter:drop-shadow(0 0 1px #10231a) drop-shadow(0 0 1px #10231a)}
@@ -1499,3 +1558,9 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"] .village-gate:focus-visible:active .vg-sign{filter:brightness(.94) var(--farm-focus-ring)}
 :root[data-qw-contrast="1"] .scene-area .map-controls>button:is(:hover,:active){background:var(--surface-soft);color:var(--ink)}
 :root[data-qw-contrast="1"] .scene-area .map-controls>button:focus-visible{outline:var(--qw-focus-w,3px) solid var(--hc-focus);outline-offset:-4px}
+
+/* Text actions share the readable caption scale, including narrow Telegram Desktop. */
+:root[data-qw-contrast="1"] .qw-btn.text{font-size:var(--qw-fs-small,14px)}
+
+/* Long bulk previews stay readable inside the existing info dialog. */
+.bulk-info-preview{max-height:min(35dvh,360px);overflow-y:auto;overscroll-behavior:contain;padding-right:4px}

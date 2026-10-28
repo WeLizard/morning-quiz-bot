@@ -15,6 +15,11 @@ OPEN_SECONDS = 48 * 3600
 SETTLE_SECONDS = 72 * 3600
 
 
+def _display_farm_name(farm):
+    name = farm.get('name') if isinstance(farm, dict) else None
+    return name.strip() if isinstance(name, str) and name.strip() else 'Сосед'
+
+
 def table(metadata):
     if 'farm_requests' in metadata.tables:
         return metadata.tables['farm_requests']
@@ -312,7 +317,7 @@ async def projection(unit, farm, now):
                 if not k.endswith('_account') and (k != 'audience_farm' or row['requester_farm'] == uid)}
         requester = farm if row['requester_farm'] == uid else peers.get(str(row['requester_farm']))
         giver = farm if row['giver_farm'] == uid else (await unit.get(str(row['giver_farm'])) if row['giver_farm'] else None)
-        data.update(requester_name='Сосед', giver_name='Сосед', can_give=False, reason=None, can_accept=False, accept_reason=None,
+        data.update(requester_name=_display_farm_name(requester), giver_name=_display_farm_name(giver), can_give=False, reason=None, can_accept=False, accept_reason=None,
                     expiring=bool(row['status'] == 'delivered' and row['settle_by'] - now <= 12 * 3600))
         if row['requester_farm'] == uid:
             own.append(data)
@@ -346,7 +351,7 @@ async def projection(unit, farm, now):
         await unit.save(farm)
         await unit.record(await unit.owner_account(farm['id']), 'request-inbox:' + str(farm['revision']), 'request_inbox', before, farm, now)
     return dict(incoming=incoming, own=own, good_deeds=state['good_deeds'], thanks=deepcopy(state.get('thanks', [])), limits=await limits(unit, farm, now),
-                neighbors=[dict(id=fid, name='Сосед') for fid in peers])
+                neighbors=[dict(id=fid, name=_display_farm_name(peer)) for fid, peer in peers.items()])
 
 
 async def create(unit, farm, account, data, now):

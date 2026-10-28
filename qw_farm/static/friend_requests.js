@@ -24,31 +24,30 @@ export function createFriendRequests(h){
  }
  function requestCard(row,type){
   const delivered=type==='own'&&row.status==='delivered',open=row.status==='open';
-  const title=delivered?'Сосед привёз посылку':type==='incoming'?'Просьба соседа':'Моя просьба';
-  const subtitle=type==='incoming'?(row.requester_name||'Сосед'):delivered?(row.giver_name||'Сосед'):'Ёж доставляет записки';
-  const c=h.card(title,subtitle,'friends');c.classList.add('friend-request-card');c.dataset.requestId=row.id;
-  c.append(h.el('p',`${delivered?'Привезли':'Нужно'}: ${h.itemName(row.item)} ×${row.qty}`),h.el('p',`Взамен: ${offerText(row,h.itemName)}`));
+  const person=type==='incoming'?(row.requester_name||'соседняя ферма'):(row.giver_name||'соседняя ферма');
+  const title=delivered?`Посылка от соседа ${person}`:type==='incoming'?`Сосед ${person} просит ${h.itemName(row.item)} ×${row.qty}`:'Моя просьба';
+  const c=h.card(title,delivered?'Доставлено Ежом':type==='incoming'?'Просьба соседа':'Ёж доставляет записки','friends');c.classList.add('friend-request-card');c.dataset.requestId=row.id;
+  const body=h.el('div',null,'qw-action-row order-body'),info=h.el('div',null,'order-info'),goods=h.el('div',null,'goods'),links=h.el('div',null,'order-links');
+  goods.append(h.el('span',`${h.itemName(row.item)} ×${row.qty}`,'good'));info.append(goods,h.el('p',`Взамен: ${offerText(row,h.itemName)}`,'reward'));
   const until=Number(delivered?row.settle_by:row.expires_at);
-  if(until)h.note(`Осталось ${h.duration(Math.max(0,until-h.now()))}`,c);
-  if(delivered&&(row.expiring||until-h.now()<=12*3600))h.note('Скоро срок принятия: Ёж вернёт посылку через 12 часов или раньше.',c);
+  if(until)h.note(`Осталось ${h.duration(Math.max(0,until-h.now()))}`,info);
+  if(delivered&&(row.expiring||until-h.now()<=12*3600))h.note('Скоро срок принятия: Ёж вернёт посылку через 12 часов или раньше.',info);
+  body.append(info);
   if(delivered){
-   if(row.accept_reason)h.note(row.accept_reason,c);
-   c.append(group(btn('Принять',()=>h.command('request_accept',{request:row.id}),'primary',row.can_accept===false),
-    btn('Отказаться',()=>confirm('request_decline',row,'Отказаться'),'danger')));
+   if(row.accept_reason)h.note(row.accept_reason,info);
+   body.append(btn('Принять',()=>h.command('request_accept',{request:row.id}),'primary order-go',row.can_accept===false));
+   links.append(btn('Отказаться',()=>confirm('request_decline',row,'Отказаться'),'danger'));
   }else if(type==='incoming'&&open){
-   const reason=giveBlock(row,h.me()?.inventory);if(reason)h.note(reason.startsWith('Не хватает:')?`${reason} · ${h.itemName(row.item)}`:reason,c);
-   c.append(group(btn('Отдать',()=>h.command('request_give',{request:row.id}),reason?'secondary':'primary',!!reason),
-    btn('Не сейчас',()=>h.command('request_hide',{request:row.id}),'text')));
-  }else if(open){h.note('Ждём ответа · Ёж в пути',c);c.append(group(btn('Отменить',()=>confirm('request_cancel',row,'Отменить просьбу'),'danger')));}
-  else h.note({delivered:'Ёж понёс посылку',settled:'Посылка принята · спасибо!',returned:'Ёж вернул товар соседу',expired:'Срок просьбы закончился',cancelled:'Просьба отменена'}[row.status]||'Просьба закрыта',c);
-  return c;
+   const reason=giveBlock(row,h.me()?.inventory);if(reason)h.note(reason.startsWith('Не хватает:')?`${reason} · ${h.itemName(row.item)}`:reason,info);
+   body.append(btn('Отдать',()=>h.command('request_give',{request:row.id}),reason?'secondary order-go':'primary order-go',!!reason));
+   links.append(btn('Не сейчас',()=>h.command('request_hide',{request:row.id}),'text'));
+  }else if(open){h.note('Ждём ответа · Ёж в пути',info);links.append(btn('Отменить',()=>confirm('request_cancel',row,'Отменить просьбу'),'danger'));}
+  else h.note({delivered:'Ёж понёс посылку',settled:'Посылка принята · спасибо!',returned:'Ёж вернул товар соседу',expired:'Срок просьбы закончился',cancelled:'Просьба отменена'}[row.status]||'Просьба закрыта',info);
+  c.append(body,links);return c;
  }
- function lane(p){
-  const list=[...rows().filter(r=>r.status==='delivered').map(r=>[r,'own']),...incoming().map(r=>[r,'incoming'])];
-  if(!list.length)return;
-  const section=h.el('section',null,'friend-requests-lane');section.setAttribute('aria-label','От соседей');
-  section.append(h.el('h3',`От соседей · ${list.length}`,'subheading'));
-  for(const [r,type]of list)section.append(requestCard(r,type));p.append(section);
+ function boardCards(p){
+  for(const row of rows().filter(r=>r.status==='delivered'))p.append(requestCard(row,'own'));
+  for(const row of incoming())p.append(requestCard(row,'incoming'));
  }
  function segments(options,value,onChange){
   const n=h.el('div',null,'qw-btn-group');n.setAttribute('role','group');
@@ -83,7 +82,7 @@ export function createFriendRequests(h){
   for(const id of ids){const option=h.el('option',h.itemName(id));option.value=id;item.append(option);}if(initialItem&&ids.includes(initialItem))item.value=initialItem;
   qty.min=1;qty.max=20;qty.step=1;qty.required=true;
   const toControls=h.el('div'),[tw,to]=h.field('Сосед','select');
-  for(const n of list.filter(n=>!n.status||n.status==='accepted')){const option=h.el('option',`Сосед · ${n.id.slice(0,8)}`);option.value=n.id;to.append(option);}
+  for(const n of list.filter(n=>!n.status||n.status==='accepted')){const option=h.el('option',n.name||'Соседняя ферма');option.value=n.id;to.append(option);}
   const offerControls=h.el('div'),[cw,coins]=h.field('Монеты взамен','number',1),[ow,offerItem]=h.field('Товар взамен','select'),[oqw,offerQty]=h.field('Количество взамен','number',1);
   coins.min=1;coins.step=1;offerQty.min=1;offerQty.step=1;
   for(const id of ids.filter(id=>Number(me.inventory?.[id])>0)){const option=h.el('option',`${h.itemName(id)} · ${me.inventory[id]}`);option.value=id;offerItem.append(option);}
@@ -112,11 +111,11 @@ export function createFriendRequests(h){
  }
  function notify(){
   const me=h.me();if(!me)return;if(identity!==me.id){identity=me.id;seen.clear();}
-  const delivered=rows().filter(row=>row.status==='delivered').map(row=>({id:`delivered:${row.id}`,text:`Сосед привёз ${h.itemName(row.item)} ×${row.qty}. Посылка ждёт на доске заказов.`}));
+  const delivered=rows().filter(row=>row.status==='delivered').map(row=>({id:`delivered:${row.id}`,text:`Сосед ${row.giver_name||'соседняя ферма'} привёз ${h.itemName(row.item)} ×${row.qty}. Посылка ждёт на доске заказов.`}));
   for(const row of [...delivered,...(view().notifications||[])]){const key=row.id||row.key;if(!key||seen.has(key))continue;seen.add(key);if(row.text)h.toast(row.text);}
   h.badge?.(count());
   if(mounted?.isConnected&&mountedSnapshot!==JSON.stringify(view())){const old=mounted,host=h.el('div');renderNeighbors(host);old.replaceWith(host.firstElementChild);}
   while(seen.size>200)seen.delete(seen.values().next().value);
  }
- return {lane,renderNeighbors,missing,create,notify,count,setNeighbors:list=>{neighbors=list||[];}};
+ return {boardCards,renderNeighbors,missing,create,notify,count,setNeighbors:list=>{neighbors=list||[];}};
 }

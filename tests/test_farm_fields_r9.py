@@ -12,7 +12,7 @@ import pytest
 
 from qw_farm import api, catalog, economy, fields, market, progression
 from qw_farm.catalog import (CROPS, FIELD_FUEL, FIELD_MACHINES, FIELD_SEED_MULT, FIELD_STEPS, FIELD_UPKEEP, HOPPER, LEVELS, Q_AUTO,
-                             public_catalog, validate, validate_fields)
+                             Q_AUTO_FULL, Q_BASE_FULL, Q_SPAN_FULL, public_catalog, validate, validate_fields)
 from qw_farm.domain import FarmError, apply, new_farm, project, validate_state
 from qw_farm.expansion import settle, upgrade_state
 from qw_farm.service import FarmService, Principal
@@ -21,6 +21,7 @@ T0 = 1_800_000_000
 DAY = 86400
 FIXTURES = Path(__file__).resolve().parent / 'fixtures' / 'farm_fields'
 OPS = ('cultivate', 'sow', 'harvest')
+ALL_OPS = OPS + ('spray',)
 TTL = catalog.FIELD_RUN_TTL
 
 
@@ -48,7 +49,7 @@ def fail(f, kind, data, at=T0, code=None, status=None):
     return error.value
 
 
-def equipped(lv=44, tiers=(1, 1, 1), step=0, coins=10 ** 8):
+def equipped(lv=44, tiers=(1, 1, 1, 1), step=0, coins=10 ** 8):
     f = farm(lv, coins)
     cmd(f, 'buy_field', dict(step=step))
     for name, tier in zip(FIELD_MACHINES, tiers):
@@ -102,10 +103,10 @@ def test_catalog_tables_and_public_projection():
     validate()
     # 9 field crops of r9 plus the long (>= FIELD_MIN_GROW) crops that R16 added later; counted, not pinned, so a new long crop keeps the test valid
     r16_field = sum(1 for k in catalog.R16_CROP_IDS if CROPS[k]['seconds'] >= catalog.FIELD_MIN_GROW and not CROPS[k].get('orchard'))
-    assert validate_fields() == dict(field_steps=5, field_machines=3, field_crops=9 + r16_field)
+    assert validate_fields() == dict(field_steps=5, field_machines=4, field_crops=9 + r16_field)
     assert [(s['level'], s['ha'], s['cost']) for s in FIELD_STEPS] == [(22, 1, 60000), (27, 1, 120000), (32, 2, 250000), (38, 2, 450000), (44, 3, 800000)]
     assert {k: m['costs'][1:] for k, m in FIELD_MACHINES.items()} == {k: (30000, 120000) for k in FIELD_MACHINES}
-    assert {m['op'] for m in FIELD_MACHINES.values()} == set(OPS)
+    assert {m['op'] for m in FIELD_MACHINES.values()} == set(ALL_OPS)
     assert all(c['field'] == (c['seconds'] >= catalog.FIELD_MIN_GROW and not c.get('orchard')) for c in CROPS.values())
     assert not CROPS['wheat']['field'] and CROPS['saffron']['field']
     pub = public_catalog()['fields']
@@ -214,8 +215,48 @@ def test_harvest_hopper_overflow_is_lost_and_unloading_is_only_at_the_top_edge()
     assert fields.simulate(field, run, never_full) == 1000
 
 
+def test_new_harvest_runs_unload_only_at_the_fixed_truck():
+    for width, good, bad in ((1, 4, 6), (2, 4, 6), (3, 4, 5)):
+        field, run = square(width, op='harvest')
+        run['unload_zone'] = True
+        assert fields._near_unload(good, width) and not fields._near_unload(bad, width)
+        assert fields.simulate(field, run, 'R' * good + 'X') is not None
+        assert fields.simulate(field, run, 'R' * bad + 'X') is None
+    field, run = square(1, op='harvest')
+    run['unload_zone'] = True
+    assert fields.simulate(field, run, 'X') is None
+    del run['unload_zone']
+    assert fields.simulate(field, run, 'X') is not None
+
+
+def test_new_runs_remember_the_fixed_unload_zone():
+    f = equipped()
+    cultivate_run = start(f, 'cultivate', T0)
+    assert cultivate_run.get('unload_zone') is False and cultivate_run.get('rules') == 3
+    g = equipped()
+    fld(g).update(state='ripe', crop=dict(id='saffron', planted_at=T0, ready_at=T0, base=100, xp=1, q_sow=1000,
+                                           version=catalog.VERSION))
+    assert start(g, 'harvest', T0 + 1).get('unload_zone') is True
+    h = equipped()
+    fld(h).update(state='ripe', crop=dict(id='saffron', planted_at=T0, ready_at=T0, base=100, xp=1, q_sow=1000,
+                                           version=catalog.VERSION))
+    spray = start(h, 'spray', T0 + 1)
+    assert spray.get('unload_zone') is True and spray.get('tank') == catalog.FIELD_TANK and spray.get('wind') in (-1, 1)
+
+
+def test_reference_driver_unloads_at_the_fixed_truck():
+    for width in (1, 2, 3):
+        field, run = square(width, op='harvest')
+        run['unload_zone'] = True
+        path = fields.reference_path(field, run)
+        assert 'X' in path
+        for ch, x, y, _ in fields._walk(field['w'], field['h'], run['width'], frozenset(run['rocks']), path, 'X'):
+            if ch == 'X':
+                assert y == 0 and fields._near_unload(x, width)
+
+
 def test_obstacles_are_deterministic_sparse_and_never_block_the_start():
-    for op in OPS:
+    for op in ALL_OPS:
         for ha in (1, 2, 3):
             a = fields.make_obstacles('abc', op, 8, 8 * ha, ha)
             assert a == fields.make_obstacles('abc', op, 8, 8 * ha, ha) and a != fields.make_obstacles('abd', op, 8, 8 * ha, ha)
@@ -395,7 +436,7 @@ def test_finish_checks_path_time_and_replays_it_server_side():
     exact = T0 + math.ceil(n_ * 12 / 100)
     cmd(f, 'field_finish', dict(field=field['id'], run=run['id'], path=path), exact)
     score = fields.simulate(field | dict(), run, path)
-    assert fld(f)['state'] == 'ready' and fld(f)['run'] is None and fld(f)['q_cult'] == fields.quality(score)
+    assert fld(f)['state'] == 'ready' and fld(f)['run'] is None and fld(f)['q_cult'] == fields.quality_full(score)
 
 
 def test_path_length_ceiling_is_three_times_the_tiles_per_width_and_never_above_2000():
@@ -440,7 +481,7 @@ def test_autopilot_is_ready_after_90_seconds_per_hectare_over_the_width():
         settle(f, T0 + 10 + seconds - 1)
         assert fld(f)['state'] == 'wild' and fld(f)['run'] is not None
         settle(f, T0 + 10 + seconds)
-        assert fld(f)['state'] == 'ready' and fld(f)['run'] is None and fld(f)['q_cult'] == Q_AUTO
+        assert fld(f)['state'] == 'ready' and fld(f)['run'] is None and fld(f)['q_cult'] == Q_AUTO_FULL
         validate_state(f)
     big = farm(32)
     cmd(big, 'buy_field', dict(step=2))
@@ -458,18 +499,18 @@ def test_an_expired_run_is_closed_by_settle_as_the_autopilot_without_owner_bonus
     settle(f, T0 + TTL - 1)
     assert fld(f)['run'] is not None and fld(f)['state'] == 'wild'
     settle(f, T0 + 5 * DAY)                                                                                      # the owner comes back much later
-    assert fld(f)['state'] == 'ready' and fld(f)['run'] is None and fld(f)['q_cult'] == Q_AUTO and fld(f)['last_run_at'] == T0 + TTL
+    assert fld(f)['state'] == 'ready' and fld(f)['run'] is None and fld(f)['q_cult'] == Q_AUTO_FULL and fld(f)['last_run_at'] == T0 + TTL
     run = start(f, 'sow', T0 + 5 * DAY, 'saffron')
     settle(f, T0 + 6 * DAY)                                                                                      # closed at its deadline: growth starts then
-    assert fld(f)['state'] == 'growing' and fld(f)['crop']['planted_at'] == T0 + 5 * DAY + TTL and fld(f)['crop']['q_sow'] == 950
-    assert fld(f)['crop']['ready_at'] == T0 + 5 * DAY + TTL + 86400
+    assert fld(f)['state'] == 'growing' and fld(f)['crop']['planted_at'] == T0 + 5 * DAY + TTL and fld(f)['crop']['q_sow'] == 900
+    assert fld(f)['crop']['ready_at'] == T0 + 5 * DAY + TTL + math.ceil(86400 * (1950 - Q_AUTO_FULL) / 1000)
     settle(f, T0 + 8 * DAY)
     assert fld(f)['state'] == 'ripe'
     start(f, 'harvest', T0 + 8 * DAY)
     settle(f, T0 + 9 * DAY)
     assert fld(f)['state'] == 'wild' and fld(f)['crop'] is None
-    assert spy[-1]['owner'] is False and spy[-1]['amount'] == CROPS['saffron']['xp'] * 8 * 1 * 950 * 950 // 10 ** 6
-    assert f['xp'] == xp + spy[-1]['amount'] and f['inventory']['saffron'] == fields.yield_qty(5 * 16, 950, 950)
+    assert spy[-1]['owner'] is False and spy[-1]['amount'] == CROPS['saffron']['xp'] * 8 * 1 * 900 * 900 // 10 ** 6
+    assert f['xp'] == xp + spy[-1]['amount'] and f['inventory']['saffron'] == fields.yield_qty(5 * 16, 900, 900)
     assert run['status'] == 'open'
 
 
@@ -484,11 +525,11 @@ def test_a_late_manual_finish_is_impossible_once_settled():
 def test_full_manual_cycle_formulas(spy):
     f = equipped(tiers=(1, 2, 3))
     t, s_cult = drive(f, 'cultivate', T0)
-    q_cult = fields.quality(s_cult)
+    q_cult = fields.quality_full(s_cult)
     assert fld(f)['state'] == 'ready' and fld(f)['q_cult'] == q_cult
     coins = f['coins']
     t2, s_sow = drive(f, 'sow', t + 3, 'saffron')
-    q_sow = fields.quality(s_sow)
+    q_sow = fields.quality_full(s_sow)
     crop = fld(f)['crop']
     assert coins - f['coins'] == FIELD_FUEL + CROPS['saffron']['cost'] * 16
     assert crop['q_sow'] == q_sow and crop['base'] == 5 * 16 and crop['planted_at'] == t2
@@ -500,12 +541,12 @@ def test_full_manual_cycle_formulas(spy):
     assert fld(f)['state'] == 'ripe'
     inv = f['inventory'].get('saffron', 0)
     t3, s_harv = drive(f, 'harvest', crop['ready_at'] + 5)
-    q_harv = fields.quality(s_harv)
-    qty = 80 * q_sow * q_harv // 10 ** 6
+    q_harv = fields.quality_full(s_harv)
+    qty = 80 * q_sow * q_harv * 1000 // 10 ** 9
     assert f['inventory']['saffron'] == inv + qty and f['inventory']['saffron'] > 0
-    assert spy[-1]['owner'] is True and spy[-1]['at'] == t3 and spy[-1]['amount'] == CROPS['saffron']['xp'] * 8 * q_sow * q_harv // 10 ** 6
+    assert spy[-1]['owner'] is True and spy[-1]['at'] == t3 and spy[-1]['amount'] == CROPS['saffron']['xp'] * 8 * q_sow * q_harv * 1000 // 10 ** 9
     assert fld(f)['state'] == 'wild' and fld(f)['crop'] is None and fld(f)['q_cult'] == Q_AUTO
-    assert max(q_cult, q_sow, q_harv) <= 1100 and min(q_cult, q_sow, q_harv) >= 850
+    assert max(q_cult, q_sow, q_harv) <= Q_BASE_FULL + Q_SPAN_FULL and min(q_cult, q_sow, q_harv) >= Q_BASE_FULL
     validate_state(f)
 
 
@@ -513,7 +554,17 @@ def test_the_best_possible_cycle_yields_about_a_third_more_than_the_autopilot_on
     q = 1100 * 1100
     assert q * 100 // (950 * 950) in range(133, 135)
     assert fields.yield_qty(80, 1100, 1100) / fields.yield_qty(80, 950, 950) == pytest.approx(1.34, abs=0.02)
-    assert 1950 - 1100 == 850                                                                                    # cultivation: -15% growth time
+    assert 1950 - 1100 == 850                                                                                    # old cultivation: -15% growth time
+
+
+def test_the_full_test_economy_is_85_to_125_and_the_autopilot_is_90():
+    assert [fields.quality_full(s) for s in (0, 400, 1000)] == [850, 1010, 1250]
+    assert Q_AUTO_FULL == 900 and fields.growth_permille(900) == 1050 and fields.growth_permille(1250) == 700
+    assert fields.yield_qty(80, 1250, 1250) == 125 and fields.yield_qty(80, 900, 900) == 64
+    assert fields.yield_qty(80, 1250, 1250, 1200) == 150
+    assert fields.spray_bonus_permille(850) == 1000 and fields.spray_bonus_permille(900) == 1025
+    assert fields.spray_bonus_permille(1250) == 1200
+    assert fields.condition_quality(1250, 90) == 1210 and fields.condition_quality(1250, 0) == 850
 
 
 def test_manual_ceiling_holds_for_any_valid_path():
@@ -701,20 +752,29 @@ def test_the_slowest_bonus_fits_into_a_run():
     assert max(fields.auto_seconds(s['ha'], 1) for s in FIELD_STEPS) * catalog.FIELD_ZERO_K // 100 <= TTL
 
 
-def test_manual_finish_uses_the_time_of_the_run():
-    for wait, expect in ((60, 1100), (225, 1100), (382, 1025), (540, 950)):
+@pytest.mark.parametrize('layout, score, qualities', (
+    (0, 1000, (1100, 1100, 1025, 950)),
+    (89, 997, (1099, 1099, 1024, 950)),
+))
+def test_manual_finish_uses_the_time_of_the_run(layout, score, qualities):
+    # The reference driver can revisit cells around rocks: its score is not always perfect.
+    # Pin both layouts so random farm IDs cannot turn this timing check into a flaky score check.
+    for wait, expect in zip((60, 225, 382, 540), qualities):
         f = equipped()
+        f['id'] = f'fields-time-regression-{layout}'
         run = start(f, 'cultivate', T0)
+        run['rules'] = None                                                                       # the old economy of runs opened before rules=3
         field = fld(f)
         path = fields.reference_path(field, run)
-        assert fields.simulate(field, run, path) == 1000
+        assert fields.simulate(field, run, path) == score
         finish(f, path, T0 + wait)
-        assert fld(f)['q_cult'] == expect == fields.timed_quality(1000, wait, 1, 1)
+        assert fld(f)['q_cult'] == expect == fields.timed_quality(score, wait, 1, 1)
 
 
 def test_a_run_opened_before_the_rule_keeps_the_plain_quality_and_its_old_deadline():
     f = equipped()
     run = start(f, 'cultivate', T0)
+    run['rules'] = None
     del run['qrule']
     run['expires_at'] = T0 + 900                                                              # how such a run was stored
     path = fields.reference_path(fld(f), run)
@@ -723,8 +783,240 @@ def test_a_run_opened_before_the_rule_keeps_the_plain_quality_and_its_old_deadli
     assert fld(f)['q_cult'] == expected and expected > Q_AUTO
     g = equipped()
     old = start(g, 'cultivate', T0)
+    old['rules'] = None
     del old['qrule']
     old['expires_at'] = T0 + 900
     settle(g, T0 + 900)
     assert fld(g)['state'] == 'ready' and fld(g)['q_cult'] == Q_AUTO and fld(g)['last_run_at'] == T0 + 900
     validate_state(g)
+
+
+def test_the_full_economy_time_bonus_melts_from_the_900_autopilot():
+    # 1 ha, width 1: A = 90 s, whole bonus up to 225 s, nothing from 540 s; 1250 - 900 = +350
+    assert [fields.timed_quality_full(1000, t, 1, 1) for t in (0, 225, 226, 382, 540, 9999)] == [1250, 1250, 1248, 1075, 900, 900]
+    assert fields.timed_quality_full(0, 0, 1, 1) == fields.timed_quality_full(0, 9999, 1, 1) == 850
+
+
+
+def test_rules2_turn_and_per_cell_sow():
+    field = dict(w=8, h=8)
+    old = dict(op='sow', width=2, rocks=[], weeds=[])
+    new = dict(old, rules=2)
+    path = 'D' * 7 + 'R' * 2 + 'U' * 7 + 'R' * 3 + 'D' * 7
+    assert fields.simulate(field, new, path) > fields.simulate(field, old, path)
+    assert fields.simulate(field, old, 'T') is None
+    assert fields.simulate(field, new, 'T') is not None
+    assert fields.simulate(field, new, 'TDRR') is not None
+    assert fields._oriented_bar(4, 0, 8, 2, 'v') == [4, 12]
+    assert fields._near_unload(4, 2, 'v') and fields._near_unload(5, 2, 'v') and not fields._near_unload(3, 2, 'v')
+    harvest = dict(op='harvest', width=2, rocks=[], weeds=[], rules=2, unload_zone=True)
+    assert fields.simulate(field, harvest, 'TRRRRX') is not None
+    assert fields.simulate(field, dict(harvest, rules=None), 'TRRRRX') is None
+
+
+def test_rules2_reference_paths_remain_valid_on_a_clear_field():
+    for op in OPS:
+        for width in (1, 2, 3):
+            field, run = square(width, op=op)
+            run['rules'] = 2
+            path = fields.reference_path(field, run)
+            score = fields.simulate(field, run, path)
+            assert score is not None
+            if op != 'sow':
+                assert score == 1000, (op, width)
+
+
+def test_rules2_turn_fixture_is_current():
+    data = json.loads((Path(__file__).resolve().parent / 'fixtures' / 'farm_fields_turn' / 'turn.json').read_text(encoding='utf-8'))
+    assert len(data['cases']) >= 8
+    for case in data['cases']:
+        assert fields.simulate(case['field'], case['run'], case['path']) == case['score'], case['name']
+
+
+# ---------------------------------------------------------------------------------------------- rules=3: full test economy
+def test_rules3_workable_cells_include_the_vertical_pockets():
+    for width in (1, 2, 3):
+        rocks, _ = fields.make_obstacles(f'rules3-{width}', 'cultivate', 8, 8, 1)
+        horizontal = fields._rules2_cells(8, 8, width, frozenset(rocks))
+        both = fields._rules3_cells(8, 8, width, frozenset(rocks))
+        assert horizontal <= both and both <= {y * 8 + x for y in range(8) for x in range(8)}
+
+
+def test_rules3_bumps_damage_the_machine_and_are_validated():
+    field, run = square(1)
+    run['rules'] = 3
+    clean = fields.simulate_full(field, run, '')
+    assert clean == dict(score=0, condition=100, hits=0, repair=0)
+    bumped = fields.simulate_full(field, run, 'u')
+    assert bumped == dict(score=0, condition=97, hits=1, repair=15)
+    assert fields.simulate_full(field, run, 'd') is None                     # a bump where the machine can move is a lie
+    assert fields.simulate_full(field, run, 'u' * 34)['condition'] == 0
+    assert fields.simulate_full(field, run, 'u' * 35) is None
+    assert fields.simulate(field, run, 'u') == 0
+
+
+def test_rules3_harvest_partial_unload_and_spray_refill():
+    field, run = square(1, op='harvest')
+    run.update(rules=3, unload_zone=False)
+    path = 'D' * 7 + 'U' * 7
+    full = fields.simulate_full(field, run, path)
+    assert full['load'] == 8 and full['condition'] == 100
+    assert fields.simulate_full(field, run, path + 'X')['load'] == 3        # one X = a quarter of the 18-cell hopper (ceil 5)
+    assert fields.simulate_full(field, run, path + 'X' * 4)['load'] == 0
+    zoned = dict(run, unload_zone=True)
+    assert fields.simulate_full(field, zoned, path + 'X') is None            # the truck is not here
+    spray = dict(op='spray', width=1, rocks=[], weeds=[], rules=3, tank=catalog.FIELD_TANK, wind=1, unload_zone=False)
+    assert fields.simulate_spray_v3(field, spray, '')['load'] == catalog.FIELD_TANK - 3
+    assert fields.simulate_spray_v3(field, spray, 'D')['load'] == catalog.FIELD_TANK - 6
+    refilled = fields.simulate_spray_v3(field, spray, 'DUX')
+    assert refilled['load'] == catalog.FIELD_TANK and refilled['condition'] == 100
+    calm = dict(spray, wind=0)
+    assert fields.simulate_spray_v3(field, calm, '')['load'] == catalog.FIELD_TANK - 2
+
+
+def test_rules3_full_economy_and_damage_on_the_server():
+    f = equipped(tiers=(1, 1, 1, 1))
+    run = start(f, 'cultivate', T0)
+    field = fld(f)
+    path = 'u' + fields.reference_path(field, run)
+    result = fields.simulate_full(field, run, path)
+    coins = f['coins']
+    finish(f, path, T0 + 60)
+    expected = fields.condition_quality(fields.quality_full(result['score']), 97)
+    assert fld(f)['q_cult'] == expected == fields.quality_full(result['score']) - 12
+    assert fld(f)['last_hits'] == 1 and fld(f)['last_repair'] == fields.FIELD_HIT_REPAIR and fld(f)['last_condition'] == 97
+    assert coins - f['coins'] == fields.FIELD_HIT_REPAIR
+    assert fld(f)['state'] == 'ready'
+    validate_state(f)
+
+
+def test_rules3_a_broken_machine_finishes_as_the_autopilot():
+    f = equipped()
+    start(f, 'cultivate', T0)
+    finish(f, 'u' * 34, T0 + 60)
+    assert fld(f)['q_cult'] == Q_AUTO_FULL and fld(f)['last_condition'] == 0
+    assert fld(f)['last_hits'] == 34 and fld(f)['last_repair'] == 34 * fields.FIELD_HIT_REPAIR
+    assert fld(f)['state'] == 'ready'
+
+
+def test_rules2_and_old_runs_keep_their_turn_and_old_economy_after_the_rules3_upgrade():
+    f = equipped(tiers=(2, 2, 2, 2))
+    run = start(f, 'cultivate', T0)
+    run['rules'] = 2
+    run['rocks'], run['weeds'] = [], []   # obstacles depend on the random farm id: a rock at (0, 1) would block the turn
+    finish(f, 'T', T0 + 60)
+    assert fld(f)['q_cult'] == fields.timed_quality(0, 60, 1, 2)
+    g = equipped(tiers=(2, 2, 2, 2))
+    old = start(g, 'cultivate', T0)
+    old['rules'] = None
+    fail(g, 'field_finish', dict(field=fld(g)['id'], run=old['id'], path='T'), at=T0 + 60, code='bad_path')
+
+
+def test_rules3_spray_completes_the_crop_and_boosts_the_harvest_yield():
+    f = equipped()
+    fld(f).update(state='ripe', crop=dict(id='saffron', planted_at=T0, ready_at=T0, base=80, xp=1, q_sow=1250,
+                                          version=catalog.VERSION))
+    run = start(f, 'spray', T0 + 1)
+    assert run['op'] == 'spray' and run['wind'] in (-1, 1)
+    score = fields.simulate(fld(f), run, 'D')
+    finish(f, 'D', T0 + 60)
+    assert fld(f)['state'] == 'ripe' and fld(f)['crop']['q_spray'] == fields.quality_full(score)
+    assert fld(f)['crop']['q_sow'] == 1250
+    fail(f, 'field_start', dict(field=fld(f)['id'], op='spray', crop='', revision=fld(f)['revision']),
+         at=T0 + 61, code='already_sprayed')
+    fld(f)['crop']['q_spray'] = 1250
+    start(f, 'harvest', T0 + 62)
+    finish(f, None, T0 + 63)
+    settle(f, T0 + 63 + fields.auto_seconds(1, 1))
+    qty = 80 * 1250 * Q_AUTO_FULL * fields.spray_bonus_permille(1250) // 10 ** 9
+    assert f['inventory']['saffron'] == qty and qty == 108
+
+
+# ---------------------------------------------------------------------------------------------- rules=3 fixture (server <-> JS)
+RULES3 = Path(__file__).resolve().parent / 'fixtures' / 'farm_fields_rules3' / 'full.json'
+
+
+def rules3_case(field, run, path, name):
+    run = dict(run, rules=3)
+    return dict(name=name, field=dict(w=field['w'], h=field['h']), run=run, path=path,
+                result=fields.simulate_full(field, run, path))
+
+
+def build_rules3_cases():
+    rows = []
+    for op in ('cultivate', 'sow'):
+        for width in (1, 2, 3):
+            field = dict(w=8, h=8)
+            run = dict(op=op, width=width, rocks=[], weeds=[])
+            paths = [('', ''), ('down', 'D' * 7), ('turn', 'T'), ('turn-down', 'T' + 'D' * 3),
+                     ('bump', 'u'), ('bump3', 'u' * 3), ('bump34', 'u' * 34), ('lie', 'd'),
+                     ('bump-down', 'u' + 'D' * 7 + 'U' * 7)]
+            for label, path in paths:
+                rows.append(rules3_case(field, run, path, f'{op} w{width} {label}'))
+            rocks, weeds = fields.make_obstacles(f'r3-{op}-{width}', op, 8, 8, 1)
+            rocky = dict(run, rocks=rocks, weeds=weeds)
+            rows.append(rules3_case(field, rocky, fields.reference_path(field, rocky), f'{op} w{width} rocks reference'))
+    for width in (1, 2, 3):
+        field = dict(w=8, h=8)
+        for zoned in (False, True):
+            run = dict(op='harvest', width=width, rocks=[], weeds=[], unload_zone=zoned)
+            base = 'D' * 7 + 'U' * 7
+            for label, path in (('none', ''), ('bump', 'u'), ('top', base), ('one-x', base + 'X'),
+                                ('four-x', base + 'X' * 4), ('zone-x', 'R' * 4 + 'X'), ('turn', 'T' + 'D' * 3)):
+                rows.append(rules3_case(field, run, path, f'harvest w{width} z{int(zoned)} {label}'))
+        rocks, weeds = fields.make_obstacles(f'r3-harvest-{width}', 'harvest', 8, 8, 1)
+        rocky = dict(op='harvest', width=width, rocks=rocks, weeds=weeds, unload_zone=False)
+        rows.append(rules3_case(field, rocky, fields.reference_path(field, rocky), f'harvest w{width} rocks reference'))
+    for width in (1, 2, 3):
+        field = dict(w=8, h=8)
+        for wind in (-1, 0, 1):
+            for zoned in (False, True):
+                run = dict(op='spray', width=width, rocks=[], weeds=[], unload_zone=zoned, tank=catalog.FIELD_TANK, wind=wind)
+                base = 'D' * 7 + 'U' * 7
+                for label, path in (('none', ''), ('bump', 'u'), ('down', 'D'), ('top', base),
+                                    ('refill', base + 'X'), ('turn', 'T' + 'D' * 3), ('run', 'D' * 7 + 'U' * 7 + 'R' * 2 + 'D' * 7 + 'U' * 7 + 'X')):
+                    rows.append(rules3_case(field, run, path, f'spray w{width} wind{wind} z{int(zoned)} {label}'))
+        rocks, weeds = fields.make_obstacles(f'r3-spray-{width}', 'spray', 8, 8, 1)
+        rocky = dict(op='spray', width=width, rocks=rocks, weeds=weeds, unload_zone=False, tank=catalog.FIELD_TANK, wind=1)
+        rows.append(rules3_case(field, rocky, fields.reference_path(field, rocky), f'spray w{width} rocks reference'))
+    return rows
+
+
+def test_rules3_fixture_matches_the_mechanics():
+    data = dict(constants=dict(hopper=HOPPER, tank=catalog.FIELD_TANK, tank_chunks=catalog.FIELD_TANK_CHUNKS,
+                               hit_damage=catalog.FIELD_HIT_DAMAGE, hit_repair=catalog.FIELD_HIT_REPAIR,
+                               cond_penalty=catalog.FIELD_COND_PENALTY),
+                cases=build_rules3_cases())
+    if os.getenv('FARM_FIELDS_WRITE_FIXTURES'):
+        RULES3.parent.mkdir(parents=True, exist_ok=True)
+        RULES3.write_text(json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + '\n', encoding='utf-8')
+    saved = json.loads(RULES3.read_text(encoding='utf-8'))
+    assert saved == json.loads(json.dumps(data, sort_keys=True)), 'regenerate with FARM_FIELDS_WRITE_FIXTURES=1'
+    assert len(saved['cases']) >= 60
+    for case in saved['cases']:
+        assert fields.simulate_full(case['field'], case['run'], case['path']) == case['result'], case['name']
+
+
+def test_rules3_finish_accepts_partial_unload_and_refill_events():
+    f = equipped()
+    fld(f).update(state='ripe', crop=dict(id='saffron', planted_at=T0, ready_at=T0, base=80, xp=1, q_sow=1000,
+                                          version=catalog.VERSION))
+    start(f, 'harvest', T0 + 1)
+    finish(f, 'R' * 4 + 'X', T0 + 60)
+    assert fld(f)['state'] == 'wild' and fld(f)['crop'] is None
+    g = equipped()
+    fld(g).update(state='ripe', crop=dict(id='saffron', planted_at=T0, ready_at=T0, base=80, xp=1, q_sow=1000,
+                                          version=catalog.VERSION))
+    start(g, 'spray', T0 + 1)
+    finish(g, 'R' * 4 + 'X', T0 + 60)
+    assert fld(g)['state'] == 'ripe' and fld(g)['crop']['q_spray'] is not None
+
+
+def test_the_sprayer_tank_scales_with_the_field_size():
+    f = equipped()
+    cmd(f, 'buy_field', dict(step=4))
+    big = fld(f, 1)
+    big.update(state='ripe', crop=dict(id='saffron', planted_at=T0, ready_at=T0, base=80, xp=1, q_sow=1000,
+                                       version=catalog.VERSION))
+    run = start(f, 'spray', T0 + 1, index=1)
+    assert run['tank'] == catalog.FIELD_TANK * 3

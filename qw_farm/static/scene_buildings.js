@@ -1097,6 +1097,78 @@ function cellar(s,o){
   crate(s,o.x+.4,o.y+1.56,.28,7,'#c9a672');for(const [dx,col] of [[-.07,'#7a1a2c'],[0,'#e6c25a'],[.07,'#5a3a7a']]){const x=o.x+.4+dx,y=o.y+1.56;L(s,x,y,7,x,y,14,col,3);L(s,x,y,14,x,y,16.5,'#c9a672',1.6)}
   return 68}
 
+/* «Компостная куча» (compost_heap, a 1x1 workshop, docs/tasks/FARM_FERTILIZERS.md §7): a slatted plank bin of dark earth on four
+   posts, a pitchfork leaning on the shaded side. Three looks from the job queue: empty — a thin layer of earth on the bottom;
+   a batch maturing — a heap of fresh earth with green clippings and straw above the rim and light steam (static curls on a phone
+   or with reduced motion); a batch ready — dark crumbly earth with a tied sack of compost on top. */
+function compostHeap(s,o){
+  const jobs=o.jobs||[],now=typeof s.now==='function'?s.now():NaN,t=s.time||0;
+  const ready=jobs.some(j=>j.ready_at<=now),brewing=jobs.some(j=>!(j.ready_at<=now)),full=ready||brewing;
+  const still=s.motion===false||(s.w>0&&s.w<650),c=s.c;
+  const wood='#b48a5a',post='#8a6844',gap='#3f2f22',earth='#4e3a2a',x0=o.x+.2,x1=o.x+.8,y0=o.y+.2,y1=o.y+.8,H=13,xm=(x0+x1)/2,ym=(y0+y1)/2;
+  ground(s,o.x+.05,o.y+.05,o.x+.95,o.y+.95,'rgba(176,154,108,.3)');
+  shadowAt(s,x0,y0,x1,y1,28,11);
+  // back walls seen from inside, with their rims and the back post
+  wallY(s,sh(wood,-.08),y0,x0,x1,0,H,H);wallX(s,sh(wood,-.3),x0,y0,y1,0,H,H);
+  boards(s,'y',y0,x0,x1,0,H,H/3,'rgba(64,44,26,.5)');boards(s,'x',x0,y0,y1,0,H,H/3,'rgba(50,34,20,.5)');
+  top(s,sh(wood,.16),x0,y0,x1,y0+.035,H);top(s,sh(wood,.04),x0,y0,x0+.035,y1,H);
+  L(s,x0,y0,0,x0,y0,H+3,sh(post,-.12),3);
+  // the earth inside
+  if(!full){
+    top(s,earth,x0,y0,x1,y1,3);
+    for(const [u,v,col] of [[.3,.35,'#6a5039'],[.62,.3,'#5d4632'],[.45,.55,'#6a5039'],[.7,.62,'#3e2e22']])E(s,x0+(x1-x0)*u,y0+(y1-y0)*v,3,2.4,1.2,col);
+    L(s,x0+.14,y0+.3,3.2,x0+.24,y0+.24,3.2,'#c9b06a',1);L(s,x0+.4,y0+.18,3.2,x0+.46,y0+.26,3.2,'#c9b06a',1);
+  }else{
+    const X=px(xm,ym),Y=py(xm,ym,H);
+    // the heap stays inside the bin's opening extruded upwards: left, back and right corners raised, the front corner at the rim
+    c.save();c.beginPath();
+    [[x0,y1,H-.5],[x0,y1,H+14],[x0,y0,H+14],[x1,y0,H+14],[x1,y0,H-.5],[x1,y1,H-.5]].forEach(([x,y,z],i)=>i?c.lineTo(px(x,y),py(x,y,z)):c.moveTo(px(x,y),py(x,y,z)));
+    c.closePath();c.clip();
+    top(s,earth,x0,y0,x1,y1,H-.5);
+    s.ellipse(X,Y-1.5,17,7.4,ready?'#47352a':'#54402e');s.ellipse(X-2,Y-3.6,12.5,5.2,ready?'#523d2d':'#614a35');s.ellipse(X-4,Y-5.2,6.5,2.6,ready?'#5d4632':'#6e543b');
+    if(brewing&&!ready){
+      // fresh material: clippings and straw on the heap
+      for(const [dx,dy,a,col] of [[-11,-1,-.5,'#7f9e58'],[-4,-6,.4,'#93b06a'],[6,-4,-.9,'#7f9e58'],[11,0,.7,'#9ab86e'],[1,1,2.6,'#86a35e'],[-8,-5,2.2,'#a2bd76']]){c.beginPath();c.ellipse(X+dx,Y+dy,3,1.2,a,0,PI*2);c.fillStyle=col;c.fill()}
+      for(const [dx,dy,ex,ey] of [[-14,1,-8,-2],[3,-7,8,-5],[8,1,13,-1],[-3,-1,2,-3]])s.line(X+dx,Y+dy,X+ex,Y+ey,'#d8c07a',1);
+    }else{
+      // finished compost: crumbly dark earth
+      for(const [dx,dy,col] of [[-10,-1,'#6e543b'],[-3,-6,'#6e543b'],[7,-3,'#3a2b20'],[12,-1,'#6e543b'],[0,0,'#3a2b20'],[-7,-4,'#3a2b20'],[4,1,'#6e543b']])s.ellipse(X+dx,Y+dy,1.3,.9,col);
+    }
+    c.restore();
+  }
+  // front walls: three planks with dark gaps where the earth shows through
+  wallY(s,gap,y1,x0,x1,0,H,H);wallX(s,sh(gap,-.2),x1,y0,y1,0,H,H);
+  for(const [a,b] of [[.4,4.2],[4.9,8.7],[9.4,H]]){wallY(s,wood,y1,x0,x1,a,b,b);wallX(s,sh(wood,-.16),x1,y0,y1,a,b,b);
+    L(s,x0+.03,y1,(a+b)/2,x1-.03,y1,(a+b)/2,'rgba(120,86,50,.28)',.6)}
+  for(const [x,z] of [[x0+.05,2.3],[x0+.05,6.8],[x0+.05,11.2],[x1-.05,2.3],[x1-.05,6.8],[x1-.05,11.2]])E(s,x,y1,z,.7,.7,'#6b5238');
+  top(s,sh(wood,.2),x0,y1-.035,x1,y1,H);top(s,sh(wood,.08),x1-.035,y0,x1,y1,H);
+  for(const [x,y,col] of [[x0,y1,post],[x1,y1,sh(post,-.08)],[x1,y0,sh(post,-.18)]]){L(s,x,y,0,x,y,H+3,col,3);E(s,x,y,H+3,1.5,.8,sh(col,.2))}
+  // pitchfork leaning on the shaded side, tines up
+  {const bx=x1+.11,by=ym+.16,tx=x1+.02,ty=ym-.02,tz=H+11;L(s,bx,by,0,tx,ty,tz,'#8a6a45',1.6);
+   const X=px(tx,ty),Y=py(tx,ty,tz);s.line(X-3.4,Y+.6,X+3.4,Y-.6,'#7d8386',1.3);for(const d of [-3.2,0,3.2])s.line(X+d,Y-d*.18,X+d+.4,Y-d*.18-6,'#8f9598',1)}
+  // grass tufts at the foot
+  for(const [x,y] of [[o.x+.14,o.y+.86],[o.x+.86,o.y+.5],[o.x+.5,o.y+.9]])for(let k=-1;k<=1;k++)L(s,x,y,0,x+k*.025,y+k*.025,4+(k?0:1.5),'#7ea468',1);
+  let h=H+6;
+  if(ready){
+    // a tied sack of compost on the heap
+    const X=px(xm-.02,ym+.02),Y=py(xm-.02,ym+.02,H+3),col='#dcc79c';
+    s.ellipse(X+1.5,Y+1,8,2.8,'rgba(40,28,18,.4)');
+    s.ellipse(X,Y-6,7.2,7.6,col);s.ellipse(X-1.8,Y-7.6,4,4.8,sh(col,.1));
+    s.poly([{x:X-3.2,y:Y-12},{x:X+3.2,y:Y-12},{x:X+2.2,y:Y-15.4},{x:X-2.2,y:Y-15.4}],sh(col,-.06));
+    s.poly([{x:X-2.2,y:Y-15.4},{x:X-4.4,y:Y-18.6},{x:X-.4,y:Y-16.4}],sh(col,-.1));s.poly([{x:X+2.2,y:Y-15.4},{x:X+4.4,y:Y-18.4},{x:X+.4,y:Y-16.4}],sh(col,-.14));
+    s.line(X-3.4,Y-13.4,X+3.4,Y-13.4,'#8a6a45',1.5);
+    c.beginPath();c.ellipse(X+1.6,Y-5.4,2.8,1.3,-.7,0,PI*2);c.fillStyle='#6f9a4f';c.fill();s.line(X-.2,Y-3.6,X+3.4,Y-7.2,'#557a3c',.6);
+    h=H+24;
+  }
+  if(brewing){
+    // light steam over the maturing heap: rising curls, or three still ones on a phone / with reduced motion
+    const X=px(xm,ym)+(ready?11:0),Y=py(xm,ym,H+6);c.save();c.lineCap='round';c.lineWidth=1.5;c.strokeStyle='#f6f3ea';
+    for(let i=0;i<3;i++){const f=still?[.15,.5,.3][i]:(t*.3+i*.33)%1,a=still?.55:.6*Math.sin(PI*f),x=X+(i-1)*6+(still?0:Math.sin(t*1.2+i*2)*1.2),y=Y-2-f*12;
+      c.globalAlpha=a;c.beginPath();c.moveTo(x,y);c.bezierCurveTo(x-3,y-3,x+3,y-5,x,y-8);c.bezierCurveTo(x-2.4,y-10,x+2,y-12,x+.4,y-14);c.stroke()}
+    c.restore();h=Math.max(h,H+32);
+  }
+  return h}
+
 /* Birdhouse (decor 1x1): a pole with a little gabled house, a perch by the round hole and a starling that sits on the ridge and now
    and then peeks out of the hole (it stays on the ridge with reduced motion). Its trees get the starling of FARM_ORCHARD.md 2.5. */
 export function drawBirdhouse(s,o){
@@ -1119,7 +1191,7 @@ export function drawBirdhouse(s,o){
     s.ellipse(X+2.8,Z-5-bob*.4,2.1,2,'#454a5a');s.poly([{x:X+4.4,y:Z-5.6-bob*.4},{x:X+7.2,y:Z-4.8-bob*.2},{x:X+4.4,y:Z-4.3-bob*.4}],'#e2b84a');
     for(const [dx,dy] of [[-1,-3],[1,-2],[-.4,-1.8]])s.ellipse(X+dx,Z+dy,.4,.4,'#cfd3dc');s.ellipse(X+3.3,Z-5.4-bob*.4,.45,.45,'#f3f1e8')}
 }
-const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop,dryer,cellar};
+const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop,dryer,cellar,compost_heap:compostHeap};
 /* ---------- r6 building upgrades (view only; the level comes from the server object) ----------
    level 2: flower boxes, a lantern post with a hanging sign. level 3: adds a lean-to annex with its own chimney and a
    waving flag on the roof. Both levels get a small gold badge. Buildings without a level (older saves) are level 1. */
@@ -1129,7 +1201,23 @@ export function drawBadge(s,o){const lv=upLevel(o);if(lv<2)return;const x=px(o.x
   c.save();c.font='bold 11px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillStyle='#6b4c1d';c.fillText(String(lv),x,y-7.5);c.restore()}
 function planter(s,x,y,w,flowers){fullBox(s,'#b98d5d',x,y,x+w,y+.14,0,6,'#8a6a45');boards(s,'y',y+.14,x,x+w,0,6,3,'rgba(60,40,20,.3)');
   const n=Math.max(3,Math.round(w/.09));for(let k=0;k<n;k++){const fx=x+.04+(w-.08)*k/(n-1),col=flowers[k%flowers.length];L(s,fx,y+.07,6,fx,y+.07,9+(k%2)*2,'#6f9a55',1.2);E(s,fx,y+.07,10+(k%2)*2,2.3,2.3,col)}}
-export function drawUpgrade(s,o,top){const lv=upLevel(o);if(lv<2)return top;const work=(o.jobs&&o.jobs.length>0)||!!o.animal_job;
+/* The same two upgrade steps for a 1x1 building (the compost heap), kept inside its tile: level 2 a little lamp post at the right
+   corner and two flower pots at the left corner, level 3 also a pennant on the left post. */
+function smallUpgrade(s,o,lv,top){const work=(o.jobs&&o.jobs.length>0)||!!o.animal_job;
+  flowerPot(s,o.x+.1,o.y+.92);flowerPot(s,o.x+.3,o.y+.96);
+  // a little lamp post at the right corner of the tile, the lamp hanging from a short arm towards the bin
+  const lx=o.x+.93,ly=o.y+.1,lz=36,ax=lx-.06,ay=ly+.06;
+  E(s,lx,ly,0,3.4,1.6,'rgba(60,50,30,.25)');L(s,lx,ly,0,lx,ly,lz+3,'#4f4638',2.2);L(s,lx,ly,lz+3,ax,ay,lz+3,'#4f4638',1.4);L(s,ax,ay,lz+3,ax,ay,lz+1,'#4f4638',1);
+  fullBox(s,'#4f4638',ax-.03,ay-.03,ax+.03,ay+.03,lz-5,lz+1,'#7a6a4e');Q(s,'#fff1b8',[ax-.024,ay+.031,lz-4.2,ax+.024,ay+.031,lz-4.2,ax+.024,ay+.031,lz,ax-.024,ay+.031,lz]);
+  s.ellipse(px(ax,ay),py(ax,ay,lz-2),7,7,work?'rgba(255,224,130,.4)':'rgba(255,224,130,.2)');
+  if(work)s.lanternLights?.push({x:px(ax,ay),y:py(ax,ay,lz-2)+43});
+  let h=Math.max(top,lz+6);
+  if(lv>=3){const fx=o.x+.2,fy=o.y+.8,z1=40;L(s,fx,fy,13,fx,fy,z1,'#5b4a38',1.8);E(s,fx,fy,z1+1,1.6,1.6,'#d9a53b');
+    const wv=s.motion===false?0:Math.sin(s.time*3)*1.4,X=px(fx,fy),Y=py(fx,fy,z1-1);
+    s.poly([{x:X,y:Y},{x:X-13,y:Y+2.5+wv},{x:X-10,y:Y+5+wv*.6},{x:X-13,y:Y+8+wv*.3},{x:X,y:Y+8}],'#d9553f');
+    s.poly([{x:X,y:Y},{x:X-13,y:Y+2.5+wv},{x:X-10,y:Y+5+wv*.6},{x:X,y:Y+4.5}],'#e9806a');h=Math.max(h,z1+4)}
+  drawBadge(s,o);return h}
+export function drawUpgrade(s,o,top){const lv=upLevel(o);if(lv<2)return top;if(o.w<2||o.h<2)return smallUpgrade(s,o,lv,top);const work=(o.jobs&&o.jobs.length>0)||!!o.animal_job;
   // level 2: flower boxes along the front, lantern post with a sign
   planter(s,o.x+.2,o.y+1.1,.4,['#e56d8b','#f3c64a','#fdf5ee']);planter(s,o.x+1.0,o.y+1.1,.4,['#fdf5ee','#a98bd0','#e56d8b']);
   const lx=o.x+.08,ly=o.y+1.62;

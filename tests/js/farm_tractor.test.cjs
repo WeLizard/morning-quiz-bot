@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
-// tractor_game.js is an ES module: pure rules first, DOM only inside openFieldGame (never called here).
+// tractor_game.js is an ES module with pure rules only; the live DOM/canvas overlay is field_overlay.js (never loaded here).
 const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/tractor_game.js'),'utf8').replace(/export (const|function|class) /g,'$1 ');
-const names='DEFAULTS simulate simulateCultivate simulateSow simulateHarvest Run quality growthPermille yieldQty autoSeconds maxPath reachableAnchors effectLines timedQuality timeKeep timeLimits gameCfg QRULE_TIMED'.split(' ');
+const names='DEFAULTS simulate simulateCultivate simulateSow simulateHarvest Run quality growthPermille yieldQty autoSeconds maxPath reachableAnchors effectLines timedQuality timeKeep timeLimits gameCfg QRULE_TIMED RULES_TURN'.split(' ');
 const ctx={Set,Map,Math,Object,String,Array,performance:{now:()=>0}};vm.createContext(ctx);vm.runInContext(source+`\nglobalThis.api={${names.join(',')}};`,ctx);
 const api=ctx.api;
 const dir=path.join(__dirname,'../fixtures/farm_fields');
@@ -41,6 +41,25 @@ test('illegal moves are refused without changing the run',()=>{
  const s=new api.Run({w:8,h:8},{op:'sow',width:1,rocks:[],weeds:[]});assert.equal(s.push('X'),false);
 });
 
+test('new harvest runs unload only at the fixed truck; older runs keep the top-edge rule',()=>{
+ const field={w:8,h:8};
+ for(const [width,good,bad] of [[1,4,6],[2,4,6],[3,4,5]]){
+  const r=new api.Run(field,{op:'harvest',width,rocks:[],weeds:[],unload_zone:true});
+  assert.equal(r.canUnload(),false);
+  for(let i=0;i<good;i++)assert.equal(r.push('R'),true);
+  assert.equal(r.canUnload(),true);
+  assert.equal(r.push('X'),true);
+  const far=new api.Run(field,{op:'harvest',width,rocks:[],weeds:[],unload_zone:true});
+  for(let i=0;i<bad;i++)assert.equal(far.push('R'),true);
+  assert.equal(far.canUnload(),false);
+  assert.equal(far.push('X'),false);
+ }
+ const old=new api.Run(field,{op:'harvest',width:1,rocks:[],weeds:[]});
+ assert.equal(old.canUnload(),true);assert.equal(old.push('X'),true);
+ assert.equal(api.gameCfg({unload_center:600,unload_half:90}).unloadCenter,600);
+ assert.equal(api.gameCfg({unload_center:600,unload_half:90}).unloadHalf,90);
+});
+
 test('derived numbers follow the server formulas',()=>{
  assert.equal(api.quality(0),850);assert.equal(api.quality(1000),1100);assert.equal(api.quality(500),975);
  assert.equal(api.growthPermille(1100),850);assert.equal(api.growthPermille(950),1000);
@@ -68,4 +87,23 @@ test('catalog keys reach the game config; missing keys fall back to the decided 
  const c=api.gameCfg({run_ttl:1800,run_full_k:300,run_zero_k:700});
  assert.equal(c.runTtl,1800);assert.equal(c.fullK,300);assert.equal(c.zeroK,700);
  const d=api.gameCfg(null);assert.equal(d.runTtl,1800);assert.equal(d.fullK,250);assert.equal(d.zeroK,600);
+});
+
+test('rules=2 adds T and per-cell sow; old runs keep the horizontal anchor rule',()=>{
+ const field={w:8,h:8};
+ const fresh=()=>new api.Run(field,{op:'sow',width:2,rocks:[],weeds:[],rules:api.RULES_TURN});
+ const r=fresh();
+ assert.equal(r.orient,'h');assert.equal(r.canTurn(),true);assert.equal(r.push('T'),true);assert.equal(r.orient,'v');
+ assert.equal(r.push('T'),true);assert.equal(r.orient,'h');
+ assert.equal(r.push('D'),true);assert.equal(r.push('R'),true);assert.equal(r.push('R'),true);assert.ok(r.sown.has(11));
+ const old=new api.Run(field,{op:'sow',width:2,rocks:[],weeds:[]});
+ assert.equal(old.push('T'),false);
+ for(const ch of 'DRR')assert.equal(old.push(ch),true);
+ assert.ok(!old.sown.has(11));
+ const h=new api.Run(field,{op:'harvest',width:2,rocks:[],weeds:[],rules:api.RULES_TURN,unload_zone:true});
+ assert.equal(h.push('T'),true);
+ for(let i=0;i<4;i++)assert.equal(h.push('R'),true);
+ assert.equal(h.canUnload(),true);assert.equal(h.push('X'),true);
+ const oldH=new api.Run(field,{op:'harvest',width:2,rocks:[],weeds:[],unload_zone:true});
+ assert.equal(oldH.push('T'),false);
 });

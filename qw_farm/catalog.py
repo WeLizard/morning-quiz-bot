@@ -28,6 +28,12 @@ for row in [
     i,n,c,t,q,p,x,l,color=row
     CROPS[i]=dict(id=i,name=n,cost=c,seconds=t,yield_qty=q,price=p,xp=x,level=l,color=color)
 ITEMS={k:dict(id=k,name=v['name'],price=v['price'],color=v['color'],kind='crop') for k,v in CROPS.items()}
+ITEMS['grass']=dict(id='grass',name='Луговая трава',price=1,color='#78a859',kind='product')
+ITEMS['manure']=dict(id='manure',name='Навоз',price=1,color='#795d43',kind='product',bound=True)
+ITEMS['compost']=dict(id='compost',name='Компост',price=3,color='#594a38',kind='product',bound=True)
+# Humate is bound and has no sale price in the design; 5 is a service placeholder covering future input value.
+ITEMS['humate']=dict(id='humate',name='Гумат',price=5,color='#4e5840',kind='product',bound=True)
+ITEMS['pumpkin_candy']=dict(id='pumpkin_candy',name='Тыквенная конфета',price=4,color='#e89137',kind='product')
 for i,n,p,col in [('flour','Мука',10,'#e8daba'),('feed','Зерносмесь',8,'#ccb977'),('hay','Сено',12,'#bdd17b'),('egg','Яйца',11,'#f0dfc1'),('milk','Молоко',18,'#e3edf0'),('wool','Шерсть',25,'#dcd6ce'),('honey','Мёд',46,'#d6a83a'),('bread','Хлеб',29,'#ca8a50'),('bun','Булочка',39,'#d99b58'),('jam','Варенье',53,'#c56e7d'),('cheese','Сыр',53,'#efd05c'),('oil','Масло',64,'#c0b15c'),('soup','Овощной суп',57,'#bf805d'),('pie','Тыквенный пирог',175,'#dc9f62'),('yarn','Пряжа',67,'#c796b0'),('bouquet','Букет',99,'#b297c7'),('pancake','Оладьи',69,'#ca9457'),('salad','Дачный салат',70,'#7cab65')]:
     ITEMS[i]=dict(id=i,name=n,price=p,color=col,kind='product')
 BUILDINGS={}
@@ -40,6 +46,7 @@ for i,n,b,ingredients,out,t,l in [
  ('feed','Смешать корм','mill',{'wheat':2},{'feed':2},45,1),
  ('mixedfeed','Зерносмесь','feedmill',{'corn':1,'wheat':1},{'feed':3},90,2),
  ('hay','Заготовить сено','feedmill',{'clover':2},{'hay':2},120,2),
+ ('meadow_hay','Луговое сено','feedmill',{'grass':4},{'hay':1},60,2),
  ('bread','Испечь хлеб','bakery',{'flour':2},{'bread':1},150,2),
  ('bun','Румяная булочка','bakery',{'flour':1,'egg':1},{'bun':1},180,2),
  ('pancake','Дачные оладьи','bakery',{'flour':1,'milk':1,'egg':1},{'pancake':1},480,4),
@@ -54,6 +61,15 @@ for i,n,b,ingredients,out,t,l in [
  ('honeybun','Булочка с мёдом','bakery',{'flour':2,'honey':1},{'bun':3},900,7),
 ]:
     RECIPES[i]=dict(id=i,name=n,building=b,inputs=ingredients,outputs=out,seconds=t,level=l,xp=max(1,t//45))
+# Compost heap recipes are service processing: the AV workshop law does not apply, as for meadow_hay.
+# Their 8-hour batch stays fixed across building upgrades to preserve the farm's daily compost cap.
+BUILDINGS['compost_heap']=dict(id='compost_heap',name='Компостная куча',cost=400,level=6,w=1,h=1,decor=False)
+for i,n,inputs in [
+    ('compost_grass','Компост из травы',{'manure':2,'grass':4}),
+    ('compost_manure','Компост без травы',{'manure':3}),
+]:
+    RECIPES[i]=dict(id=i,name=n,building='compost_heap',inputs=inputs,outputs={'compost':2},seconds=8*60*60,
+                    level=6,xp=0,no_level_speedup=True)
 ANIMALS={}
 for i,n,b,inputs,out,t,l,c in [('chicken','Курочки','coop',{'feed':1},{'egg':2},240,1,65),('cow','Бурёнки','cowshed',{'hay':1},{'milk':2},900,4,180),('sheep','Овечки','sheepfold',{'hay':1},{'wool':2},1200,5,200),('bees','Пчёлы','apiary',{'lavender':1},{'honey':2},1800,7,220)]:
     ANIMALS[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,cost=c)
@@ -459,9 +475,13 @@ HELPERS.update({
  'cat_keeper':dict(id='cat_keeper',name='Кошка Хозяюшка',cost=160,level=7,role='animals',icon='helper_cat',
    description='Кормит животных в своей зоне и забирает их продукцию. Без корма на складе спокойно ждёт.'),
  'beaver_artisan':dict(id='beaver_artisan',name='Бобёр Мастер',cost=170,level=6,role='craft',icon='helper_beaver',
-   description='Забирает готовое в мастерских своей зоны и ставит прежний рецепт заново, если хватает сырья.'),
+   description='Забирает готовое в мастерских своей зоны и повторяет запомненные рецепты, пока хватает сырья и смены.'),
  'badger_artisan':dict(id='badger_artisan',name='Барсук Подмастерье',cost=240,level=10,role='craft',icon='helper_badger',
-   description='Второй мастер для другой части фермы: повторяет последний рецепт каждой мастерской.'),
+   description='Второй мастер для другой части фермы: повторяет запомненные рецепты мастерских своей зоны.'),
+ 'beaver_artisan_2':dict(id='beaver_artisan_2',name='Бобёр Подмастерье',cost=360,level=14,role='craft',icon='helper_beaver',
+   description='Ещё один мастер для отдельной зоны: забирает готовое и повторяет запомненные рецепты, пока хватает сырья и смены.'),
+ 'badger_artisan_2':dict(id='badger_artisan_2',name='Барсук Старший',cost=600,level=20,role='craft',icon='helper_badger',
+   description='Четвёртый мастер для своей зоны: забирает готовое и повторяет запомненные рецепты, пока хватает сырья и смены.'),
 })
 SHIFTS.update({
  'estate':dict(id='estate',name='На восемь часов · большая ферма',seconds=28800,actions=240,cost=48,level=8),
@@ -522,8 +542,30 @@ MARKET=dict(
  contracts=dict(count=3,level=2,streak_step=4,streak_max=5,tz_offset=10800),
 )
 
-def public_catalog():
-    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=dict(income_ref=INCOME_REF_BANDS,upkeep_level=UPKEEP_LEVEL,plot_upkeep=PLOT_UPKEEP,upkeep_pct=UPKEEP_PCT,field_upkeep=FIELD_UPKEEP,debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN],fund_level=FUND_LEVEL,season_days=SEASON_DAYS,fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,reward_decor=REWARD_DECOR),invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),orchard=orchard_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
+def public_catalog(upkeep_config=None):
+    from .upkeep_config import defaults as upkeep_defaults, land_plot_rate, validate_values
+    configured = validate_values({**upkeep_defaults(), **{
+        key: value for key, value in (upkeep_config or {}).items()
+        if key in upkeep_defaults()
+    }})
+    economy_catalog = dict(
+        income_ref=INCOME_REF_BANDS,
+        upkeep_level=configured['upkeep_level'],
+        plot_upkeep={size: land_plot_rate(size, configured) for size in LAND_SIZES},
+        upkeep_pct=UPKEEP_PCT,
+        land_rate_pct=configured['land_rate_pct'],
+        building_rate_pct=configured['building_rate_pct'],
+        field_upkeep=configured['field_per_hectare'],
+        field_per_hectare=configured['field_per_hectare'],
+        tree_rate_per_extra_tree=configured['tree_rate_per_extra_tree'],
+        upkeep_revision=int((upkeep_config or {}).get('revision', 0)),
+        debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN], fund_level=FUND_LEVEL, season_days=SEASON_DAYS,
+        fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,
+        min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,
+        feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,
+        reward_decor=REWARD_DECOR,
+    )
+    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=economy_catalog,invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),orchard=orchard_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(configured['field_per_hectare']),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
 
 def validate():
     for r in RECIPES.values():
@@ -1039,18 +1081,21 @@ FIELD_STEPS=(                  # buy_field {step}: index into this table, each s
  dict(step=3,level=38,ha=2,cost=450000),
  dict(step=4,level=44,ha=3,cost=800000),
 )
-FIELD_MACHINES={               # three machines, one per operation; tier = width of the swath (1 -> 2 -> 3)
+FIELD_MACHINES={               # four machines, one per operation; tier = width of the swath (1 -> 2 -> 3)
  'cultivator':dict(id='cultivator',name='Культиватор',op='cultivate',icon='cultivator',costs=(5000,30000,120000),levels=(22,27,38),
-   description='Культивация: срезает сорняки, объезжает камни. Чем чище работа, тем быстрее растёт урожай (до -15% времени).'),
+   description='Культивация: срезает сорняки, объезжает камни. Чем чище работа, тем быстрее растёт урожай (до -30% времени).'),
  'seeder':dict(id='seeder',name='Сеялка',op='sow',icon='seeder',costs=(7500,30000,120000),levels=(22,27,38),
    description='Посев по разметке рядов. От аккуратности зависит урожай.'),
  'combine':dict(id='combine',name='Комбайн',op='harvest',icon='combine',costs=(12500,30000,120000),levels=(22,27,38),
    description='Уборка полосами с выгрузкой бункера у края поля. Переполнение бункера — потери урожая.'),
+ 'sprayer':dict(id='sprayer',name='Опрыскиватель',op='spray',icon='sprayer',costs=(7000,30000,120000),levels=(22,27,38),
+   description='Опрыскивание созревшего поля: прибавка к урожаю до +20%. Ветер сносит распыл, бак наполняется у цистерны.'),
 }
 FIELD_OPS={                    # operation -> (machine, state before, state after)
  'cultivate':dict(machine='cultivator',src='wild',dst='ready'),
  'sow':dict(machine='seeder',src='ready',dst='growing'),
  'harvest':dict(machine='combine',src='ripe',dst='wild'),
+ 'spray':dict(machine='sprayer',src='ripe',dst='ripe'),
 }
 FIELD_FUEL=200                 # coins per hectare for every operation
 FIELD_YIELD_MULT=16            # one hectare ~ 16 beds: yield_qty * 16, seeds cost * 16, XP crop.xp * 8
@@ -1063,25 +1108,45 @@ FIELD_ZERO_K=600               # percent of A: from here on the manual bonus ove
 FIELD_STEP_CS=12               # honest play cannot be faster than 0.12 s per path character
 FIELD_MAX_PATH=2000
 FIELD_AUTO_S=90                # autopilot: 90 s * ha / width
-Q_AUTO=950                     # permille: autopilot quality
-Q_BASE,Q_SPAN=850,250          # permille: manual q = 850 + 250 * score (score 0..1000 permille) -> 0.85 .. 1.10
-GROW_CUT=150                   # permille: best cultivation shortens growth by 15%
+Q_AUTO=950                     # permille: autopilot quality of the old economy (open runs keep it)
+Q_BASE,Q_SPAN=850,250          # permille: old manual q = 850 + 250 * score -> 0.85 .. 1.10
+GROW_CUT=300                   # permille: best cultivation shortens growth by 30% (q 1250 -> 700)
 HOPPER=18                      # hopper capacity of the combine = 18 * width * ha cells (two lanes and a little slack)
+FIELD_UNLOAD_CENTER=500        # hundredths of a cell: fixed grain truck / sprayer tanker on the top road at 0.62 * 8 cells
+FIELD_UNLOAD_HALF=115          # hundredths of a cell: machine centre may stand this far from the supply when transferring
+FIELD_RULES=3                  # new runs: T + per-cell sow + spray + damage + partial transfer + the full economy
+Q_AUTO_FULL=900                # permille: autopilot quality of the full test economy (rules >= 3)
+Q_BASE_FULL,Q_SPAN_FULL=850,400  # permille: full manual q = 850 + 400 * score -> 0.85 .. 1.25
+FIELD_TANK=48                  # sprayer tank in half-litres: 24 L shown, one half-litre per treated cell
+FIELD_TANK_CHUNKS=4            # X events needed for a full tanker refill / hopper unload (partial transfer)
+FIELD_HIT_DAMAGE=3             # condition points lost when a bump actually damages the machine
+FIELD_HIT_REPAIR=15            # coins charged per damaging bump
+FIELD_COND_PENALTY=4           # permille of quality lost for every missing condition point
+FIELD_SPRAY_BONUS_BASE=850     # q below this gives no spray bonus
+FIELD_SPRAY_BONUS_SPAN=2000    # +20% yield at q=1250: (q-850)*1000/2000 permille (+2.5% at 900)
+FIELD_SPRAY_BONUS_MAX=1200     # permille: the spray yield multiplier is 1.00 .. 1.20
 for _c in CROPS.values():
     _c['field']=_c['seconds']>=FIELD_MIN_GROW
 
-def field_catalog():
+def field_catalog(upkeep=FIELD_UPKEEP):
     return deepcopy(dict(min_level=FIELD_MIN_LEVEL,w=FIELD_W,steps=FIELD_STEPS,machines=FIELD_MACHINES,ops=FIELD_OPS,fuel=FIELD_FUEL,
         yield_mult=FIELD_YIELD_MULT,seed_mult=FIELD_SEED_MULT,xp_mult=FIELD_XP_MULT,min_grow=FIELD_MIN_GROW,run_ttl=FIELD_RUN_TTL,
         run_full_k=FIELD_FULL_K,run_zero_k=FIELD_ZERO_K,
         step_cs=FIELD_STEP_CS,max_path=FIELD_MAX_PATH,auto_s=FIELD_AUTO_S,q_auto=Q_AUTO,q_base=Q_BASE,q_span=Q_SPAN,grow_cut=GROW_CUT,
-        hopper=HOPPER,upkeep=FIELD_UPKEEP,crops=sorted(k for k,c in CROPS.items() if c['field'])))
+        q_auto_full=Q_AUTO_FULL,q_base_full=Q_BASE_FULL,q_span_full=Q_SPAN_FULL,tank=FIELD_TANK,tank_chunks=FIELD_TANK_CHUNKS,
+        hit_damage=FIELD_HIT_DAMAGE,hit_repair=FIELD_HIT_REPAIR,cond_penalty=FIELD_COND_PENALTY,
+        spray_bonus_base=FIELD_SPRAY_BONUS_BASE,spray_bonus_span=FIELD_SPRAY_BONUS_SPAN,spray_bonus_max=FIELD_SPRAY_BONUS_MAX,
+        hopper=HOPPER,unload_center=FIELD_UNLOAD_CENTER,unload_half=FIELD_UNLOAD_HALF,field_rules=FIELD_RULES,upkeep=upkeep,crops=sorted(k for k,c in CROPS.items() if c['field'])))
 
 def validate_fields():
     assert [s['step'] for s in FIELD_STEPS]==list(range(len(FIELD_STEPS))) and [s['level'] for s in FIELD_STEPS]==sorted(s['level'] for s in FIELD_STEPS)
     assert FIELD_STEPS[0]['level']==FIELD_MIN_LEVEL and all(s['ha'] in (1,2,3) for s in FIELD_STEPS)
     assert {m['op'] for m in FIELD_MACHINES.values()}==set(FIELD_OPS) and all(FIELD_OPS[m['op']]['machine']==k for k,m in FIELD_MACHINES.items())
     assert all(len(m['costs'])==3 and len(m['levels'])==3 and list(m['costs'])==sorted(m['costs']) for m in FIELD_MACHINES.values())
+    assert 0 < FIELD_UNLOAD_CENTER < FIELD_W * 200 and 0 < FIELD_UNLOAD_HALF < FIELD_W * 100
+    assert FIELD_RULES == 3 and FIELD_TANK > 0 and FIELD_TANK_CHUNKS > 0 and FIELD_HIT_DAMAGE > 0
+    assert Q_BASE_FULL + Q_SPAN_FULL == 1250 and Q_AUTO_FULL == 900 and GROW_CUT == 300
+    assert FIELD_SPRAY_BONUS_BASE == Q_BASE_FULL and FIELD_SPRAY_BONUS_MAX >= 1000
     assert 100<=FIELD_FULL_K<FIELD_ZERO_K and FIELD_RUN_TTL>=FIELD_AUTO_S*max(s['ha'] for s in FIELD_STEPS)*FIELD_ZERO_K//100   # the slowest bonus still fits into a run
     assert any(c['field'] for c in CROPS.values())
     return dict(field_steps=len(FIELD_STEPS),field_machines=len(FIELD_MACHINES),field_crops=sum(c['field'] for c in CROPS.values()))

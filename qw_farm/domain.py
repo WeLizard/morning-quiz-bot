@@ -151,7 +151,7 @@ def reachable(farm):
     return sorted(result)
 
 
-def order_recent(farm):
+def order_recent(farm, commit=True):
     """Keep the last four item sets per resident, including active legacy orders."""
     if 'order_recent' not in farm:
         recent={}
@@ -159,7 +159,9 @@ def order_recent(farm):
             entries=recent.setdefault(order['npc'], [])
             entries.append(list(order['needs']))
             del entries[:-4]
-        farm['order_recent']=recent
+        if commit:
+            farm['order_recent']=recent
+        return recent
     return farm['order_recent']
 
 
@@ -167,7 +169,7 @@ def make_order(farm, slot, now):
     seq=farm['order_seq']
     rng=int(sha256(f'{farm["id"]}:{seq}:{slot}'.encode()).hexdigest()[:16],16)
     products=reachable(farm)
-    recent=order_recent(farm)
+    recent=order_recent(farm, commit=False)
     active=[o for o in farm['orders'] if o['slot']!=slot]
     occupied={item for order in active for item in order['needs']}
     available=[item for item in products if item not in occupied]
@@ -182,13 +184,10 @@ def make_order(farm, slot, now):
             candidates[name]=goods or sigs[name]
     relaxed=not candidates
     if relaxed:
-        # A demolished production chain can leave every reachable good cooling or taken.
-        # Keep the board usable: a rare repeat is fine, a duplicate in active slots only if nothing else exists.
-        pool=available or products
+        # Ignore cooldowns while keeping goods unique across active slots.
+        pool=available
         candidates={name:pool for name,_ in NPCS if counts[name]<2 and pool}
-        if not candidates and pool:
-            candidates={name:pool for name,_ in NPCS}
-    need(any(candidates.values()),'no_order_goods','Пока нет доступных товаров для нового заказа.',500)
+    need(any(candidates.values()),'no_order_goods','Пока нет доступных товаров для нового заказа.')
     start=rng % len(NPCS)
     npc,subtitle=next((name,title) for name,title in (NPCS[(start+i)%len(NPCS)] for i in range(len(NPCS))) if candidates.get(name))
     eligible=candidates[npc]
@@ -215,6 +214,7 @@ def make_order(farm, slot, now):
         needs=special;price=sum(ITEMS[k]['price']*q for k,q in needs.items());subtitle='Особая просьба: любимая вещь' if set(needs)<=WEARABLE_ITEM_IDS else 'Особая просьба: любимое лакомство'
     coins=math.ceil(price*1.45)+6
     if special:coins=math.ceil(coins*1.2)
+    farm['order_recent']=recent
     farm['order_seq']+=1
     history=recent.setdefault(npc, [])
     history.append(list(needs))
@@ -225,15 +225,21 @@ def make_order(farm, slot, now):
 
 def new_farm(farm_id, name, now):
     now=tick(now)
+    from . import meadow
     farm=dict(id=farm_id,name=f'Ферма {name}'[:28],catalog=VERSION,created_at=now,revision=0,
         coins=250,starter_credit=250,xp=0,size=8,inventory={'wheat':6,'feed':2},
         settings={'visibility':'friends','allow_help':True,'allow_gifts':True,'allow_pranks':False,'allow_trade':True},
         objects=[],neighbors={},blocked=[],events=[],pranks=[],listings=[],orders=[],order_seq=0,order_recent={},
         stats={'harvests':0,'crafts':0,'orders':0,'helps':0,'builds':0,'gifts':0},
         home_projects=projects.initial_state(),
-        claimed_quests=[],daily={'day':int(now//86400),'counts':{}})
+        claimed_quests=[],daily={'day':int(now//86400),'counts':{}},
+        meadow={'v':1,'epoch':int((now + 10800) // meadow.EPOCH),'patches':{}})
     for i,(typ,x,y) in enumerate([('house',0,0),('barn',0,3),('mill',3,0),('coop',6,0)]):
-        farm['objects'].append(dict(id=f'building_{i}',type=typ,x=x,y=y,w=2,h=2,revision=0,level=1,jobs=[],animal='chicken' if typ=='coop' else None,animal_job=None))
+        building=dict(id=f'building_{i}',type=typ,x=x,y=y,w=2,h=2,revision=0,level=1,jobs=[],
+                      animal='chicken' if typ=='coop' else None,animal_job=None)
+        if typ=='coop':
+            building['animal_repeat']=False
+        farm['objects'].append(building)
     for i,(x,y) in enumerate([(3,4),(4,4),(5,4),(3,5),(4,5),(5,5)]):
         plot=dict(id=f'plot_{i}',type='plot',x=x,y=y,w=1,h=1,revision=0,crop=None)
         if i<2:
@@ -251,9 +257,11 @@ def new_farm(farm_id, name, now):
 # Per-command schemas reject client-supplied rewards, prices or ready_at.
 SCHEMAS={
  'plant':{'object','crop','revision'},'dig_up':{'object','revision'},'harvest':{'object','revision'},'collect_all':set(),
- 'queue':{'object','recipe'},'collect':{'object','job'},'cancel_job':{'object','job'},
+ 'queue':{'object','recipe'},'set_recipe_repeat':{'object','recipe','enabled'},
+ 'set_animal_repeat':{'object','enabled'},'collect':{'object','job'},'cancel_job':{'object','job'},
  'cancel_job_and_forget_recipe':{'object','job'},'forget_recipe':{'object'},
  'feed':{'object'},'collect_animal':{'object'},'buy_animal':{'object','animal'},
+ 'mow':{'cell'},'mow_all':set(),
  'build':{'type','x','y'},'move':{'object','x','y','revision'},'rotate':{'object','revision'},'demolish':{'object','revision'},'upgrade':{'object','revision'},
  'rescue':set(),'expand':set(),'sell':{'item','qty'},'order':{'order'},'skip_order':{'order'},'quest':{'quest'},
  'village_quest':{'npc','action'},
@@ -267,7 +275,7 @@ OPTIONAL_KEYS={'forget_recipe':{'recipe'},'settings':{'allow_requests','notify_r
 SOCIAL={'request_neighbor','accept_neighbor','claim_neighbor_reward','remove_neighbor','block','unblock','help','prank','gift','buy'}
 
 
-def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
+def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_config=None):
     """Apply one strictly validated command to locked copies of farm aggregates."""
     now=tick(now)
     from . import expansion
@@ -276,9 +284,10 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
     if kind in expansion.SCHEMAS:
         need(isinstance(data,dict) and set(data)==expansion.SCHEMAS[kind], 'invalid_command', 'Некорректные параметры действия.',422)
         need(me['id']==other['id'], 'not_owner', 'Это не твоя ферма.',403)
-        text=expansion.apply_extension(me,kind,data,now,command_id,speed,form)
+        text=expansion.apply_extension(me,kind,data,now,command_id,speed,form,upkeep_config)
         progression.touch(me,now)  # r9: a successful command of the actor is activity (M2 pool, Moscow-day roll)
-        economy.bill(me,now)       # r9 stage 14: one upkeep bill per active Moscow day, after the command
+        if kind != 'claim_horseman_gift':
+            economy.bill(me,now,upkeep_config)   # Free gift does not trigger a bill.
         return text
     need(kind in SCHEMAS, 'unknown_command', 'Неизвестное действие.', 422)
     need(isinstance(data,dict) and SCHEMAS[kind]<=set(data)<=SCHEMAS[kind]|OPTIONAL_KEYS.get(kind,set()), 'invalid_command', 'Некорректные параметры действия.',422)
@@ -296,18 +305,15 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(obj['type']=='plot' and obj['crop'] is None,'busy_plot','Эта грядка занята.')
         need(lv>=spec['level'],'locked','Эта культура откроется на следующем уровне.')
         inventory(me,{spec['seed']:1},-1)
-        obj['crop']=dict(id=spec['id'],planted_at=now,ready_at=now+duration(spec['seconds'],speed,me),
-            yield_qty=spec['yield_qty'],xp=spec['xp'],helped=False,version=VERSION,cost=0,gift=0,seed=spec['seed'])
-        obj['revision']+=1; text=f'{spec["name"]}: посажено.'
+        expansion.plant(me,obj,dict(spec,cost=0),now,speed,seed=spec['seed'],manual=True)
+        text=f'{spec["name"]}: посажено.'
     elif kind=='plant':
         crop=named(CROPS,data['crop'])
         need(obj['type']=='plot' and obj['crop'] is None,'busy_plot','Эта грядка занята.')
         need(lv>=crop['level'],'locked','Эта культура откроется на следующем уровне.')
         need(not crop.get('orchard'),'orchard_crop','Плодовые деревья теперь растут в саду: посади саженец во вкладке «Сад».')
-        gift=pay(me,crop['cost'])
-        obj['crop']=dict(id=crop['id'],planted_at=now,ready_at=now+duration(crop['seconds'],speed,me),
-            yield_qty=crop['yield_qty'],xp=crop['xp'],helped=False,version=VERSION,cost=crop['cost'],gift=gift)
-        obj['revision']+=1; text=f'{crop["name"]}: посажено.'
+        expansion.plant(me,obj,crop,now,speed,manual=True)
+        text=f'{crop["name"]}: посажено.'
     elif kind=='dig_up':
         from . import undo
         text=undo.dig_up(me,obj,now)
@@ -318,9 +324,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         for p in plots:
             if p['type']=='tree':orchard.harvest(me,p,now,True,speed);continue
             c=p.get('crop'); need(c is not None and c['ready_at']<=now,'not_ready','Урожай ещё растёт.')
-            inventory(me,{c['id']:c['yield_qty']});progression.grant_xp(me,c['xp'],'harvest',now,True,CROPS[c['id']]['seconds'] if c['id'] in CROPS else None);me['stats']['harvests']+=1
-            expansion.observe_harvest(me,c['id']);expansion.market.count(me,'h:'+c['id'],c['yield_qty']);p['last_crop']=c['id']
-            p['crop']=None;p['revision']+=1
+            expansion.harvest(me,p,now,True,speed)
         trees=sum(p['type']=='tree' for p in plots)
         text=f'Урожай собран: {len(plots)-trees} гряд.' if not trees else f'Урожай собран: {len(plots)-trees} гряд., деревьев: {trees}.' if len(plots)>trees else f'Урожай собран: деревьев {trees}.'
     elif kind=='queue':
@@ -328,11 +332,38 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         need(obj['type']==r['building'] and expansion.textile.recipe_level(me,r)<=lv,'wrong_building','Этот рецепт здесь пока недоступен.')
         need(len(obj['jobs']) < queue_slots(obj.get('level')),'queue_full','Очередь заполнена. Забери готовые товары.')
         inventory(me,r['inputs'],-1)
-        new_setup=not expansion.has_manual_job(obj)  # nothing manual left in the queue -> this starts a new setup
         job=expansion.make_job(obj,r,now,speed,command_id,me);job['manual']=True
         obj['jobs'].append(job)
-        expansion.remember_recipe(obj,r['id'],new_setup)  # the last manual setup, repeated by the artisans and «повторить партии»
         obj['revision']+=1;text='Производство поставлено в очередь.'
+    elif kind=='set_recipe_repeat':
+        from . import expansion as ex
+        need(obj['type'] in ex.WORKSHOP_TYPES,'wrong_object','Автоповтор доступен только в мастерской.')
+        recipe=named(RECIPES,data['recipe'])
+        need(recipe['building']==obj['type'],'wrong_recipe','Этот рецепт здесь не готовят.',422)
+        need(type(data['enabled']) is bool,'invalid_command','Неверный режим автоповтора.',422)
+        memory=ex.recipe_memory(obj)
+        if data['enabled']:
+            need(recipe['id'] in memory or any(j.get('recipe')==recipe['id'] for j in obj.get('jobs',[])),
+                 'no_job','Сначала поставь эту партию в очередь.')
+            if recipe['id'] not in memory:
+                need(len(memory)<ex.memory_cap(obj),'repeat_limit','Автоповтор настроен для максимума рецептов. Сначала отключи другой рецепт.')
+                ex._own_memory(obj).append(recipe['id'])
+                ex._sync_memory(obj)
+                obj['revision']+=1
+            text=f'Автоповтор включён: {recipe["name"]}.'
+        else:
+            if recipe['id'] in memory:
+                ex.forget_recipe_id(obj,recipe['id'])
+                obj['revision']+=1
+            text=f'Автоповтор выключен: {recipe["name"]}. Текущие партии завершатся.'
+    elif kind=='set_animal_repeat':
+        need(bool(obj.get('animal')),'wrong_object','В этом домике нет животных.')
+        need(type(data['enabled']) is bool,'invalid_command','Неверный режим автокормления.',422)
+        old=obj.get('animal_repeat',True)  # legacy saves keep automatic feeding enabled
+        if old!=data['enabled']:
+            obj['animal_repeat']=data['enabled']
+            obj['revision']+=1
+        text='Автокормление включено.' if data['enabled'] else 'Автокормление выключено. Готовая порция будет собрана.'
     elif kind=='forget_recipe':
         from . import expansion as ex
         need(obj['type'] in ex.WORKSHOP_TYPES,'wrong_object','Забыть рецепт можно только в мастерской.')
@@ -364,23 +395,40 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         a=named(ANIMALS,data['animal'])
         need(obj['type']==a['building'] and not obj.get('animal'),'animal_exists','Этот домик уже занят или не подходит.')
         need(lv>=a['level'],'locked','Нужен более высокий уровень.')
-        pay(me,a['cost']);obj['animal']=a['id'];obj['revision']+=1;text='Животные поселились на ферме.'
+        pay(me,a['cost']);obj['animal']=a['id'];obj['animal_repeat']=False;obj['revision']+=1;text='Животные поселились на ферме.'
     elif kind=='feed':
         a=named(ANIMALS,obj.get('animal'))
         need(not obj.get('animal_job'),'animal_busy','Сначала забери готовую продукцию.')
-        inputs,outputs,seconds=animal_batch(a,obj.get('level'))
-        inventory(me,inputs,-1)
-        obj['animal_job']=dict(ready_at=now+duration(seconds,speed,me),outputs=outputs,xp=animal_xp(a,obj.get('level')),version=VERSION)
-        obj['revision']+=1;text='Животные накормлены. Можно заниматься другими делами.'
+        need(expansion.can_feed(me,obj),'missing_goods','Не хватает корма или луговой травы.')
+        expansion.start_feed(me,obj,now,speed,player=True)
+        text='Животные накормлены. Можно заниматься другими делами.'
+    elif kind in {'mow','mow_all'}:
+        from . import meadow
+        preview=deepcopy(me)
+        meadow.update(preview,now)
+        if kind == 'mow':
+            cell=data['cell']
+            need(isinstance(cell,str) and re.fullmatch(r'\d+,\d+',cell),'invalid_command','Неверная клетка.',422)
+            qty=meadow.mow(preview,cell,now)
+            need(qty>0,'meadow_not_ready','Трава ещё растёт или укрыта снегом.')
+            text=f'Скошено: луговая трава ×{qty}.'
+        else:
+            qty=meadow.mow_ready(preview,now)
+            need(qty>0,'nothing_ready','Пока нечего косить.')
+            text=f'Скошена луговина: луговая трава ×{qty}.'
+        me['meadow']=preview['meadow'];me['inventory']=preview['inventory']
     elif kind=='collect_animal':
         j=obj.get('animal_job');need(j and j['ready_at']<=now,'not_ready','Животные ещё не приготовили продукцию.')
-        inventory(me,j['outputs']);expansion.market.count_outputs(me,j['outputs']);progression.grant_xp(me,j.get('xp',ANIMAL_XP_LEGACY),'animal',now,True);me['stats']['crafts']+=1;obj['animal_job']=None;obj['revision']+=1;text='Продукция животных собрана.'
+        expansion.take_animal(me,obj,now,owner=True);text='Продукция животных собрана.'
     elif kind=='build':
         typ=data['type']
         if typ=='plot':
             c=dict(cost=35,level=1,w=1,h=1)
             need(sum(o['type']=='plot' for o in me['objects'])<plot_limit(me['size']),'plot_limit',f'На таком участке доступно до {plot_limit(me["size"])} грядок. Расширь землю.')
         else: c=named(BUILDINGS,typ)
+        if typ=='compost_heap':
+            need(not any(o['type']=='compost_heap' for o in me['objects']),
+                 'compost_heap_limit','На ферме может быть только одна компостная куча.')
         need(lv>=c['level'],'locked',f'Нужен уровень {c["level"]}.')
         need(not c.get('secret') or c['secret'] in me['secrets'],'secret_locked','Этот декор нужно сначала найти в кабинете находок.')
         need(not c.get('reward') or economy.reward_allowed(me,typ),'reward_locked','Этот декор выдаётся наградой фонда деревни.')
@@ -435,7 +483,11 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
         step=land_step(me['size'])
         need(step,'max_land','Весь участок уже открыт.')
         need(level(me['xp'])>=step['level'],'level_required',f"Расширение до {step['size']} × {step['size']} открывается с {step['level']} уровня.")
-        pay(me,step['cost']);me['size']=step['size'];progression.grant_xp(me,20,'expand',now,True);text='Новый участок открыт.'
+        previous_size=me['size']
+        pay(me,step['cost']);me['size']=step['size'];progression.grant_xp(me,20,'expand',now,True)
+        from . import meadow
+        meadow.seed_new_land(me,previous_size,now)
+        text='Новый участок открыт.'
     elif kind=='rescue':
         has_resources=any(me['inventory'].values()) or projects.has_reserved(me) or bool(me['listings']) or any(
             o.get('crop') or o.get('jobs') or o.get('animal_job') for o in me['objects'])
@@ -557,8 +609,10 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n'):
     # free starter option below, not by silently granting currency.
     expansion.detect_secrets(me,now)
     progression.touch(me,now)  # r9: successful command = activity; failed ones leave the state untouched
-    if kind not in {'rescue','pay_upkeep'}:economy.bill(me,now)  # r9 stage 14: one bill per active Moscow day, after the command
+    if kind not in {'rescue','pay_upkeep'}:economy.bill(me,now,upkeep_config)  # r9 stage 14: one bill per active Moscow day, after the command
     event(me,now,text,kind)
+    from . import meadow
+    meadow.update(me,now)  # construction and expansion can invalidate or unlock patch cells
     return text
 
 
@@ -568,10 +622,23 @@ def validate_state(farm):
     validate_expansion(farm)
     minigames.validate(farm)
     oleg.validate(farm)
+    from application import farm_village_games
+    farm_village_games.validate(farm)
     progression.validate(farm)
     economy.validate(farm)
     from . import village_quests
     village_quests.validate(farm)
+    from . import meadow
+    record=farm.get('meadow')
+    if record is not None:
+        need(type(record) is dict and record.get('v') == 1 and type(record.get('epoch')) is int and
+             type(record.get('patches')) is dict and len(record['patches']) <= 12 and
+             all(type(cell) is str and re.fullmatch(r'\d+,\d+',cell) and type(cut) is int
+                 for cell,cut in record['patches'].items()),
+             'invalid_meadow','Некорректное состояние луговины.',500)
+        coords=[tuple(map(int,cell.split(','))) for cell in record['patches']]
+        need(len(coords)==len(set(coords)) and all(0<=x<farm['size'] and 0<=y<farm['size'] for x,y in coords),
+             'invalid_meadow','Некорректное состояние луговины.',500)
     need(type(farm['coins']) is int and 0<=farm['coins']<=10**12,'invalid_balance','Некорректное состояние баланса.',500)
     need(0<=farm['starter_credit']<=farm['coins'],'invalid_credit','Некорректное состояние средств.',500)
     need(farm['xp']>=0 and is_land_size(farm['size']),'invalid_state','Некорректное состояние фермы.',500)
@@ -581,13 +648,16 @@ def validate_state(farm):
     used=set()
     for obj in farm['objects']:
         need(type(obj.get('level',1)) is int and 1<=obj.get('level',1)<=4,'invalid_level','Некорректный уровень постройки.',500)
+        if 'animal_repeat' in obj:
+            need(type(obj['animal_repeat']) is bool and bool(obj.get('animal')),
+                 'invalid_animal_repeat','Некорректный режим автокормления.',500)
         need(type(obj.get('orientation',0)) is int and obj.get('orientation',0) in (0,1),'invalid_orientation','Некорректная ориентация постройки.',500)
         cells=object_cells(obj)
         need(not cells&used and all(0<=x<farm['size'] and 0<=y<farm['size'] for x,y in cells),'invalid_layout','Некорректная планировка.',500)
         used|=cells
 
 
-def project(farm, visitor, now):
+def project(farm, visitor, now, upkeep_config=None):
     now=tick(now)
     own=farm['id']==visitor['id']
     need(can_visit(visitor,farm),'private_farm','Ферма недоступна.',404)
@@ -598,27 +668,33 @@ def project(farm, visitor, now):
         from . import minigames, oleg, expansion as _ex
         result['minigames']=minigames.public(farm,now)
         result['oleg_game']=oleg.public(farm,now)
+        from application import farm_village_games
+        result['village_games']=farm_village_games.public(farm,now)
         from . import swans
         result['swans']=swans.public(farm,now)
         from . import festivals
         result['festival']=festivals.owner_view(farm,now)
+        from . import horseman
+        result['horseman']=horseman.owner_view(farm,now)
         from . import merchant
         result['merchant_view']=merchant.owner_view(farm,now)
         from . import orchard
         result['orchard_view']=orchard.owner_view(farm,now)
+        from . import meadow
+        result['meadow_view']=meadow.view(farm,now)
         result['home_projects']=projects.owner_state(farm)
-        for o in result['objects']:
-            if o['type'] in _ex.WORKSHOP_TYPES:o.setdefault('recipes_memory',[])
+        result.setdefault('fert_beds',False);result.setdefault('fert_trees',False);result.setdefault('fert_carry',{})
     else:
         result={k:deepcopy(farm[k]) for k in ['id','name','size','revision','objects']}
         # Only visual progress and ready flags, never production contents or economy.
         for obj in result['objects']:
             obj['jobs']=[{'ready_at':j['ready_at']} for j in obj.get('jobs',[])]
-            for k in ('last_recipe','recipes_memory','recipe_cursor'):obj.pop(k,None)
+            for k in ('last_recipe','recipes_memory','recipe_cursor','animal_repeat'):obj.pop(k,None)
             if obj.get('animal_job'):obj['animal_job']={'ready_at':obj['animal_job']['ready_at']}
             if obj['type']=='tree':   # a visitor sees the look and the ripeness, never the price, the voucher or the care state
                 for k in ('cost','gift','paid_with','pruned_until','prune_at'):obj.pop(k,None)
-                if obj.get('fruit'):obj['fruit']={'ready_at':obj['fruit']['ready_at'],'helped':obj['fruit']['helped']}
+                if obj.get('fruit'):obj['fruit']={'ready_at':obj['fruit']['ready_at'],'helped':obj['fruit']['helped'],**({'fert':1} if obj['fruit'].get('fert')==1 else {})}   # fert: look only
+            elif obj.get('crop'):obj['crop'].pop('fert_item',None)
         result['equipment']={k:{'active':bool(v.get('shift') and v['shift']['status']=='working'),'last_run_at':v.get('last_run_at',0)} for k,v in farm.get('equipment',{}).items()}
         result['helpers']={k:{'active':bool(v.get('shift') and v['shift']['status']=='working')} for k,v in farm.get('helpers',{}).items()}
         result['pranks']=[{'kind':p['kind'],'until':p['until']} for p in farm['pranks'] if p['until']>now]
@@ -628,7 +704,7 @@ def project(farm, visitor, now):
         result['festival']=festivals.public_calendar(farm,now)
     result.update(is_owner=own,level=level(farm['xp']),server_time=now)
     if own:result.setdefault('fields',[]);result.setdefault('field_machines',{})
-    if own:result['xp_bonus']=progression.status(farm,now);result['economy_status']=economy.status(farm,now)
+    if own:result['xp_bonus']=progression.status(farm,now);result['economy_status']=economy.status(farm,now,upkeep_config)
     accepted=visitor['neighbors'].get(farm['id'],{}).get('status')=='accepted'
     result['permissions']={p:own or (accepted and farm['settings'][p]) for p in ['allow_help','allow_gifts','allow_pranks','allow_trade']}
     return result

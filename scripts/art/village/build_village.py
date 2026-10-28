@@ -139,7 +139,7 @@ INPUTS = ("scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scri
 
 def inputs() -> dict:
     """sha256 of everything the picture depends on: a changed hash here explains a changed picture."""
-    out = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()[:16] for p in INPUTS}
+    out = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()[:16] for p in (*INPUTS, "scripts/art/village/fest_pumpkin.js", "scripts/art/village/pumpkin_jack.js")}
     return out
 
 
@@ -177,6 +177,11 @@ def build(out: Path, install: bool = False) -> dict:
     (out / "merchant-figure.svg").write_text(res["meta"]["merchant"]["figure"], encoding="utf-8", newline="")
     for fid, layer in res["meta"]["fest"].items():   # festival layers: qw_farm/static/village-fest-<id>.svg
         (out / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
+    jack = res["meta"]["fest"]["pumpkin_night"]["jack"]
+    if jack:
+        # Review artifact only: the live character is integrated separately after owner approval.
+        (out / "pumpkin-jack.svg").write_text(jack["svg"], encoding="utf-8", newline="")
+        (out / "pumpkin-jack.json").write_text(json.dumps({k: v for k, v in jack.items() if k != "svg"}, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "gate_board.svg").write_text(res["meta"]["gate_art"]["board"]["svg"], encoding="utf-8", newline="")
     # «Контрастный режим» path edges (contrast_paths.js): a vector layer of the game, qw_farm/static/village-contrast-paths.svg
     (out / "village-contrast-paths.svg").write_text(res["meta"]["contrast_paths"]["svg"], encoding="utf-8", newline="")
@@ -186,6 +191,7 @@ def build(out: Path, install: bool = False) -> dict:
               "svg_sha256": hashlib.sha256(svg.encode()).hexdigest(),
               "svg_bytes": len(svg.encode()), "versions": versions(), "inputs": inputs(),
               "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()},
+              "jack_sha256": hashlib.sha256(jack["svg"].encode()).hexdigest() if jack else None,
               "merchant_sha256": hashlib.sha256((res["meta"]["merchant"]["svg"] + res["meta"]["merchant"]["figure"]).encode()).hexdigest(),
               "build_sha256": hashlib.sha256(res["meta"]["build"]["sprite"].encode()).hexdigest(),
               "contrast_paths_sha256": hashlib.sha256(res["meta"]["contrast_paths"]["svg"].encode()).hexdigest()}

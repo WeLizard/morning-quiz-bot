@@ -71,7 +71,7 @@ body.oleg-game-open .header-destinations{display:none!important}
 #oleg-game-view svg.oleg-scene-art{width:100%;height:100%}
 #oleg-game-view .os-moon,#oleg-game-view .os-stars,#oleg-game-view .os-eye-happy,#oleg-game-view .os-eye-oops,#oleg-game-view .os-drop,#oleg-game-view .os-notes{opacity:0;transition:opacity .2s ease}
 #oleg-game-view .os-glow{opacity:0;transition:opacity .15s ease}
-#oleg-game-view .os-bell{transform-box:view-box}
+#oleg-game-view .os-bell{transform-box:view-box;transition:translate .4s ease}
 #oleg-game-view .os-bell.oleg-lit .os-glow{opacity:1}
 #oleg-game-view .os-bell.oleg-lit>path{filter:brightness(1.1) saturate(1.15)}
 #oleg-game-view .os-bell.oleg-lit{animation:os-swing .5s ease-in-out}

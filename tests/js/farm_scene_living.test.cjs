@@ -122,6 +122,27 @@ test('after dusk animals walk to their house door and vanish; after dawn they co
  });
 });
 
+test('contrast brightens the night without changing when hens and geese go indoors or come out',async()=>{
+ const E=await import('../../qw_farm/static/scene_expansion.js');
+ const farm={id:'contrast-night',size:12,pranks:[],equipment:{},helpers:{},objects:[
+  {id:'coop',type:'coop',animal:'chicken',x:2,y:2,w:2,h:2},{id:'gh',type:'goose_house',animal:'goose',x:6,y:6,w:2,h:2}]};
+ withClock(tick=>{
+  for(const motion of [false,true]){
+   const s={farm,motion,time:0,now:()=>0,view:null,placement:null,lightingRaw:{darkness:1},lighting:{darkness:.5}};
+   E.resetWalkingGeese(s);E.resetLivestock(s);
+   assert.equal(E.teamSprites(s).length,0,'opening in contrast at night starts all animals indoors');
+   s.lighting.darkness=1;E.teamSprites(s);s.lighting.darkness=.5;
+   assert.equal(E.teamSprites(s).length,0,'toggling contrast cannot wake the animals');
+   s.lightingRaw.darkness=0;s.lighting.darkness=0;
+   for(let i=0;i<900;i++){tick(33);E.teamSprites(s)}
+   assert.ok(E.teamSprites(s).length>=3,'hens and a goose return at dawn');
+   s.lightingRaw.darkness=.8;s.lighting.darkness=.4;
+   for(let i=0;i<900;i++){tick(33);E.teamSprites(s)}
+   assert.equal(E.teamSprites(s).length,0,'animals return indoors at dusk even though contrast stays below the visual night threshold');
+  }
+ });
+});
+
 test('a farm refresh at night does not make indoor animals pop out and run home again, and opening after dark starts them indoors',async()=>{
  const E=await import('../../qw_farm/static/scene_expansion.js');
  const farm={id:'f',size:12,pranks:[],equipment:{},helpers:{},objects:[

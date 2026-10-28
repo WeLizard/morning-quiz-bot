@@ -74,8 +74,10 @@ export function catalogEntries(catalog,me,objects=[],orchardRows=[]){
  }
  for(const r of orchardRows){
   const waiting=r.options.filter(o=>o.voucher&&o.qty).reduce((n,o)=>n+(o.voucher==='free'?o.qty:0),0);
+  // «не хватает монет» like the buildings: only when the best way to plant is paying coins (no free sapling, no talon).
+  const best=bestOption(r),poor=!r.locked&&!r.blocked&&!!best&&best.price>me.coins;
   out.push({key:'t:'+r.id,kind:'tree',section:'trees',id:r.id,name:r.name,sapling:r.sapling,cost:r.cost,level:r.level||1,w:1,h:1,have:trees[r.id]||0,
-   saplings:waiting,locked:!!r.locked,lock:r.locked?`С ${r.level} ур.`:r.blocked||'',row:r,fruit:r.fruit});
+   saplings:waiting,locked:!!r.locked,lock:r.locked?`С ${r.level} ур.`:r.blocked||'',poor,row:r,fruit:r.fruit});
  }
  // Open first, by level; locked ones after them, nearest first.
  return out.sort((a,b)=>(a.locked-b.locked)||(a.level-b.level)||((a.cost||0)-(b.cost||0)));
@@ -117,7 +119,7 @@ export const bestOption=row=>row?.options?.find(o=>o.voucher==='free'&&o.qty)||r
 /* «(i)» — details of a catalogue entry without choosing it (FARM_FEEDBACK E13). Only numbers from the server catalogue:
    a line whose field is missing is left out, nothing is guessed. `h` gives the formatting the app already uses:
    duration(seconds), cropSeconds(crop) — growth time at the server speed, purpose(type) — buildingPurpose() lines,
-   rent — orchard rent summary or null, levelEffect(kind,level) — the upgrade effect text. */
+   rent — orchard rent summary or null, levelEffect(kind,level,type) — the upgrade effect text (type: a heap's batch keeps its time). */
 export function entryInfo(e,catalog,me,h={}){
  if(!e||!catalog)return null;
  const items=catalog.items||{},nm=id=>items[id]?.name||id,dur=s=>h.duration?h.duration(s):`${s} с`;
@@ -173,7 +175,7 @@ export function entryInfo(e,catalog,me,h={}){
  section('Животные',animals.map(a=>`${a.name||a.id}: корм ${list(a.inputs)} → ${list(a.outputs)} · ${dur(a.seconds)}${a.cost!=null?` · поселить за ${a.cost} мон.`:''}`));
  section('Рецепты',recipes.map(recipeLine));
  const up=catalog.upgrades,costs=up?.costs?.[b.id],kind=up?.kinds?.[b.id];
- if(costs)section('Улучшения',Object.entries(costs).sort((x,y)=>x[0]-y[0]).map(([lv,c])=>`Ур. ${lv}: ${c.coins} мон.${Object.keys(c.items||{}).length?` и ${list(c.items)}`:''}, с ${c.level} ур. фермы${h.levelEffect&&kind?` — ${h.levelEffect(kind,Number(lv))}`:''}`));
+ if(costs)section('Улучшения',Object.entries(costs).sort((x,y)=>x[0]-y[0]).map(([lv,c])=>`Ур. ${lv}: ${c.coins} мон.${Object.keys(c.items||{}).length?` и ${list(c.items)}`:''}, с ${c.level} ур. фермы${h.levelEffect&&kind?` — ${h.levelEffect(kind,Number(lv),b.id)}`:''}`));
  info.action={label:'Поставить',kind:'place'};
  return info;
 }

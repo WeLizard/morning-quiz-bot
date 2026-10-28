@@ -4,18 +4,31 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
+function makeClassList(set){return {add:value=>set.add(value),remove:value=>set.delete(value),toggle:(value,force)=>{
+ const enabled=force===undefined?!set.has(value):!!force;if(enabled)set.add(value);else set.delete(value);return enabled;
+ }};}
 function client(){
  let clock=100000,nextTimer=0;
  const timers=new Set(),callbacks=new Map(),memory=new Map(),calls=[],responses=[],messages=[];
- const nodes={connection:{},retry:{}},classes=new Set();
+ const classes=new Set();
+ const makeNode=()=>({style:{},dataset:{},hidden:false,disabled:false,textContent:'',children:[],classList:makeClassList(new Set()),
+  setAttribute(){},append(...children){this.children.push(...children);},replaceChildren(...children){this.children=[...children];},
+  querySelector(){return makeNode();},close(){this.open=false;},open:false});
+ const nodes={};
+ for(const id of ['connection','retry','login-rate','login-retry','scene-status','connection-dot','repeat-run','dialog','game','login','hud'])nodes[id]=makeNode();
  const S={me:{id:'actor'},farm:null,busy:false,pending:null};
  const c={S,API:'/api/farm/v1',Date:{now:()=>clock},AbortController,TypeError,JSON,
   crypto:{randomUUID:()=> 'stable-command-id'},url:p=>p,
   fetch:async(p,options)=>{calls.push({p,options});const r=responses.shift();if(r instanceof Error)throw r;return r||response(200);},
   setTimeout:(fn,ms)=>{timers.add(++nextTimer);callbacks.set(nextTimer,{fn,ms});return nextTimer;},clearTimeout:id=>{timers.delete(id);callbacks.delete(id);},
   sessionStorage:{setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)},
-  document:{querySelector:()=>({style:{}}),body:{classList:{add:v=>classes.add(v),remove:v=>classes.delete(v)}}},
-  '$':id=>nodes[id],toast:t=>messages.push(t),localizeWagerNotice:t=>t,gf:(m,f,n)=>n,refresh:async()=>true,showLogin:()=>{}};
+  document:{querySelector:selector=>selector==='.scene-status'?nodes['scene-status']:selector==='.connection-dot'?nodes['connection-dot']:null,
+   body:{classList:makeClassList(classes)}},
+  '$':id=>nodes[id]||(nodes[id]=makeNode()),toast:t=>messages.push(t),localizeWagerNotice:t=>t,gf:(m,f,n)=>n,
+  refresh:async()=>true,showLogin:()=>{},rememberMachineCommand:()=>{},
+  // Non-target app dependencies called during command cleanup/login; rate-limit code remains real.
+  closeFarmMenu:()=>{},updateRepeat:()=>{},resetVillageView:()=>{},cancelPlacement:()=>{},closePanel:()=>{},renderPanel:()=>{},renderToasts:()=>{},
+  toastList:[],dashaGameOpen:false,olegGameOpen:false,dashaGame:null,olegGame:null,farmViewEpoch:0,mode:'web',SESSION_ENDED:'Session ended',quizzyLoginLink:()=>makeNode()};
  vm.createContext(c);
  const feedback=source.slice(source.indexOf('const rateUntil='),source.indexOf('function field('));
  const request=source.slice(source.indexOf('async function request('),source.indexOf('let farmViewEpoch=0,'));
@@ -100,11 +113,11 @@ test('Real login displays startup 429 countdown/retry outside the hidden game an
  for(const failing of ['config','start']){
   const a=client();a.S.me=null;
   class Node{
-   constructor(tag,text){this.tagName=tag.toUpperCase();this.textContent=text;this.children=[];this.hidden=false;}
+   constructor(tag,text){this.tagName=tag.toUpperCase();this.textContent=text;this.children=[];this.hidden=false;this.disabled=false;this.classList=makeClassList(new Set());this.style={};this.dataset={};}
    set id(id){a.nodes[id]=this;}
    append(...children){for(const child of children){child.parentNode=this;this.children.push(child);}}
    replaceChildren(...children){this.children=[];this.append(...children);}
-   setAttribute(){}
+   setAttribute(){}close(){this.open=false;}
   }
   const body=new Node('body');
   for(const id of ['game','login','header-actions','hud']){a.nodes[id]=new Node('div');body.append(a.nodes[id]);}

@@ -30,11 +30,14 @@ function harness(over={}){
 }
 const row=(over={})=>({id:'request-a',item:'wheat',qty:3,status:'open',offer_kind:'free',expires_at:1000,...over});
 
-test('separate lane renders delivery and incoming cards without using resident slots',async()=>{
+test('neighbor cards share the order board layout without a separate lane',async()=>{
  const {createFriendRequests}=await load(),{h,me,calls}=harness();
  me.friend_requests.own=[row({status:'delivered',settle_by:900})];me.friend_requests.incoming=[...me.friend_requests.own,row({id:'request-b',offer_kind:'item',offer_item:'egg',offer_qty:2})];
- const parent=new Node('div'),ui=createFriendRequests(h);ui.lane(parent);
- assert.equal(parent.children[0].attrs['aria-label'],'От соседей');
+ const parent=new Node('div'),ui=createFriendRequests(h);ui.boardCards(parent);
+ assert.equal(parent.children.length,2);assert.ok(parent.children.every(n=>n.className.includes('friend-request-card')));
+ assert.ok(!walk(parent).some(n=>n.className.includes('friend-requests-lane')||n.textContent==='От соседей'));
+ assert.equal(walk(parent).filter(n=>n.className==='qw-action-row order-body').length,2);
+ assert.equal(walk(parent).filter(n=>n.className==='order-info').length,2);
  assert.equal(walk(parent).filter(n=>n.className.includes('friend-request-card')).length,2);
  await buttons(parent).find(b=>b.textContent==='Принять').onclick();
  await buttons(parent).find(b=>b.textContent==='Отдать').onclick();
@@ -43,7 +46,7 @@ test('separate lane renders delivery and incoming cards without using resident s
 });
 test('giving is disabled with the stock or server reason; hide is a server command',async()=>{
  const {createFriendRequests}=await load(),{h,me,calls}=harness();me.friend_requests.incoming=[row({qty:10}),row({id:'request-c',can_give:false,reason:'Соседству ещё нет 24 часов'})];
- const p=new Node('div');createFriendRequests(h).lane(p);
+ const p=new Node('div');createFriendRequests(h).boardCards(p);
  const give=buttons(p).filter(b=>b.textContent==='Отдать');assert.ok(give.every(b=>b.disabled));assert.ok(give.every(b=>!b.className.includes('primary')));
  assert.ok(walk(p).some(n=>n.textContent==='Не хватает: ×2 · wheat'));
  assert.ok(walk(p).some(n=>n.textContent==='Соседству ещё нет 24 часов'));
@@ -51,7 +54,7 @@ test('giving is disabled with the stock or server reason; hide is a server comma
 });
 test('decline and cancel require confirmation and never send client exchange terms',async()=>{
  const {createFriendRequests}=await load(),{h,me,calls,dialogs}=harness();me.friend_requests.own=[row({status:'delivered'})];
- const ui=createFriendRequests(h),p=new Node('div');ui.lane(p);buttons(p).find(b=>b.textContent==='Отказаться').onclick();assert.equal(calls.length,0);
+ const ui=createFriendRequests(h),p=new Node('div');ui.boardCards(p);buttons(p).find(b=>b.textContent==='Отказаться').onclick();assert.equal(calls.length,0);
  await dialogs[0][2][0].onclick();assert.deepEqual(calls,[['request_decline',{request:'request-a'}]]);
  me.friend_requests.own=[row()];const own=new Node('div');ui.renderNeighbors(own);buttons(own).find(b=>b.textContent==='Я прошу').onclick();
  const refreshed=new Node('div');ui.renderNeighbors(refreshed);buttons(refreshed).find(b=>b.textContent==='Отменить').onclick();assert.equal(calls.length,1);
@@ -81,9 +84,9 @@ test('notifications dedupe by identity and free thanks never promise coins or XP
  const ui=createFriendRequests(h);ui.notify();ui.notify();assert.deepEqual(notices,['Посылка пришла']);me.id='farm-b';ui.notify();assert.equal(notices.length,2);
  assert.match(offerText(row(),h.itemName),/без монет и опыта/);
 });
-test('app hooks the lane, missing goods, settings, notifications and existing dialog navigation',()=>{
+test('app hooks the board cards, missing goods, settings, notifications and existing dialog navigation',()=>{
  const app=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
- for(const hook of ['FRIEND_REQUESTS.lane(p)','FRIEND_REQUESTS.missing(links,o.needs)','FRIEND_REQUESTS.renderNeighbors(p)','FRIEND_REQUESTS.notify()','allow_requests'])assert.ok(app.includes(hook),hook);
+ for(const hook of ['FRIEND_REQUESTS.boardCards(p)','FRIEND_REQUESTS.missing(links,o.needs)','FRIEND_REQUESTS.renderNeighbors(p)','FRIEND_REQUESTS.notify()','allow_requests'])assert.ok(app.includes(hook),hook);
  assert.match(app,/navPush\('dialog'/);
  assert.ok(!app.includes('\r\n'),'app.js stays LF');
 });
@@ -104,4 +107,14 @@ test('notification preference lives in both Profile settings paths and persists 
   const body=JSON.parse(last[2].body);assert.equal(body.kind,'settings');assert.equal(body.data.notify_requests,true);assert.equal(body.data.allow_help,false);assert.equal(body.actor,'farm-a');
   assert.equal(last[2].headers['X-QW-Farm'],'1');assert.ok(!calls.some(([url])=>url.includes('/start')));
  }
+});
+test('farm names render as literal text on requests, parcels and audience options without account ids',async()=>{
+ const {createFriendRequests}=await load(),{h,me,dialogs}=harness(),name='<img src=x onerror=alert(1)>';
+ me.friend_requests.incoming=[row({requester_name:name})];me.friend_requests.own=[row({id:'parcel',status:'delivered',giver_name:'Солнечная ферма'})];
+ h.fetchNeighbors=async()=>({neighbors:[{id:'private-account-id',name:'Лесная ферма',status:'accepted'}]});
+ const ui=createFriendRequests(h),p=new Node('div');ui.boardCards(p);
+ assert.equal(p.children[0].textContent,'Посылка от соседа Солнечная ферма');assert.equal(p.children[1].textContent,`Сосед ${name} просит wheat ×3`);
+ assert.ok(!walk(p).some(n=>Object.hasOwn(n,'innerHTML')));
+ await ui.create('wheat');buttons(dialogs.at(-1)[1]).find(b=>b.textContent==='Одному').onclick();const option=walk(dialogs.at(-1)[1]).find(n=>n.tag==='option'&&n.value==='private-account-id');assert.equal(option.textContent,'Лесная ферма');
+ assert.ok(!walk(dialogs.at(-1)[1]).some(n=>n.textContent.includes('private-account-id')));
 });

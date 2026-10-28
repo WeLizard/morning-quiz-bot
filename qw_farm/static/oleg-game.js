@@ -2,15 +2,21 @@
 // The server (qw_farm/oleg.py) owns the melodies, the rounds and the once-a-day reward; this view only plays and collects taps.
 const BELL_NAMES=['Первый колокольчик, красный','Второй колокольчик, золотой','Третий колокольчик, зелёный','Четвёртый колокольчик, синий'];
 const FREQUENCIES=[523.25,659.25,783.99,987.77];
+const MODIFIERS={classic:['Запомни и повтори','Повтори мелодию по порядку.'],echo:['Эхо','Повтори мелодию задом наперёд: начни с последней ноты.'],false_note:['Фальшивая нота','Послушай две мелодии. Во второй появится новый колокольчик — нажми его один раз.'],acceleration:['Ускорение','Повтори по порядку. С каждым раундом Олег играет быстрее.'],shuffle:['Перепутанные колокольчики','Повтори по порядку. После мелодии колокольчики поменяются местами; их номера и звуки сохранятся.']};
+export function olegExpectedNotes(active){return active.modifier==='echo'?active.sequence.slice().reverse():active.modifier==='false_note'?active.sequence.filter(n=>!active.referenceSequence.includes(n)).slice(0,1):active.sequence.slice();}
+export function olegPlaybackTiming(active,reduced=false){const speed=active.modifier==='acceleration'?1-active.round*.23:1;return {lit:Math.round((reduced?120:360)*speed),gap:Math.round((reduced?240:520)*speed)};}
 
 export function olegPlural(n){const a=n%10,b=n%100;return a===1&&b!==11?'нота':a>=2&&a<=4&&(b<12||b>14)?'ноты':'нот';}
 
 export function olegViewState(game){
  const raw=game?.active||null,rounds=Array.isArray(game?.rounds)&&game.rounds.length?game.rounds:[3,4,5];
  const sequence=Array.isArray(raw?.sequence)&&raw.sequence.every(n=>Number.isInteger(n)&&n>=0&&n<4)?raw.sequence.slice():null;
- const active=raw&&sequence&&Number.isInteger(raw.round)?{runId:raw.run_id,round:raw.round,rounds:Number(raw.rounds)||rounds.length,notes:sequence.length,sequence}:null;
+ const modifier=Object.hasOwn(MODIFIERS,raw?.modifier)?raw.modifier:'classic';
+ const referenceSequence=Array.isArray(raw?.reference_sequence)?raw.reference_sequence.slice():[];
+ const bellOrder=Array.isArray(raw?.bell_order)&&raw.bell_order.length===4&&new Set(raw.bell_order).size===4&&raw.bell_order.every(n=>Number.isInteger(n)&&n>=0&&n<4)?raw.bell_order.slice():[0,1,2,3];
+ const active=raw&&sequence&&Number.isInteger(raw.round)?{runId:raw.run_id,round:raw.round,rounds:Number(raw.rounds)||rounds.length,notes:modifier==='false_note'?1:sequence.length,sequence,modifier,referenceSequence,bellOrder}:null;
  const reward=game?.next_reward||{};
- return {active,rounds,rewardedToday:!!game?.rewarded_today,coins:Number(reward.coins)||0,xp:Number(reward.xp)||0,lastResult:game?.last_result||null};
+ return {active,modifier:active?.modifier||(Object.hasOwn(MODIFIERS,game?.modifier)?game.modifier:'classic'),rounds,rewardedToday:!!game?.rewarded_today,coins:Number(reward.coins)||0,xp:Number(reward.xp)||0,lastResult:game?.last_result||null};
 }
 
 // What the server did with a submitted round, read from the projection that came back.
@@ -115,7 +121,7 @@ export function mountOlegGame(host,{getState,command,onBack,isCommandPending=()=
 <aside class="oleg-side"><section class="oleg-card oleg-panel" aria-label="Ход игры"><div class="oleg-round-head"><div><span class="oleg-eyebrow">Мелодия</span><strong data-role="round">1 / 3</strong></div><button class="oleg-sound" type="button" aria-pressed="false" aria-label="Включить звук колокольчиков">Звук выкл.</button></div>
 <div class="oleg-progress" role="progressbar" aria-label="Пройдено мелодий" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><span></span></div><p class="oleg-round-hint" data-role="hint"></p>
 <button class="oleg-primary" type="button" data-role="action">Послушать Олега</button><p class="oleg-status" data-role="status" role="status" aria-live="polite"></p><div class="oleg-key-help">Можно нажимать клавиши 1–4.</div></section>
-<section class="oleg-card oleg-intro"><span class="oleg-eyebrow">Игра с Олегом</span><h2>Запомни и повтори</h2><p>Олег сыграет мелодию на колокольчиках. Повтори её по памяти. В каждой следующей мелодии на ноту больше; ошибиться можно сколько угодно раз.</p><p class="oleg-reward" data-role="reward"></p></section></aside></div></div>`;
+<section class="oleg-card oleg-intro"><span class="oleg-eyebrow">Игра с Олегом · правило дня</span><h2 data-role="modifier-title">Запомни и повтори</h2><p data-role="modifier-rule"></p><p>Три раунда; ошибиться можно сколько угодно раз.</p><p class="oleg-reward" data-role="reward"></p></section></aside></div></div>`;
  const $=s=>host.querySelector(s),bells=[...host.querySelectorAll('.oleg-bell')],speech=$('.oleg-speech'),statusNode=$('[data-role="status"]'),action=$('[data-role="action"]'),roundNode=$('[data-role="round"]'),hintNode=$('[data-role="hint"]'),rewardNode=$('[data-role="reward"]'),progress=$('.oleg-progress'),scene=$('.oleg-scene'),sceneBells=[...host.querySelectorAll('[data-scene-bell]')],sound=$('.oleg-sound');
  const reduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
  const view=()=>olegViewState(getState());
@@ -140,6 +146,12 @@ export function mountOlegGame(host,{getState,command,onBack,isCommandPending=()=
   progress.setAttribute('aria-valuemax',String(total));progress.setAttribute('aria-valuenow',String(done));progress.firstElementChild.style.width=`${done/total*100}%`;
   hintNode.textContent=finished?'Три мелодии сыграны':`Мелодия ${Math.min(done+1,total)} · ${notes} ${olegPlural(notes)}`;
   rewardNode.textContent=v.rewardedToday?'Награда за сегодня уже получена — можно играть просто так.':`Пройди три мелодии: +${v.coins} монет и +${v.xp} опыта раз в день.`;
+  const rule=MODIFIERS[v.modifier];
+  if($('[data-role="modifier-title"]'))$('[data-role="modifier-title"]').textContent=rule[0];
+  if($('[data-role="modifier-rule"]'))$('[data-role="modifier-rule"]').textContent=rule[1];
+  const order=a?.modifier==='shuffle'&&['input','sending','retry','next'].includes(phase)?a.bellOrder:[0,1,2,3];
+  bells.forEach((b,i)=>{b.style.order=String(order.indexOf(i));});
+  sceneBells.forEach((b,i)=>{b.style.translate=`${(order.indexOf(i)-i)*104}px`;});
   bells.forEach(b=>{b.disabled=phase!=='input'||busy();});
   if(scene)scene.dataset.mood=olegMood(phase,!!finished);
   action.hidden=phase==='input';
@@ -150,9 +162,15 @@ export function mountOlegGame(host,{getState,command,onBack,isCommandPending=()=
   const a=view().active;if(!a||destroyed)return;
   cancelPlayback();const run=generation;phase='show';finished=null;entered=[];inputIndex=0;
   say('Слушай внимательно — вот моя мелодия!','Олег играет мелодию. Колокольчики пока закрыты.');render();
-  const lit=reduced()?120:360,gap=reduced()?240:520;
+  const {lit,gap}=olegPlaybackTiming(a,reduced());
+  if(a.modifier==='false_note'){
+   say('Сначала — моя мелодия. Запомни её колокольчики.','Слушай исходную мелодию.');
+   for(const note of a.referenceSequence){flash(note,lit);if(!await wait(lit+gap,run))return;}
+   say('А теперь найди новый колокольчик!','Во второй мелодии один новый колокольчик.');
+   if(!await wait(700,run))return;
+  }
   for(const note of a.sequence){flash(note,lit);if(!await wait(lit+gap,run))return;}
-  phase='input';say('Теперь твоя очередь!',`Повтори ${a.notes} ${olegPlural(a.notes)} по порядку.`);render();
+  phase='input';say('Теперь твоя очередь!',MODIFIERS[a.modifier][1]);render();
   bells.find(b=>!b.disabled)?.focus({preventScroll:true});
  }
  async function start(){
@@ -180,7 +198,7 @@ export function mountOlegGame(host,{getState,command,onBack,isCommandPending=()=
  function choose(index){
   if(phase!=='input'||busy())return;
   const a=view().active;if(!a)return;
-  if(a.sequence[inputIndex]!==index){phase='retry';entered=[];inputIndex=0;say('Ой, сбились! Давай попробуем ещё раз.','Не совпало. Послушай мелодию ещё раз и повтори.');render();return;}
+  if(olegExpectedNotes(a)[inputIndex]!==index){phase='retry';entered=[];inputIndex=0;say('Ой, сбились! Давай попробуем ещё раз.','Не совпало. Послушай мелодию ещё раз и повтори.');render();return;}
   flash(index,reduced()?110:180);entered.push(index);inputIndex++;
   if(inputIndex<a.notes){statusNode.textContent=`Верно: ${inputIndex} из ${a.notes}. Продолжай!`;return;}
   submit();

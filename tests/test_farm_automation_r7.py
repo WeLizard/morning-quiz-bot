@@ -13,7 +13,8 @@ from qw_farm.expansion import settle, upgrade_state
 
 STATIC = Path(__file__).resolve().parents[1] / 'qw_farm' / 'static'
 T0 = 1000
-NEW_HELPERS = ('fox_picker', 'hamster_reaper', 'cat_keeper', 'beaver_artisan', 'badger_artisan')
+NEW_HELPERS = ('fox_picker', 'hamster_reaper', 'cat_keeper', 'beaver_artisan', 'badger_artisan',
+               'beaver_artisan_2', 'badger_artisan_2')
 
 
 def farm(coins=10 ** 6, size=20, xp=LEVELS[29], fid='00000000-0000-0000-0000-00000000f001'):
@@ -104,7 +105,7 @@ def test_every_helper_has_an_icon_and_a_figure():
 
 def test_client_uses_the_new_commands_and_draws_zones():
     app = (STATIC / 'app.js').read_text(encoding='utf-8')
-    for word in ('collect_group', 'feed_all', 'restart_all', 'plant_many', 'set_zone'):
+    for word in ('collect_group', 'feed_all', 'repeat_once', 'fill_queues', 'plant_many', 'set_zone'):
         assert f"'{word}'" in app, word
     assert 'zones' in (STATIC / 'scene_expansion.js').read_text(encoding='utf-8')
 
@@ -351,18 +352,44 @@ def test_artisan_needs_a_remembered_recipe_and_enough_inputs_and_respects_the_qu
     assert len({j['id'] for j in mill['jobs']}) == len(mill['jobs'])
 
 
-def test_manual_queue_remembers_the_recipe_and_it_drives_the_artisan_in_its_zone_only():
+def test_manual_queue_only_repeats_after_explicit_opt_in_and_respects_the_artisan_zone():
     st = farm()
     add_building(st, 'mill', 'a', 0, 0)
     add_building(st, 'mill', 'b', 12, 0)
     st['inventory'] = {'wheat': 4}  # exactly the two manual batches: nothing left for a restart
     for oid in ('a', 'b'):
         cmd(st, 'queue', {'object': oid, 'recipe': 'flour'})
+        assert obj(st, oid).get('recipes_memory', []) == []
+        cmd(st, 'set_recipe_repeat', {'object': oid, 'recipe': 'flour', 'enabled': True})
         assert obj(st, oid)['last_recipe'] == 'flour'
     hire_and_start(st, 'badger_artisan', 'day', zone=left(6))
     settle(st, T0 + 7200)
     assert obj(st, 'a')['jobs'] == [] and len(obj(st, 'b')['jobs']) == 1  # b is outside the zone: not collected
     assert st['inventory']['flour'] == 1
+
+
+def test_four_craft_helpers_keep_independent_zones_and_shifts():
+    st = farm()
+    workers = ('beaver_artisan', 'badger_artisan', 'beaver_artisan_2', 'badger_artisan_2')
+    mills = []
+    for i, worker in enumerate(workers):
+        mill = add_building(st, 'mill', f'm{i}', i * 4, 0, last_recipe='flour')
+        mills.append(mill)
+        hire_and_start(st, worker, 'short', zone=dict(x=i * 4, y=0, w=2, h=2))
+    st['inventory'] = {'wheat': 8}
+    settle(st, T0 + 7200)
+    assert [len(mill['jobs']) for mill in mills] == [0, 0, 0, 0]
+    assert all(st['helpers'][worker]['shift']['done'] > 0 for worker in workers)
+    assert st['inventory']['flour'] == 4
+    assert len({st['helpers'][worker]['shift']['id'] for worker in workers}) == 4
+
+
+def test_existing_farm_with_only_the_two_original_artisans_still_validates():
+    st = farm()
+    hire_and_start(st, 'beaver_artisan', 'short')
+    hire_and_start(st, 'badger_artisan', 'short')
+    assert validate_state(st) is None
+    assert set(st['helpers']) == {'beaver_artisan', 'badger_artisan'}
 
 
 def test_artisan_equals_manual_play():
@@ -541,6 +568,10 @@ def test_old_r6_save_with_a_running_shift_loads_and_settles_unchanged():
     old = new_farm(str(uuid4()), 'Legacy', T0)
     old['catalog'] = 'farm-2026-10-r6'
     old.update(xp=5000, coins=5000)
+    # This snapshot predates the explicit animal-repeat preference; old houses
+    # must retain their legacy auto-feed behavior (missing field means on).
+    for obj in old['objects']:
+        obj.pop('animal_repeat', None)
     old['helpers'] = {}
     old['helpers']['shepherd'] = dict(acquired_at=0, total_runs=0, shift=dict(
         id='s', status='working', plan='night', starts_at=T0, until=T0 + 28800, next_at=T0, interval=30, remaining=96,

@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import market, progression, economy, fields, projects, trip_games, swans, festivals, textile, merchant, orchard
+from . import market, progression, economy, fields, projects, trip_games, swans, festivals, horseman, textile, merchant, orchard, meadow, fertilizer
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -31,7 +31,11 @@ SCHEMAS = {
     'collect_building': {'object'},
     'feed_all': {'area'},
     'restart_all': {'area'},
+    'repeat_once': {'area'},
+    'fill_queues': {'area'},
     'plant_many': {'crop', 'area'},
+    'grass_feed': {'object', 'enabled'},
+    'fert_toggle': {'target', 'enabled'},
 }
 SCHEMAS.update(market.SCHEMAS)  # r8: caravan_fill, contract_claim
 SCHEMAS.update(fields.SCHEMAS)  # r9 stage 15: buy_field, buy_machine, upgrade_machine, field_start, field_finish
@@ -39,6 +43,7 @@ SCHEMAS.update(projects.SCHEMAS)
 SCHEMAS.update(trip_games.SCHEMAS)  # trip minigames: trip_play
 SCHEMAS.update(swans.SCHEMAS)  # lake swans: feed_swans
 SCHEMAS.update(festivals.SCHEMAS)  # festivals: festival_task, festival_buy
+SCHEMAS.update(horseman.SCHEMAS)
 SCHEMAS.update(textile.SCHEMAS)  # lessons of Кошка Соня: lesson_deliver
 SCHEMAS.update(merchant.SCHEMAS)  # Сорока-коробейница: merchant_buy, merchant_sell
 SCHEMAS.update(orchard.SCHEMAS)  # fruit orchard: plant_tree, tree_care
@@ -103,22 +108,29 @@ def harvest(farm, obj, at, owner=True, speed=1):
     if obj['type'] == 'tree':
         return orchard.harvest(farm, obj, at, owner, speed)
     crop = obj['crop']
-    inventory(farm, {crop['id']: crop['yield_qty']})
+    qty = crop['yield_qty'] + fertilizer.bonus(farm, crop['id'], crop['yield_qty'], crop)   # the fertilizer effect is paid only here
+    inventory(farm, {crop['id']: qty})
     progression.grant_xp(farm, crop['xp'], 'harvest', at, owner, CROPS[crop['id']]['seconds'] if crop['id'] in CROPS else None)
     farm['stats']['harvests'] += 1
     observe_harvest(farm, crop['id'])
-    market.count(farm, 'h:' + crop['id'], crop['yield_qty'])
+    market.count(farm, 'h:' + crop['id'], qty)
     obj['last_crop'] = crop['id']
     obj['crop'] = None
     obj['revision'] += 1
 
 
-def plant(farm, obj, crop, at, speed):
-    gift = pay(farm, crop['cost'])
+def plant(farm, obj, crop, at, speed, seed=None, manual=False):
+    """The one place that plants a bed: a seed-pack planting (``seed`` = the pack item, no coins) and a coin planting alike.
+    Only the player's own planting (``manual``: the plant and plant_many commands) may spend a fertilizer unit; a machine never does."""
+    gift = pay(farm, crop.get('cost', 0))
     obj['crop'] = dict(id=crop['id'], planted_at=at,
                        ready_at=at + duration(crop['seconds'], speed, farm),
                        yield_qty=crop['yield_qty'], xp=crop['xp'], helped=False,
-                       watered=False, version=VERSION, cost=crop['cost'], gift=gift)
+                       watered=False, version=VERSION, cost=crop.get('cost', 0), gift=gift)
+    if seed:
+        obj['crop']['seed'] = seed
+    if manual:
+        fertilizer.mark(farm, obj['crop'], 'fert_beds')
     obj['revision'] += 1
 
 
@@ -160,7 +172,8 @@ def ordered_objects(farm):
 def make_job(obj, recipe, at, speed, job_id, farm=None):
     """The one place that builds a queued recipe, used by the manual command and by the artisans."""
     start = max([at] + [j['ready_at'] for j in obj['jobs']])
-    seconds = duration(recipe['seconds'] * RECIPE_SPEED[effective_level(obj.get('level'))], speed, farm)
+    level_speed = 1 if recipe.get('no_level_speedup') else RECIPE_SPEED[effective_level(obj.get('level'))]
+    seconds = duration(recipe['seconds'] * level_speed, speed, farm)
     return dict(id=job_id, recipe=recipe['id'], starts_at=start, ready_at=start + seconds, seconds=seconds,
                 inputs=deepcopy(recipe['inputs']), outputs=deepcopy(recipe['outputs']), xp=recipe['xp'], version=VERSION)
 
@@ -261,15 +274,89 @@ def restartable(farm, obj, lv):
     return None
 
 
+def plan_repeats(farm, area, mode):
+    """Read-only plan for owner bulk repeats. The command recalculates this under the farm lock."""
+    need(mode in {'repeat_once', 'fill_queues'}, 'invalid_command', 'Неверный способ повтора.', 422)
+    box = rect(area, 'invalid_area')
+    workshops = [o for o in ordered_objects(farm) if o['type'] in WORKSHOP_TYPES and in_zone(o, box)]
+    stock = dict(farm['inventory'])
+    state = {}
+    for obj in workshops:
+        memory = list(dict.fromkeys(recipe_memory(obj)))
+        cursor = obj.get('recipe_cursor', 0) % len(memory) if memory else 0
+        slots = max(0, queue_slots(obj.get('level')) - len(obj['jobs']))
+        state[obj['id']] = dict(memory=memory, cursor=cursor, slots=slots, initial_slots=slots, used=set())
+    starts = []
+    lv = level(farm['xp'])
+    # Each successful pass consumes at least one slot. The total available slots bound the loop.
+    for _ in range(sum(item['slots'] for item in state.values())):
+        progress = False
+        for obj in workshops:
+            item = state[obj['id']]
+            memory = item['memory']
+            if not item['slots'] or not memory or mode == 'repeat_once' and len(item['used']) == len(memory):
+                continue
+            for offset in range(len(memory)):
+                index = (item['cursor'] + offset) % len(memory)
+                recipe_id = memory[index]
+                if mode == 'repeat_once' and recipe_id in item['used']:
+                    continue
+                recipe = RECIPES.get(recipe_id)
+                if (recipe is None or recipe['building'] != obj['type'] or textile.recipe_level(farm, recipe) > lv
+                        or any(stock.get(key, 0) < qty for key, qty in recipe['inputs'].items())):
+                    continue
+                starts.append(dict(object=obj['id'], recipe=recipe_id))
+                for key, qty in recipe['inputs'].items():
+                    stock[key] = stock.get(key, 0) - qty
+                item['slots'] -= 1
+                item['used'].add(recipe_id)
+                item['cursor'] = (index + 1) % len(memory)
+                progress = True
+                break
+        if not progress:
+            break
+    reasons = set()
+    if not workshops:
+        reasons.add('no_workshops')
+    for obj in workshops:
+        item = state[obj['id']]
+        memory = item['memory']
+        if not memory:
+            reasons.add('no_recipes')
+        elif not item['slots']:
+            if (mode == 'fill_queues' and item['initial_slots'] == 0
+                    or mode == 'repeat_once' and len(item['used']) < len(memory)):
+                reasons.add('full_queue')
+        elif mode == 'fill_queues' or len(item['used']) < len(memory):
+            remaining = (rid for rid in memory if mode == 'fill_queues' or rid not in item['used'])
+            for rid in remaining:
+                recipe = RECIPES.get(rid)
+                if recipe is None or recipe['building'] != obj['type'] or textile.recipe_level(farm, recipe) > lv:
+                    reasons.add('locked_recipe')
+                elif any(stock.get(key, 0) < qty for key, qty in recipe['inputs'].items()):
+                    reasons.add('ingredients')
+    return dict(starts=starts, reasons=sorted(reasons))
+
+
 def can_feed(farm, obj):
     if not obj.get('animal') or obj.get('animal_job'):
         return False
     inputs = animal_batch(ANIMALS[obj['animal']], obj.get('level'))[0]
-    return all(farm['inventory'].get(k, 0) >= q for k, q in inputs.items())
+    grass = farm['inventory'].get('grass', 0) if obj.get('grass_feed', True) and 'feed' in inputs else 0
+    feed_need = inputs.get('feed', 0)
+    grass_used = min(grass, feed_need * 2)
+    return farm['inventory'].get('feed', 0) >= feed_need - grass_used // 2 and all(
+        k == 'feed' or farm['inventory'].get(k, 0) >= q for k, q in inputs.items())
 
 
 def start_feed(farm, obj, at, speed, player=True):
     inputs, outputs, seconds = animal_batch(ANIMALS[obj['animal']], obj.get('level'))
+    inputs = dict(inputs)
+    feed_need = inputs.pop('feed', 0)
+    grass_used = min(farm['inventory'].get('grass', 0), feed_need * 2) if obj.get('grass_feed', True) else 0
+    grass_used -= grass_used % 2
+    if grass_used: inventory(farm, {'grass': grass_used}, -1)
+    if feed_need - grass_used // 2: inputs['feed'] = feed_need - grass_used // 2
     inventory(farm, inputs, -1)
     obj['animal_job'] = dict(ready_at=at + duration(seconds, speed, farm if player else None), outputs=outputs, xp=animal_xp(ANIMALS[obj['animal']], obj.get('level')),
                           version=VERSION)
@@ -281,6 +368,8 @@ def take_animal(farm, obj, at, owner=True):
     inventory(farm, job['outputs'])
     market.count_outputs(farm, job['outputs'])
     progression.grant_xp(farm, job.get('xp', ANIMAL_XP_LEGACY), 'animal', at, owner)
+    if obj.get('animal') not in {'bees', 'silkworm'}:
+        inventory(farm, {'manure': 1})
     farm['stats']['crafts'] += 1
     obj['animal_job'] = None
     obj['revision'] += 1
@@ -297,15 +386,12 @@ def take_job(farm, obj, job, at, owner=True):
 
 
 def _targets(farm, ordered, role, at, box):
-    """Yield (object, payload) eligible at this instant, in deterministic order (by object id)."""
+    """Yield (object, payload) eligible at this instant, oldest ready work first."""
     if role == 'craft':
-        # Collect first (the master then restarts the same workshop right away if quota allows), then restart idle workshops:
-        # the one that frees up earliest goes first (empty queue = earliest), ties by object id.
-        for obj in ordered:
-            if obj['type'] in WORKSHOP_TYPES and in_zone(obj, box):
-                for job in obj['jobs']:
-                    if job['ready_at'] <= at:
-                        yield obj, job
+        ready = [(obj, job) for obj in ordered if obj['type'] in WORKSHOP_TYPES and in_zone(obj, box)
+                 for job in obj['jobs'] if job['ready_at'] <= at]
+        yield from sorted(ready, key=lambda pair: (pair[1]['ready_at'], pair[0]['id'], pair[1]['id']))
+        # After collections, retain the existing start order: earliest freeing workshop, then id.
         lv = level(farm['xp'])
         frees = lambda o: (max((j['ready_at'] for j in o.get('jobs', [])), default=float('-inf')), o['id'])
         for obj in sorted(ordered, key=frees):
@@ -313,6 +399,20 @@ def _targets(farm, ordered, role, at, box):
                 recipe = restartable(farm, obj, lv)
                 if recipe:
                     yield obj, recipe['id']
+        return
+    if role == 'production':
+        ready = [(obj, job) for obj in ordered if in_zone(obj, box)
+                 for job in obj.get('jobs', []) if job['ready_at'] <= at]
+        yield from sorted(ready, key=lambda pair: (pair[1]['ready_at'], pair[0]['id'], pair[1]['id']))
+        return
+    if role == 'animals':
+        ready = [(obj, obj['animal_job']) for obj in ordered if in_zone(obj, box)
+                 and obj.get('animal') and obj.get('animal_job') and obj['animal_job']['ready_at'] <= at]
+        yield from sorted(ready, key=lambda pair: (pair[1]['ready_at'], pair[0]['id'], pair[1].get('id', '')))
+        for obj in ordered:
+            if in_zone(obj, box) and obj.get('animal') and not obj.get('animal_job') \
+                    and obj.get('animal_repeat', True) and can_feed(farm, obj):
+                yield obj, None
         return
     for obj in ordered:
         if not in_zone(obj, box):
@@ -327,16 +427,11 @@ def _targets(farm, ordered, role, at, box):
                 yield obj, None
         elif role == 'water' and crop and crop['planted_at'] <= at < crop['ready_at'] and not crop.get('watered'):
             yield obj, None
-        elif role == 'production':
-            for job in obj.get('jobs', []):
-                if job['ready_at'] <= at:
-                    yield obj, job
-        elif role == 'animals' and obj.get('animal'):
-            job = obj.get('animal_job')
-            if job and job['ready_at'] <= at:
-                yield obj, job
-            elif not job and can_feed(farm, obj):
-                yield obj, None
+    if role == 'harvest' and meadow.season_at(at) != 'winter':
+        for cell, cut in sorted(farm.get('meadow', {}).get('patches', {}).items()):
+            x, y = map(int, cell.split(','))
+            if meadow.stage(cut, at) == 2 and (box is None or box[0] <= x <= box[2] and box[1] <= y <= box[3]):
+                yield None, cell
 
 
 def _next_possible(farm, ordered, role, at, box):
@@ -358,12 +453,44 @@ def _next_possible(farm, ordered, role, at, box):
         elif role == 'animals' and obj.get('animal_job'):
             if obj['animal_job']['ready_at'] > at:
                 moments.append(obj['animal_job']['ready_at'])
+    if role == 'harvest':
+        for cell, cut in farm.get('meadow', {}).get('patches', {}).items():
+            x, y = map(int, cell.split(','))
+            if (box is None or box[0] <= x <= box[2] and box[1] <= y <= box[3]) and meadow.stage(cut, at) < 2:
+                ready_at = meadow.next_stage_at(cut, at, 2)
+                if ready_at is not None and ready_at > at:
+                    moments.append(ready_at)
     return min(moments) if moments else None
 
 
 def _craft_row(log, worker, obj):
     """Per (worker, workshop) account of one settle: what went to the warehouse, what was put back in."""
     return log.setdefault((worker, obj['id']), dict(worker=worker, object=obj['id'], type=obj['type'], carried={}, started={}))
+
+
+def _craft_collects_fit(farm, ordered, box, shift, at, action_units, candidate):
+    """Can this automatic start and the queued workshop jobs be collected this shift?
+
+    Reserve both action quota and future worker ticks. Slots follow the helper's interval grid, so a job that
+    finishes near the deadline cannot be counted as collected if no later action slot remains.
+    """
+    quota = shift['remaining'] - action_units
+    interval = shift['interval']
+    pending = [candidate['ready_at']]
+    pending.extend(job['ready_at'] for obj in ordered
+                   if obj['type'] in WORKSHOP_TYPES and in_zone(obj, box)
+                   for job in obj['jobs'] if job['ready_at'] <= shift['until'])
+    if quota < len(pending):
+        return False
+
+    slot = at + interval
+    for ready_at in sorted(pending):
+        if slot < ready_at:
+            slot = at + max(1, math.ceil((ready_at - at) / interval)) * interval
+        if slot > shift['until']:
+            return False
+        slot += interval
+    return True
 
 
 def _start_craft(farm, obj, recipe, at, speed, job_id, log, worker):
@@ -384,11 +511,26 @@ def _work_once(farm, ordered, role, at, shift, box, log=None, worker=None):
     target = next(_targets(farm, ordered, role, at, box), None)
     if target is None:
         return 0
-    units = 1
     obj, payload = target
+    if role == 'craft' and isinstance(payload, str):
+        # An earlier idle workshop may not fit this shift's remaining time/quota.
+        # Scan in the deterministic _targets order for the first start that can be collected.
+        for candidate_obj, recipe_id in _targets(farm, ordered, role, at, box):
+            if not isinstance(recipe_id, str):
+                continue
+            preview = make_job(candidate_obj, RECIPES[recipe_id], at, shift['speed'], 'preview')
+            if _craft_collects_fit(farm, ordered, box, shift, at, 1, preview):
+                obj, payload = candidate_obj, recipe_id
+                break
+        else:
+            return 0
+    units = 1
     speed = shift['speed']
     if role in {'harvest', 'roots'}:
-        harvest(farm, obj, at, False, speed)
+        if obj is None:
+            meadow.mow(farm, payload, at, update_state=False)
+        else:
+            harvest(farm, obj, at, False, speed)
     elif role == 'water' and obj['type'] == 'tree':
         orchard.water(obj, at)
     elif role == 'water':
@@ -404,13 +546,22 @@ def _work_once(farm, ordered, role, at, shift, box, log=None, worker=None):
             for item, qty in outputs.items():
                 row['carried'][item] = row['carried'].get(item, 0) + qty
         if role == 'craft':
-            # The master puts the next remembered recipe straight back: collect (1 unit) + start (1 unit).
+            # Collect costs one unit; a restart also needs a reserved future collect slot.
             again = restartable(farm, obj, level(farm['xp'])) if shift['remaining'] >= 2 else None
             if again:
-                _start_craft(farm, obj, again, at, speed, f'auto-{shift["id"]}-{shift["done"] + 1}', log, worker)
-                units = 2
+                # Helpers are not slowed by owner upkeep debt; match _start_craft.
+                preview = make_job(obj, again, at, speed, 'preview')
+                if _craft_collects_fit(farm, ordered, box, shift, at, 2, preview):
+                    _start_craft(farm, obj, again, at, speed, f'auto-{shift["id"]}-{shift["done"] + 1}', log, worker)
+                    units = 2
     elif role == 'craft':
-        _start_craft(farm, obj, RECIPES[payload], at, speed, f'auto-{shift["id"]}-{shift["done"]}', log, worker)
+        recipe = RECIPES[payload]
+        # Helpers are not slowed by owner upkeep debt; match _start_craft.
+        preview = make_job(obj, recipe, at, speed, 'preview')
+        if _craft_collects_fit(farm, ordered, box, shift, at, 1, preview):
+            _start_craft(farm, obj, recipe, at, speed, f'auto-{shift["id"]}-{shift["done"]}', log, worker)
+        else:
+            return 0
     elif role == 'animals':
         if payload:
             take_animal(farm, obj, at, False)
@@ -425,7 +576,8 @@ GENITIVE = dict(
     energy_shop='бодрильни', cannery='консервного цеха', confectionery='кондитерской', creamery='молокозавода',
     juicery='соковарни', noodle_shop='макаронной мастерской', oil_press='маслобойни', sausage_shop='колбасного цеха',
     smokehouse='коптильни', soapery='мыловарни', syrupery='сироповарни', tailor='швейной мастерской',
-    teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой', dryer='сушильни', cellar='погребка')
+    teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой', dryer='сушильни', cellar='погребка',
+    compost_heap='компостной кучи')
 
 
 def craft_text(rows):
@@ -462,6 +614,7 @@ def settle(farm, now):
     upgrade_state(farm, now)
     market.settle(farm, now)  # caravan arrival/expiry and the Moscow-day contract reset, even with no workers
     fields.settle(farm, now)  # r9 stage 15: autopilot/expired field runs and ripening, even with no workers
+    meadow.update(farm, now)
     workers = [(key, val, EQUIPMENT[key] if key in EQUIPMENT else HELPERS[key])
                for source in (farm['equipment'], farm['helpers']) for key, val in source.items()
                if val.get('shift') and val['shift']['status'] == 'working']
@@ -533,6 +686,31 @@ def _bulk(farm, kind, data, now, speed, command_id):
     box = rect(data['area'], 'invalid_area')
     ordered = ordered_objects(farm)
     lv = level(farm['xp'])
+    if kind in {'repeat_once', 'fill_queues'}:
+        plan = plan_repeats(farm, data['area'], kind)
+        starts = plan['starts']
+        need(starts, 'nothing_to_do', 'Нечего повторять: проверь рецепты, очередь и сырьё.')
+        by_id = {obj['id']: obj for obj in ordered}
+        details = []
+        for index, entry in enumerate(starts):
+            obj = by_id[entry['object']]
+            recipe = RECIPES[entry['recipe']]
+            inventory(farm, recipe['inputs'], -1)
+            job = make_job(obj, recipe, now, speed, f'bulk-{command_id}-{index}', farm)
+            job['manual'] = True
+            obj['jobs'].append(job)
+            mark_started(obj, recipe['id'])
+            obj['revision'] += 1
+            details.append(dict(object=obj['id'], recipe=recipe['id'], job=job['id']))
+        reasons = {'no_recipes': 'нет запомненных рецептов', 'full_queue': 'заполнены очереди',
+                   'locked_recipe': 'часть рецептов недоступна', 'ingredients': 'не хватает сырья'}
+        partial = [reasons[key] for key in plan['reasons'] if key in reasons]
+        notice = f'Поставлено партий: {len(starts)}.'
+        if partial:
+            notice += ' Часть не запущена: ' + ', '.join(partial) + '.'
+        event(farm, now, notice, kind)
+        farm['events'][0]['details'] = details
+        return notice
     if kind == 'collect_group':
         group = data['group']
         need(isinstance(group, str) and group in GROUPS, 'invalid_command', 'Неизвестная категория.', 422)
@@ -589,13 +767,17 @@ def _bulk(farm, kind, data, now, speed, command_id):
     count = min(len(empty), farm['coins'] // crop['cost'])
     need(count > 0, 'insufficient_coins', 'Не хватает монет даже на одну грядку.')
     for obj in empty[:count]:
-        plant(farm, obj, crop, now, speed)
+        plant(farm, obj, crop, now, speed, manual=True)
     text = f'{crop["name"]}: посажено {count} из {len(empty)} свободных грядок.'
     return text + (' Монет хватило не на все — остальные ждут.' if count < len(empty) else '')
 
 
-def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
+def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_config=None):
     lv = level(farm['xp'])
+    if kind in horseman.SCHEMAS:
+        text = horseman.claim(farm, now)
+        event(farm, now, text, kind)
+        return text
     if kind in textile.SCHEMAS:
         text = textile.apply(farm, kind, data)
         event(farm, now, text, kind)
@@ -612,6 +794,19 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
         text = orchard.apply(farm, kind, data, now, command_id, speed)
         event(farm, now, text, kind)
         return text
+    if kind == 'fert_toggle':
+        text = fertilizer.toggle(farm, data)
+        event(farm, now, text, kind)
+        return text
+    if kind == 'grass_feed':
+        obj = find(farm['objects'], data['object'])
+        need(type(data['enabled']) is bool and obj.get('animal') and 'feed' in ANIMALS[obj['animal']]['inputs'],
+             'wrong_object','Переключатель доступен только птицам и животным на зерносмеси.',422)
+        obj['grass_feed']=data['enabled']
+        obj['revision']+=1
+        text='Кормить травой: '+('включено.' if data['enabled'] else 'выключено.')
+        event(farm, now, text, kind)
+        return text
     if kind in projects.SCHEMAS:
         text = projects.apply(farm, kind, data)
         event(farm, now, text, kind)
@@ -621,7 +816,7 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
         event(farm, now, text, kind)
         return text
     if kind in fields.SCHEMAS:
-        text = fields.apply_field(farm, kind, data, now, command_id, speed)
+        text = fields.apply_field(farm, kind, data, now, command_id, speed, upkeep_config)
         event(farm, now, text, kind)
         return text
     if kind in {'buy_equipment', 'hire_helper'}:
@@ -711,7 +906,7 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
         for job in ready:
             take_job(farm, obj, job, now)
         text = f'На склад отправлено готовых партий: {len(ready)}.'
-    elif kind in {'collect_group', 'feed_all', 'restart_all', 'plant_many'}:
+    elif kind in {'collect_group', 'feed_all', 'restart_all', 'repeat_once', 'fill_queues', 'plant_many'}:
         text = _bulk(farm, kind, data, now, speed, command_id)
     elif kind == 'start_trip':
         route = named(ROUTES, data['route'])
@@ -774,7 +969,8 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n'):
     else:
         raise AssertionError('Unknown expansion command')
     detect_secrets(farm, now)
-    event(farm, now, text, kind)
+    if kind not in {'repeat_once', 'fill_queues'}:  # _bulk has already recorded details with the short summary
+        event(farm, now, text, kind)
     return text
 
 
@@ -784,9 +980,11 @@ def validate_expansion(farm):
     trip_games.validate(farm)
     swans.validate(farm)
     festivals.validate(farm)
+    horseman.validate(farm)
     textile.validate(farm)
     merchant.validate(farm)
     orchard.validate(farm)
+    fertilizer.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),
          'invalid_team', 'Некорректный состав команды.', 500)

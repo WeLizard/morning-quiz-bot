@@ -22,9 +22,10 @@ from .catalog import (CROPS, ITEMS, TREES, TREE_BY_FRUIT, GRAFTS, TREE_CYCLE, TR
                       TREE_PEST_PCT, TREE_GOLD_PERMILLE, TREE_PRUNE_EVERY, TREE_PRUNE_WOOD, TREE_WATER_CUT, TREE_HELP_PCT, TREE_BIRDHOUSE_RADIUS,
                       TREE_VOUCHER_DISCOUNT_PCT, TREE_REFUND_WOOD, TREE_PESTS, VERSION, level, tick, object_limit)
 from .domain import need, named, find, duration, inventory, pay, place, event
-from . import progression, market
+from . import progression, market, fertilizer
 
 SCHEMAS = {'plant_tree': {'species', 'x', 'y', 'voucher'}, 'tree_care': {'object', 'action', 'item'}}
+CARE_ACTIONS = {'spray', 'prune', 'graft', 'fertilize'}
 PESTS = dict(TREE_PESTS)
 INFUSION = 'garden_infusion'
 GOLDEN = 'rejuvenating_apple'
@@ -93,8 +94,11 @@ def new_cycle(farm, obj, at, speed=1, player=True):
     if _h(farm['id'], obj['id'], obj['harvests'], 'pest') % 100 < TREE_PEST_PCT:
         pest = TREE_PESTS[_h(farm['id'], obj['id'], obj['harvests'], 'kind') % len(TREE_PESTS)][0]
     gold = _h(farm['id'], obj['id'], obj['harvests'], 'gold') % 1000 < gold_chance(n)
-    return dict(started_at=at, ready_at=at + duration(TREE_CYCLE * cycles, speed, farm if player else None), qty=qty, xp=spec['xp'],
-                pest=pest, golden=gold and pest is None, gold_hidden=gold and pest is not None, helped=False, watered=False, version=VERSION)
+    fruit = dict(started_at=at, ready_at=at + duration(TREE_CYCLE * cycles, speed, farm if player else None), qty=qty, xp=spec['xp'],
+                 pest=pest, golden=gold and pest is None, gold_hidden=gold and pest is not None, helped=False, watered=False, version=VERSION)
+    if obj['harvests'] > 0 and player:     # automatic only for an adult tree after the PLAYER's own harvest (a helper's never); golden chance untouched
+        fertilizer.mark(farm, fruit, 'fert_trees')
+    return fruit
 
 
 def ripe(obj, at):
@@ -127,6 +131,7 @@ def harvest(farm, obj, at, owner=True, speed=1):
         golden = golden or f.get('gold_hidden', False)
     if spas_bonus(obj['species'], at):
         qty += 1
+    qty += fertilizer.bonus(farm, spec['fruit'], qty, f)      # the fertilizer effect is paid only here
     got = {spec['fruit']: qty}
     if golden:
         got[GOLDEN] = 1
@@ -360,7 +365,7 @@ def care(farm, data, now):
     obj = find(farm['objects'], data['object'])
     need(is_tree(obj), 'wrong_object', 'Это не дерево.', 422)
     action, item = data['action'], data['item']
-    need(isinstance(action, str) and action in {'spray', 'prune', 'graft'}, 'invalid_command', 'Неизвестный уход.', 422)
+    need(isinstance(action, str) and action in CARE_ACTIONS, 'invalid_command', 'Неизвестный уход.', 422)
     spec = TREES[obj['species']]
     if action == 'spray':
         need(item is None, 'invalid_command', 'Некорректные параметры действия.', 422)
@@ -374,6 +379,14 @@ def care(farm, data, now):
         f['pest'] = None
         obj['revision'] += 1
         return f'{spec["name"]}: вредитель ушёл, плодов в этом году будет больше.'
+    if action == 'fertilize':
+        need(item is None, 'invalid_command', 'Некорректные параметры действия.', 422)
+        f = obj['fruit']
+        need(f is not None and f['ready_at'] > now, 'not_growing', 'Плоды уже созрели: подкормить можно только растущий урожай.')
+        need(f.get('fert') != 1, 'already_fertilized', 'В этот садовый год дерево уже подкормлено.')
+        need(fertilizer.mark(farm, f, 'fert_trees', force=True), 'missing_goods', 'Нет подкормки: нужен гумат или компост.')
+        obj['revision'] += 1
+        return f'{spec["name"]}: подкормлено, урожай этого цикла станет больше.'
     if action == 'prune':
         need(item is None, 'invalid_command', 'Некорректные параметры действия.', 422)
         need(dry(obj), 'no_dry_branches', 'Сухих веток пока нет.')
@@ -409,6 +422,8 @@ def uproot(farm, obj, now, speed=1):
         harvest(farm, obj, now, True, speed)
         taken = ' Созревший урожай собран.'
     spec = TREES[obj['species']]
+    if now - obj['planted_at'] <= undo.UNDO_WINDOW or taken:     # a cycle started by the harvest just taken never ripens: its unit comes back too
+        fertilizer.give_back(farm, obj['fruit'] or {})
     if now - obj['planted_at'] <= undo.UNDO_WINDOW:
         farm['coins'] += obj['cost']
         undo.restore_gift(farm, obj.get('gift', 0), obj['cost'])
@@ -433,7 +448,7 @@ def tree_view(farm, obj, now):
     n = obj['harvests'] + 1
     return dict(stage=stage(obj), age=max(0, (now - obj['planted_at']) // TREE_CYCLE), ripe=ripe(obj, now), pest=f.get('pest'),
                 pest_active=pest_active(farm, obj), dry=dry(obj), qty=f.get('qty', 0), golden_permille=gold_chance(n),
-                next_yield=yield_of(TREES[obj['species']], n), bird=near_birdhouse(farm, obj))
+                next_yield=yield_of(TREES[obj['species']], n), bird=near_birdhouse(farm, obj), fert=f.get('fert', 0))
 
 
 def owner_view(farm, now):

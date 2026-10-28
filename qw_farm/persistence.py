@@ -46,7 +46,9 @@ def tables(metadata: sa.MetaData):
         sa.Column('command_id',sa.String(64),nullable=False),
         sa.Column('kind',sa.String(32),nullable=False),sa.Column('coins_delta',sa.BigInteger,nullable=False),
         sa.Column('coins_after',sa.BigInteger,nullable=False),sa.Column('inventory_delta',sa.JSON,nullable=False),
-        sa.Column('xp_delta',sa.BigInteger,nullable=False),sa.Column('created_at',sa.Float,nullable=False),
+        sa.Column('xp_delta',sa.BigInteger,nullable=False),
+        sa.Column('vigour_delta',sa.BigInteger,nullable=False,server_default='0'),
+        sa.Column('created_at',sa.Float,nullable=False),
         sa.UniqueConstraint('farm_id','actor_account_id','command_id',name='uq_farm_ledger_command'))
     village=sa.Table('farm_village',metadata,
         sa.Column('season',sa.Integer,primary_key=True),
@@ -122,6 +124,16 @@ class Unit:
     async def execute(self, statement, parameters=None):
         result=self.connection.execute(statement,parameters or {})
         return await result if self.asynchronous else result
+
+    async def farm_upkeep_config(self, at):
+        """Read the effective global rate snapshot inside this farm transaction."""
+        from .upkeep_config import effective_values
+        if self.dialect != 'postgresql' or not self.asynchronous:
+            return effective_values(None, at)
+        from storage.models import SystemState
+        from storage.farm_upkeep import KEY
+        row = await self.connection.get(SystemState, KEY)
+        return effective_values(row.payload if row else None, at)
 
     async def lock(self, *keys):
         if self.dialect=='postgresql':
@@ -236,14 +248,17 @@ class Unit:
         old=before or {'coins':0,'xp':0,'inventory':{}}
         delta={k:after['inventory'].get(k,0)-old['inventory'].get(k,0) for k in set(old['inventory'])|set(after['inventory'])}
         delta={k:q for k,q in delta.items() if q}
+        vigour_delta=0
+        if kind=='vgame_m2':
+            vigour_delta=(after.get('progress') or {}).get('pool',0)-(old.get('progress') or {}).get('pool',0)
         await self.execute(sa.insert(self.t['ledger']).values(id=uuid4(),farm_id=UUID(after['id']),actor_account_id=UUID(str(actor)),
              command_id=key,kind=kind,coins_delta=after['coins']-old['coins'],coins_after=after['coins'],
-             xp_delta=after['xp']-old['xp'],inventory_delta=delta,created_at=now))
+             xp_delta=after['xp']-old['xp'],vigour_delta=vigour_delta,inventory_delta=delta,created_at=now))
 
     async def history(self, farm_id):
         t=self.t['ledger']
         rows=(await self.execute(sa.select(t).where(t.c.farm_id==UUID(farm_id)).order_by(t.c.created_at.desc(),t.c.id).limit(80))).mappings().all()
-        return [{k:r[k] for k in ['kind','coins_delta','coins_after','inventory_delta','xp_delta','created_at']} for r in rows]
+        return [{k:r[k] for k in ['kind','coins_delta','coins_after','inventory_delta','xp_delta','vigour_delta','created_at']} for r in rows]
 
     # ---- r9 stage 14: the shared village counter (one row per season). Never touches farm rows or farm locks.
     async def village_peek(self, season):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Deterministic progression simulator for the farm (qw_farm). Usage:
 
-    python scripts/farm_balance_sim.py [--days 150] [--profile all|active|online|casual|grind|skilled] [--helpers] [--visit-queues] [--debug] [--no-fields]
+    python scripts/farm_balance_sim.py [--days 150] [--profile all|active|online|casual|grind|skilled] [--helpers] [--craft-masters 0..4] [--craft-capacity] [--visit-queues] [--debug] [--no-fields]
     (r9: e.g. --days 90; the run stops at the maximum level L50)
 
 WHAT IS REAL.  Every game action goes through the real ``qw_farm.domain.apply`` (plant, plant_many, harvest via
@@ -18,7 +18,7 @@ PLAYER MODEL (documented simplifications).
     orders/day.  ``grind`` = active + inside every session a ~9 minute loop: the best FAST crop of the level (growth
     < 1800 s, best (XP + 0.25 * profit) per hour; wheat at L1) on every empty bed, one cycle later collect + replant, the
     mill is kept busy with the best recipe (feed) - the "spam short crops + mill feed loop" exploit.
-  * Session order: collect (collect_group animals/workshops/plots, forest baskets) -> quests, daily contracts, caravan
+  * Session order: settle and mow ready meadow patches -> collect (collect_group animals/workshops/plots, forest baskets) -> quests, daily contracts, caravan
     crates -> orders (deliver what the stock covers, skip what it cannot; up to 4 passes, 20 s apart, capped by the
     profile's orders/day) -> production (feed_all, workshop queues) -> forest trips -> sell the surplus -> invest
     -> plant.  Free player time is not otherwise limited (tap budgets are not modelled).
@@ -72,6 +72,7 @@ from qw_farm import expansion as X        # noqa: E402
 from qw_farm import fields as FD          # noqa: E402
 from qw_farm import market as M           # noqa: E402
 from qw_farm import progression as P      # noqa: E402
+from qw_farm import meadow as MD           # noqa: E402
 
 DAY = 86400
 T_BASE = 20000 * DAY - M.TZ_OFFSET        # a Moscow midnight
@@ -141,9 +142,12 @@ def fill(recipes, slots, mult, gap, full=False):
 
 
 class Sim:
-    def __init__(self, name, days, debug=False, fields=True, orchard=True, helpers=False, full_queues=True):
+    def __init__(self, name, days, debug=False, fields=True, orchard=True, helpers=False, full_queues=True,
+                 craft_masters=None, demand_actions_override=None):
         self.name, self.days, self.debug, self.fields, self.orchard = name, days, debug, fields, orchard
         self.helpers, self.full_queues = helpers, full_queues
+        self.craft_masters = (1 if helpers else 0) if craft_masters is None else craft_masters
+        self.demand_actions_override = demand_actions_override
         self.helper_shifts = Counter()
         self.helper_actions = Counter()
         self.fruit_xp = Counter()             # band -> xp of the recipes that eat orchard fruit or orchard goods (approx.: counted when queued)
@@ -172,6 +176,8 @@ class Sim:
         self.fs = Counter()                   # field statistics (ops, fuel, seeds, ha-days)
         self.fs_q = defaultdict(list)         # operation -> achieved manual q (permille)
         self.fs_ha = {}                       # day -> hectares owned
+        self.meadow = Counter()                # harvested grass, feeding substitution, and mill-equivalent
+        self.meadow_proxy = defaultdict(float) # band -> saved mill time valued at workshop income_ref
 
     # ---------------------------------------------------------------- plumbing
     def lv(self):
@@ -185,6 +191,7 @@ class Sim:
         if self.helpers:
             self.settle(now)
         c0, x0, w0, lv0 = f['coins'], f['xp'], self.inv_value(), C.level(f['xp'])
+        grass0, feed0 = f['inventory'].get('grass', 0), f['inventory'].get('feed', 0)
         m0 = dict(P.progress(f)['total'])
         paid0 = E.state(f)['stats']['upkeep_paid']
         self.n += 1
@@ -197,6 +204,20 @@ class Sim:
         du = E.state(f)['stats']['upkeep_paid'] - paid0       # the daily bill is taken inside whichever command came first
         dw = dc + self.inv_value() - w0 + du
         band = band_of(lv0)
+        grass_delta = f['inventory'].get('grass', 0) - grass0
+        if kind == 'mow_all' and grass_delta > 0:
+            self.meadow['grass_mowed'] += grass_delta
+            # One grass substitutes half a feed; each feed is one unit of the mill's 2-for-45s recipe.
+            self.meadow['proxy'] += grass_delta * 0.5
+            self.meadow_proxy[band] += grass_delta * 0.5
+        elif kind == 'feed_all':
+            grass_used = max(0, grass0 - f['inventory'].get('grass', 0))
+            feed_used = max(0, feed0 - f['inventory'].get('feed', 0))
+            if grass_used or feed_used:
+                self.meadow['grass_fed'] += grass_used
+                self.meadow['feed_from_mill'] += feed_used
+                self.meadow['feed_equivalent'] += feed_used + grass_used / 2
+                self.meadow['mill_seconds_saved'] += grass_used * 11.25
         if du:
             self.sinks[band]['upkeep'] += du
         if tag.startswith('sink:'):
@@ -219,6 +240,9 @@ class Sim:
             self.level_t[self.maxlv] = now
         if kind == 'sell':
             self.sold_log.append((int((now - T_BASE) // DAY), dc))
+            if data.get('item') == 'grass':
+                self.meadow['grass_sold'] += data.get('qty', 0)
+                self.meadow['grass_sale_coins'] += dc
         return True
 
     def stock(self, item):
@@ -303,6 +327,8 @@ class Sim:
         base = Counter()
         workshops = self.objects(lambda o: o['type'] in X.WORKSHOP_TYPES)
         animals = self.objects(lambda o: o.get('animal'))
+        demand_actions = (self.demand_actions_override if self.demand_actions_override is not None
+                          else self.helper_plan()['actions']) if self.helpers else None
         for o in workshops:
             recipes = self.pick_jobs(o, now, None, reach)
             for r in recipes:
@@ -311,7 +337,7 @@ class Sim:
                 r = recipes[-1]
                 seconds = D.duration(r['seconds'] * C.RECIPE_SPEED[C.effective_level(o.get('level'))], 1)
                 batches = min(math.ceil(min(self.gap(now), self.helper_plan()['seconds']) / seconds),
-                              self.helper_plan()['actions'] // max(2, 2 * len(workshops)))
+                              demand_actions // max(2, 2 * len(workshops)))
                 for k, q in r['inputs'].items():
                     base[k] += q * max(0, batches - len(recipes))
         for o in animals:
@@ -319,7 +345,7 @@ class Sim:
             batches = 1
             if self.helpers and lv >= 3:
                 batches = max(1, min(math.ceil(min(self.gap(now), self.helper_plan()['seconds']) / seconds),
-                                     self.helper_plan()['actions'] // max(2, 2 * len(animals))))
+                                     demand_actions // max(2, 2 * len(animals))))
             for k, q in inputs.items():
                 base[k] += q * batches
         m = f['market']
@@ -884,17 +910,20 @@ class Sim:
         if not self.helpers:
             return
         for role in ('craft', 'animals', 'harvest'):
-            spec = min((h for h in C.HELPERS.values() if h['role'] == role), key=lambda h: (h['level'], h['cost']))
+            candidates = sorted((h for h in C.HELPERS.values() if h['role'] == role),
+                                key=lambda h: (h['level'], h['cost'], h['id']))
+            specs = candidates[:self.craft_masters] if role == 'craft' else candidates[:1]
             plan = self.helper_plan()
-            if self.lv() < spec['level']:
-                continue
-            if spec['id'] not in self.f['helpers'] and self.f['coins'] >= spec['cost'] + plan['cost']:
-                self.cmd('hire_helper', {'helper': spec['id']}, now, 'capex:helpers')
-                self.cache.clear()
-            worker = self.f['helpers'].get(spec['id'])
-            if worker and (not worker.get('shift') or worker['shift']['status'] != 'working'):
-                if self.f['coins'] >= plan['cost'] and self.cmd('start_shift', {'worker': spec['id'], 'shift': plan['id']}, now, 'helpers'):
-                    self.helper_shifts[role] += 1
+            for spec in specs:
+                if self.lv() < spec['level']:
+                    continue
+                if spec['id'] not in self.f['helpers'] and self.f['coins'] >= spec['cost'] + plan['cost']:
+                    self.cmd('hire_helper', {'helper': spec['id']}, now, 'capex:helpers')
+                    self.cache.clear()
+                worker = self.f['helpers'].get(spec['id'])
+                if worker and (not worker.get('shift') or worker['shift']['status'] != 'working'):
+                    if self.f['coins'] >= plan['cost'] and self.cmd('start_shift', {'worker': spec['id'], 'shift': plan['id']}, now, 'helpers'):
+                        self.helper_shifts[role] += 1
 
     def settle(self, now):
         """Run real field settlement first, then the real worker scheduler; record their value separately."""
@@ -932,6 +961,11 @@ class Sim:
         f = self.f
         self.cache.clear()
         self.settle(t)
+        # Model a player mowing every ready patch at each visit. Reading the view also
+        # advances lazy spawn/cleanup to this visit's Moscow epoch.
+        meadow_view = MD.view(f, t)
+        if any(p['stage'] >= 1 for p in meadow_view['patches']):
+            self.cmd('mow_all', {}, t, 'meadow')
         self.cmd('collect_group', {'group': 'animals', 'area': None}, t, 'animals')
         self.cmd('collect_group', {'group': 'workshops', 'area': None}, t, 'workshops')
         self.orchard_visit(t)
@@ -985,7 +1019,7 @@ def slowest(sim, band):
 def report(sim):
     f = sim.f
     out = []
-    out.append(f'=== {sim.name}: {sim.p["label"]}; helpers={sim.helpers}; full_queues={sim.full_queues}')
+    out.append(f'=== {sim.name}: {sim.p["label"]}; helpers={sim.helpers}; craft_masters={sim.craft_masters}; full_queues={sim.full_queues}')
     out.append(f'simulated {sim.days_run} days, level {sim.maxlv}, xp {f["xp"]}, coins {f["coins"]}, '
                f'land {f["size"]}x{f["size"]}, beds {sum(o["type"] == "plot" for o in f["objects"])}, '
                f'objects {len(f["objects"])}, orders {f["stats"]["orders"]}, commands {sim.n}')
@@ -1048,11 +1082,15 @@ def report(sim):
     out.append('max days on one level in band: ' + ', '.join(f'L{b[0]}-{b[1]} {slowest(sim, b):.1f}' for b in BANDS if sim.level_t.get(b[0]) is not None))
     out.extend(field_report(sim, srcs_all, xp_all, tot))
     out.extend(orchard_report(sim, srcs_all, xp_all))
+    out.extend(meadow_report(sim))
     if sim.helpers:
         out.append('HELPERS: paid shifts ' + str(dict(sim.helper_shifts)) + '; useful actions ' + str(dict(sim.helper_actions)))
+        roster = ', '.join(f'{C.HELPERS[hid]["name"]} L{C.HELPERS[hid]["level"]}'
+                           for hid in sorted(f['helpers']) if hid in C.HELPERS)
+        out.append('  roster: ' + (roster or 'none hired'))
     if sim.debug:
         out.append('refused commands: ' + ', '.join(f'{k[0]}/{k[1]}={v}' for k, v in sim.err.most_common(12)))
-    return '\n'.join(out)
+    return '\r\n'.join(out)
 
 
 def field_report(sim, srcs_all, xp_all, sink_tot):
@@ -1107,6 +1145,36 @@ def orchard_report(sim, srcs_all, xp_all):
     return out
 
 
+def meadow_report(sim):
+    """FARM_WILD_GRASS.md §5: count the saved mill work at 0.5 coins per grass."""
+    stats = sim.meadow
+    if not stats['grass_mowed'] and not stats['grass_fed']:
+        return ['', 'MEADOW: no grass harvested or fed in this run']
+    end_t = sim.t0 + sim.days_run * DAY
+    reference = 0.0
+    rows = []
+    for b in BANDS:
+        start = sim.level_t.get(b[0])
+        if start is None:
+            continue
+        nxt = sim.level_t.get(b[1] + 1)
+        stop = nxt if nxt is not None else end_t
+        days = max((stop - start) / DAY, 0.0)
+        ref_value = C.income_ref(b[0]) * days
+        reference += ref_value
+        proxy = sim.meadow_proxy[b]
+        if proxy:
+            rows.append(f'L{b[0]}-{b[1]}: proxy {proxy:.0f}, income_ref {C.income_ref(b[0])}/day x {days:.1f}d = {100 * proxy / max(1, ref_value):.2f}%')
+    share = 100 * stats['proxy'] / max(1, reference)
+    feed_proxy = stats['grass_fed'] * 0.5
+    feed_share = 100 * feed_proxy / max(1, reference)
+    total_equiv = stats['feed_equivalent']
+    retained = 100 * stats['feed_from_mill'] / max(1, total_equiv)
+    return ['', f'MEADOW: mowed {stats["grass_mowed"]} grass (shop value {stats["grass_mowed"]} coins); sold {stats["grass_sold"]} for {stats["grass_sale_coins"]} coins; harvest value proxy {stats["proxy"]:.1f} coins ({share:.3f}% of time-weighted income_ref; 0.5/grass); realized mill-time proxy {feed_proxy:.1f} coins ({feed_share:.3f}%); mowing XP 0',
+            f'  feeding: grass {stats["grass_fed"]} = {stats["grass_fed"] / 2:.1f} feed-equivalent; mill feed {stats["feed_from_mill"]}; feed demand retained {retained:.1f}% of no-grass demand; mill time saved {stats["mill_seconds_saved"] / 3600:.2f}h',
+            '  value by band: ' + ('; '.join(rows) if rows else 'none')]
+
+
 def coins_at(self, t):
     d = int((t - self.t0) // DAY)
     return self.end_coins.get(d, self.f['coins'])
@@ -1115,22 +1183,138 @@ def coins_at(self, t):
 Sim.coins_at = coins_at
 
 
+def craft_capacity_benchmark(master_count, workshop_count=23, action_quota=None, shift_cost=None):
+    """Run the real settlement against all workshop types with every queue full and ample shared stock.
+
+    This measures scheduler capacity, not a realistic production economy or a price recommendation.
+    """
+    if not 1 <= master_count <= 4:
+        raise ValueError('master_count must be between 1 and 4')
+    crafts = sorted((h for h in C.HELPERS.values() if h['role'] == 'craft'),
+                    key=lambda h: (h['level'], h['cost'], h['id']))[:master_count]
+    if len(crafts) != master_count:
+        raise ValueError(f'only {len(crafts)} craft helpers are available')
+    workshop_types = sorted(X.WORKSHOP_TYPES)[:workshop_count]
+    if len(workshop_types) != workshop_count:
+        raise ValueError(f'only {len(X.WORKSHOP_TYPES)} workshop types are available')
+
+    start = T_BASE
+    farm = D.new_farm('capacity-benchmark', 'Capacity', start)
+    farm['xp'] = C.LEVELS[-1]
+    farm['size'] = 60
+    farm['coins'] = 10_000_000
+    farm['helpers'] = {}
+    farm['equipment'] = {}
+    farm['inventory'] = {item: 10**12 for item in C.ITEMS}
+    farm['objects'] = []
+    seeded = 0
+    for index, building in enumerate(workshop_types):
+        recipes = sorted((r for r in C.RECIPES.values() if r['building'] == building),
+                         key=lambda r: (r['seconds'], r['id']))
+        if not recipes:
+            continue
+        recipe = recipes[0]
+        obj = dict(id=f'bench_{index:02d}', type=building, x=(index % 20) * 3,
+                   y=(index // 20) * 3, w=2, h=2, revision=0, level=3, jobs=[],
+                   recipes_memory=[recipe['id']], last_recipe=recipe['id'], recipe_cursor=0)
+        for slot in range(C.queue_slots(3)):
+            job = X.make_job(obj, recipe, start, 1, f'seed-{index}-{slot}', farm)
+            job['manual'] = True
+            obj['jobs'].append(job)
+            for item, amount in recipe['inputs'].items():
+                farm['inventory'][item] -= amount
+            seeded += 1
+        farm['objects'].append(obj)
+
+    shift_plan = dict(C.SHIFTS['manor'])
+    if action_quota is not None:
+        shift_plan['actions'] = action_quota
+    if shift_cost is not None:
+        shift_plan['cost'] = shift_cost
+    for index, spec in enumerate(crafts):
+        farm['helpers'][spec['id']] = dict(acquired_at=start, zone=None, total_runs=0,
+            shift=dict(id=f'bench-shift-{index}', status='working', plan=shift_plan['id'],
+                       starts_at=start, until=start + shift_plan['seconds'], next_at=start,
+                       interval=C.SHIFT_INTERVAL, remaining=shift_plan['actions'], done=0,
+                       speed=1, role='craft', quota=shift_plan['actions'], version=C.VERSION))
+
+    X.settle(farm, start + shift_plan['seconds'])
+    actions = sum(worker['shift']['done'] for worker in farm['helpers'].values())
+    collected = farm['stats']['crafts']
+    started_again = sum(amount for event in farm['events'] for row in event.get('details', [])
+                        for amount in row.get('started', {}).values())
+    return dict(masters=master_count, workshop_types=len(workshop_types), queue_slots=C.queue_slots(3),
+                seeded_jobs=seeded, actions=actions, quota=master_count * shift_plan['actions'],
+                batches_collected=collected, batches_restarted=started_again,
+                jobs_left=sum(len(obj['jobs']) for obj in farm['objects']),
+                shift_hours=shift_plan['seconds'] / 3600,
+                quota_per_master=shift_plan['actions'], shift_cost=shift_plan['cost'],
+                total_shift_cost=master_count * shift_plan['cost'],
+                quota_hours_each=shift_plan['actions'] * C.SHIFT_INTERVAL / 3600,
+                productive_hours_total=actions * C.SHIFT_INTERVAL / 3600)
+
+
+def run_craft_capacity():
+    print('Craft capacity benchmark: real scheduler; all workshop types, level-3 full queues, unlimited stock, no zones.')
+    print('Manor shift time = 8h; quota capacity is actions × 30 s.')
+    for masters in range(1, 5):
+        result = craft_capacity_benchmark(masters)
+        print('masters={masters} workshops={workshop_types} queue={seeded_jobs} actions={actions}/{quota} '
+              'quota_ends_each_h={quota_hours_each:.1f}/{shift_hours:.0f} productive_h_total={productive_hours_total:.1f} '
+              'collected={batches_collected} restarted={batches_restarted} jobs_left={jobs_left}'.format(**result))
+    for actions, cost in ((720, 135), (960, 180)):
+        result = craft_capacity_benchmark(2, action_quota=actions, shift_cost=cost)
+        print('variant masters={masters} actions_each={quota_per_master} cost_each={shift_cost} '
+              'total_cost={total_shift_cost} actions={actions}/{quota} '
+              'quota_ends_each_h={quota_hours_each:.1f}/{shift_hours:.0f} productive_h_total={productive_hours_total:.1f} '
+              'collected={batches_collected} restarted={batches_restarted} jobs_left={jobs_left}'.format(**result))
+
+
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap = argparse.ArgumentParser(description=__doc__.split('\r\n')[0])
     ap.add_argument('--days', type=int, default=25)
     ap.add_argument('--profile', default='all', choices=['all', *PROFILES])
     ap.add_argument('--debug', action='store_true')
     ap.add_argument('--helpers', action='store_true', help='hire one master, animal keeper and harvester; renew paid shifts only at visits')
+    ap.add_argument('--craft-masters', type=int, choices=range(5), help='hire this many craft helpers (0–4; implies --helpers)')
+    ap.add_argument('--craft-capacity', action='store_true', help='benchmark 1–4 masters on every workshop with full queues')
+    ap.add_argument('--sim-manor-actions', type=int, help='simulation-only override for manor shift actions; duration and catalog cost stay unchanged')
+    ap.add_argument('--sim-demand-actions', type=int, help='simulation-only fixed action budget used by demand planning; isolates demand from shift quota overrides')
     ap.add_argument('--visit-queues', action='store_true', help='historical policy: only queue recipes that finish by the next visit')
     ap.add_argument('--no-fields', action='store_true', help='baseline: the player never buys a field')
     ap.add_argument('--no-orchard', action='store_true', help='baseline: the player never buys a fruit tree (fruit beds are closed by the catalog)')
     args = ap.parse_args()
-    print(f'catalog {C.VERSION}; days={args.days}')
-    for name in (PROFILES if args.profile == 'all' else [args.profile]):
-        t = time.time()
-        sim = Sim(name, args.days, args.debug, not args.no_fields, not args.no_orchard, args.helpers, not args.visit_queues).run()
-        print(report(sim))
-        print(f'(simulated in {time.time() - t:.1f}s)\n')
+    if args.craft_capacity:
+        run_craft_capacity()
+        return
+    if args.sim_manor_actions is not None and not 1 <= args.sim_manor_actions <= 1920:
+        ap.error('--sim-manor-actions must be between 1 and 1920')
+    if args.sim_demand_actions is not None and not 1 <= args.sim_demand_actions <= 1920:
+        ap.error('--sim-demand-actions must be between 1 and 1920')
+    helpers = args.helpers or args.craft_masters is not None
+    original_actions = C.SHIFTS['manor']['actions']
+    original_catalog_limit = C.MAX_SHIFT_ACTIONS
+    original_expansion_limit = X.MAX_SHIFT_ACTIONS
+    if args.sim_manor_actions is not None:
+        C.SHIFTS['manor']['actions'] = args.sim_manor_actions
+        C.MAX_SHIFT_ACTIONS = max(p['actions'] for p in C.SHIFTS.values())
+        X.MAX_SHIFT_ACTIONS = C.MAX_SHIFT_ACTIONS
+    try:
+        print(f'catalog {C.VERSION}; days={args.days}')
+        if args.sim_manor_actions is not None:
+            print(f'SIMULATION ONLY: manor actions={C.SHIFTS["manor"]["actions"]}; duration={C.SHIFTS["manor"]["seconds"]}s; cost={C.SHIFTS["manor"]["cost"]} coins; product catalog unchanged')
+        if args.sim_demand_actions is not None:
+            print(f'SIMULATION ONLY: demand planning action budget={args.sim_demand_actions}; product catalog unchanged')
+        for name in (PROFILES if args.profile == 'all' else [args.profile]):
+            t = time.time()
+            sim = Sim(name, args.days, args.debug, not args.no_fields, not args.no_orchard, helpers,
+                      not args.visit_queues, args.craft_masters, args.sim_demand_actions).run()
+            print(report(sim))
+            print(f'(simulated in {time.time() - t:.1f}s)\r\n')
+    finally:
+        C.SHIFTS['manor']['actions'] = original_actions
+        C.MAX_SHIFT_ACTIONS = original_catalog_limit
+        X.MAX_SHIFT_ACTIONS = original_expansion_limit
 
 
 if __name__ == '__main__':

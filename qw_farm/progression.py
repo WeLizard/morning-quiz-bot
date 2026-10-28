@@ -77,6 +77,14 @@ def touch(farm, at):
     return p
 
 
+def add_vigour(farm, amount, at):
+    """Refill M2 without granting XP. Owner activity is settled before the cap."""
+    p = touch(farm, at)
+    credited = min(max(0, amount), max(0, _pool_cap(level(farm['xp'])) - p['pool']))
+    p['pool'] += credited
+    return credited
+
+
 def grant_xp(farm, amount, source, at, owner, seconds=None):
     """The only place that adds XP. Returns the XP actually credited (base + bonuses - fatigue loss)."""
     if amount <= 0:

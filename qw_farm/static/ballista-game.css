@@ -1,0 +1,37 @@
+body.ballista-game-open .workspace{position:relative;display:block;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding-bottom:0}
+body.ballista-game-open .workspace>#rail,body.ballista-game-open .workspace>.scene-area,body.ballista-game-open .workspace>.side-panel,body.ballista-game-open .header-destinations{display:none!important}
+#ballista-game-view[hidden],#ballista-game-view [hidden]{display:none!important}
+#ballista-game-view{min-width:0;min-height:calc(100dvh - var(--qw-header-h));overflow:auto;background:var(--paper);color:var(--qw-game-text)}
+#ballista-game-view *{box-sizing:border-box}
+#ballista-game-view .ballista-page{max-width:1350px;margin:auto;padding:24px var(--qw-gutter) calc(24px + var(--qw-safe-bottom));display:grid;gap:16px}
+#ballista-game-view h1,#ballista-game-view p{margin:0}
+#ballista-game-view h1{font-size:var(--qw-fs-h1);line-height:1.15}
+#ballista-game-view .ballista-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#ballista-game-view .ballista-back{min-height:44px;padding:8px 14px;border:1px solid var(--qw-game-line,#b5c8a9);border-radius:var(--qw-r-control);background:var(--qw-game-surface,#fffaf0);color:inherit;font:inherit;font-weight:700;cursor:pointer}
+#ballista-game-view .ballista-intro{font-size:var(--qw-fs-body)}
+#ballista-game-view .ballista-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,330px);gap:18px;align-items:start}
+#ballista-game-view .ballista-stage-card,#ballista-game-view .ballista-controls{min-width:0;background:var(--qw-game-surface,#fffaf0);border:1px solid var(--qw-game-line,#c8d4b9);border-radius:var(--qw-r-card);padding:12px;box-shadow:0 8px 24px #28463019}
+#ballista-game-view .ballista-scene{width:100%;aspect-ratio:5/3;overflow:hidden;border-radius:12px;background:var(--qw-game-surface-2);touch-action:none;cursor:crosshair}
+#ballista-game-view .ballista-scene[aria-disabled="true"]{cursor:default}
+#ballista-game-view .ballista-scene svg{display:block;width:100%;height:100%}
+#ballista-game-view .ballista-scene.is-aiming #pb-slingshot>path:nth-last-child(-n+2){visibility:hidden}
+#ballista-game-view .ballista-scene .ballista-target{visibility:visible!important;fill:#f4d36a88;stroke:#fff5b5;stroke-width:5;paint-order:stroke;filter:drop-shadow(0 0 10px #f4d36a)}
+#ballista-game-view .ballista-progress{min-height:28px;padding:8px 2px 0;font-size:var(--qw-fs-control);font-weight:700}
+#ballista-game-view .ballista-controls{display:grid;gap:14px;padding:18px}
+#ballista-game-view .ballista-status{font-size:var(--qw-fs-h3);font-weight:750}
+#ballista-game-view .ballista-wind{font-size:var(--qw-fs-body);font-weight:700}
+#ballista-game-view .ballista-controls label{display:grid;gap:7px;font-size:var(--qw-fs-control);font-weight:700}
+#ballista-game-view .ballista-controls output{font-variant-numeric:tabular-nums}
+#ballista-game-view .ballista-keyboard{border-top:1px solid var(--qw-game-line);padding-top:10px}
+#ballista-game-view .ballista-keyboard summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700}
+#ballista-game-view .ballista-keyboard-body{display:grid;gap:10px}
+#ballista-game-view input[type=range]{width:100%;min-height:44px;accent-color:var(--qw-game-accent,#5b883c);cursor:pointer}
+#ballista-game-view .ballista-actions{display:grid;gap:8px}
+#ballista-game-view .ballista-actions button{min-height:48px;font-size:var(--qw-fs-control)}
+#ballista-game-view .ballista-rules{font-size:var(--qw-fs-small);line-height:1.5}
+#ballista-game-view :focus-visible{outline:3px solid var(--qw-game-accent,#5b883c);outline-offset:3px}
+html.qw-telegram #ballista-game-view .ballista-back{display:none}
+:root[data-qw-contrast="1"] #ballista-game-view .ballista-stage-card,:root[data-qw-contrast="1"] #ballista-game-view .ballista-controls{border-width:2px}
+:root[data-qw-contrast="1"] #ballista-game-view .ballista-scene .ballista-target{stroke:#172300;stroke-width:8;fill:#fff39cbb;filter:none}
+:root[data-qw-contrast="1"][data-farm-theme="night"] #ballista-game-view .ballista-scene svg{filter:brightness(1.55) contrast(1.18) saturate(1.1)}
+@media(max-width:850px){#ballista-game-view .ballista-page{padding-top:14px}#ballista-game-view .ballista-layout{grid-template-columns:1fr}#ballista-game-view .ballista-controls{gap:10px}#ballista-game-view .ballista-title{align-items:start}#ballista-game-view .ballista-title h1{max-width:70%}}

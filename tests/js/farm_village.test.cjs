@@ -13,14 +13,15 @@ class Node{
  setAttribute(k,v){this.attrs[k]=v;}
  focus(){this.focused=true;}
  querySelector(){return null;}
- querySelectorAll(selector){const all=this.children.flatMap(n=>n instanceof Node?[n,...n.querySelectorAll('*')]:[]);return selector==='*'?all:all.filter(n=>selector.includes('data-village-npc')?n.dataset.villageNpc||n.dataset.villageTownhall:selector==='.village-services'?n.className==='village-services':false);}
+ querySelectorAll(selector){const all=this.children.flatMap(n=>n instanceof Node?[n,...n.querySelectorAll('*')]:[]);return selector==='*'?all:all.filter(n=>selector.includes('data-village-npc')?n.dataset.villageNpc||n.dataset.villageTownhall||selector.includes('data-village-place')&&n.dataset.villagePlace:selector.includes('data-village-focus')?n.dataset.villageFocus:selector==='.village-services'?n.className==='village-services':false);}
 }
 const AC=h=>h.nodes.get('village-scene').children[0].children.find(n=>n.className==='village-actors');
 function setup(){
  const nodes=new Map(),area=new Node('section'),calls=[],pause=[],bodyClasses=new Set();
  const S={me:{id:'own',is_owner:true,orders:[{id:'one',npc:'Филиныч',title:'Чай',needs:{tea:2},coins:100,xp:10}],inventory:{tea:2},market:{}},farm:{id:'guest'},tab:'orders',catalog:{market:{tastes:{'Филиныч':['tea'],'Агата':['bread']}}},village:null};
  nodes.set('farm-canvas',new Node('canvas'));nodes.set('panel-content',new Node('div'));nodes.set('panel-head',new Node('div'));const sheetFocus=new Node('section'),title=new Node('h2');nodes.get('panel-content').querySelector=()=>sheetFocus;nodes.get('panel-head').querySelector=()=>title;
- const ctx={S,AVATARS:{},own:()=>S.me?.is_owner===true,openDashaGame:()=>calls.push('open-dasha'),openOlegGame:()=>calls.push('open-oleg'),dashaReasonText:reason=>({level:'Игра открывается с 3 уровня.',daily_limit:'Лимит ставок 200 монет в день исчерпан.',pending_payout:'Выигрыш ожидает места на балансе.',earned_balance:'Для ставки нужны заработанные монеты.',wallet_limit:'Баланс монет достиг предела.',active:'Раунд уже начат — выбери стаканчик.'}[reason]||'Игра сейчас недоступна.'),document:{activeElement:null,body:{classList:{toggle:(k,v)=>v?bodyClasses.add(k):bodyClasses.delete(k),add:k=>bodyClasses.add(k),remove:k=>bodyClasses.delete(k),contains:k=>bodyClasses.has(k)}},querySelector:()=>area},
+ // General village fixtures have no active Horseman; its active flow is covered by farm_horseman.test.cjs.
+ const ctx={S,AVATARS:{},horsemanDisplay:()=>null,now:()=>0,own:()=>S.me?.is_owner===true,openDashaGame:()=>calls.push('open-dasha'),openOlegGame:()=>calls.push('open-oleg'),dashaReasonText:reason=>({level:'Игра открывается с 3 уровня.',daily_limit:'Лимит ставок 200 монет в день исчерпан.',pending_payout:'Выигрыш ожидает места на балансе.',earned_balance:'Для ставки нужны заработанные монеты.',wallet_limit:'Баланс монет достиг предела.',active:'Раунд уже начат — выбери стаканчик.'}[reason]||'Игра сейчас недоступна.'),document:{activeElement:null,body:{classList:{toggle:(k,v)=>v?bodyClasses.add(k):bodyClasses.delete(k),add:k=>bodyClasses.add(k),remove:k=>bodyClasses.delete(k),contains:k=>bodyClasses.has(k)}},querySelector:()=>area},
  $:id=>nodes.get(id),el:(tag,text,cls)=>{const n=new Node(tag);n.textContent=text;n.className=cls;return n;},icon:()=>new Node('svg'),
  button:(text,fn,cls,disabled)=>{const n=new Node('button');n.textContent=text;n.onclick=fn;n.disabled=disabled;return n;},
  scene:{setPaused:v=>pause.push(v),set:()=>calls.push('scene'),selected:'x',resize(){}},farmViewEpoch:4,requestAnimationFrame:fn=>fn(),
@@ -37,6 +38,49 @@ function setup(){
 }
 test('entering village from guest routes to own farm and invalidates older requests',()=>{
  const h=setup();h.ctx.selectTab('village');assert.equal(h.S.farm,h.S.me);assert.equal(h.S.tab,'village');assert.equal(h.ctx.farmViewEpoch,5);assert.ok(h.calls.includes('scene'));assert.equal(h.bodyClasses.has('panel-open'),false);assert.equal(h.bodyClasses.has('panel-collapsed'),true);const world=AC(h);assert.equal(world.children.filter(n=>n.dataset.villageNpc&&n.attrs['aria-pressed']==='true').length,0);
+});
+
+test('Hedgehog and the existing post sign open the read-only bulletin without leaving village',()=>{
+ const h=setup();h.S.catalog.market.tastes['Почтальон Ёж']=['tea'];h.ctx.selectTab('village');
+ h.ctx.chooseVillageResident('Почтальон Ёж');const panel=new Node('div');h.ctx.renderVillageResident(panel);
+ const news=panel.querySelectorAll('*').find(n=>n.textContent==='Деревенский вестник');assert.ok(news);news.onclick();
+ assert.equal(vm.runInContext('villageSheet',h.ctx),'bulletin');assert.equal(h.S.tab,'village');assert.equal(h.title.focused,true);
+ const calls=[];h.ctx.now=()=>123;h.ctx.renderBulletin=(parent,me,now)=>calls.push({parent,me,now});
+ h.ctx.renderVillage(panel);assert.equal(calls[0].me,h.S.me);assert.equal(calls[0].now,123);
+ h.ctx.chooseVillageResident('Почтальон Ёж');
+ const post=h.nodes.get('village-scene').querySelectorAll('*').find(n=>n.dataset.villagePlace==='post');assert.ok(post);post.onclick({detail:0});
+ assert.equal(vm.runInContext('villageSheet',h.ctx),'bulletin');assert.equal(h.S.tab,'village');
+ h.S.me.is_owner=false;h.ctx.openVillageBulletin();assert.equal(vm.runInContext('villageSheet',h.ctx),'bulletin');
+ assert.equal(h.calls.some(c=>Array.isArray(c)),false,'reading never submits a game command');
+});
+
+test('bulletin close restores visible source focus, and Back retains the restored parent sheet',()=>{
+ const h=setup();h.S.catalog.market.tastes['Почтальон Ёж']=['tea'];h.ctx.selectTab('village');
+ h.ctx.renderPanel=()=>{
+  h.ctx.syncVillageScene();const p=h.nodes.get('panel-content');p.replaceChildren();
+  const sheet=vm.runInContext('villageSheet',h.ctx);
+  if(sheet==='resident')h.ctx.renderVillageResident(p);
+  else if(sheet==='rows'){const news=new Node('button');news.dataset.villageFocus='bulletin';p.append(news);}
+ };
+ h.ctx.chooseVillageResident('Почтальон Ёж');
+ h.nodes.get('panel-content').querySelectorAll('*').find(n=>n.dataset.villageFocus==='bulletin').onclick();
+ assert.equal(h.ctx.closePanel(),false,'closing nested news keeps the parent panel');
+ assert.equal(vm.runInContext('villageSheet',h.ctx),'resident');assert.equal(h.bodyClasses.has('panel-open'),true);
+ assert.equal(h.nodes.get('panel-content').querySelectorAll('*').find(n=>n.dataset.villageFocus==='bulletin').focused,true);
+ h.ctx.closePanel();assert.equal(h.bodyClasses.has('panel-open'),false);
+ h.ctx.openVillageBulletin('post');h.ctx.closePanel();
+ assert.equal(h.bodyClasses.has('panel-open'),false);
+ assert.equal(h.nodes.get('village-scene').querySelectorAll('*').find(n=>n.dataset.villagePlace==='post').focused,true);
+ const stack=new Map();h.ctx.QW={config:{history:false},nav:{has:id=>stack.has(id),push:entry=>stack.set(entry.id,entry),pop:id=>stack.delete(id)}};
+ h.ctx.farmMenuOpen=false;
+ const start=source.indexOf('function navPush('),end=source.indexOf('new MutationObserver(syncNav)',start);
+ vm.runInContext(source.slice(start,end),h.ctx);
+ h.ctx.openVillageBulletin('rows');h.ctx.syncNav();
+ assert.equal(stack.get('panel').onBack(),false,'shell Back keeps the panel entry while returning to rows');
+ assert.equal(vm.runInContext('villageSheet',h.ctx),'rows');assert.equal(h.bodyClasses.has('panel-open'),true);
+ assert.equal(h.nodes.get('panel-content').querySelectorAll('*').find(n=>n.dataset.villageFocus==='bulletin').focused,true);
+ assert.equal(stack.get('panel').onBack(),undefined,'a further Back closes the restored rows normally');
+ assert.equal(h.bodyClasses.has('panel-open'),false);
 });
 test('Dasha and rooster are visible residents with take and deliver actions',async()=>{
  const h=setup();h.S.catalog.market.village_quests={'Лиса Даша':{item:'carrot',qty:2,coins:12,xp:4,title:'Морковка для тайника'},'Петух Олег':{item:'wheat',qty:4,coins:12,xp:4,title:'Завтрак перед рассветом'}};

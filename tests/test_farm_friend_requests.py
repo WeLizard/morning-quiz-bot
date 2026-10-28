@@ -4,7 +4,9 @@ import math
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
+import pytest
 
+from qw_farm import friend_requests
 from qw_farm.catalog import ITEMS
 from qw_farm.domain import validate_state
 from qw_farm.domain import FarmError
@@ -119,6 +121,73 @@ def test_pg_friend_request_free_delivery_acceptance_and_replay(farm_pg_url):
             closed = await command(requester, 'request_accept', {'request': request_id})
             assert closed.status_code in (400, 409)
             assert (await raw_farm(env, requester))['inventory']['wheat'] == after_accept['inventory']['wheat']
+
+    asyncio.run(scenario())
+
+
+def test_demo_friend_request_projection_uses_farm_names_and_hides_account_fields(monkeypatch):
+    async def scenario():
+        db, requester_account, giver_account, now, service = await demo_pair()
+        try:
+            async with db.transaction() as unit:
+                requester = service(unit, requester_account, 'Requester')
+                requester_farm = await requester.me()
+                giver_farm = await unit.by_account(giver_account)
+                requester_farm['name'] = 'Requester Meadow'
+                giver_farm['name'] = 'Giver Orchard'
+                await unit.save(requester_farm)
+                await unit.save(giver_farm)
+
+                created = await requester.command(uuid4().hex, 'request_create',
+                    {'item': 'wheat', 'qty': 1, 'offer_kind': 'free', 'to': giver_farm['id']},
+                    target_id=requester_farm['id'])
+                request_id = created['request']
+
+                requester_view = (await requester.view())['farm']['friend_requests']
+                own = requester_view['own']
+                assert requester_view['neighbors'] == [
+                    {'id': giver_farm['id'], 'name': 'Giver Orchard'}]
+                assert not any(key.endswith('_account') for neighbor in requester_view['neighbors']
+                               for key in neighbor)
+                own_row = next(row for row in own if row['id'] == request_id)
+                assert own_row['requester_name'] == 'Requester Meadow'
+                assert own_row['audience_farm'] == giver_farm['id']
+                assert not any(key.endswith('_account') for key in own_row)
+
+                giver = service(unit, giver_account, 'Giver')
+                giver_projection = (await giver.view())['farm']['friend_requests']
+                incoming = giver_projection['incoming']
+                assert giver_projection['neighbors'] == [
+                    {'id': requester_farm['id'], 'name': 'Requester Meadow'}]
+                assert not any(key.endswith('_account') for neighbor in giver_projection['neighbors']
+                               for key in neighbor)
+                neighbor_row = next(row for row in incoming if row['id'] == request_id)
+                assert neighbor_row['requester_name'] == 'Requester Meadow'
+                assert 'audience_farm' not in neighbor_row
+                assert not any(key.endswith('_account') for key in neighbor_row)
+
+                now[0] += 86401
+                await giver.command(uuid4().hex, 'request_give', {'request': request_id},
+                                    target_id=giver_farm['id'])
+                delivered = (await requester.view())['farm']['friend_requests']['own']
+                delivered_row = next(row for row in delivered if row['id'] == request_id)
+                assert delivered_row['requester_name'] == 'Requester Meadow'
+                assert delivered_row['giver_name'] == 'Giver Orchard'
+                assert not any(key.endswith('_account') for key in delivered_row)
+
+                real_get = unit.get
+                async def unavailable_giver(farm_id):
+                    if str(farm_id) == giver_farm['id']:
+                        return None
+                    return await real_get(farm_id)
+                monkeypatch.setattr(unit, 'get', unavailable_giver)
+                requester_farm = await unit.by_account(requester_account)
+                fallback = await friend_requests.projection(unit, requester_farm, now[0])
+                fallback_row = next(row for row in fallback['own'] if row['id'] == request_id)
+                assert fallback_row['giver_name'] == 'Сосед'
+                assert not any(key.endswith('_account') for key in fallback_row)
+        finally:
+            db.engine.dispose()
 
     asyncio.run(scenario())
 

@@ -65,6 +65,15 @@ test('catalogue: crops, a new bed, buildings by section, trees; gating of the fo
  assert.deepEqual(Object.keys(N.sectionCounts(e)),['plots','trees','workshops','animals','decor','roads']);
 });
 
+test('tree cards say «не хватает монет» like the buildings, but not with a free sapling or when locked',async()=>{
+ const N=await load(),paid=[{...rows[0],options:[{voucher:null,price:1920,qty:null}]},rows[1]];
+ const tree=(r,coins)=>N.catalogEntries(catalog,{...me,coins},[],r).find(x=>x.key==='t:apple');
+ assert.equal(tree(rows,0).poor,false,'a free sapling is planted without coins');
+ assert.equal(tree(paid,120).poor,true);assert.equal(tree(paid,1920).poor,false);
+ assert.equal(N.catalogEntries(catalog,{...me,coins:0},[],paid).find(x=>x.key==='t:cherry').poor,false,'a locked tree shows its lock, not the price');
+ const src=read('app.js');assert.match(src,/e\.poor\?'не хватает монет'/,'the card label reads the entry flag for every kind');
+});
+
 test('search finds by name and by product: buildings that process it and orders that need it',async()=>{
  const N=await load(),e=N.catalogEntries(catalog,me,[],rows);
  const r=N.searchCatalog(e,'ябл',catalog,[{id:'o1',title:'Пирог',npc:'Сорока',needs:{pie:1}},{id:'o2',title:'Мука',npc:'Филиныч',needs:{flour:2}}]);
@@ -88,12 +97,27 @@ test('«Недавнее»: newest first, no repeats, four at most, per farm, su
  assert.equal(N.bestOption(rows[0]).voucher,'free','a free sapling first');assert.equal(N.bestOption(rows[1]).voucher,null);
 });
 
+test('fields header and menu share the approved vector generated from the farm vehicle',()=>{
+ const app=read('app.js');
+ const match=app.match(/^const FIELDS_CARD_ART=(.+);$/m);
+ assert.ok(match,'generated artwork stays in one shared declaration');
+ const art=JSON.parse(match[1]);
+ assert.equal(require('node:crypto').createHash('sha256').update(art).digest('hex'),'558c680d3f7a1358bacbbf0cafc937798211d30da1fcdbfaf0979ef228c5eb8b','approved E17 geometry');
+ assert.doesNotMatch(art,/<image\b|data:image|<script\b/i,'no raster patch or executable artwork');
+ assert.match(art,/matrix\(0\.59 0 0 0\.59 105 55\)/,'the farm vehicle transform is preserved');
+ assert.ok(app.includes("headerCardArt('fields-card',FIELDS_CARD_ART)"));
+ assert.match(app,/function menuArt\(id\).*FIELDS_CARD_ART/,'the menu uses the same approved art');
+});
+
 test('app wiring: one menu in #rail, «Меню» on a phone, header picture cards kept, catalogue and placement',()=>{
  const app=read('app.js'),html=read('index.html'),css=read('style.css'),api=read('../api.py');
  assert.ok(api.includes("'farm_nav.js'"),'the module is served');assert.ok(app.includes("import * as NAV from './farm_nav.js'"));
  // The owner asked to keep the picture cards in the header (2026-10-24): «За околицей» is reachable from the menu and the header.
  for(const id of ['forest-door','fields-door'])assert.ok(html.includes(`id="${id}"`),`${id} is in the header`);
  for(const id of ['lake-door','village-card-door','farm-card-door'])assert.ok(app.includes(`'${id}'`),`${id} is built into the header`);
+ // «Поля» is a picture card like the others, not the old text chip «Поля ↗».
+ assert.match(html,/class="forest-door dest-card" id="fields-door"[^>]*data-label="Поля"/);assert.ok(!html.includes('Поля ↗'));
+ assert.ok(app.includes("headerCardArt('fields-card',FIELDS_CARD_ART)"),'the fields card gets its picture');assert.ok(!/\.fields-door\{/.test(css),'no chip styles left');
  assert.ok(!/body:not\(\.village-open\):not\(\.farm-visit\) \.header-destinations\{display:none/.test(css),'the header strip is not hidden on the own farm');
  assert.ok(!html.includes('id="village-door"')&&!app.includes("'village-door'"),'no extra village chip on the map');
  assert.ok(html.includes('id="farm-menu-button"')&&html.includes('aria-controls="rail"'),'«Меню» next to «Собрать урожай»');
@@ -102,7 +126,7 @@ test('app wiring: one menu in #rail, «Меню» on a phone, header picture car
  assert.ok(!app.includes('function renderBuild')&&!app.includes("selectTab('build')"),'no «Строить» tab');
  assert.ok(app.includes('land:renderLand,catalog:renderCatalog'),'«Участок» and the catalogue are panels');
  assert.ok(/function renderLand\(p\)\{\n heading\('Участок'[^\n]*landExpansion\(p\)/.test(app),'land expansion moved to «Участок»');
- assert.ok(app.includes("navPush('panel',()=>{if(farmMenuOpen)closeFarmMenu();else closePanel();})"),'the menu sheet shares the panel back-stack entry');
+ assert.ok(/navPush\('panel',\(\)=>\{if\(farmMenuOpen\)closeFarmMenu\(\);else (?:return )?closePanel\(\);\}\)/.test(app),'the menu sheet shares the panel back-stack entry');
  assert.ok(app.includes('if(!p.obj){rememberPlaced(p.spec);renderSeeds();}'),'a placement feeds «Недавнее»');
  assert.ok(/@media\(min-width:851px\)\{\n body\{--menu-w:248px\}/.test(css),'PC: a 248 px column');
  assert.ok(!app.includes("'seedbar-label'"),'the vertical label class is not reused');
@@ -146,4 +170,30 @@ test('entry details wiring: (i) is a sibling of the card, a long press opens det
  assert.ok(press.includes('ev.stopImmediatePropagation()')&&press.includes("'contextmenu'"),'the click after a long press is swallowed; right click opens details');
  assert.ok(app.includes("bindInfoPress(b,()=>({kind:'crop'")&&app.includes('bindInfoPress(b,()=>e)'),'crops and «Недавнее» in the strip');
  assert.ok(/\.entry-info-btn\{[^}]*width:var\(--qw-tap\);height:var\(--qw-tap\)/.test(css),'the (i) target is 44 px');
+});
+test('return picture card works in guests and village; a late visit cannot reopen a guest farm',async()=>{
+ const app=read('app.js'),css=read('style.css'),vm=require('node:vm');
+ assert.ok(app.includes("id:'farm-card-door',label:'На ферму'"));assert.ok(app.includes('run:returnToFarm'));
+ assert.match(css,/\.farm-visit \.header-destinations>\.dest-only-village\{display:(?:flex|block)!important/);
+ assert.match(css,/\.village-open \.header-destinations>\.dest-only-village\{display:(?:flex|block)!important/);
+ let resolve;const own={id:'own'},guest={id:'guest'},calls=[];
+ const ctx={S:{me:own,farm:guest,tab:'neighbors'},farmViewEpoch:0,API:'/api/farm',request:()=>new Promise(r=>{resolve=r;}),
+ scene:{set:f=>calls.push(f.id),fit(){}},updateHUD(){},renderSeeds(){},renderPanel(){},renderRail(){},toast(){},
+ document:{body:{classList:{remove(){}}}},villageVisible:()=>false,exitVillage:()=>calls.push('village-exit')};
+ vm.createContext(ctx);vm.runInContext(app.slice(app.indexOf('async function visit('),app.indexOf('function renderVisit(')),ctx);
+ vm.runInContext(app.slice(app.indexOf('function returnToFarm('),app.indexOf('\n',app.indexOf('function returnToFarm('))),ctx);
+ const pending=ctx.visit('other');ctx.returnToFarm();assert.equal(ctx.S.farm,own);assert.equal(ctx.S.tab,'orders');
+ resolve({farm:{id:'other'}});await pending;assert.equal(ctx.S.farm,own);assert.deepEqual(calls,['own']);
+ ctx.villageVisible=()=>true;ctx.returnToFarm();assert.equal(calls.at(-1),'village-exit');
+});
+
+test('catalogue hover keeps row gaps and outlined categories use the shared button gap',()=>{
+ const css=read('style.css');assert.match(css,/\.catalog-card:hover:not\(:disabled\)\{transform:none\}/);
+ const groups=[...css.matchAll(/\.catalog-sections\{([^}]+)\}/g)];assert.ok(groups.length>=2);for(const [,rules]of groups)assert.match(rules,/gap:var\(--qw-btn-gap\)/);
+ const shell=read('../../web/shell/qw-shell.css');assert.match(shell,/\.qw-menu\{[^}]*bottom:var\(--qw-safe-bottom\);[^}]*max-height:[^}]+--qw-safe-bottom/);assert.doesNotMatch(css,/body \.qw-menu\{/);
+});
+
+test('village minimap stays above the bottom safe area on phone and wide layouts',()=>{
+ const css=read('style.css');const rules=[...css.matchAll(/\.village-minimap\{([^}]+)\}/g)];assert.ok(rules.length>=2);
+ for(const [,rule]of rules)if(/bottom:/.test(rule))assert.match(rule,/bottom:calc\((?:8|10)px \+ var\(--qw-safe-bottom\)\)/);
 });

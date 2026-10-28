@@ -182,6 +182,19 @@ export class FarmScene {
   const exact=objs.find(o=>cell.x>=o.x&&cell.x<o.x+o.w&&cell.y>=o.y&&cell.y<o.y+o.h);
   if(exact)return exact;
   for(let o of objs){if(o.type==='plot'||o.type==='road')continue;let p=P(o.x+o.w/2,o.y+o.h/2);const hw=o.type==='mill'?MILL_HIT.hw:43,top=o.type==='mill'?MILL_HIT.top:90;if(q.x>p.x-hw&&q.x<p.x+hw&&q.y>p.y-top&&q.y<p.y+10)return o}
+  // Grass receives taps only after footprints and painted object silhouettes. Enlarge its target in screen pixels,
+  // not world cells: a fit view is .85 on phones and its cells are smaller than a finger target.
+  if(this.farm.is_owner){
+   const patches=this.farm.meadow_view?.patches||[];
+   let nearest=null,distance=Infinity;
+   for(const patch of patches){
+    const [cx,cy]=patch.cell.split(',').map(Number);
+    if(!Number.isInteger(cx)||!Number.isInteger(cy)||cx<0||cy<0||cx>=this.farm.size||cy>=this.farm.size)continue;
+    const p=P(cx+.5,cy+.5),dx=(q.x-p.x)*this.scale,dy=(q.y-(p.y-5))*this.scale,d=dx*dx+dy*dy;
+    if(Math.abs(dx)<=22&&Math.abs(dy)<=22&&d<distance){nearest=patch;distance=d;}
+   }
+   if(nearest)return {type:'meadow',id:`meadow:${nearest.cell}`,cell:nearest.cell};
+  }
   return null;
  }
  // `camera` moves the view to the object (lists and the mini-map); a tap on the map itself only selects.
@@ -414,6 +427,7 @@ export class FarmScene {
   for(const p of plots)if(visible(p.bounds)){this.plotGround(p.object);drawnObjects.add(p.object.id)}
   // Vegetation is a separate layer below all solid sprites: no per-plant scratch canvases or masks.
   for(const e of crops)if(visible(e.bounds))e.draw();
+  for(const patch of this.farm.meadow_view?.patches||[])this.drawMeadow(patch);
   const list=entries.filter(e=>visible(e.bounds)),moving=teamSprites(this),slots=spriteSlots(list,moving);
   // Buildings, animals, fence and moving sprites keep their existing depth/parent constraints.
   for(let i=0;i<=list.length;i++){
@@ -781,16 +795,25 @@ export class FarmScene {
   if(['flowerbed','bench','lantern','scarecrow'].includes(o.type)){this.decor(o,p);return}
   const top=drawUpgrade(this,o,drawBuilding(this,o,p));
   let ready=o.jobs?.some(j=>j.ready_at<=this.now())||(o.animal_job&&o.animal_job.ready_at<=this.now());
-  const by=Math.max(70,top+6);
+  const by=o.w<2&&o.h<2?top+8:Math.max(70,top+6);   // a low 1x1 workshop (the compost heap) keeps its bubble close above it
   if(ready)this.ready(p.x+22,p.y-by);
   else if(o.jobs?.length||o.animal_job){let job=o.jobs?.[0]||o.animal_job;this.clockBubble(p.x+25,p.y-by-1,job.ready_at)}
  }
  title(o){return {house:'Дом Филиныча',barn:'Склад',plot:'Грядка'}[o.type]||(o.type==='tree'?this.catalog?.orchard?.trees?.[o.species]?.name:null)||this.catalog?.buildings[o.type]?.name||o.type}
  // Fruit tree (docs/tasks/FARM_ORCHARD.md, section 7): seven species by stage and cycle phase, graft looks and care marks (scene_orchard.js).
- orchardTree(o,p){drawTree(this,o,p,this.catalog,this.now())}
+ orchardTree(o,p){if(o.fruit?.fert||o.fert)this.fertRing(o,p);drawTree(this,o,p,this.catalog,this.now())}
+ // A fed tree (fruit.fert for the owner, fert in a guest's projection): a dark circle of earth round the trunk with a few light grains,
+ // painted under the tree's own shadow; in contrast mode a thin dark edge. Grains: n light specks at fixed spots of a tile area.
+ fertRing(o,p){this.ellipse(p.x,p.y+.5,18,8.6,'#7a664c');this.ellipse(p.x-1.5,p.y-.3,13.5,6.2,'#6c5841');
+  if(this.contrast){const c=this.c;c.beginPath();c.ellipse(p.x,p.y+.5,18,8.6,0,0,Math.PI*2);c.strokeStyle='#1f1508';c.lineWidth=1.3;c.stroke()}
+  const k=o.x*7+o.y*13;for(let i=0;i<6;i++){const a=seed(i,k)*Math.PI*2,r=.45+.45*seed(i+9,k);this.ellipse(p.x+Math.cos(a)*15*r,p.y+.5+Math.sin(a)*7*r,1.4,.85,i%2?'#d9caa0':'#efe4c4')}}
+ fertGrains(x,y,w,h,n,k){for(let i=0;i<n;i++){const q=P(x+w*seed(i,k),y+h*seed(i+17,k));this.ellipse(q.x,q.y,1.5,.9,i%3?'#e9dcb8':'#cdbd92')}}
  // Birdhouse decor (1x1): a pole with a little house and its starling (scene_buildings.js, same solids as the workshops).
  birdhouse(o,p){drawBirdhouse(this,o)}
- plotGround(o){if(this.contrast)this.footprint(o,'#7a5a34','#1f1508');else this.footprint(o,'#b19a70','#a18a62');this.poly([P(o.x+.06,o.y+.06),P(o.x+.94,o.y+.06),P(o.x+.94,o.y+.94),P(o.x+.06,o.y+.94)],'#937f5d');for(let f of [.25,.48,.71]){let a=P(o.x+.1,o.y+f),b=P(o.x+.9,o.y+f);this.line(a.x,a.y,b.x,b.y,'#b19b73',2.4)}
+ // A fed bed (crop.fert, docs/tasks/FARM_FERTILIZERS.md §7): slightly darker soil and furrows, a few light grains; in contrast mode
+ // also a thin dark edge round the soil. Without the flag the bed is painted exactly as before.
+ plotGround(o){const fed=!!o.crop?.fert;if(this.contrast)this.footprint(o,'#7a5a34','#1f1508');else this.footprint(o,'#b19a70','#a18a62');this.poly([P(o.x+.06,o.y+.06),P(o.x+.94,o.y+.06),P(o.x+.94,o.y+.94),P(o.x+.06,o.y+.94)],fed?'#7f6a4b':'#937f5d',fed&&this.contrast?'#1f1508':null,1.3);for(let f of [.25,.48,.71]){let a=P(o.x+.1,o.y+f),b=P(o.x+.9,o.y+f);this.line(a.x,a.y,b.x,b.y,fed?'#9f8962':'#b19b73',2.4)}
+  if(fed)this.fertGrains(o.x+.1,o.y+.1,.8,.8,9,o.x*7+o.y*13);
   if(o.id===this.selected)this.footprint(o,'#f8edb837','#f7f0c3');
   if(!o.crop){let p=P(o.x+.5,o.y+.5);this.line(p.x-3,p.y,p.x+3,p.y,'#d3c49855',1);this.line(p.x,p.y-3,p.x,p.y+3,'#d3c49855',1)}
  }
@@ -905,9 +928,21 @@ export class FarmScene {
   }
   return false;
  }
+ grass(x,y,n,col,col2,h,sway=0){
+  for(let k=0;k<n;k++){const d=k-(n-1)/2,hh=h*(1-Math.abs(d)*.12);this.line(x+d*2,y,x+sway+d*3.2,y-hh,k%2?col2:col,1.2)}
+ }
+ drawMeadow(patch){
+  const [cx,cy]=patch.cell.split(',').map(Number),size=this.farm.size;
+  if(!Number.isInteger(cx)||!Number.isInteger(cy)||cx<0||cy<0||cx>=size||cy>=size)return;
+  const p=P(cx+.5,cy+.5),stage=patch.stage,season=this.farm.meadow_view?.season;
+  const colors=season==='autumn'?['#9b9e5c','#bdad69']:season==='spring'?['#78a859','#9acb72']:['#6f9a55','#8dbb70'];
+  this.grass(p.x,p.y,stage===0?4:stage===1?7:9,colors[0],colors[1],stage===0?6:stage===1?10:15);
+  if(season==='winter'){this.ellipse(p.x,p.y-5,8,2.5,'#edf3e9');return}
+  if(stage===2)for(const dx of [-6,4])this.ellipse(p.x+dx,p.y-12-(dx>0?1:0),1.5,1.5,season==='spring'?'#f2d26b':season==='autumn'?'#dbc77b':'#f7eee0');
+ }
  sapling(x,y,id,f,sway){
   const g=Math.min(1,f/.6),h=3+g*10,L=(a,l,w,col)=>this.leaf(x+sway*.5,y-(a[1]),a[0],l,w,col),up=-Math.PI/2,top=y-h,sx=x+sway;
-  const grass=(n,col,col2,tall)=>{for(let k=0;k<n;k++){let d=(k-(n-1)/2),hh=h*(tall||1)*(1-Math.abs(d)*.12);this.line(x+d*2,y,sx+d*3.2,y-hh,k%2?col2:col,1.2)}};
+  const grass=(n,col,col2,tall)=>this.grass(x,y,n,col,col2,h*(tall||1),sway);
   const fruit=(col,n)=>{if(f>.42)for(let k=0;k<n;k++)this.ellipse(x+(k-(n-1)/2)*4,y-4-k%2*3,1.6+(f-.42)*5,1.6+(f-.42)*5,col)};
   const G='#719856',G2='#8daf66',G3='#5f8a4e';
   switch(id){

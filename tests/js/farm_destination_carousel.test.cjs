@@ -4,6 +4,29 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 
+test('phone destination cards keep their width instead of shrinking away the overflow',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');
+ const rules=[...css.matchAll(/html \.compact \.header-destinations>\.forest-door\{([^}]+)\}/g)];
+ assert.ok(rules.length);
+ assert.match(rules.at(-1)[1],/flex:0 0 92px/);
+ assert.match(css,/overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity/);
+});
+
+test('fields stays visible before level 22 and advertises its existing lock explanation',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
+ const start=source.indexOf("const fieldsDoor=$('fields-door'),"),end=source.indexOf("$('object-list-button')",start);
+ assert.ok(start>=0&&end>start);
+ for(const owner of [true,false])for(const level of [1,21,22]){
+  const card={setAttribute(k,v){this[k]=v;}},ctx={S:{catalog:{fields:{min_level:22}},me:{level}},$:()=>card,own:()=>owner};
+  vm.runInNewContext(source.slice(start,end),ctx);
+  assert.equal(card.hidden,false);
+  assert.equal(card['aria-label'].includes('Откроется на 22 уровне'),level<22);
+  assert.equal(card['aria-label'].includes('Вернуться к своим полям'),!owner);
+ }
+ assert.match(source,/\$\('fields-door'\)\.onclick=safe\(async\(\)=>\{[^\n]*selectTab\('fields'\)/);
+ assert.match(source,/if\(S\.me\.level<F\.min_level\)\{/);
+});
+
 const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
 const start=source.indexOf('function bindDestinationCarousel(');
 const end=source.indexOf('\n// Every destination card',start);

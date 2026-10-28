@@ -1,0 +1,53 @@
+{
+  "cases": [
+    {
+      "name": "once_rotates_and_shares_stock",
+      "mode": "repeat_once",
+      "area": null,
+      "farm": {
+        "xp": 5000,
+        "inventory": {"wheat": 6, "sunflower": 2},
+        "objects": [
+          {"id": "a", "type": "mill", "x": 0, "y": 0, "w": 2, "h": 2, "level": 1, "jobs": [], "recipes_memory": ["flour", "feed", "oil"], "recipe_cursor": 1},
+          {"id": "b", "type": "mill", "x": 4, "y": 0, "w": 2, "h": 2, "level": 1, "jobs": [], "recipes_memory": ["flour", "feed"], "recipe_cursor": 0}
+        ]
+      },
+      "starts": [
+        {"object": "a", "recipe": "feed"}, {"object": "b", "recipe": "flour"},
+        {"object": "a", "recipe": "oil"}, {"object": "b", "recipe": "feed"}
+      ]
+    },
+    {
+      "name": "once_skips_unavailable_and_respects_area",
+      "mode": "repeat_once",
+      "area": {"x": 0, "y": 0, "w": 2, "h": 2},
+      "farm": {
+        "xp": 5000,
+        "inventory": {"wheat": 2, "sunflower": 0},
+        "objects": [
+          {"id": "a", "type": "mill", "x": 0, "y": 0, "w": 2, "h": 2, "level": 1, "jobs": [], "recipes_memory": ["oil", "flour", "feed"], "recipe_cursor": 0},
+          {"id": "b", "type": "mill", "x": 4, "y": 0, "w": 2, "h": 2, "level": 1, "jobs": [], "recipes_memory": ["flour"], "recipe_cursor": 0}
+        ]
+      },
+      "starts": [{"object": "a", "recipe": "flour"}]
+    },
+    {
+      "name": "fill_round_robin",
+      "mode": "fill_queues",
+      "area": null,
+      "farm": {
+        "xp": 5000,
+        "inventory": {"wheat": 12},
+        "objects": [
+          {"id": "a", "type": "mill", "x": 0, "y": 0, "w": 2, "h": 2, "level": 1, "jobs": [], "recipes_memory": ["flour", "feed"], "recipe_cursor": 0},
+          {"id": "b", "type": "mill", "x": 4, "y": 0, "w": 2, "h": 2, "level": 1, "jobs": [], "recipes_memory": ["feed", "flour"], "recipe_cursor": 0}
+        ]
+      },
+      "starts": [
+        {"object": "a", "recipe": "flour"}, {"object": "b", "recipe": "feed"},
+        {"object": "a", "recipe": "feed"}, {"object": "b", "recipe": "flour"},
+        {"object": "a", "recipe": "flour"}, {"object": "b", "recipe": "feed"}
+      ]
+    }
+  ]
+}

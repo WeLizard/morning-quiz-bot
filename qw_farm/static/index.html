@@ -7,13 +7,15 @@
 <link rel="stylesheet" href="/app/shell/qw-tokens.css">
 <link rel="stylesheet" href="/app/shell/qw-shell.css">
 <link rel="stylesheet" href="/app/farm/assets/style.css">
+<link rel="stylesheet" href="/app/farm/assets/field_overlay.css?v=20261028c">
 <link rel="stylesheet" href="/app/farm/assets/dasha-game.css">
 <link rel="stylesheet" href="/app/farm/assets/oleg-game.css">
+<link rel="stylesheet" href="/app/farm/assets/ballista-game.css">
 <link rel="stylesheet" href="/app/farm/assets/festivals.css">
 <link rel="stylesheet" href="/app/farm/assets/merchant.css">
 <link rel="stylesheet" href="/app/farm/assets/construction.css">
 <script src="/app/shell/qw-shell.js"></script>
-<script type="module" src="/app/farm/assets/app.js"></script>
+<script type="module" src="/app/farm/assets/app.js?v=20261028c"></script>
 </head>
 <body class="compact farm-login">
 <header class="topbar">
@@ -22,7 +24,6 @@
   <g class="lighting-moon"><mask id="lt-moon-cut"><rect width="40" height="40" fill="#fff"/><circle cx="26.2" cy="13.8" r="10.2" fill="#000"/></mask><g mask="url(#lt-moon-cut)"><circle cx="19" cy="20.6" r="13.4" fill="#d6bf6f"/><circle cx="19.8" cy="19.8" r="12" fill="#ecd88d"/><circle cx="12.8" cy="24.6" r="2" fill="#dcc77e"/><circle cx="17.4" cy="29.6" r="1.4" fill="#dcc77e"/></g><path d="m31 4.8 1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1Z" fill="#f6d77c"/><circle cx="34.6" cy="20.4" r="1.3" fill="#f6d77c"/></g>
   <g class="lighting-auto"><g fill="#f2c763"><rect x="17.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(-45 19 20)"/><rect x="17.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(-90 19 20)"/><rect x="17.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(-135 19 20)"/></g><path class="la-day" d="M19 9a11 11 0 0 0 0 22Z" fill="#f2c25e"/><path class="la-night" d="M19 9a11 11 0 0 1 0 22Z" fill="#7488b2"/><ellipse cx="14.4" cy="15.6" rx="2.4" ry="1.6" fill="#fff2c4" opacity=".8" transform="rotate(-35 14.4 15.6)"/><path class="la-night" d="m24 12.6.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7Z" fill="#f6e3a0"/><circle class="la-night" cx="24.4" cy="22.8" r="1" fill="#f6e3a0"/><g class="la-cycle" fill="none" stroke="#5f9a6e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M35.6 32.4A4.8 4.8 0 1 1 33.8 26.6"/><path d="m31.2 25.2 2.8 1.2-1 2.8"/></g></g>
  </svg></button>
- <button id="return-home" class="light small header-return-home" type="button" aria-label="Вернуться на свою ферму" hidden>Своя ферма</button>
  <nav id="header-destinations" class="header-destinations" aria-label="Места фермы">
   <button class="forest-door" id="forest-door" type="button" aria-label="Отправиться в лес">
    <svg class="forest-door-art" viewBox="0 0 160 68" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
@@ -30,7 +31,7 @@
     <g clip-path="url(#forest-card-clip)"><rect width="160" height="68" fill="url(#forest-sky)"/><circle cx="126" cy="14" r="9" fill="#f7d579" opacity=".8"/><path d="M0 42 30 17l30 28 32-32 41 38 27-19v36H0Z" fill="#94b58b"/><path d="m0 53 34-23 34 28 34-30 58 36v18H0Z" fill="#668e67"/><path d="M77 68c-3-13 8-16 6-25-1-5-8-9-5-16 8 5 13 10 13 17 0 8-8 11-5 24Z" fill="#e6d4a0"/><path d="M77 68c-2-10 7-13 8-18 2 5-3 9-2 18" fill="#f6e7bd"/><g fill="#456d54"><path d="m18 54 13-32 13 32Zm9 8 13-34 14 34Zm78-14 14-34 14 34Zm-8 10 12-30 13 30Zm43 1 10-25 11 25Z"/></g><g fill="#7f9e69"><circle cx="11" cy="57" r="9"/><circle cx="152" cy="49" r="11"/><circle cx="61" cy="47" r="8"/></g><g fill="#f5d889"><circle cx="56" cy="60" r="1.7"/><circle cx="66" cy="55" r="1.4"/><circle cx="20" cy="64" r="1.5"/></g></g>
    </svg><span class="sr-only">Лесные тропы</span>
   </button>
-  <button class="forest-door fields-door" id="fields-door" type="button" aria-label="Перейти к полям за околицей" hidden>Поля ↗</button>
+  <button class="forest-door dest-card" id="fields-door" type="button" aria-label="Перейти к полям за околицей" data-label="Поля" hidden><span class="sr-only">Поля</span></button>
  </nav>
  <div class="header-center"><span class="leaf-dot"></span> Весёлый фермер <span class="alpha">ALPHA 0.2</span></div>
  <div id="hud" class="hud"><span>Открываем калитку…</span></div>
@@ -69,6 +70,7 @@
  <aside id="panel" class="side-panel" aria-label="Панель управления"><div id="panel-head"></div><div id="panel-content" class="panel-content"></div></aside>
  <section id="dasha-game-view" class="dasha-game-view" aria-label="Лисий фокус" hidden></section>
  <section id="oleg-game-view" class="oleg-game-view" aria-label="Перезвон с Олегом" hidden></section>
+ <section id="ballista-game-view" aria-label="Энергетос-баллиста" hidden></section>
 </main>
 <section id="login" class="login-screen" hidden></section>
 <dialog id="dialog"><div id="dialog-body"></div></dialog>

@@ -4,7 +4,7 @@ const P=(x,y,z=0)=>({x:(x-y)*36,y:(x+y)*18-z});
 function rect(s,x,y,w,h,color,r=3){const c=s.c;c.fillStyle=color;c.beginPath();c.roundRect(x,y,w,h,r);c.fill();}
 export function vehicle(s,x,y,id,active=false){
  const c=s.c;c.save();c.translate(x,y);c.scale(.88,.88);s.shadow(0,0,28,9);
- const rolling=active?Math.sin(s.time*8):0;
+ const rolling=active&&s.motion?Math.sin(s.time*8):0;
  if(id==='robot'){
   rect(s,-12,-20,25,21,'#acc2b6',6);rect(s,-9,-28,19,12,'#e4e7d4',5);rect(s,-7,-25,15,6,'#577b76',3);
   for(let d of [-5,5])s.ellipse(d,-22,1.4,1.3,'#ddeb9d');s.line(1,-28,1,-35,'#6c8e7a',2);s.ellipse(1,-36,3,3,active?'#eac362':'#94ad8f');
@@ -61,23 +61,24 @@ function lateAnimal(s,id){
 }
 function helper(s,x,y,id,working){
  const c=s.c;c.save();c.translate(x,y);s.shadow(0,0,10,5);
- let col={rabbit_gardener:'#d5bb94',mole_gardener:'#a79786',raccoon:'#a8afa4',shepherd:'#bb9d72',hedgehog:'#ad9073',squirrel:'#c2966d',fox_picker:'#e0955a',hamster_reaper:'#e3c9a2',cat_keeper:'#c5bdb0',beaver_artisan:'#a37c58',badger_artisan:'#8f9388'}[id]||'#c4b79a';
- if(id==='beaver_artisan')s.ellipse(-10,-4,9,4,'#6f5a46');
- if(id==='fox_picker')s.ellipse(-9,-9,8,5,'#f0f0e2');
- if(id==='squirrel')s.ellipse(-9,-13,7,12,'#b5855d');
- if(id==='hedgehog')for(let a=0;a<8;a++){const t=a*Math.PI/7;s.line(Math.cos(t)*10,-6-Math.sin(t)*12,Math.cos(t)*14,-6-Math.sin(t)*16,'#957b62',2);}
+ const visualId={beaver_artisan_2:'beaver_artisan',badger_artisan_2:'badger_artisan'}[id]||id;
+ let col={rabbit_gardener:'#d5bb94',mole_gardener:'#a79786',raccoon:'#a8afa4',shepherd:'#bb9d72',hedgehog:'#ad9073',squirrel:'#c2966d',fox_picker:'#e0955a',hamster_reaper:'#e3c9a2',cat_keeper:'#c5bdb0',beaver_artisan:'#a37c58',badger_artisan:'#8f9388'}[visualId]||'#c4b79a';
+ if(visualId==='beaver_artisan')s.ellipse(-10,-4,9,4,'#6f5a46');
+ if(visualId==='fox_picker')s.ellipse(-9,-9,8,5,'#f0f0e2');
+ if(visualId==='squirrel')s.ellipse(-9,-13,7,12,'#b5855d');
+ if(visualId==='hedgehog')for(let a=0;a<8;a++){const t=a*Math.PI/7;s.line(Math.cos(t)*10,-6-Math.sin(t)*12,Math.cos(t)*14,-6-Math.sin(t)*16,'#957b62',2);}
  s.ellipse(0,-10,10,12,col);s.ellipse(0,-23,8,8,col);
- if(id==='rabbit_gardener')for(let dx of [-4,4])s.ellipse(dx,-36,3,10,col);
+ if(visualId==='rabbit_gardener')for(let dx of [-4,4])s.ellipse(dx,-36,3,10,col);
  else for(let dx of [-6,6])s.ellipse(dx,-28,3.5,5,col);
- if(id==='raccoon')rect(s,-8,-25,16,6,'#69756a',3);
- if(id==='shepherd'){s.ellipse(-6,-21,3,7,'#8d775c');s.ellipse(6,-21,3,7,'#8d775c');}
+ if(visualId==='raccoon')rect(s,-8,-25,16,6,'#69756a',3);
+ if(visualId==='shepherd'){s.ellipse(-6,-21,3,7,'#8d775c');s.ellipse(6,-21,3,7,'#8d775c');}
  for(let dx of [-3,3])s.ellipse(dx,-24,1,1,'#3d5849');
  s.ellipse(0,-20,2,1.5,'#7b715a');rect(s,-7,-13,14,13,'#7e9b7b',3);
- if(id==='hamster_reaper'){s.ellipse(-6,-21,2.6,2,'#efb9a4');s.ellipse(6,-21,2.6,2,'#efb9a4');}
- if(id==='cat_keeper')for(let d of [-1,1]){s.line(d*3,-20,d*10,-22,'#8f877b',.8);s.line(d*3,-19,d*10,-18,'#8f877b',.8);}
- if(id==='beaver_artisan')rect(s,-1.5,-19,3,3,'#fffcee',1);
- if(id==='badger_artisan'){s.line(-3,-30,-3,-17,'#4f554d',2);s.line(3,-30,3,-17,'#4f554d',2);}
- if(working){s.line(8,-11,17,-5,'#a1b19c',3);rect(s,13,-5,9,7,id==='rabbit_gardener'?'#8dbbb7':'#c6a875',2);}
+ if(visualId==='hamster_reaper'){s.ellipse(-6,-21,2.6,2,'#efb9a4');s.ellipse(6,-21,2.6,2,'#efb9a4');}
+ if(visualId==='cat_keeper')for(let d of [-1,1]){s.line(d*3,-20,d*10,-22,'#8f877b',.8);s.line(d*3,-19,d*10,-18,'#8f877b',.8);}
+ if(visualId==='beaver_artisan')rect(s,-1.5,-19,3,3,'#fffcee',1);
+ if(visualId==='badger_artisan'){s.line(-3,-30,-3,-17,'#4f554d',2);s.line(3,-30,3,-17,'#4f554d',2);}
+ if(working){c.save();c.translate(0,s.motion?Math.sin(s.time*2.6)*1.8:0);s.line(8,-11,17,-5,'#a1b19c',3);rect(s,13,-5,9,7,id==='rabbit_gardener'?'#8dbbb7':'#c6a875',2);c.restore();}
  c.restore();
 }
 // A rectangle of the land seen from above: used for helper zones and for the bulk-action area preview.
@@ -87,19 +88,84 @@ function zoneBox(s,z,fill,stroke,dashed){
  c.closePath();c.fillStyle=fill;c.fill();c.lineWidth=2.2;c.strokeStyle=stroke;if(dashed)c.setLineDash([9,6]);c.stroke();c.restore();
 }
 const ZONE_COLORS=[['#7fb59a22','#4f8f77'],['#d8a35a22','#b9803a'],['#8aa6d822','#5f7fb8'],['#c88ab822','#a2628f'],['#a9bf6a22','#7f9a3f'],['#d98a7a22','#b86556']];
-// Helpers wander inside their zone (the whole land when there is none). Position is a pure function of time,
-// so the scene holds no state and a calm-mode (frozen time) figure simply stands still.
-function walk(s,i,z){
- const t=s.time*.25+i*1.9,fx=.5+.42*Math.sin(t)*Math.cos(t*.37+i),fy=.5+.42*Math.sin(t*.71+i*2.1);
- return P(z.x+z.w*fx,z.y+z.h*fy);
+// A crew member works from clear ground beside its task, never from the bed itself. Layout uses the farm
+// snapshot only; animation is a small movement within that reserved space, not a route through buildings.
+const intersects=(a,b)=>a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;
+function crewBox(p,machine,pad=0){return {x0:p.x-(machine?30:18)-pad,x1:p.x+(machine?40:29)+pad,y0:p.y-(machine?49:48)-pad,y1:p.y+11+pad};}
+function taskBox(o){
+ const p=P(o.x+(o.w||1)/2,o.y+(o.h||1)/2),half=((o.w||1)+(o.h||1))*18;
+ if(o.type==='road')return {x0:p.x-36,x1:p.x+36,y0:p.y-18,y1:p.y+18};
+ if(o.type==='plot')return {x0:p.x-36,x1:p.x+36,y0:p.y-52,y1:p.y+20};
+ if(o.type==='tree')return {x0:p.x-64,x1:p.x+64,y0:p.y-145,y1:p.y+26};
+ return {x0:p.x-Math.max(half,46),x1:p.x+Math.max(half,46),y0:p.y-(o.type==='mill'?150:100),y1:p.y+half/2+14};
+}
+function crewMembers(farm,catalog,now){
+ return ['equipment','helpers'].flatMap(kind=>Object.entries(farm[kind]||{}).sort(([a],[b])=>a.localeCompare(b)).map(([id,v])=>({
+  id,machine:kind==='equipment',role:catalog?.[kind]?.[id]?.role,zone:v.zone,
+  active:!!(v.shift?.status==='working'&&v.shift.until>now||v.active||(kind==='equipment'&&v.last_run_at&&now-v.last_run_at<12))
+ })));
+}
+function crewTargets(farm,member,workshops){
+ const z=member.zone,inZone=o=>!z||(o.x>=z.x&&o.y>=z.y&&o.x<z.x+z.w&&o.y<z.y+z.h);
+ return (farm.objects||[]).filter(o=>inZone(o)&&(
+  ['sow','reap','water','harvest','roots'].includes(member.role)?o.type==='plot'||(o.type==='tree'&&['water','harvest'].includes(member.role)):
+  member.role==='animals'?!!o.animal:
+  ['production','craft'].includes(member.role)?workshops.has(o.type):false));
+}
+// Exported for geometric tests. No saved state, timers, rewards or random choices are changed here.
+export function crewLayout(farm,catalog,now){
+ const size=farm.size||8,objects=farm.objects||[],members=crewMembers(farm,catalog,now),reserved=[],out=[];
+ const occupied=new Set();for(const o of objects)for(let x=o.x;x<o.x+(o.w||1);x++)for(let y=o.y;y<o.y+(o.h||1);y++)occupied.add(`${x},${y}`);
+ const blockers=objects.map(taskBox),workshops=new Set(Object.values(catalog?.recipes||{}).map(r=>r.building));
+ for(const patch of farm.meadow_view?.patches||[]){const [x,y]=patch.cell.split(',').map(Number);occupied.add(patch.cell);const p=P(x+.5,y+.5);blockers.push({x0:p.x-19,x1:p.x+19,y0:p.y-18,y1:p.y+8});}
+ const cells=[];for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(!occupied.has(`${x},${y}`))cells.push({x:x+.5,y:y+.5,p:P(x+.5,y+.5)});
+ const barn=objects.find(o=>o.type==='barn')||objects.find(o=>o.type==='house'),rest=barn?{x:barn.x+(barn.w||1)/2,y:barn.y+(barn.h||1)/2}:{x:.5,y:size-.5};
+ for(const member of members){
+  const targets=member.active?crewTargets(farm,member,workshops):[],active=member.active&&targets.length>0;
+  let best=null,bestScore=Infinity,targetId=null;
+  for(const cell of cells){
+   const box=crewBox(cell.p,member.machine,5);
+   if(blockers.some(b=>intersects(box,b))||reserved.some(b=>intersects(box,b)))continue;
+   let distance=Infinity,nearest=null;
+   for(const target of active?targets:[rest]){const x=target.x+(target.w||0)/2,y=target.y+(target.h||0)/2,d=(cell.x-x)**2+(cell.y-y)**2;if(d<distance){distance=d;nearest=target.id||null;}}
+   // Large vehicles prefer the outer service area; helpers rest close to the barn.
+   const edge=Math.min(cell.x,cell.y,size-cell.x,size-cell.y),score=distance+(member.machine?edge*edge*2:0);
+   if(score<bestScore){best=cell;bestScore=score;targetId=nearest;}
+  }
+  // With no clear space the crew stays inside, instead of covering crops, doors or another crew member.
+  if(!best)continue;
+  reserved.push(crewBox(best.p,member.machine,5));
+  out.push({...member,active,x:best.x,y:best.y,targetId});
+ }
+ return out;
+}
+function crewSprites(s,drawing=false){
+ if(!s.farm)return [];
+ const old=s.crewLayoutCache,sameSnapshot=old&&old.farm===s.farm&&old.token===s.farmToken&&old.catalog===s.catalog;
+ // Calm Scene.draw keeps time at zero. Refresh its status on each draw, while taps use the last drawn layout.
+ // A shift ending between drawing and tapping must not move the vehicle's hit target in the same frame.
+ if(!sameSnapshot||old.frame!==s.time||drawing&&!s.motion){
+  const now=s.now(),key=JSON.stringify(crewMembers(s.farm,s.catalog,now));
+  s.crewLayoutCache={farm:s.farm,token:s.farmToken,key,catalog:s.catalog,frame:s.time,
+   layout:sameSnapshot&&old.key===key?old.layout:crewLayout(s.farm,s.catalog,now)};
+ }
+ return s.crewLayoutCache.layout.map((member,i)=>{
+  const q=P(member.x,member.y);
+  if(member.machine&&member.active&&s.motion){const step=Math.sin((s.time||0)*1.2+i)*2;q.x+=step;q.y+=step*.5;}
+  const cell=isoInverse(q.x,q.y);
+  return {...cell,w:0,h:0,machine:member.machine?member.id:undefined,crewId:member.id,targetId:member.targetId,wx:q.x,wy:q.y,
+   draw:()=>member.machine?vehicle(s,q.x,q.y,member.id,member.active):helper(s,q.x,q.y,member.id,member.active)};
+ });
 }
 // Off-screen figures are skipped: sprites reach ~80px sideways, ~90px up and ~30px down from their anchor.
 const seen=(s,q)=>!s.view||(q.x+80>=s.view.x0&&q.x-80<=s.view.x1&&q.y+30>=s.view.y0&&q.y-90<=s.view.y1);
 // After dusk the animals go home: they walk to their house door and disappear inside, and come out again after dawn.
 // Hysteresis keeps them from popping in and out while the light fades.
 function nightState(s){
- if(!s.lighting)return !!s.nightFlag;
- const d=s.lighting.darkness||0;
+ // Contrast dims only the painted night; the animals follow the original day/night cycle.
+ const lighting=s.lightingRaw||s.lighting;
+ if(!lighting)return !!s.nightFlag;
+ const d=lighting.darkness||0;
  // The first reading at night means the game was opened after dark: everybody is already indoors (nightSnap), nobody runs home.
  if(s.nightFlag===undefined){s.nightFlag=d>.5;if(s.nightFlag)s.nightSnap=true}else if(!s.nightFlag&&d>.62)s.nightFlag=true;else if(s.nightFlag&&d<.4)s.nightFlag=false;
  return s.nightFlag;
@@ -371,20 +437,8 @@ export function drawTeamZones(s){
 export function teamSprites(s){
  const out=[];
  if(!s.farm)return out;
- const size=s.farm.size||8,whole={x:0,y:0,w:size,h:size};
  const add=(q,draw,machine)=>{const c=isoInverse(q.x,q.y);out.push({x:c.x,y:c.y,w:0,h:0,draw,machine,wx:q.x,wy:q.y});};
- Object.entries(s.farm.equipment||{}).forEach(([id,v],i)=>{
-  const active=v.shift?.status==='working'&&v.shift.until>s.now()||v.active||(v.last_run_at&&s.now()-v.last_run_at<12);
-  let q=active?P(2.5+Math.sin(s.time*.35+i)*1.3,6.7):P(.5+i*1.3,6.5);
-  if(id==='robot'&&active&&v.shift?.status==='working')q=walk(s,i+7,v.zone||whole);
-  if(seen(s,q))add(q,()=>vehicle(s,q.x,q.y,id,active),id);
- });
- Object.entries(s.farm.helpers||{}).forEach(([id,v],i)=>{
-  const active=v.shift?.status==='working'&&v.shift.until>s.now()||v.active;
-  const q=active?(v.shift?v.zone||whole:null):null;
-  const pos=q?walk(s,i,q):active?P(3.4+(i%3)*1.4,3.1+Math.sin(s.time*.4+i)*.3):P(1+i%12,7.2+Math.floor(i/12));
-  if(seen(s,pos))add(pos,()=>helper(s,pos.x,pos.y,id,active));
- });
+ for(const sprite of crewSprites(s,true))if(seen(s,{x:sprite.wx,y:sprite.wy}))out.push(sprite);
  if(s.farm.pranks?.some(p=>p.until>s.now())){const p=P(2.3,3.6+Math.sin(s.time*.35)*.7);if(seen(s,p))add(p,()=>s.goose(p.x,p.y,s.time));}
  const now=performance.now()/1000,night=nightState(s),snap=!!s.nightSnap;s.nightSnap=false;
  for(const g of s.walkingGeese||[]){
@@ -480,7 +534,7 @@ function lateDecor(s,o,p){
 
 // Tap target of a parked or working machine (world pixels, the sprite is scaled by .88): the id of the machine under the point.
 export function machineAt(s,wx,wy){
- const list=teamSprites(s).filter(m=>m.machine);
+ const list=crewSprites(s).filter(m=>m.machine&&seen(s,{x:m.wx,y:m.wy}));
  for(let i=list.length-1;i>=0;i--){const m=list[i];if(wx>m.wx-26&&wx<m.wx+38&&wy>m.wy-46&&wy<m.wy+10)return m.machine;}
  return null;
 }

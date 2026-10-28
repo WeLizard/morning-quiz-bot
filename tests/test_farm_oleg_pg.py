@@ -2,12 +2,12 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from copy import deepcopy
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
+from qw_farm import oleg
 from qw_farm.catalog import LEVELS
 from qw_farm.domain import new_farm
 from qw_farm.expansion import upgrade_state
@@ -60,7 +60,7 @@ def test_run_progress_and_daily_reward_persist_exactly_once(pg_url):
                 started = await service.command('oleg-start-001', 'oleg_start', {})
                 run_id = started['oleg_game']['active']['run_id']
                 farm = await service.u.by_account(account)
-                sequences = deepcopy(farm['oleg_game']['run']['sequences'])
+                sequences = [oleg.expected_notes(farm['oleg_game']['run'], i) for i in range(oleg.ROUNDS)]
                 notes = None
                 for number, sequence in enumerate(sequences):
                     notes = {'run_id': run_id, 'round': number, 'notes': sequence}
@@ -83,7 +83,7 @@ def test_run_progress_and_daily_reward_persist_exactly_once(pg_url):
                 service = FarmService(unit, Principal(str(account), 'Игрок'), clock=lambda: now[0])
                 again = await service.command('oleg-start-002', 'oleg_start', {})
                 second_run = again['oleg_game']['active']['run_id']
-                sequences = deepcopy((await service.u.by_account(account))['oleg_game']['run']['sequences'])
+                sequences = [oleg.expected_notes((await service.u.by_account(account))['oleg_game']['run'], i) for i in range(oleg.ROUNDS)]
                 for number, sequence in enumerate(sequences):
                     result = await service.command(f'oleg-again-{number:02}', 'oleg_answer',
                                                    {'run_id': second_run, 'round': number, 'notes': sequence})

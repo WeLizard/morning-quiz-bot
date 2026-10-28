@@ -42,9 +42,13 @@ import heapq
 import math
 from .catalog import (CROPS, ITEMS, level, FIELD_STEPS, FIELD_MACHINES, FIELD_OPS, FIELD_FUEL, FIELD_YIELD_MULT, FIELD_SEED_MULT,
                       FIELD_XP_MULT, FIELD_MIN_GROW, FIELD_RUN_TTL, FIELD_STEP_CS, FIELD_MAX_PATH, FIELD_AUTO_S, FIELD_W,
-                      FIELD_MIN_LEVEL, FIELD_UPKEEP, FIELD_FULL_K, FIELD_ZERO_K, Q_AUTO, Q_BASE, Q_SPAN, HOPPER, VERSION)
+                      FIELD_MIN_LEVEL, FIELD_UPKEEP, FIELD_FULL_K, FIELD_ZERO_K, Q_AUTO, Q_BASE, Q_SPAN, Q_AUTO_FULL, Q_BASE_FULL,
+                      Q_SPAN_FULL, HOPPER, FIELD_UNLOAD_CENTER, FIELD_UNLOAD_HALF, FIELD_RULES, FIELD_TANK, FIELD_TANK_CHUNKS,
+                      FIELD_HIT_DAMAGE, FIELD_HIT_REPAIR, FIELD_COND_PENALTY, FIELD_SPRAY_BONUS_BASE, FIELD_SPRAY_BONUS_SPAN,
+                      FIELD_SPRAY_BONUS_MAX, VERSION)
 from .domain import need, named, find, pay, inventory, event, duration
 from . import progression, market
+from .upkeep_config import settings_for
 
 SCHEMAS = {
     'buy_field': {'step'},
@@ -54,8 +58,9 @@ SCHEMAS = {
     'field_finish': {'field', 'run', 'path'},
 }
 DIRS = {'U': (0, -1), 'D': (0, 1), 'L': (-1, 0), 'R': (1, 0)}
+BUMP_DIRS = {'u': (0, -1), 'd': (0, 1), 'l': (-1, 0), 'r': (1, 0)}   # a damaging bump against a rock/wall (rules=3)
 WEED_WEIGHT = 3
-ROCKS_PER_HA = {'cultivate': 3, 'sow': 2, 'harvest': 2}
+ROCKS_PER_HA = {'cultivate': 3, 'sow': 2, 'harvest': 2, 'spray': 2}
 WEEDS_PER_HA = 10
 
 
@@ -72,6 +77,12 @@ def _free(x, y, W, width, rocks):
 def _bar(x, y, W, width):
     base = y * W + x
     return [base + i for i in range(width)]
+
+
+def _near_unload(x, width, orient='h'):
+    """True when the machine centre stands at the fixed grain truck (hundredths of a cell)."""
+    center2 = 2 * x + (width if orient == 'h' else 1)
+    return abs(center2 * 50 - FIELD_UNLOAD_CENTER) <= FIELD_UNLOAD_HALF
 
 
 def _step(x, y, ch, W, H, width, rocks):
@@ -123,6 +134,54 @@ def _walk(W, H, width, rocks, path, events=''):
         x, y = nxt
         t += 1
         yield ch, x, y, t
+
+
+def _oriented_bar(x, y, W, width, orient):
+    base = y * W + x
+    if orient == 'h':
+        return [base + i for i in range(width)]
+    return [base + i * W for i in range(width)]
+
+
+def _orient_ok(x, y, W, H, width, rocks, orient):
+    if orient == 'h':
+        if x < 0 or x + width > W or y < 0 or y >= H:
+            return False
+    elif x < 0 or x >= W or y < 0 or y + width > H:
+        return False
+    return not any(c in rocks for c in _oriented_bar(x, y, W, width, orient))
+
+
+def _walk_v2(W, H, width, rocks, path, events=''):
+    """Rules=2 walk: T toggles the implement in place and does not consume a cell visit."""
+    x = y = t = 0
+    orient = 'h'
+    yield '', x, y, orient, t
+    for ch in path:
+        if ch in events:
+            yield ch, x, y, orient, t
+            continue
+        if ch == 'T':
+            if width < 2:
+                yield None
+                return
+            no = 'v' if orient == 'h' else 'h'
+            if not _orient_ok(x, y, W, H, width, rocks, no):
+                yield None
+                return
+            orient = no
+            continue
+        d = DIRS.get(ch)
+        if d is None:
+            yield None
+            return
+        nx, ny = x + d[0], y + d[1]
+        if not _orient_ok(nx, ny, W, H, width, rocks, orient):
+            yield None
+            return
+        x, y = nx, ny
+        t += 1
+        yield ch, x, y, orient, t
 
 
 def _grade(cov, ov):
@@ -179,7 +238,7 @@ def simulate_harvest(field, run, path):
             return None
         ch, x, y, t = item
         if ch == 'X':
-            if y != 0:
+            if y != 0 or (run.get('unload_zone') and not _near_unload(x, width)):
                 return None
             load = 0
             continue
@@ -194,41 +253,360 @@ def simulate_harvest(field, run, path):
     return _grade(kept * 1000 // len(cells), again * 1000 // len(last))
 
 
+def _rules2_cells(W, H, width, rocks):
+    return _cells_of(reachable_anchors(W, H, width, rocks), W, width)
+
+
+def _rules2_sowable(W, H, width, rocks):
+    lanes = [a for a in reachable_anchors(W, H, width, rocks) if a[0] % (width + 1) == 0]
+    return _cells_of(lanes, W, width)
+
+
+def simulate_cultivate_v2(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    weeds = frozenset(run.get('weeds') or ())
+    cells = _rules2_cells(W, H, width, rocks)
+    total = sum(WEED_WEIGHT if c in weeds else 1 for c in cells)
+    last, got, again = {}, 0, 0
+    for item in _walk_v2(W, H, width, rocks, path):
+        if item is None:
+            return None
+        _, x, y, orient, t = item
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in cells:
+                continue
+            if c not in last:
+                got += WEED_WEIGHT if c in weeds else 1
+            elif last[c] < t - 1:
+                again += 1
+            last[c] = t
+    return _grade(got * 1000 // total, again * 1000 // max(1, len(last)))
+
+
+def simulate_sow_v2(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    sowable = _rules2_sowable(W, H, width, rocks)
+    sown, doubles = set(), 0
+    for item in _walk_v2(W, H, width, rocks, path):
+        if item is None:
+            return None
+        _, x, y, orient, _ = item
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in sowable:
+                continue
+            if c in sown:
+                doubles += 1
+            else:
+                sown.add(c)
+    rec, dbl = len(sown) * 1000 // len(sowable), doubles * 1000 // len(sowable)
+    return max(0, min(1000, max(0, rec - 600) * 1000 // 380) - 2 * max(0, dbl - 30))
+
+
+def simulate_harvest_v2(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    cells = _rules2_cells(W, H, width, rocks)
+    cap = HOPPER * width * (H // W)
+    last, load, kept, again = {}, 0, 0, 0
+    for item in _walk_v2(W, H, width, rocks, path, 'X'):
+        if item is None:
+            return None
+        ch, x, y, orient, t = item
+        if ch == 'X':
+            if y != 0 or (run.get('unload_zone') and not _near_unload(x, width, orient)):
+                return None
+            load = 0
+            continue
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in cells:
+                continue
+            if c not in last:
+                if load < cap:
+                    load += 1
+                    kept += 1
+            elif last[c] < t - 1:
+                again += 1
+            last[c] = t
+    return _grade(kept * 1000 // max(1, len(cells)), again * 1000 // max(1, len(last)))
+
+
+def _rules3_cells(W, H, width, rocks):
+    """Cells reachable with both implement orientations (T included): the turn opens pockets that a horizontal bar cannot enter."""
+    seen = {(0, 0, 'h')}
+    todo = [(0, 0, 'h')]
+    cells = set()
+    while todo:
+        x, y, orient = todo.pop()
+        cells.update(_oriented_bar(x, y, W, width, orient))
+        for ch in 'UDLR':
+            dx, dy = DIRS[ch]
+            nx, ny = x + dx, y + dy
+            if not _orient_ok(nx, ny, W, H, width, rocks, orient):
+                continue
+            state = (nx, ny, orient)
+            if state not in seen:
+                seen.add(state)
+                todo.append(state)
+        other = 'v' if orient == 'h' else 'h'
+        if _orient_ok(x, y, W, H, width, rocks, other) and (x, y, other) not in seen:
+            seen.add((x, y, other))
+            todo.append((x, y, other))
+    cells.difference_update(rocks)
+    return cells
+
+
+def _walk_v3(W, H, width, rocks, path, events=''):
+    """Rules=3 walk: T toggles the implement, a lowercase direction is a damaging bump against a rock/wall, events (X) do not move.
+    Every item is ``(char, x, y, orient, t, condition)``; ``None`` marks the first illegal character."""
+    x = y = t = 0
+    orient = 'h'
+    condition = 100
+    yield '', x, y, orient, t, condition
+    for ch in path:
+        if ch in events:
+            yield ch, x, y, orient, t, condition
+            continue
+        if ch == 'T':
+            if width < 2:
+                yield None
+                return
+            other = 'v' if orient == 'h' else 'h'
+            if not _orient_ok(x, y, W, H, width, rocks, other):
+                yield None
+                return
+            orient = other
+            continue
+        if ch in BUMP_DIRS:
+            dx, dy = BUMP_DIRS[ch]
+            if condition <= 0 or _orient_ok(x + dx, y + dy, W, H, width, rocks, orient):
+                yield None                          # a bump is legal only where the move is really blocked
+                return
+            condition = max(0, condition - FIELD_HIT_DAMAGE)
+            yield ch, x, y, orient, t, condition
+            continue
+        d = DIRS.get(ch)
+        if d is None:
+            yield None
+            return
+        nx, ny = x + d[0], y + d[1]
+        if not _orient_ok(nx, ny, W, H, width, rocks, orient):
+            yield None
+            return
+        x, y = nx, ny
+        t += 1
+        yield ch, x, y, orient, t, condition
+
+
+def _v3_result(score, condition, hits, load=None):
+    result = dict(score=score, condition=condition, hits=hits, repair=hits * FIELD_HIT_REPAIR)
+    if load is not None:
+        result['load'] = load
+    return result
+
+
+def simulate_cultivate_v3(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    weeds = frozenset(run.get('weeds') or ())
+    cells = _rules3_cells(W, H, width, rocks)
+    total = sum(WEED_WEIGHT if c in weeds else 1 for c in cells)
+    last, got, again, condition, hits = {}, 0, 0, 100, 0
+    for item in _walk_v3(W, H, width, rocks, path):
+        if item is None:
+            return None
+        ch, x, y, orient, t, condition = item
+        if ch in BUMP_DIRS:
+            hits += 1
+            continue
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in cells:
+                continue
+            if c not in last:
+                got += WEED_WEIGHT if c in weeds else 1
+            elif last[c] < t - 1:
+                again += 1
+            last[c] = t
+    score = _grade(got * 1000 // total, again * 1000 // max(1, len(last)))
+    return _v3_result(score, condition, hits)
+
+
+def simulate_sow_v3(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    sowable = _rules2_sowable(W, H, width, rocks)
+    sown, doubles, condition, hits = set(), 0, 100, 0
+    for item in _walk_v3(W, H, width, rocks, path):
+        if item is None:
+            return None
+        ch, x, y, orient, _, condition = item
+        if ch in BUMP_DIRS:
+            hits += 1
+            continue
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in sowable:
+                continue
+            if c in sown:
+                doubles += 1
+            else:
+                sown.add(c)
+    rec, dbl = len(sown) * 1000 // len(sowable), doubles * 1000 // len(sowable)
+    score = max(0, min(1000, max(0, rec - 600) * 1000 // 380) - 2 * max(0, dbl - 30))
+    return _v3_result(score, condition, hits)
+
+
+def simulate_harvest_v3(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    cells = _rules3_cells(W, H, width, rocks)
+    cap = HOPPER * width * (H // W)
+    chunk = max(1, math.ceil(cap / FIELD_TANK_CHUNKS))
+    last, load, kept, again, condition, hits = {}, 0, 0, 0, 100, 0
+    for item in _walk_v3(W, H, width, rocks, path, 'X'):
+        if item is None:
+            return None
+        ch, x, y, orient, t, condition = item
+        if ch == 'X':
+            if y != 0 or (run.get('unload_zone') and not _near_unload(x, width, orient)):
+                return None
+            load = max(0, load - chunk)
+            continue
+        if ch in BUMP_DIRS:
+            hits += 1
+            continue
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in cells:
+                continue
+            if c not in last:
+                if load < cap:
+                    load += 1
+                    kept += 1
+            elif last[c] < t - 1:
+                again += 1
+            last[c] = t
+    score = _grade(kept * 1000 // max(1, len(cells)), again * 1000 // max(1, len(last)))
+    return _v3_result(score, condition, hits, load=load)
+
+
+def simulate_spray_v3(field, run, path):
+    W, H, width, rocks = _geometry(field, run)
+    cells = _rules3_cells(W, H, width, rocks)
+    tank = int(run.get('tank') or FIELD_TANK)
+    chunk = max(1, tank // FIELD_TANK_CHUNKS)
+    wind = -1 if int(run.get('wind') or 0) < 0 else 1 if int(run.get('wind') or 0) > 0 else 0
+    load, sprayed, doubles, condition, hits = tank, set(), 0, 100, 0
+    for item in _walk_v3(W, H, width, rocks, path, 'X'):
+        if item is None:
+            return None
+        ch, x, y, orient, _, condition = item
+        if ch == 'X':
+            if y != 0 or (run.get('unload_zone') and not _near_unload(x, width, orient)):
+                return None
+            load = min(tank, load + chunk)
+            continue
+        if ch in BUMP_DIRS:
+            hits += 1
+            continue
+        for c in _oriented_bar(x, y, W, width, orient):
+            if c not in cells:
+                continue
+            if c in sprayed:
+                doubles += 1
+                if load > 0:
+                    load -= 1
+                continue
+            if load < 2:
+                continue
+            sprayed.add(c)
+            load -= 2
+            if wind and load > 0:
+                cx = c % W
+                wx = cx + wind
+                if 0 <= wx < W:
+                    wk = c - cx + wx
+                    if wk in cells and wk not in sprayed and load > 0:
+                        sprayed.add(wk)
+                        load -= 1
+    rec = len(sprayed) * 1000 // max(1, len(cells))
+    dbl = doubles * 1000 // max(1, len(cells))
+    score = _grade(rec, dbl)
+    return _v3_result(score, condition, hits, load=load)
+
+
 SIMULATE = {'cultivate': simulate_cultivate, 'sow': simulate_sow, 'harvest': simulate_harvest}
+SIMULATE_V2 = {'cultivate': simulate_cultivate_v2, 'sow': simulate_sow_v2, 'harvest': simulate_harvest_v2}
+SIMULATE_V3 = {'cultivate': simulate_cultivate_v3, 'sow': simulate_sow_v3, 'harvest': simulate_harvest_v3, 'spray': simulate_spray_v3}
+
+
+def simulate_full(field, run, path):
+    """Full result of a path: ``dict(score, condition, hits, repair)`` or None; old and rules=2 runs report a clean machine."""
+    rules = run.get('rules')
+    if rules is not None and rules >= FIELD_RULES:
+        return SIMULATE_V3[run['op']](field, run, path)
+    table = SIMULATE_V2 if rules == 2 else SIMULATE
+    score = table[run['op']](field, run, path)
+    return None if score is None else _v3_result(score, 100, 0)
 
 
 def simulate(field, run, path):
-    return SIMULATE[run['op']](field, run, path)
+    result = simulate_full(field, run, path)
+    return None if result is None else result['score']
 
 
 def quality(score):
-    """Manual quality in permille from a score in permille."""
+    """Manual quality in permille from a score in permille (old economy, open runs)."""
     return Q_BASE + Q_SPAN * score // 1000
+
+
+def quality_full(score):
+    """Manual quality of the full test economy: 0.85 at a bad run, 1.25 at a perfect one."""
+    return Q_BASE_FULL + Q_SPAN_FULL * score // 1000
 
 
 QRULE_TIMED = 2                    # run['qrule']: the bonus over the autopilot melts with the time of the run (runs without it: plain quality)
 
 
-def timed_quality(score, elapsed, ha, width):
-    """Manual quality when the run took ``elapsed`` seconds: the bonus over the autopilot is whole within FIELD_FULL_K % of the
-    autopilot time A (in real seconds, no world speed), falls linearly to 0 at FIELD_ZERO_K %; a worse-than-autopilot drive keeps its quality."""
-    q = quality(score)
-    bonus = q - Q_AUTO
+def _timed(score, elapsed, ha, width, base, span, q_auto):
+    q = base + span * score // 1000
+    bonus = q - q_auto
     if bonus <= 0:
         return q
     a = auto_seconds(ha, width)
     full, zero = a * FIELD_FULL_K // 100, a * FIELD_ZERO_K // 100
     keep = 1000 if elapsed <= full else 0 if elapsed >= zero else (zero - elapsed) * 1000 // (zero - full)
-    return Q_AUTO + bonus * keep // 1000
+    return q_auto + bonus * keep // 1000
+
+
+def timed_quality(score, elapsed, ha, width):
+    """Manual quality when the run took ``elapsed`` seconds: the bonus over the autopilot is whole within FIELD_FULL_K % of the
+    autopilot time A (in real seconds, no world speed), falls linearly to 0 at FIELD_ZERO_K %; a worse-than-autopilot drive keeps its quality."""
+    return _timed(score, elapsed, ha, width, Q_BASE, Q_SPAN, Q_AUTO)
+
+
+def timed_quality_full(score, elapsed, ha, width):
+    """The same time rule for the full economy: the bonus over the 900 autopilot melts with time."""
+    return _timed(score, elapsed, ha, width, Q_BASE_FULL, Q_SPAN_FULL, Q_AUTO_FULL)
+
+
+def damage_penalty(condition):
+    return max(0, 100 - condition) * FIELD_COND_PENALTY
+
+
+def condition_quality(q, condition):
+    """Full-economy quality after machine damage: every missing condition point costs 4 permille, clamped to 0.85 .. 1.25."""
+    return max(Q_BASE_FULL, min(Q_BASE_FULL + Q_SPAN_FULL, q - damage_penalty(condition)))
 
 
 def growth_permille(q_cult):
-    """Growth-time multiplier (permille) after cultivation of quality ``q_cult``: autopilot 950 -> 1000, best 1100 -> 850."""
+    """Growth-time multiplier (permille) after cultivation of quality ``q_cult``: 950 -> 1000, best 1250 -> 700."""
     return 1950 - q_cult
 
 
-def yield_qty(base, q_sow, q_harvest):
-    return max(1, base * q_sow * q_harvest // 10 ** 6)
+def spray_bonus_permille(q_spray):
+    """Yield multiplier of a sprayed crop: 1.00 at 850 quality, up to 1.20 at 1250 (the approved test economy)."""
+    if not q_spray:
+        return 1000
+    bonus = max(0, q_spray - FIELD_SPRAY_BONUS_BASE) * 1000 // FIELD_SPRAY_BONUS_SPAN
+    return min(FIELD_SPRAY_BONUS_MAX, 1000 + bonus)
+
+
+def yield_qty(base, q_sow, q_harvest, q_spray=1000):
+    return max(1, base * q_sow * q_harvest * q_spray // 10 ** 9)
 
 
 def auto_seconds(ha, width, speed=1):
@@ -308,8 +686,8 @@ def reference_path(field, run):
         nonlocal load
         if op != 'harvest' or load == 0 or not (force or load + lane > cap):
             return True
-        if pos[1] != 0:
-            home = route(lambda a: a[1] == 0)
+        if pos[1] != 0 or (run.get('unload_zone') and not _near_unload(pos[0], width)):
+            home = route(lambda a: a[1] == 0 and (not run.get('unload_zone') or _near_unload(a[0], width)))
             if home is None:
                 return False
             go(home)
@@ -394,7 +772,7 @@ def new_field(spec):
 STATE_TEXT = {'wild': 'Дикое поле', 'ready': 'Подготовлено', 'growing': 'Растёт', 'ripe': 'Созрело'}
 
 
-def apply_field(farm, kind, data, now, command_id, speed):
+def apply_field(farm, kind, data, now, command_id, speed, upkeep_config=None):
     lv = level(farm['xp'])
     if kind == 'buy_field':
         step = data['step']
@@ -404,7 +782,8 @@ def apply_field(farm, kind, data, now, command_id, speed):
         need(all(f['step'] != step for f in fields_of(farm)), 'already_owned', 'Это поле уже куплено.')
         pay(farm, spec['cost'])
         farm.setdefault('fields', []).append(new_field(spec))
-        return f'Поле {spec["ha"]} га куплено. Содержание — {FIELD_UPKEEP * spec["ha"]} монет в сутки.'
+        per_hectare = settings_for(upkeep_config)['field_per_hectare']
+        return f'Поле {spec["ha"]} га куплено. Содержание — {per_hectare * spec["ha"]} монет в сутки.'
     if kind in {'buy_machine', 'upgrade_machine'}:
         spec = named(FIELD_MACHINES, data['machine'])
         owned = farm.setdefault('field_machines', {})
@@ -443,13 +822,17 @@ def _start(farm, data, now, speed, lv):
         crop_id, seeds = crop['id'], crop['cost'] * FIELD_SEED_MULT * f['ha']
     else:
         need(data['crop'] == '', 'invalid_command', 'Культура указывается только при посеве.', 422)
+    if op == 'spray':
+        need(isinstance(f.get('crop'), dict) and not f['crop'].get('q_spray'), 'already_sprayed', 'Это поле уже обработано.')
     fuel = FIELD_FUEL * f['ha']
     need(farm['coins'] >= fuel + seeds, 'insufficient_coins', 'Не хватает монет на топливо и семена.')
     pay(farm, fuel + seeds)
     seed = sha256(f'{farm["id"]}:{f["id"]}:{f["seq"]}:{op}'.encode()).hexdigest()[:24]
     rocks, weeds = make_obstacles(seed, op, f['w'], f['h'], f['ha'])
     f['run'] = dict(id=f'run_{f["seq"]}', op=op, status='open', crop=crop_id, started_at=now, expires_at=now + FIELD_RUN_TTL,
-                    width=machine['tier'], seed=seed, rocks=rocks, weeds=weeds, speed=speed, qrule=QRULE_TIMED)
+                    width=machine['tier'], seed=seed, rocks=rocks, weeds=weeds, speed=speed, qrule=QRULE_TIMED,
+                    rules=FIELD_RULES, unload_zone=(op in {'harvest', 'spray'}),
+                    tank=(FIELD_TANK * f['ha'] if op == 'spray' else 0), wind=(1 if int(seed[-1], 16) % 2 else -1) if op == 'spray' else 0)
     f['seq'] += 1
     f['revision'] += 1
     return f'{FIELD_MACHINES[spec["machine"]]["name"]} выехал в поле (ширина {machine["tier"]}).'
@@ -467,22 +850,44 @@ def _finish(farm, data, now, speed):
         run['done_at'] = now + auto_seconds(f['ha'], run['width'], run['speed'])
         f['revision'] += 1
         return 'Автопилот взялся за работу.'
-    need(isinstance(path, str) and len(path) <= max_path(f, run) and set(path) <= set('UDLRX' if run['op'] == 'harvest' else 'UDLR'),
+    rules = run.get('rules')
+    allowed = set('UDLRT') | ({'X'} if run['op'] in {'harvest', 'spray'} else set())
+    if rules is None or rules < 2:
+        allowed.discard('T')
+    if rules is not None and rules >= FIELD_RULES:
+        allowed.update(BUMP_DIRS)
+    need(isinstance(path, str) and len(path) <= max_path(f, run) and set(path) <= allowed,
          'bad_path', 'Недопустимый маршрут.', 422)
     need(100 * (now - run['started_at']) >= FIELD_STEP_CS * len(path), 'too_fast', 'Слишком быстро для такой работы.', 422)
-    score = simulate(f, run, path)
-    need(score is not None, 'bad_path', 'Маршрут нарушает правила поля.', 422)
-    q = timed_quality(score, now - run['started_at'], f['ha'], run['width']) if run.get('qrule') == QRULE_TIMED else quality(score)
+    result = simulate_full(f, run, path)
+    need(result is not None, 'bad_path', 'Маршрут нарушает правила поля.', 422)
+    if rules is not None and rules >= FIELD_RULES:
+        condition, hits = result['condition'], result['hits']
+        if condition <= 0:
+            q = Q_AUTO_FULL
+        else:
+            q = condition_quality(quality_full(result['score']), condition)
+            if run.get('qrule') == QRULE_TIMED:
+                a = auto_seconds(f['ha'], run['width'])
+                full, zero = a * FIELD_FULL_K // 100, a * FIELD_ZERO_K // 100
+                elapsed = now - run['started_at']
+                keep = 1000 if elapsed <= full else 0 if elapsed >= zero else (zero - elapsed) * 1000 // (zero - full)
+                bonus = q - Q_AUTO_FULL
+                if bonus > 0:
+                    q = Q_AUTO_FULL + bonus * keep // 1000
+        return complete(farm, f, run, q, now, True, condition=condition, hits=hits)
+    q = timed_quality(result['score'], now - run['started_at'], f['ha'], run['width']) if run.get('qrule') == QRULE_TIMED else quality(result['score'])
     return complete(farm, f, run, q, now, True)
 
 
-def complete(farm, f, run, q, at, owner):
+def complete(farm, f, run, q, at, owner, condition=100, hits=0):
     """Close the run of ``f`` with quality ``q`` (permille) at time ``at``; returns the notice."""
     op = run['op']
     f['run'] = None
     f['revision'] += 1
     name = FIELD_MACHINES[FIELD_OPS[op]['machine']]['name']
     pct = f'{q / 10:.1f}%'.replace('.', ',')
+    repair = hits * FIELD_HIT_REPAIR
     if op == 'cultivate':
         f['state'], f['q_cult'] = 'ready', q
         text = f'{name}: поле подготовлено, качество {pct}.'
@@ -493,16 +898,27 @@ def complete(farm, f, run, q, at, owner):
         f['crop'] = dict(id=crop['id'], planted_at=at, ready_at=at + duration(seconds, run['speed'], farm if owner else None),
                          base=crop['yield_qty'] * FIELD_YIELD_MULT * f['ha'], xp=crop['xp'], q_sow=q, version=VERSION)
         text = f'{name}: {crop["name"]} посеяна, качество {pct}.'
+    elif op == 'spray':
+        c = f['crop']
+        c['q_spray'], c['sprayed_at'] = q, at
+        bonus = spray_bonus_permille(q)
+        text = f'{name}: поле обработано, качество {pct}, прибавка к урожаю +{(bonus - 1000) / 10:.1f}%.'.replace('.', ',')
     else:
         c = f['crop']
-        qty = yield_qty(c['base'], c['q_sow'], q)
+        spray = spray_bonus_permille(c.get('q_spray'))
+        qty = yield_qty(c['base'], c['q_sow'], q, spray)
         inventory(farm, {c['id']: qty})
-        gain = max(1, c['xp'] * FIELD_XP_MULT * f['ha'] * c['q_sow'] * q // 10 ** 6)
+        gain = max(1, c['xp'] * FIELD_XP_MULT * f['ha'] * c['q_sow'] * q * spray // 10 ** 9)
         progression.grant_xp(farm, gain, 'field', at, owner)
         market.count(farm, 'h:' + c['id'], qty)
         f['state'], f['crop'], f['q_cult'] = 'wild', None, Q_AUTO
         text = f'{name}: убрано {ITEMS[c["id"]]["name"]} ×{qty}, качество {pct}.'
+    if repair:
+        farm['coins'] -= min(repair, farm['coins'])
+        text += f' Ремонт {repair} монет.'
     f['last_run_at'], f['last_q'] = at, q                  # the client reads the exact quality of the run it just finished
+    if run.get('rules') is not None and run['rules'] >= FIELD_RULES:
+        f['last_hits'], f['last_repair'], f['last_condition'] = hits, repair, condition
     event(farm, at, text, 'field')
     return text
 
@@ -511,10 +927,12 @@ def settle(farm, now):
     """Materialise finished autopilot runs, expired runs (closed as the autopilot, owner=False, at their deadline) and ripening."""
     for f in sorted(fields_of(farm), key=lambda x: x['id']):
         run = f.get('run')
+        full = run is not None and run.get('rules') is not None and run['rules'] >= FIELD_RULES
+        auto_q = Q_AUTO_FULL if full else Q_AUTO
         if run and run['status'] == 'auto' and run['done_at'] <= now:
-            complete(farm, f, run, Q_AUTO, run['done_at'], run.get('owner', False))
+            complete(farm, f, run, auto_q, run['done_at'], run.get('owner', False))
         elif run and run['status'] == 'open' and run['expires_at'] <= now:
-            complete(farm, f, run, Q_AUTO, run['expires_at'], False)
+            complete(farm, f, run, auto_q, run['expires_at'], False)
         if f['state'] == 'growing' and f['crop']['ready_at'] <= now:
             f['state'] = 'ripe'
             f['revision'] += 1
@@ -537,7 +955,13 @@ def validate(farm):
             need(run.get('op') in FIELD_OPS and run.get('status') in {'open', 'auto'} and type(run.get('width')) is int
                  and 1 <= run['width'] <= 3 and FIELD_OPS[run['op']]['src'] == f['state']
                  and isinstance(run.get('rocks'), list) and isinstance(run.get('weeds'), list)
+                 and run.get('rules') in (None, 2, 3)
+                 and (run.get('unload_zone') is None or type(run['unload_zone']) is bool)
+                 and (run['op'] != 'spray' or (type(run.get('tank')) is int and run['tank'] > 0 and run.get('wind') in (-1, 1)))
                  and (run['status'] != 'auto' or type(run.get('done_at')) is int), 'invalid_field', 'Некорректная работа на поле.', 500)
+        for key, lo, hi in (('last_hits', 0, 10 ** 6), ('last_repair', 0, 10 ** 9), ('last_condition', 0, 100)):
+            if key in f:
+                need(type(f[key]) is int and lo <= f[key] <= hi, 'invalid_field', 'Некорректное состояние машины.', 500)
     machines = farm.get('field_machines') or {}
     need(set(machines) <= set(FIELD_MACHINES) and all(isinstance(m, dict) and m.get('tier') in (1, 2, 3) for m in machines.values()),
          'invalid_field', 'Некорректный парк машин.', 500)

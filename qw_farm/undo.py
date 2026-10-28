@@ -49,10 +49,12 @@ def restore_gift(farm, gift, amount):
 
 
 def dig_up(farm, obj, now):
+    from . import fertilizer
     crop = obj.get('crop')
     need(obj['type'] == 'plot', 'wrong_object', 'Выкопать можно только посадку на грядке.')
     need(crop is not None, 'empty_plot', 'Грядка уже свободна.')
     need(crop['ready_at'] > now, 'ripe', 'Урожай уже созрел — лучше собрать его.')
+    fertilizer.give_back(farm, crop)   # an unripe fertilized bed returns the unit at any moment, even after the undo window
     if crop.get('seed'):     # a foreign crop: no coins were paid; inside the undo window the seed unit comes back, later it is lost
         back = now - crop['planted_at'] <= UNDO_WINDOW
         if back:

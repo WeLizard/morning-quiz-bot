@@ -40,6 +40,7 @@ def test_r1_upgrade_preserves_identity_economy_inventory_crops_and_jobs():
 def test_shift_is_bounded_by_time_and_action_quota():
     state = farm()
     state['inventory']['feed'] = 1000
+    next(o for o in state['objects'] if o['type'] == 'coop')['animal_repeat'] = True
     command(state, 'hire_helper', {'helper': 'shepherd'})
     command(state, 'start_shift', {'worker': 'shepherd', 'shift': 'night'})
 
@@ -57,6 +58,7 @@ def test_shift_is_bounded_by_time_and_action_quota():
 def interacting_workers():
     state = farm()
     state['inventory'] = {'wheat': 10}
+    next(o for o in state['objects'] if o['type'] == 'coop')['animal_repeat'] = True
     for helper in ('raccoon', 'shepherd'):
         command(state, 'hire_helper', {'helper': helper})
         command(state, 'start_shift', {'worker': helper, 'shift': 'night'})

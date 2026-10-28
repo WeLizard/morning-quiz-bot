@@ -13,6 +13,8 @@ from . import economy, invites, undo, minigames, oleg, progression, trip_games
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
 from . import wagers, friend_requests, construction
+from application import farm_village_games
+from .upkeep_config import effective_values as effective_upkeep_config
 
 # The client pulses every 10 s, the lease is 25 s: persistence every other pulse is enough to keep it live.
 PRESENCE_PERSIST_EVERY=15
@@ -33,6 +35,10 @@ class FarmService:
         need(isinstance(speed,(int,float)) and 1<=speed<=60,'invalid_speed','Недопустимый темп сервера.',500)
         self.speed=speed
 
+    async def _upkeep_config(self, at):
+        loader=getattr(self.u,'farm_upkeep_config',None)
+        return await loader(at) if loader else effective_upkeep_config(None,at)
+
     async def open(self, invite=None):
         await self.u.lock('account:'+self.p.account_id)
         farm=await self.u.by_account(self.p.account_id)
@@ -51,10 +57,11 @@ class FarmService:
         await wagers.expire(self.u,farm,self.p.account_id,self.clock())
         await wagers.claim_pending(self.u,farm,self.p.account_id,self.clock())
         requests=await friend_requests.projection(self.u,farm,self.clock())
-        projection=project(farm,farm,self.clock());projection['wager']=await wagers.projection(self.u,farm,self.p.account_id,self.clock())
+        now=self.clock();upkeep_config=await self._upkeep_config(now)
+        projection=project(farm,farm,now,upkeep_config);projection['wager']=await wagers.projection(self.u,farm,self.p.account_id,now)
         projection['friend_requests']=requests
         projection['village_build']=await construction.projection(self.u,farm,self.p.account_id,self.clock())
-        return dict(farm=projection,catalog=dict(public_catalog(),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
+        return dict(farm=projection,catalog=dict(public_catalog(upkeep_config),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
                     invites=await self._invites(farm),address_form=self.p.address_form,**self._account_prefs())
 
     async def share_link_status(self):
@@ -262,7 +269,7 @@ class FarmService:
             await self.u.save(farm)
             # Market housekeeping (a caravan arriving, the daily contracts rolling over) changes no balance:
             # it is saved, but only real work leaves a receipt in the economic ledger.
-            quiet={'market','events','revision','economy','village_errands','village_bonus'}
+            quiet={'market','events','revision','economy','village_errands','village_bonus','meadow'}
             if any(farm.get(k)!=baseline.get(k) for k in set(farm)|set(baseline) if k not in quiet):
                 # Stable per-version economic receipt for automatically completed work.
                 key='auto:'+str(farm['revision'])
@@ -286,12 +293,14 @@ class FarmService:
         if farm is not me:
             await self._settle(farm,await self.u.owner_account(farm['id']))
         requests=await friend_requests.projection(self.u,me,self.clock()) if farm is me else None
-        projected=project(farm,me,self.clock())
+        now=self.clock();upkeep_config=await self._upkeep_config(now)
+        projected=project(farm,me,now,upkeep_config)
         if farm is me:
             projected['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
             projected['friend_requests']=requests
             projected['village_build']=await construction.projection(self.u,me,self.p.account_id,self.clock())
-        return dict(farm=projected,speed=self.speed,village=await self._village(me) if farm is me else None,
+        return dict(farm=projected,catalog=dict(public_catalog(upkeep_config),undo=undo.public_rules(),trip_games=trip_games.public_rules()),
+                    speed=self.speed,village=await self._village(me) if farm is me else None,
                     invites=await self._invites(me) if farm is me else None,
                     address_form=self.p.address_form,**self._account_prefs())
 
@@ -378,7 +387,7 @@ class FarmService:
             target_id=str(UUID(str(target_id or me['id'])))
         except (ValueError,TypeError,AttributeError):
             raise FarmError('not_found','Ферма не найдена.',404)
-        if kind in {'wager_start','wager_choose','oleg_start','oleg_answer'}:
+        if kind in {'wager_start','wager_choose','oleg_start','oleg_answer'} | farm_village_games.COMMANDS:
             need(target_id==me['id'],'not_owner','Это не твоя ферма.',403)
         # UUID spelling must not create two different advisory locks for the
         # same row (uppercase/lowercase or alternate UUID notation).
@@ -386,7 +395,7 @@ class FarmService:
         cached=await self.u.receipt(self.p.account_id,key)
         if cached:
             need(cached['fingerprint']==fingerprint,'key_reused','Этот номер уже относится к другому действию.')
-            if kind in {'wager_start','wager_choose','oleg_start','oleg_answer'}:
+            if kind in {'wager_start','wager_choose','oleg_start','oleg_answer'} | farm_village_games.COMMANDS:
                 await self.u.lock('farm:'+me['id'])
                 me=await self.u.get(me['id'])
                 need(target_id==me['id'],'not_owner','Это не твоя ферма.',403)
@@ -396,6 +405,9 @@ class FarmService:
                     await wagers.expire(self.u,me,self.p.account_id,self.clock())
                     await wagers.claim_pending(self.u,me,self.p.account_id,self.clock())
                     refreshed['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
+                elif kind in farm_village_games.COMMANDS:
+                    refreshed['village_games']=farm_village_games.public(me,self.clock())
+                    refreshed['revision']=me['revision']
                 else:
                     refreshed['oleg_game']=oleg.public(me,self.clock())
                     refreshed['revision']=me['revision']
@@ -419,10 +431,21 @@ class FarmService:
             await self._settle(other,await self.u.owner_account(other['id']))
         before=deepcopy(me);before_other=deepcopy(other)
         now=self.clock()
+        upkeep_config=await self._upkeep_config(now)
         mini_kind=kind in {'minigame_start','minigame_answer'}
         wager_kind=kind in {'wager_start','wager_choose'}
         oleg_kind=kind in {'oleg_start','oleg_answer'}
-        if wager_kind:
+        vgame_kind=kind in farm_village_games.COMMANDS
+        if vgame_kind:
+            need(other is me,'not_owner','Это не твоя ферма.',403)
+            notice,changed=farm_village_games.command(me,kind,data,now)
+            if not changed:
+                result=dict(command_id=key,notice=notice,server_time=now,revision=me['revision'],
+                            village_games=farm_village_games.public(me,now))
+                await self.u.remember(self.p.account_id,key,fingerprint,result,now)
+                return result
+            economy.bill(me,now,upkeep_config)
+        elif wager_kind:
             need(other is me,'not_owner','Это не твоя ферма.',403)
             notice,ledger_kind=await wagers.command(self.u,me,self.p.account_id,kind,data,now)
         elif mini_kind:
@@ -443,7 +466,7 @@ class FarmService:
             # A newly started or answered game is an owner action. Replays above
             # remain true no-ops, including the activity and daily upkeep state.
             progression.touch(me,now)
-            economy.bill(me,now)
+            economy.bill(me,now,upkeep_config)
         elif oleg_kind:
             need(other is me,'not_owner','Это не твоя ферма.',403)
             notice,changed=(oleg.start(me,data,now) if kind=='oleg_start'
@@ -454,14 +477,14 @@ class FarmService:
                 await self.u.remember(self.p.account_id,key,fingerprint,result,now)
                 return result
             progression.touch(me,now)
-            economy.bill(me,now)
+            economy.bill(me,now,upkeep_config)
         elif kind in construction.COMMANDS:
             notice,ledger_kind=await construction.command(self.u,me,other,self.p.account_id,kind,data,now)
             event(me,now,notice,kind)
             progression.touch(me,now)
-            economy.bill(me,now)
+            economy.bill(me,now,upkeep_config)
         else:
-            notice=apply(me,other,kind,data,now,key,self.speed,self.p.address_form)
+            notice=apply(me,other,kind,data,now,key,self.speed,self.p.address_form,upkeep_config)
         if kind in {'remove_neighbor','block'}:
             await friend_requests.break_pair(self.u,me,other,self.p.account_id,now)
         neighbor_reward_paid=False
@@ -474,7 +497,14 @@ class FarmService:
             await self.u.village_add(economy.season_of(now),sent,now)
         me['revision']+=1
         validate_state(me);await self.u.save(me)
-        await self.u.record(self.p.account_id,key,ledger_kind if wager_kind else kind,before,me,now)
+        ledger_key=key
+        record_kind=ledger_kind if wager_kind else kind
+        if vgame_kind and kind=='vgame_finish':
+            outcome=me['village_games'][data['game']]['last_result']
+            ledger_key='vgame:'+outcome['run_id']+':'+str(outcome['stars'])
+            # M2 is a future bonus pool, never an XP award. Keep its actual delta explicit.
+            record_kind='vgame_m2' if outcome['reward_kind']=='vigour' else 'vgame_premium'
+        await self.u.record(self.p.account_id,ledger_key,record_kind,before,me,now)
         if me['id']!=other['id'] and other!=before_other:
             other['revision']+=1;validate_state(other);await self.u.save(other)
             await self.u.record(self.p.account_id,key,kind,before_other,other,now)
@@ -482,6 +512,7 @@ class FarmService:
         result=dict(command_id=key,notice=notice,server_time=now,revision=me['revision'])
         if mini_kind:result['minigames']=minigames.public(me,now)
         if oleg_kind:result['oleg_game']=oleg.public(me,now)
+        if vgame_kind:result['village_games']=farm_village_games.public(me,now)
         if wager_kind:result['wager']=await wagers.projection(self.u,me,self.p.account_id,now)
         if neighbor_reward_paid:result['neighbor_reward_paid']=True
         # Wager projections may reveal a settled result to the live owner response;

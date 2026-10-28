@@ -49,33 +49,55 @@ const STAGE={sapling:.58,young:.76,adult:.92,elder:1.02,century:1.06};
 const WIDE={elder:1.08,century:1.12};
 const TRUNK={sapling:2.2,young:3,adult:4,elder:5.4,century:6.2};
 const COUNT={sapling:3,young:4,adult:7,elder:9,century:10};
-const BARK='#9a8360',BARK_DARK='#7c6849',UNRIPE='#b4c88a';
+const BARK='#9a8360',BARK_DARK='#7c6849';
 
 const MIX=new Map();
 function mixHex(a,b,k){k=Math.round(Math.max(0,Math.min(1,k))*8)/8;const key=a+b+k;let v=MIX.get(key);if(v)return v;
  const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16),m=sh=>Math.round(((A>>sh)&255)+(((B>>sh)&255)-((A>>sh)&255))*k);
  v=`rgb(${m(16)},${m(8)},${m(0)})`;MIX.set(key,v);return v}
-const RIPE={apple:'#d9534f',pear:'#c6cf5a',cherry:'#a3203a',plum:'#6b4a8c',apricot:'#f0a64a',peach:'#f2a07a',pomegranate:'#b3262f',paradise:'#c42f3c',bergamot:'#d2b24a'};
+// Fruit colours per kind (species or graft fruit). A ripening fruit already wears a pale tone of its kind: young at fruit set, turn by
+// the end of the fill, blush on its cheek on the way. The ripe one jumps to the catalogue colour (CROPS colour, icons.svg) with its cheek
+// and a gloss, at full size: that jump is the «можно собирать» signal, so no ripening tone comes close to the ripe one.
+const FRUIT={
+ apple:{young:'#a8cc5a',turn:'#c6cf68',blush:'#e3876a',ripe:'#d9534f',gloss:'#f3a99a'},
+ paradise:{young:'#e4d47c',turn:'#f0cf80',blush:'#ef9088',ripe:'#c42f3c',gloss:'#f6b8b0'},
+ pear:{young:'#c8d49c',turn:'#e3de9c',blush:'#ead08a',ripe:'#d4cd4c',cheek:'#e0a24e',gloss:'#f7f0b6'},
+ bergamot:{young:'#cdbd84',turn:'#e2cc8e',blush:'#c39563',ripe:'#d2b24a',cheek:'#a8763a',gloss:'#f4e09a'},
+ cherry:{young:'#efdc9c',turn:'#f0a6a2',ripe:'#a3203a',gloss:'#f4b4c0'},
+ plum:{young:'#b3bdcf',turn:'#ab9fd2',ripe:'#6b4a8c',seam:'#57396f',gloss:'#a596c4'},
+ apricot:{young:'#d8d874',turn:'#f5d574',blush:'#f1b25e',ripe:'#f0a64a',cheek:'#e48a3e',gloss:'#fbd49a'},
+ peach:{young:'#efd3b8',turn:'#f5d0a8',blush:'#efa496',ripe:'#f2a07a',cheek:'#e0675a',gloss:'#fcd8c0'},
+ pomegranate:{young:'#ceb27a',turn:'#dd9274',blush:'#d36e60',ripe:'#b3262f',crown:'#8e1c26',gloss:'#e8818a'}
+};
 
 // Birdhouses of a snapshot, found once per objects array (a farm has a few at most).
 const HOUSES=new WeakMap();
 function birdhouses(farm){const objs=farm?.objects;if(!objs)return [];let v=HOUSES.get(objs);if(!v||v.n!==objs.length){v={n:objs.length,list:objs.filter(o=>o.type==='birdhouse')};HOUSES.set(objs,v)}return v.list}
 export function nearBirdhouse(farm,o,radius=2){return birdhouses(farm).some(b=>Math.max(Math.abs(b.x-o.x),Math.abs(b.y-o.y))<=radius)}
 
-/* One fruit: r is the full radius at this stage (scaled), k 0..1 how ripe (colour and size). */
+/* One fruit: r is the full radius at this stage (scaled), k 0..1 how ripe (colour and size; 1 = ripe). In contrast mode every fruit
+   body gets a thin dark rim, so the pale ripening tones still part from the leaves. */
 function fruit(s,kind,x,y,r,k){
- const col=k>=1?RIPE[kind]:k<.35?UNRIPE:mixHex(UNRIPE,RIPE[kind],(k-.35)/.65),R=r*(.55+.45*Math.min(1,k));
+ const F=FRUIT[kind]||FRUIT.apple,ripe=k>=1,t=Math.max(0,Math.min(1,(k-.12)/.73));
+ const col=ripe?F.ripe:mixHex(F.young,F.turn,t),R=r*(ripe?1:.55+.4*Math.min(1,k)),blush=!ripe&&F.blush?mixHex(F.young,F.blush,.5+.5*t):null;
+ const rim=s.contrast?'rgba(31,21,8,.55)':null,body=list=>{if(rim)for(const [ex,ey,rx,ry] of list)s.ellipse(ex,ey+.2,rx+.7,ry+.7,rim);for(const [ex,ey,rx,ry] of list)s.ellipse(ex,ey,rx,ry,col)};
  if(kind==='cherry'){s.line(x,y-R*2.6,x-R*.9,y-R*.4,'#7d7a4c',.7);s.line(x,y-R*2.6,x+R*.9,y-R*.2,'#7d7a4c',.7);
-  s.ellipse(x-R*.9,y,R*.82,R*.82,col);s.ellipse(x+R*.9,y+.2,R*.82,R*.82,col);if(k>.8){s.ellipse(x-R*1.15,y-R*.3,R*.25,R*.22,'#f4b4c0');s.ellipse(x+R*.65,y-R*.1,R*.25,R*.22,'#f4b4c0')}return}
- if(kind==='paradise'){for(const [dx,dy] of [[-.8,0],[.8,.2],[0,-.9]])s.ellipse(x+dx*R,y+dy*R,R*.58,R*.58,col);if(k>.8)s.ellipse(x-R*.95,y-R*.2,R*.2,R*.18,'#f6b8b0');return}
- if(kind==='pear'){s.ellipse(x,y+R*.25,R*.86,R*.86,col);s.ellipse(x,y-R*.55,R*.52,R*.62,col);if(k>.8)s.ellipse(x+R*.4,y+R*.35,R*.32,R*.3,'#dcae5a');s.line(x,y-R*1.15,x+R*.3,y-R*1.6,'#7c6849',.7);return}
- if(kind==='plum'){s.ellipse(x,y,R*.78,R,col);if(k>.8){s.ellipse(x-R*.3,y-R*.3,R*.3,R*.45,'#a596c4');s.line(x+R*.1,y-R*.85,x+R*.15,y+R*.7,'#57396f',.6)}return}
- s.ellipse(x,y,R,R,col);
- if(kind==='peach'&&k>.6){s.ellipse(x+R*.32,y+R*.15,R*.62,R*.62,mixHex('#f2a07a','#e0675a',k));s.ellipse(x-R*.38,y-R*.36,R*.28,R*.26,'#fcd8c0')}
- else if(kind==='apricot'&&k>.6){s.ellipse(x+R*.4,y+R*.2,R*.42,R*.4,'#e48a3e');s.ellipse(x-R*.4,y-R*.4,R*.26,R*.24,'#fbd49a')}
- else if(kind==='pomegranate'){s.poly([{x:x-R*.42,y:y-R*.8},{x:x-R*.3,y:y-R*1.35},{x,y:y-R*.95},{x:x+R*.3,y:y-R*1.35},{x:x+R*.42,y:y-R*.8}],k>.6?'#8e1c26':'#8aa36a');if(k>.8)s.ellipse(x-R*.4,y-R*.3,R*.26,R*.24,'#e8818a')}
- else if(kind==='bergamot'){if(k>.6)s.ellipse(x+R*.35,y+R*.25,R*.45,R*.4,'#a8763a');if(k>.8)s.ellipse(x-R*.4,y-R*.4,R*.25,R*.22,'#f4e09a')}
- else if(k>.8)s.ellipse(x-R*.38,y-R*.38,R*.28,R*.26,'#f3a99a');
+  body([[x-R*.9,y,R*.82,R*.82],[x+R*.9,y+.2,R*.82,R*.82]]);if(ripe){s.ellipse(x-R*1.15,y-R*.3,R*.25,R*.22,F.gloss);s.ellipse(x+R*.65,y-R*.1,R*.25,R*.22,F.gloss)}return}
+ if(kind==='paradise'){body([[x-R*.8,y,R*.58,R*.58],[x+R*.8,y+R*.2,R*.58,R*.58],[x,y-R*.9,R*.58,R*.58]]);
+  if(ripe)s.ellipse(x-R*.95,y-R*.2,R*.2,R*.18,F.gloss);else s.ellipse(x+R*.95,y+R*.32,R*.3,R*.28,blush);return}
+ if(kind==='pear'){body([[x,y+R*.25,R*.86,R*.86],[x,y-R*.55,R*.52,R*.62]]);
+  if(ripe){s.ellipse(x+R*.4,y+R*.35,R*.32,R*.3,F.cheek);s.ellipse(x-R*.36,y+R*.05,R*.2,R*.24,F.gloss)}else if(t>.4)s.ellipse(x+R*.4,y+R*.35,R*.3,R*.28,blush);
+  s.line(x,y-R*1.15,x+R*.3,y-R*1.6,'#7c6849',.7);return}
+ if(kind==='plum'){body([[x,y,R*.78,R]]);
+  if(ripe){s.ellipse(x-R*.3,y-R*.3,R*.3,R*.45,F.gloss);s.line(x+R*.1,y-R*.85,x+R*.15,y+R*.7,F.seam,.6)}else if(t>.4)s.line(x+R*.1,y-R*.8,x+R*.15,y+R*.65,mixHex(F.turn,F.seam,.45),.5);return}
+ body([[x,y,R,R]]);
+ if(kind==='peach'){if(ripe){s.ellipse(x+R*.32,y+R*.15,R*.62,R*.62,F.cheek);s.ellipse(x-R*.38,y-R*.36,R*.28,R*.26,F.gloss)}else s.ellipse(x+R*.3,y+R*.15,R*.55,R*.55,blush)}
+ else if(kind==='apricot'){if(ripe){s.ellipse(x+R*.4,y+R*.2,R*.42,R*.4,F.cheek);s.ellipse(x-R*.4,y-R*.4,R*.26,R*.24,F.gloss)}else if(t>.45)s.ellipse(x+R*.4,y+R*.2,R*.4,R*.38,blush)}
+ else if(kind==='pomegranate'){s.poly([{x:x-R*.42,y:y-R*.8},{x:x-R*.3,y:y-R*1.35},{x,y:y-R*.95},{x:x+R*.3,y:y-R*1.35},{x:x+R*.42,y:y-R*.8}],ripe?F.crown:mixHex(F.young,'#6e5a3a',.5));
+  if(ripe)s.ellipse(x-R*.4,y-R*.3,R*.26,R*.24,F.gloss);else if(t>.3)s.ellipse(x+R*.35,y+R*.2,R*.45,R*.42,blush)}
+ else if(kind==='bergamot'){if(ripe){s.ellipse(x+R*.35,y+R*.25,R*.45,R*.4,F.cheek);s.ellipse(x-R*.4,y-R*.4,R*.25,R*.22,F.gloss)}else if(t>.5)s.ellipse(x+R*.35,y+R*.25,R*.42,R*.38,blush)}
+ else if(ripe)s.ellipse(x-R*.38,y-R*.38,R*.28,R*.26,F.gloss);
+ else if(t>.25)s.ellipse(x+R*(.6-.22*t),y+R*(.42-.14*t),R*(.4+.22*t),R*(.38+.2*t),blush);   // apple: the red cheek of a green apple grows as it ripens
  if(kind==='apple'||kind==='bergamot'||kind==='apricot')s.line(x,y-R,x+R*.25,y-R*1.45,'#7c6849',.7);
 }
 function blossom(s,x,y,r,col){s.ellipse(x,y,r,r*.86,col[0]);s.ellipse(x-r*.5,y-r*.4,r*.55,r*.5,col[0]);s.ellipse(x+.2,y-.1,r*.36,r*.36,col[1])}
@@ -159,8 +181,9 @@ export function drawTree(s,o,p,catalog,t){
  if(!winter&&(L.phase==='bloom'||look?.always)){const all=bloomSpots(o.species,kit),m=look?.always?all.length:Math.ceil(Math.min(all.length,n*1.7)*(.45+.55*Math.min(1,L.k)));for(let i=0;i<m;i+=lod?2:1)blossom(s,all[i][0]*wide,all[i][1],2.3,bloomCol)}
  if(look?.frost&&!winter)rime(s,bloomSpots(o.species,kit));
  if(L.phase==='set'||L.phase==='fill'||ripe){
-  const kk=L.phase==='set'?0:L.phase==='fill'?L.k*.85:1,gold=ripe&&mine&&f?.golden;
-  if(!winter||ripe)for(let i=gold?1:0;i<n;i++)fruit(s,fruitKind,spots[i][0]*wide,spots[i][1],3.3,L.phase==='set'?.12+.18*L.k:kk);
+  // how ripe: set .12-.30, fill on to .85 without a step back, ripe 1 (fruit() keeps the ripe colour, cheek and gloss for k=1 only)
+  const kk=L.phase==='set'?.12+.18*L.k:L.phase==='fill'?.3+L.k*.55:1,gold=ripe&&mine&&f?.golden;
+  if(!winter||ripe)for(let i=gold?1:0;i<n;i++)fruit(s,fruitKind,spots[i][0]*wide,spots[i][1],3.3,kk);
   if(gold){goldenFruit(s,spots[0][0]*wide,spots[0][1]);golden=[p.x+(spots[0][0]*wide+sway)*k,p.y+spots[0][1]*k]}
  }
  if(look?.cozy&&!winter)pompoms(s);

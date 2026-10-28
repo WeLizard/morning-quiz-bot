@@ -126,10 +126,13 @@ export function placeHint(a,size,box,gap=8){
 }
 
 /* ---- what a building is for, generated from the catalog ---- */
-const PURPOSE_LEAD={mill:'Мелет урожай в муку и масло.',feedmill:'Готовит корм для животных.',bakery:'Печёт хлеб и сладкое.',kitchen:'Готовит блюда и варенье.',dairy:'Перерабатывает молочное.',loom:'Вяжет, набивает подушки и плетёт букеты.',spinnery:'Прядёт шерсть, пух и лён.',weavery:'Ткёт полотно, сукно и пледы.',dryer:'Сушит фрукты и делает пастилу.',cellar:'Выдерживает напитки и закуски «Ноль градусов»: градус только в названии.'};
+const PURPOSE_LEAD={mill:'Мелет урожай в муку и масло.',feedmill:'Готовит корм для животных.',bakery:'Печёт хлеб и сладкое.',kitchen:'Готовит блюда и варенье.',dairy:'Перерабатывает молочное.',loom:'Вяжет, набивает подушки и плетёт букеты.',spinnery:'Прядёт шерсть, пух и лён.',weavery:'Ткёт полотно, сукно и пледы.',dryer:'Сушит фрукты и делает пастилу.',cellar:'Выдерживает напитки и закуски «Ноль градусов»: градус только в названии.',
+ compost_heap:'Превращает навоз и траву в компост — подкормку для грядок и сада: урожай больше на четверть.'};
+// A third line where a building needs one more rule to be understood (FARM_FERTILIZERS §4: hand work is rewarded better than machines).
+const PURPOSE_NOTE={compost_heap:'Подкормка срабатывает только от твоих рук: когда грядку сажаешь ты и когда урожай в саду собираешь ты. Трактор, комбайн и помощники её не тратят. Куча одна на ферму.'};
 const uniq=a=>[...new Set(a)];
 const short=(a,max)=>a.slice(0,max).join(', ')+(a.length>max?' и др.':'');
-/** Up to two short lines: what the building makes, from what, and who or what needs it. [] for decor and plain houses. */
+/** Two short lines: what the building makes, from what, and who or what needs it (a third from PURPOSE_NOTE). [] for decor and plain houses. */
 export function buildingPurpose(type,catalog){
  if(type==='road')return ['Грунтовая дорога занимает одну свободную клетку. Продолжай существующую дорогу или прокладывай новые повороты и перекрёстки.'];
  if(!catalog)return [];
@@ -151,8 +154,8 @@ export function buildingPurpose(type,catalog){
  const users=[];
  for(const a of Object.values(catalog.animals||{}))if(outIds.some(id=>a.inputs&&id in a.inputs))users.push(String(a.name).toLowerCase());
  for(const r of Object.values(catalog.recipes||{}))if(r.building!==type&&outIds.some(id=>r.inputs&&id in r.inputs))for(const o of Object.keys(r.outputs||{}))users.push(nm(o));
- const lead=PURPOSE_LEAD[type];
- return [`${lead?lead+' ':''}Делает: ${short(outIds.map(nm),5)}.`,`Из: ${short(inIds.map(nm),5)}.${users.length?` Нужно для: ${short(uniq(users),4)}.`:''}`];
+ const lead=PURPOSE_LEAD[type],extra=PURPOSE_NOTE[type];
+ return [`${lead?lead+' ':''}Делает: ${short(outIds.map(nm),5)}.`,`Из: ${short(inIds.map(nm),5)}.${users.length?` Нужно для: ${short(uniq(users),4)}.`:''}`,...(extra?[extra]:[])];
 }
 
 /** Camera pan that puts world point (wx,wy) in the middle of a w×h viewport. */

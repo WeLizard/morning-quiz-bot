@@ -1,0 +1,1778 @@
+{
+  "package": "chthonic_charcoal",
+  "world_id": "deep_choir",
+  "status": "prompt validated; art progress in package manifest",
+  "style_block": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs.",
+  "shared_constraints": "No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+  "generation_count": 106,
+  "cutout_count": 36,
+  "tasks": [
+    {
+      "path": "locations/reference.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create an empty, unpeopled 1930s abandoned lower mine gallery ending at a sealed dark rock face. The view is a deep central perspective with a few old timber braces and long slack cables; chalk-white mineral hand impressions emerge faintly from the rock wall, human-sized but clearly mineral, not living hands. A small kerosene lamp glow falls across tactile strata while the far end disappears into immense graphite-black negative space. No figures, faces, bodies, tools in active use, or close-up creature. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [],
+      "group": "reference",
+      "order": 1
+    },
+    {
+      "path": "characters/c_01_mine_manager.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 49, dark practical coat over mine work clothes; composed upright stance; one hand holds a closed plain order folder at her side. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 2,
+      "character_id": "mine_manager"
+    },
+    {
+      "path": "characters/c_02_shift_foreman.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 43, scratched mining helmet, sturdy work jacket and straight disciplined posture; hands relaxed, no tool raised. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 3,
+      "character_id": "shift_foreman"
+    },
+    {
+      "path": "characters/c_03_veteran_miner.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 57, heavy weathered build, old unlit hand lamp held low; tired but alert expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 4,
+      "character_id": "veteran_miner"
+    },
+    {
+      "path": "characters/c_04_new_miner.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 20, new plain mining helmet and ill-fitting work gloves; earnest, slightly tense posture; no injury. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 5,
+      "character_id": "new_miner"
+    },
+    {
+      "path": "characters/c_05_geologist.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 41, grey field coat and sample satchel; analytical expression; holds a small sealed rock sample vial. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 6,
+      "character_id": "geologist"
+    },
+    {
+      "path": "characters/c_06_surveyor.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 36, graphite-smudged fingers, folded measuring ruler and plain survey board; precise reserved posture. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 7,
+      "character_id": "surveyor"
+    },
+    {
+      "path": "characters/c_07_hoist_operator.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 52, work vest with a grease-marked collar and oil-stained palms; calm balanced stance; small blank metal control token. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 8,
+      "character_id": "hoist_operator"
+    },
+    {
+      "path": "characters/c_08_ventilation_tech.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 34, practical work coveralls and a simple listening tube around the neck; attentive posture. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 9,
+      "character_id": "ventilation_tech"
+    },
+    {
+      "path": "characters/c_09_lamp_keeper.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 60, spectacles on a chain, soot-smudged fingertips and a sturdy apron; observant expression; blank lamp tag in hand. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 10,
+      "character_id": "lamp_keeper"
+    },
+    {
+      "path": "characters/c_10_blasting_master.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 46, protective plain goggles pushed safely over eyes and measuring tape at belt; careful professional stance. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 11,
+      "character_id": "blasting_master"
+    },
+    {
+      "path": "characters/c_11_ore_sorter.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 32, headscarf and dust on work sleeves; direct guarded expression; holds a tied sample sack. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 12,
+      "character_id": "ore_sorter"
+    },
+    {
+      "path": "characters/c_12_mine_doctor.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 55, old medical satchel and immaculately clean cuffs; calm face and hands visible. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 13,
+      "character_id": "mine_doctor"
+    },
+    {
+      "path": "characters/c_13_company_accountant.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 39, neat severe appearance and plain closed ledger folder; reserved posture. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 14,
+      "character_id": "company_accountant"
+    },
+    {
+      "path": "characters/c_14_safety_inspector.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 47, field notebook and simple handheld measuring gauge; formal questioning expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 15,
+      "character_id": "safety_inspector"
+    },
+    {
+      "path": "characters/c_15_rail_dispatcher.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 31, coal pencil tucked behind ear and plain route board; alert, practical posture. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 16,
+      "character_id": "rail_dispatcher"
+    },
+    {
+      "path": "characters/c_16_mutual_aid_keeper.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 44, durable jacket and canvas bag of blank slips; steady reassuring expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 17,
+      "character_id": "mutual_aid_keeper"
+    },
+    {
+      "path": "characters/c_17_school_teacher.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 38, coat with chalk dust on one sleeve and a folder of childlike geological sketches (marks abstract, no writing); thoughtful expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 18,
+      "character_id": "school_teacher"
+    },
+    {
+      "path": "characters/c_18_inn_keeper.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 50, simple apron and a ring of plain keys at her belt; warm but watchful expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 19,
+      "character_id": "inn_keeper"
+    },
+    {
+      "path": "characters/c_19_local_reporter.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult woman, 27, leather camera satchel and an old compact camera held down at waist; inquisitive expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 20,
+      "character_id": "local_reporter"
+    },
+    {
+      "path": "characters/c_20_seam_listener.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Full-body 2:3 character cutout, centered, complete head and boots visible, front three-quarter view. Adult man, 63, dark miner’s overcape with chalk-white dust at collar; holds an unmarked tuning fork gently, speaking-pause expression. Restrained 1930s fictional mining-town workwear, no readable insignia. Isolated cutout on a genuinely transparent background, clean hard-edged silhouette, no halo, glow, vignette, floor, cast shadow, or environmental backdrop. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "characters",
+      "order": 21,
+      "character_id": "seam_listener"
+    },
+    {
+      "path": "locations/lift_house_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. empty cage moving upward without anyone at the controls, a single kerosene lamp and deep shaft darkness. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 22,
+      "location_id": "lift_house",
+      "state": "night"
+    },
+    {
+      "path": "locations/lift_house_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. the mine hoist house interior, iron cage elevator, blank indicator board with no marks, heavy cable and worn brake mechanism; no people. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/lift_house_night.png"
+      ],
+      "group": "locations",
+      "order": 23,
+      "location_id": "lift_house",
+      "state": "morning"
+    },
+    {
+      "path": "locations/lift_house_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. the cage scale and cable viewed from a safe distance, dusty control room in practical daylight. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/lift_house_night.png"
+      ],
+      "group": "locations",
+      "order": 24,
+      "location_id": "lift_house",
+      "state": "day"
+    },
+    {
+      "path": "locations/lift_house_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. brake assembly being inspected in warm late light, still machinery and empty floor. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/lift_house_night.png"
+      ],
+      "group": "locations",
+      "order": 25,
+      "location_id": "lift_house",
+      "state": "evening"
+    },
+    {
+      "path": "locations/lower_gallery_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. sealed rock wall answering with an uncanny sequence of seven tiny dust falls and subtle mineral vibration; no figure or creature. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 26,
+      "location_id": "lower_gallery",
+      "state": "night"
+    },
+    {
+      "path": "locations/lower_gallery_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. abandoned lower gallery toward a sealed dull rock seam, fresh-looking timber braces, lamp glow and immense dark beyond. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/lower_gallery_night.png"
+      ],
+      "group": "locations",
+      "order": 27,
+      "location_id": "lower_gallery",
+      "state": "morning"
+    },
+    {
+      "path": "locations/lower_gallery_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. portable lamps illuminating the new braces and rough stone, no people. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/lower_gallery_night.png"
+      ],
+      "group": "locations",
+      "order": 28,
+      "location_id": "lower_gallery",
+      "state": "day"
+    },
+    {
+      "path": "locations/lower_gallery_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. the gallery entrance closed by a plain chain and seal with no writing, dusk warmth. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/lower_gallery_night.png"
+      ],
+      "group": "locations",
+      "order": 29,
+      "location_id": "lower_gallery",
+      "state": "evening"
+    },
+    {
+      "path": "locations/survey_room_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. in an otherwise still room, a drafting compass subtly angled toward a wall; no visible hand or person. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 30,
+      "location_id": "survey_room",
+      "state": "night"
+    },
+    {
+      "path": "locations/survey_room_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. a 1930s mine survey room with drafting table, folded blank maps, mineral samples and old instruments. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/survey_room_night.png"
+      ],
+      "group": "locations",
+      "order": 31,
+      "location_id": "survey_room",
+      "state": "morning"
+    },
+    {
+      "path": "locations/survey_room_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. daylight across a blank cross-section drawing and survey tools, no readable marks. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/survey_room_night.png"
+      ],
+      "group": "locations",
+      "order": 32,
+      "location_id": "survey_room",
+      "state": "day"
+    },
+    {
+      "path": "locations/survey_room_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. empty instrument shelves and a closed case at shift end. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/survey_room_night.png"
+      ],
+      "group": "locations",
+      "order": 33,
+      "location_id": "survey_room",
+      "state": "evening"
+    },
+    {
+      "path": "locations/sorting_yard_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. one isolated ore heap faintly warm with a restrained amber shimmer, empty yard at night. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 34,
+      "location_id": "sorting_yard",
+      "state": "night"
+    },
+    {
+      "path": "locations/sorting_yard_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. industrial ore sorting yard with quiet conveyor, ore carts and sorted rock heaps. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/sorting_yard_night.png"
+      ],
+      "group": "locations",
+      "order": 35,
+      "location_id": "sorting_yard",
+      "state": "morning"
+    },
+    {
+      "path": "locations/sorting_yard_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. ore cart and sorting belt in cool daylight, no workers, no labels. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/sorting_yard_night.png"
+      ],
+      "group": "locations",
+      "order": 36,
+      "location_id": "sorting_yard",
+      "state": "day"
+    },
+    {
+      "path": "locations/sorting_yard_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. quiet yard as the last light warms rusted rails and coarse stone piles. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/sorting_yard_night.png"
+      ],
+      "group": "locations",
+      "order": 37,
+      "location_id": "sorting_yard",
+      "state": "evening"
+    },
+    {
+      "path": "locations/ventilation_tower_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. tower silhouette over a sleeping fictional mining town, low night haze and a subtle distant hum suggested by vibrating ductwork. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 38,
+      "location_id": "ventilation_tower",
+      "state": "night"
+    },
+    {
+      "path": "locations/ventilation_tower_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. exterior and interior threshold of a 1930s mine ventilation tower, large plain ducts and soot-dark louvers. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/ventilation_tower_night.png"
+      ],
+      "group": "locations",
+      "order": 39,
+      "location_id": "ventilation_tower",
+      "state": "morning"
+    },
+    {
+      "path": "locations/ventilation_tower_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. tower service platform in clear daylight, ducts and simple gauge with no markings. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/ventilation_tower_night.png"
+      ],
+      "group": "locations",
+      "order": 40,
+      "location_id": "ventilation_tower",
+      "state": "day"
+    },
+    {
+      "path": "locations/ventilation_tower_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. filter cloth and louver mechanism in warm work light, no staff. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/ventilation_tower_night.png"
+      ],
+      "group": "locations",
+      "order": 41,
+      "location_id": "ventilation_tower",
+      "state": "evening"
+    },
+    {
+      "path": "locations/miners_hall_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. empty tables while a few cups subtly tremble in a regular rhythm; no figures. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 42,
+      "location_id": "miners_hall",
+      "state": "night"
+    },
+    {
+      "path": "locations/miners_hall_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. empty miners’ mutual-aid hall with long tables, plain notice board without writing, stove and chairs. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/miners_hall_night.png"
+      ],
+      "group": "locations",
+      "order": 43,
+      "location_id": "miners_hall",
+      "state": "morning"
+    },
+    {
+      "path": "locations/miners_hall_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. sunlit community hall with tea cups and empty chairs, no people. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/miners_hall_night.png"
+      ],
+      "group": "locations",
+      "order": 44,
+      "location_id": "miners_hall",
+      "state": "day"
+    },
+    {
+      "path": "locations/miners_hall_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. quiet hall with chairs drawn close around the stove, no text or figures. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/miners_hall_night.png"
+      ],
+      "group": "locations",
+      "order": 45,
+      "location_id": "miners_hall",
+      "state": "evening"
+    },
+    {
+      "path": "locations/town_clinic_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. closed ward door beneath a single lamp, quiet non-graphic atmosphere, no people. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 46,
+      "location_id": "town_clinic",
+      "state": "night"
+    },
+    {
+      "path": "locations/town_clinic_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. small 1930s town clinic room with orderly beds, medicine cabinet and plain patient folders with blank covers. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/town_clinic_night.png"
+      ],
+      "group": "locations",
+      "order": 47,
+      "location_id": "town_clinic",
+      "state": "morning"
+    },
+    {
+      "path": "locations/town_clinic_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. bright clinic desk and unmarked medical cards, no people. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/town_clinic_night.png"
+      ],
+      "group": "locations",
+      "order": 48,
+      "location_id": "town_clinic",
+      "state": "day"
+    },
+    {
+      "path": "locations/town_clinic_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. doctor’s empty night-duty room lit by a practical lamp, no readable text. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/town_clinic_night.png"
+      ],
+      "group": "locations",
+      "order": 49,
+      "location_id": "town_clinic",
+      "state": "evening"
+    },
+    {
+      "path": "locations/old_quarry_night.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. a stone above the fissure seems to carry one low resonant note, indicated by slight dust vibration, no supernatural figure. State: night. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "locations",
+      "order": 50,
+      "location_id": "old_quarry",
+      "state": "night"
+    },
+    {
+      "path": "locations/old_quarry_morning.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. old open quarry edge above an abandoned extraction crack, exposed layered rock and a displaced stone. State: morning. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/old_quarry_night.png"
+      ],
+      "group": "locations",
+      "order": 51,
+      "location_id": "old_quarry",
+      "state": "morning"
+    },
+    {
+      "path": "locations/old_quarry_day.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. sunlight revealing clear geological strata and wheel tracks at a distance, no people. State: day. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/old_quarry_night.png"
+      ],
+      "group": "locations",
+      "order": 52,
+      "location_id": "old_quarry",
+      "state": "day"
+    },
+    {
+      "path": "locations/old_quarry_evening.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Empty location scene, no people. a lone geologist’s plain sample case rests near the quarry edge, no person visible. State: evening. Preserve the established mine-town architecture and material language; frame as a legible 2:3 environmental illustration. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png",
+        "locations/old_quarry_night.png"
+      ],
+      "group": "locations",
+      "order": 53,
+      "location_id": "old_quarry",
+      "state": "evening"
+    },
+    {
+      "path": "items/sheet_c1.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One transparent 3 by 3 contactless item sprite sheet: exactly nine separate centered square item cutouts, equal cells in a perfectly aligned three-column by three-row grid, generous transparent gutters, nothing touching cell boundaries. Each object is clearly distinct and fully visible, consistent scale, no captions, no tiles or grid lines. cell 1 (row 1, column 1): lift token — small worn hoist token with an anomalous blank punched edge; cell 2 (row 1, column 2): lamp tag — plain metal tag attached to a short lamp hook; cell 3 (row 1, column 3): rock core — dark cylindrical rock core with a thin inner cavity; cell 4 (row 2, column 1): tuning fork — old steel tuning fork with one worn notch; cell 5 (row 2, column 2): survey pin — short iron survey pin carrying pale mineral dust; cell 6 (row 2, column 3): rivet — new iron rivet beside a fragment of aged timber brace; cell 7 (row 3, column 1): filter cloth — folded ventilation filter cloth with two distinct dust deposits; cell 8 (row 3, column 2): drill bit — used drill bit with unusual mica-blue mineral crust; cell 9 (row 3, column 3): sample sack — small tied canvas sample sack with a re-sewn seam. Each cell must itself have a clean isolated silhouette and transparent surroundings. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "items",
+      "order": 54,
+      "sheet_id": "c1",
+      "slots": [
+        {
+          "slot": 1,
+          "id": "lift_token"
+        },
+        {
+          "slot": 2,
+          "id": "lamp_tag"
+        },
+        {
+          "slot": 3,
+          "id": "rock_core"
+        },
+        {
+          "slot": 4,
+          "id": "tuning_fork"
+        },
+        {
+          "slot": 5,
+          "id": "survey_pin"
+        },
+        {
+          "slot": 6,
+          "id": "rivet"
+        },
+        {
+          "slot": 7,
+          "id": "filter_cloth"
+        },
+        {
+          "slot": 8,
+          "id": "drill_bit"
+        },
+        {
+          "slot": 9,
+          "id": "sample_sack"
+        }
+      ]
+    },
+    {
+      "path": "items/sheet_c2.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One transparent 3 by 3 contactless item sprite sheet: exactly nine separate centered square item cutouts, equal cells in a perfectly aligned three-column by three-row grid, generous transparent gutters, nothing touching cell boundaries. Each object is clearly distinct and fully visible, consistent scale, no captions, no tiles or grid lines. cell 1 (row 1, column 1): hand lamp — compact old hand lamp with a visibly different burner; cell 2 (row 1, column 2): gallery map — folded blank mine map with one erased lower route drawn only as a line, no labels; cell 3 (row 1, column 3): shift book — closed ledger showing a missing index tab, all pages blank; cell 4 (row 2, column 1): brace invoice — aged invoice sheet with empty ruled boxes and no writing; cell 5 (row 2, column 2): clinic record — plain medical folder with one shifted blank time tab; cell 6 (row 2, column 3): train manifest — blank route ledger with a small quarry cart sketch and no marks; cell 7 (row 3, column 1): air report — simple ventilation gauge diagram on blank paper, no numerals; cell 8 (row 3, column 2): sample register — open sample ledger with two empty adjacent slots; cell 9 (row 3, column 3): old drawing — aged charcoal geological sketch of an earlier fissure contour, no text. Each cell must itself have a clean isolated silhouette and transparent surroundings. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "items",
+      "order": 55,
+      "sheet_id": "c2",
+      "slots": [
+        {
+          "slot": 1,
+          "id": "hand_lamp"
+        },
+        {
+          "slot": 2,
+          "id": "gallery_map"
+        },
+        {
+          "slot": 3,
+          "id": "shift_book"
+        },
+        {
+          "slot": 4,
+          "id": "brace_invoice"
+        },
+        {
+          "slot": 5,
+          "id": "clinic_record"
+        },
+        {
+          "slot": 6,
+          "id": "train_manifest"
+        },
+        {
+          "slot": 7,
+          "id": "air_report"
+        },
+        {
+          "slot": 8,
+          "id": "sample_register"
+        },
+        {
+          "slot": 9,
+          "id": "old_drawing"
+        }
+      ]
+    },
+    {
+      "path": "items/sheet_c3.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One transparent 3 by 3 contactless item sprite sheet: exactly nine separate centered square item cutouts, equal cells in a perfectly aligned three-column by three-row grid, generous transparent gutters, nothing touching cell boundaries. Each object is clearly distinct and fully visible, consistent scale, no captions, no tiles or grid lines. cell 1 (row 1, column 1): dust layer — small evidence tray with a disturbed crescent of pale mineral dust; cell 2 (row 1, column 2): hammer pattern — short timber brace fragment bearing a sequence of seven irregular hammer dents; cell 3 (row 1, column 3): warm stone — single dark stone with restrained warm amber light along its edges; cell 4 (row 2, column 1): boot drag — dusty floor tile with one partial drag mark from a work boot; cell 5 (row 2, column 2): cable mark — short cable segment with one fresh bright scrape; cell 6 (row 2, column 3): echo gap — old sound-recording cylinder and blank waveform card with a clean silent gap implied visually; cell 7 (row 3, column 1): operator account — small blank testimony card beside a miniature empty hoist cage token; cell 8 (row 3, column 2): sorter account — blank testimony card beside a tiny tied ore sack; cell 9 (row 3, column 3): clinic account — blank testimony card beside a plain clinic clock face without numerals. Each cell must itself have a clean isolated silhouette and transparent surroundings. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "items",
+      "order": 56,
+      "sheet_id": "c3",
+      "slots": [
+        {
+          "slot": 1,
+          "id": "dust_layer"
+        },
+        {
+          "slot": 2,
+          "id": "hammer_pattern"
+        },
+        {
+          "slot": 3,
+          "id": "warm_stone"
+        },
+        {
+          "slot": 4,
+          "id": "boot_drag"
+        },
+        {
+          "slot": 5,
+          "id": "cable_mark"
+        },
+        {
+          "slot": 6,
+          "id": "echo_gap"
+        },
+        {
+          "slot": 7,
+          "id": "operator_account"
+        },
+        {
+          "slot": 8,
+          "id": "sorter_account"
+        },
+        {
+          "slot": 9,
+          "id": "clinic_account"
+        }
+      ]
+    },
+    {
+      "path": "items/sheet_c4.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One transparent 3 by 3 contactless item sprite sheet: exactly nine separate centered square item cutouts, equal cells in a perfectly aligned three-column by three-row grid, generous transparent gutters, nothing touching cell boundaries. Each object is clearly distinct and fully visible, consistent scale, no captions, no tiles or grid lines. cell 1 (row 1, column 1): quarry account — blank testimony card beside a miniature ore cart wheel; cell 2 (row 1, column 2): listener account — blank testimony card beside a seven-notch tuning fork motif; cell 3 (row 1, column 3): teacher account — blank testimony card beside a small abstract geological sketch; cell 4 (row 2, column 1): unknown ore — sealed specimen vial with an unclassified dark mineral flake; cell 5 (row 2, column 2): damaged brace — small section of split wooden mine support with no injury or gore; cell 6 (row 2, column 3): lamp wick — spent lamp wick and a small pool of cooling wax-like residue; cell 7 (row 3, column 1): cable fiber — single frayed cable strand on a neutral evidence tray; cell 8 (row 3, column 2): resonance chip — thin mica-blue mineral chip with concentric fracture lines; cell 9 (row 3, column 3): sealed sample — plain sealed evidence tin containing a dark stone fragment. Each cell must itself have a clean isolated silhouette and transparent surroundings. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "items",
+      "order": 57,
+      "sheet_id": "c4",
+      "slots": [
+        {
+          "slot": 1,
+          "id": "quarry_account"
+        },
+        {
+          "slot": 2,
+          "id": "listener_account"
+        },
+        {
+          "slot": 3,
+          "id": "teacher_account"
+        },
+        {
+          "slot": 4,
+          "id": "unknown_ore"
+        },
+        {
+          "slot": 5,
+          "id": "damaged_brace"
+        },
+        {
+          "slot": 6,
+          "id": "lamp_wick"
+        },
+        {
+          "slot": 7,
+          "id": "cable_fiber"
+        },
+        {
+          "slot": 8,
+          "id": "resonance_chip"
+        },
+        {
+          "slot": 9,
+          "id": "sealed_sample"
+        }
+      ]
+    },
+    {
+      "path": "ui/frame_hero.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait hero card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 58,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_location.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait location card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 59,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_clue.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable square clue card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 60,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_object.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable square physical object card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 61,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_event.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait event card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 62,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_ghost.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait uncanny echo card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 63,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_final.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait case conclusion card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 64,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_role.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait role card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 65,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_goal.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait private objective card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 66,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/frame_dossier.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Create a reusable 2:3 portrait dossier card border UI frame only, no card artwork. Chthonic charcoal ornament: thin layered rock strata, restrained iron corner rivets, small seven-notch accents. Keep the entire center and all four outer corners fully transparent; border visually clear and not too heavy. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 67,
+      "ui_kind": "frame"
+    },
+    {
+      "path": "ui/case_deck_back.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Portrait 2:3 card back, full-bleed symmetrical design. Distinct case deck back motif built from layered rock bands, a dark shaft cable and a discreet seven-notch rhythm; no text, no symbols resembling real organizations. Transparent outside the ornamental card silhouette with clean edge. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 68,
+      "ui_kind": "card_back"
+    },
+    {
+      "path": "ui/event_deck_back.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Portrait 2:3 card back, full-bleed symmetrical design. Distinct event deck back motif built from layered rock bands, a dark shaft cable and a discreet seven-notch rhythm; no text, no symbols resembling real organizations. Transparent outside the ornamental card silhouette with clean edge. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 69,
+      "ui_kind": "card_back"
+    },
+    {
+      "path": "ui/role_deck_back.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Portrait 2:3 card back, full-bleed symmetrical design. Distinct role deck back motif built from layered rock bands, a dark shaft cable and a discreet seven-notch rhythm; no text, no symbols resembling real organizations. Transparent outside the ornamental card silhouette with clean edge. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 70,
+      "ui_kind": "card_back"
+    },
+    {
+      "path": "ui/paper_warm.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Seamless subtle UI material tile: warm chalk-paper texture, low contrast, no lettering, no objects, transparent outside any irregular mineral fibers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 71,
+      "ui_kind": "underlay"
+    },
+    {
+      "path": "ui/paper_cool.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Seamless subtle UI material tile: cool slate-paper texture, low contrast, no lettering, no objects, transparent outside any irregular mineral fibers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 72,
+      "ui_kind": "underlay"
+    },
+    {
+      "path": "ui/cloth.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Seamless subtle UI material tile: dark woven work-cloth texture, low contrast, no lettering, no objects, transparent outside any irregular mineral fibers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 73,
+      "ui_kind": "underlay"
+    },
+    {
+      "path": "ui/parchment.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Seamless subtle UI material tile: aged pale mineral parchment texture, low contrast, no lettering, no objects, transparent outside any irregular mineral fibers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 74,
+      "ui_kind": "underlay"
+    },
+    {
+      "path": "ui/panel_dark.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Seamless subtle UI material tile: dark graphite panel texture, low contrast, no lettering, no objects, transparent outside any irregular mineral fibers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 75,
+      "ui_kind": "underlay"
+    },
+    {
+      "path": "ui/panel_light.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Seamless subtle UI material tile: light limestone panel texture, low contrast, no lettering, no objects, transparent outside any irregular mineral fibers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 76,
+      "ui_kind": "underlay"
+    },
+    {
+      "path": "ui/buttons_primary.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI asset sheet with a precise 3x3 grid of nine separate primary buttons in normal, pressed, disabled and selected states; consistent charcoal-stone lithograph button shapes, each cell self-contained, no text or letters, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 77,
+      "ui_kind": "button_sheet"
+    },
+    {
+      "path": "ui/buttons_secondary.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI asset sheet with a precise 3x3 grid of nine separate secondary buttons in normal, pressed, disabled and selected states; consistent charcoal-stone lithograph button shapes, each cell self-contained, no text or letters, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 78,
+      "ui_kind": "button_sheet"
+    },
+    {
+      "path": "ui/buttons_icon.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI asset sheet with a precise 3x3 grid of nine separate icon-only buttons in normal, pressed, disabled and selected states; consistent charcoal-stone lithograph button shapes, each cell self-contained, no text or letters, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 79,
+      "ui_kind": "button_sheet"
+    },
+    {
+      "path": "ui/panels_common.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI asset sheet, exact 3x3 grid of nine reusable title ribbons, separators and tabs; distinct silhouettes, restrained seven-notch details, no text, each asset separated by transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 80,
+      "ui_kind": "panel_sheet"
+    },
+    {
+      "path": "ui/panels_hints.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI asset sheet, exact 3x3 grid of nine reusable hint bubbles, input field frames and notification plates; distinct silhouettes, restrained seven-notch details, no text, each asset separated by transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 81,
+      "ui_kind": "panel_sheet"
+    },
+    {
+      "path": "ui/panels_badges.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI asset sheet, exact 3x3 grid of nine reusable counter badges and compact status panels; distinct silhouettes, restrained seven-notch details, no text, each asset separated by transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 82,
+      "ui_kind": "panel_sheet"
+    },
+    {
+      "path": "ui/icons_clues.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Icon atlas in a strict 3x3 grid of nine distinct simple monochrome pictograms for physical, document, trace and testimony clue type pictograms; clear at small size, consistent solid charcoal silhouettes with tiny ochre accents, no letters or numbers, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 83,
+      "ui_kind": "icon_sheet"
+    },
+    {
+      "path": "ui/icons_reliability.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Icon atlas in a strict 3x3 grid of nine distinct simple monochrome pictograms for four evidence reliability states; clear at small size, consistent solid charcoal silhouettes with tiny ochre accents, no letters or numbers, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 84,
+      "ui_kind": "icon_sheet"
+    },
+    {
+      "path": "ui/icons_factions.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Icon atlas in a strict 3x3 grid of nine distinct simple monochrome pictograms for three faction and three city force pictograms; clear at small size, consistent solid charcoal silhouettes with tiny ochre accents, no letters or numbers, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 85,
+      "ui_kind": "icon_sheet"
+    },
+    {
+      "path": "ui/icons_actions.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Icon atlas in a strict 3x3 grid of nine distinct simple monochrome pictograms for investigate, inspect, archive, refute, ask and protect action pictograms; clear at small size, consistent solid charcoal silhouettes with tiny ochre accents, no letters or numbers, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 86,
+      "ui_kind": "icon_sheet"
+    },
+    {
+      "path": "ui/icons_time.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Icon atlas in a strict 3x3 grid of nine distinct simple monochrome pictograms for morning, day, evening, night and silence pictograms; clear at small size, consistent solid charcoal silhouettes with tiny ochre accents, no letters or numbers, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 87,
+      "ui_kind": "icon_sheet"
+    },
+    {
+      "path": "ui/icons_status.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Icon atlas in an exact 4-column by 3-row grid of twelve equally sized cells with generous transparent gutters. Cells 1–10 contain ten distinct pictograms: four case/module symbols (1: a combined case-status and final-questions emblem, 2: sanity, 3: cipher, 4: archive) and six separate navigation symbols (5: back, 6: map, 7: board, 8: notebook, 9: chat, 10: profile). Cells 11 and 12 remain fully transparent and empty. Make every symbol independently recognizable at small size, with consistent solid charcoal silhouettes and tiny ochre accents; no letters or numbers. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 88,
+      "ui_kind": "icon_sheet"
+    },
+    {
+      "path": "ui/emblem_investigation.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One standalone circular faction emblem for investigation faction: open archive tab over a miner lamp; original fictional design, no text, transparent outside emblem. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 89,
+      "ui_kind": "faction_emblem"
+    },
+    {
+      "path": "ui/emblem_shadow.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One standalone circular faction emblem for shadow faction: obscured ledger and cable loop; original fictional design, no text, transparent outside emblem. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 90,
+      "ui_kind": "faction_emblem"
+    },
+    {
+      "path": "ui/emblem_independent.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. One standalone circular faction emblem for independent faction: balanced stone and listening fork; original fictional design, no text, transparent outside emblem. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 91,
+      "ui_kind": "faction_emblem"
+    },
+    {
+      "path": "ui/reputation_medals.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Reward sprite sheet, exact 3x3 grid of nine small distinct reputation medals and mine-service badges, fictional and unlettered, no numbers, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 92,
+      "ui_kind": "reward_sheet"
+    },
+    {
+      "path": "ui/avatar_frames.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Avatar-frame sprite sheet, exact 3x3 grid of nine square portrait rings for fictional players and NPCs; one unmistakable but wordless NPC marker motif among them; every portrait center and outside corners transparent. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 93,
+      "ui_kind": "avatar_sheet"
+    },
+    {
+      "path": "ui/map_symbols.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Map overlay sheet with a strict 3x3 grid: eight distinct mine-town location markers and one simple compass rose, no text, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 94,
+      "ui_kind": "map_symbols"
+    },
+    {
+      "path": "ui/map_routes.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Map overlay sheet with a strict 3x3 grid: route frame, dotted route line, and seven distinct opaque-to-transparent fog shapes for unexplored areas; no text, transparent gutters. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 95,
+      "ui_kind": "map_routes"
+    },
+    {
+      "path": "ui/screen_case_intro.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Quiet 2:3 case opening screen background; empty composition with broad readable negative space for later interface overlay, layered mine strata and distant shaft light, no interface widgets, no text or people. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 96,
+      "ui_kind": "screen"
+    },
+    {
+      "path": "ui/screen_case_end.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Quiet 2:3 case conclusion screen background; empty composition with broad readable negative space for later interface overlay, layered mine strata and distant shaft light, no interface widgets, no text or people. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 97,
+      "ui_kind": "screen"
+    },
+    {
+      "path": "ui/screen_dossier.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. Quiet 2:3 dossier background; empty composition with broad readable negative space for later interface overlay, layered mine strata and distant shaft light, no interface widgets, no text or people. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 98,
+      "ui_kind": "screen"
+    },
+    {
+      "path": "ui/case_menu_front.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI component for the case selection menu: case menu card front border with empty central art window and small blank icon recesses. Keep all inset windows transparent; no lettering, numbers or logos, transparent background and clean edges. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 99,
+      "ui_kind": "case_menu"
+    },
+    {
+      "path": "ui/case_menu_back.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI component for the case selection menu: case menu card reverse border with empty central panel and blank icon recesses. Keep all inset windows transparent; no lettering, numbers or logos, transparent background and clean edges. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 100,
+      "ui_kind": "case_menu"
+    },
+    {
+      "path": "ui/case_difficulty_badges.png",
+      "size": "1024x1024",
+      "transparent_background": true,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. UI component for the case selection menu: nine separate unlettered case difficulty, player-count, duration and world-seal pictograms in a 3x3 sprite sheet. Keep all inset windows transparent; no lettering, numbers or logos, transparent background and clean edges. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "ui",
+      "order": 101,
+      "ui_kind": "case_menu"
+    },
+    {
+      "path": "covers/case_01_seventh_knock.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. 2:3 vertical illustrated case cover, no typography. Case cover about a sealed lower-gallery rock face answering with seven distinct dust tremors while a replacement brace lies in foreground; no people or gore. Make a strong central silhouette and a calm dark margin for later title overlay. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "covers",
+      "order": 102,
+      "case_id": "01_seventh_knock"
+    },
+    {
+      "path": "covers/case_02_empty_cage.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. 2:3 vertical illustrated case cover, no typography. Case cover about an empty mine cage rising in a black shaft, one abandoned lamp and a cable vanishing upward; absence and uncertainty, no person. Make a strong central silhouette and a calm dark margin for later title overlay. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "covers",
+      "order": 103,
+      "case_id": "02_empty_cage"
+    },
+    {
+      "path": "covers/case_03_missing_horizon.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. 2:3 vertical illustrated case cover, no typography. Case cover about several blank survey maps whose drawn lower seams diverge around an erased horizon; no readable marks. Make a strong central silhouette and a calm dark margin for later title overlay. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "covers",
+      "order": 104,
+      "case_id": "03_missing_horizon"
+    },
+    {
+      "path": "covers/case_04_do_not_wake.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. 2:3 vertical illustrated case cover, no typography. Case cover about a dormant drill bit facing a sealed mineral seam, a tiny kerosene lamp and immense dark negative space; no active dangerous procedure. Make a strong central silhouette and a calm dark margin for later title overlay. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "covers",
+      "order": 105,
+      "case_id": "04_do_not_wake"
+    },
+    {
+      "path": "covers/case_05_doctors_signature.png",
+      "size": "1024x1536",
+      "transparent_background": false,
+      "prompt": "1930s industrial charcoal-and-stone-lithograph illustration; layered graphite black, kerosene ochre, iron rust, chalk white, rare cold mica-blue; mineral grain, colossal underground negative space, seven-notch rhythm and tactile rock strata; strong readable silhouettes, human scale dwarfed by the mine; no recognizable cult sigils or borrowed horror designs. 2:3 vertical illustrated case cover, no typography. Case cover about an unmarked clinic folder and a lamp tag casting mismatched shadows across a mine map; no text or injured person. Make a strong central silhouette and a calm dark margin for later title overlay. No readable text, letters, numbers, labels, logos, real brands, recognizable people, or watermark. Show only fictional adult characters. Editorial 16+ horror: claustrophobia and uncanny mine atmosphere are allowed; no graphic blood, torture, sexual violence, threats to children, or detailed self-harm. Do not imitate any known film, game, artist, or franchise.",
+      "reference_paths": [
+        "locations/reference.png"
+      ],
+      "group": "covers",
+      "order": 106,
+      "case_id": "05_doctors_signature"
+    }
+  ],
+  "item_cutouts": [
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 1,
+      "id": "lift_token",
+      "path": "items/i_c1_01_lift_token.png",
+      "size": "1024x1024",
+      "order": 1
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 2,
+      "id": "lamp_tag",
+      "path": "items/i_c1_02_lamp_tag.png",
+      "size": "1024x1024",
+      "order": 2
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 3,
+      "id": "rock_core",
+      "path": "items/i_c1_03_rock_core.png",
+      "size": "1024x1024",
+      "order": 3
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 4,
+      "id": "tuning_fork",
+      "path": "items/i_c1_04_tuning_fork.png",
+      "size": "1024x1024",
+      "order": 4
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 5,
+      "id": "survey_pin",
+      "path": "items/i_c1_05_survey_pin.png",
+      "size": "1024x1024",
+      "order": 5
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 6,
+      "id": "rivet",
+      "path": "items/i_c1_06_rivet.png",
+      "size": "1024x1024",
+      "order": 6
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 7,
+      "id": "filter_cloth",
+      "path": "items/i_c1_07_filter_cloth.png",
+      "size": "1024x1024",
+      "order": 7
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 8,
+      "id": "drill_bit",
+      "path": "items/i_c1_08_drill_bit.png",
+      "size": "1024x1024",
+      "order": 8
+    },
+    {
+      "source_path": "items/sheet_c1.png",
+      "slot": 9,
+      "id": "sample_sack",
+      "path": "items/i_c1_09_sample_sack.png",
+      "size": "1024x1024",
+      "order": 9
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 1,
+      "id": "hand_lamp",
+      "path": "items/i_c2_01_hand_lamp.png",
+      "size": "1024x1024",
+      "order": 10
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 2,
+      "id": "gallery_map",
+      "path": "items/i_c2_02_gallery_map.png",
+      "size": "1024x1024",
+      "order": 11
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 3,
+      "id": "shift_book",
+      "path": "items/i_c2_03_shift_book.png",
+      "size": "1024x1024",
+      "order": 12
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 4,
+      "id": "brace_invoice",
+      "path": "items/i_c2_04_brace_invoice.png",
+      "size": "1024x1024",
+      "order": 13
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 5,
+      "id": "clinic_record",
+      "path": "items/i_c2_05_clinic_record.png",
+      "size": "1024x1024",
+      "order": 14
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 6,
+      "id": "train_manifest",
+      "path": "items/i_c2_06_train_manifest.png",
+      "size": "1024x1024",
+      "order": 15
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 7,
+      "id": "air_report",
+      "path": "items/i_c2_07_air_report.png",
+      "size": "1024x1024",
+      "order": 16
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 8,
+      "id": "sample_register",
+      "path": "items/i_c2_08_sample_register.png",
+      "size": "1024x1024",
+      "order": 17
+    },
+    {
+      "source_path": "items/sheet_c2.png",
+      "slot": 9,
+      "id": "old_drawing",
+      "path": "items/i_c2_09_old_drawing.png",
+      "size": "1024x1024",
+      "order": 18
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 1,
+      "id": "dust_layer",
+      "path": "items/i_c3_01_dust_layer.png",
+      "size": "1024x1024",
+      "order": 19
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 2,
+      "id": "hammer_pattern",
+      "path": "items/i_c3_02_hammer_pattern.png",
+      "size": "1024x1024",
+      "order": 20
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 3,
+      "id": "warm_stone",
+      "path": "items/i_c3_03_warm_stone.png",
+      "size": "1024x1024",
+      "order": 21
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 4,
+      "id": "boot_drag",
+      "path": "items/i_c3_04_boot_drag.png",
+      "size": "1024x1024",
+      "order": 22
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 5,
+      "id": "cable_mark",
+      "path": "items/i_c3_05_cable_mark.png",
+      "size": "1024x1024",
+      "order": 23
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 6,
+      "id": "echo_gap",
+      "path": "items/i_c3_06_echo_gap.png",
+      "size": "1024x1024",
+      "order": 24
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 7,
+      "id": "operator_account",
+      "path": "items/i_c3_07_operator_account.png",
+      "size": "1024x1024",
+      "order": 25
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 8,
+      "id": "sorter_account",
+      "path": "items/i_c3_08_sorter_account.png",
+      "size": "1024x1024",
+      "order": 26
+    },
+    {
+      "source_path": "items/sheet_c3.png",
+      "slot": 9,
+      "id": "clinic_account",
+      "path": "items/i_c3_09_clinic_account.png",
+      "size": "1024x1024",
+      "order": 27
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 1,
+      "id": "quarry_account",
+      "path": "items/i_c4_01_quarry_account.png",
+      "size": "1024x1024",
+      "order": 28
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 2,
+      "id": "listener_account",
+      "path": "items/i_c4_02_listener_account.png",
+      "size": "1024x1024",
+      "order": 29
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 3,
+      "id": "teacher_account",
+      "path": "items/i_c4_03_teacher_account.png",
+      "size": "1024x1024",
+      "order": 30
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 4,
+      "id": "unknown_ore",
+      "path": "items/i_c4_04_unknown_ore.png",
+      "size": "1024x1024",
+      "order": 31
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 5,
+      "id": "damaged_brace",
+      "path": "items/i_c4_05_damaged_brace.png",
+      "size": "1024x1024",
+      "order": 32
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 6,
+      "id": "lamp_wick",
+      "path": "items/i_c4_06_lamp_wick.png",
+      "size": "1024x1024",
+      "order": 33
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 7,
+      "id": "cable_fiber",
+      "path": "items/i_c4_07_cable_fiber.png",
+      "size": "1024x1024",
+      "order": 34
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 8,
+      "id": "resonance_chip",
+      "path": "items/i_c4_08_resonance_chip.png",
+      "size": "1024x1024",
+      "order": 35
+    },
+    {
+      "source_path": "items/sheet_c4.png",
+      "slot": 9,
+      "id": "sealed_sample",
+      "path": "items/i_c4_09_sealed_sample.png",
+      "size": "1024x1024",
+      "order": 36
+    }
+  ]
+}

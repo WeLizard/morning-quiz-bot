@@ -94,12 +94,16 @@ def test_room_photo_receipts_privacy_hints_scoring_restart_and_stop(pg_env, phot
                         question_count=2, open_seconds=5, now=100)
             async with db.transaction() as session:
                 service = RoomPhotoApplicationService(session)
-                assert (await service.setup(room_id=room, account_id=owner))['available_questions'] == 1
+                setup = await service.setup(room_id=room, account_id=owner)
+                # Setup counts metadata-usable records without hashing media;
+                # start still validates files and safely repeats the one valid item.
+                assert setup['available_questions'] == 2 and setup['can_start'] is True
                 started = await service.start(**body)
                 assert 'rounds' not in started and 'normalized_answer' not in str(started)
                 assert 'Сова' not in str(started)
                 game = await session.get(Game, started['game_id'])
                 assert game.chat_id is None and game.state['creator_account_id'] == str(owner)
+                assert [round_item['media']['media_key'] for round_item in game.state['rounds']] == ['owl', 'owl']
             for actor, exception in ((member, PermissionError), (outsider, LookupError)):
                 with pytest.raises(exception):
                     async with db.transaction() as session:
@@ -149,6 +153,41 @@ def test_room_photo_receipts_privacy_hints_scoring_restart_and_stop(pg_env, phot
             with pytest.raises(RuntimeError):
                 async with db.transaction() as session:
                     await RoomPhotoApplicationService(session).start(**{**body, 'question_count': 3})
+    asyncio.run(run())
+
+
+def test_photo_setup_and_round_selection_skip_legacy_digest_answers(pg_env, photo_media, monkeypatch):
+    async def run():
+        async with isolated_database(pg_env) as (db, _):
+            room, owner, _, _ = await seed(db)
+            await catalog(db, photo_media)
+            digest_answer = 'sha256-' + 'a' * 64
+            async with db.transaction() as session:
+                session.add(PhotoQuizItem(
+                    media_key='legacy-hash-answer', correct_answer=digest_answer,
+                    enabled=True, hints={}, metadata_json={
+                        'display_answer': digest_answer, 'storage_name': 'owl',
+                        'image_sha256': sha256(photo_media).hexdigest(),
+                    },
+                ))
+
+            # Sorted candidates then try the hash-answer row before owl, making
+            # this deterministic test fail if selection stops filtering it.
+            monkeypatch.setattr('application.photo_selection.random.SystemRandom.shuffle',
+                                lambda _self, items: None)
+            async with db.transaction() as session:
+                service = RoomPhotoApplicationService(session)
+                setup = await service.setup(room_id=room, account_id=owner)
+                assert setup['available_questions'] == 2 and setup['can_start'] is True
+                started = await service.start(
+                    room_id=room, account_id=owner, command_id=str(uuid4()),
+                    question_count=2, open_seconds=60, now=100,
+                )
+                game = await session.get(Game, started['game_id'])
+                assert [item['media']['media_key'] for item in game.state['rounds']] == ['owl', 'owl']
+                assert 'sha256-' not in str(game.state)
+                assert len(started['question']['mask']) == len('Сова')
+
     asyncio.run(run())
 
 

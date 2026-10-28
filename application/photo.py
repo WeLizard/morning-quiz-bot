@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Sequence
@@ -63,7 +64,7 @@ class PhotoApplicationService:
         return await available_photo_questions(self.session)
 
     async def setup(self) -> dict[str, Any]:
-        """Return the server-owned defaults and playable catalog size."""
+        """Return defaults and the metadata-eligible catalog size."""
         try:
             available = await self._available_questions()
         except LookupError:
@@ -344,7 +345,8 @@ class PhotoApplicationService:
                 or not state["current_round_id"] or round_id != state["current_round_id"]):
             raise LookupError("Активный фото-вопрос не найден.")
         item = next(item for item in state["rounds"] if item["round_id"] == state["current_round_id"])
-        path = verified_image_path(images_root(), item["media"]["media_key"], item["media"])
+        path = await asyncio.to_thread(
+            verified_image_path, images_root(), item["media"]["media_key"], item["media"])
         if path is None:
             raise LookupError("Изображение недоступно.")
         return path
@@ -357,7 +359,8 @@ class PhotoApplicationService:
         item = next((item for item in state["rounds"] if item["round_id"] == round_id), None)
         if item is None or item["status"] != "open" or state["current_round_id"] != round_id:
             return None
-        path = verified_image_path(images_root(), item["media"]["media_key"], item["media"])
+        path = await asyncio.to_thread(
+            verified_image_path, images_root(), item["media"]["media_key"], item["media"])
         if path is None:
             return None
         key = ("initial", "first_letters", "partial")[item["hint_level"]]

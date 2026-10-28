@@ -3,6 +3,7 @@
 The room owner controls the series. Other members receive only occupancy;
 group Photo rules remain an owner decision, not an implicit new game mode.
 """
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.parse import quote
@@ -198,7 +199,8 @@ class RoomPhotoApplicationService:
         item = next(item for item in state['rounds'] if item['round_id'] == round_id)
         if item['status'] != 'open' or _moment(now) > item['closes_at']:
             raise LookupError('Активный фото-вопрос не найден.')
-        path = verified_image_path(images_root(), item['media']['media_key'], item['media'])
+        path = await asyncio.to_thread(
+            verified_image_path, images_root(), item['media']['media_key'], item['media'])
         if path is None:
             raise LookupError('Изображение недоступно.')
         return path

@@ -269,4 +269,17 @@ body .bottomnav{padding-bottom:calc(6px + var(--qw-safe-bottom,0px))}
 :root[data-qw-contrast="1"] .brand-caption{white-space:nowrap;letter-spacing:1px}
 /* Larger captions must not push ⚙ out of the desktop top bar. */
 :root[data-qw-contrast="1"] .topbar .nav-btn{padding-inline:9px}
+/* One row, one height (UI_RULES «Одна группа — одна высота»): the 2px outline and the larger caption made the section
+   pills 48px next to 44px icon buttons. Vertical padding goes, min-height keeps every top-bar control at 44px. */
+body .topbar .nav-btn{padding-block:0}
+/* PC collection: the order select gets the whole second line instead of a 97–113px cap that clipped «Сначала новые»
+   (and, in contrast mode, its 15px caption and 2px outline); the count stays on the first line. */
+@media(min-width:761px){
+ body .collection-meta{flex-wrap:wrap;row-gap:6px}
+ body .collection-meta>span{flex:1 0 100%}
+ body .collection-tools{flex:1 1 100%;min-width:0}
+ body .collection-meta select{flex:1 1 auto;min-width:0;max-width:none;padding-inline:8px}
+}
 @media(min-width:1024px){:root[data-qw-contrast="1"] .topbar{gap:14px}}
+/* Keep the chapter number and arrow on one line in the desktop side panel. */
+.chapter-head{gap:10px;min-width:0}.chapter-head>.eyebrow{min-width:0}.chapter-head>.text-btn{flex:0 0 auto;white-space:nowrap;gap:5px;padding-inline:8px}

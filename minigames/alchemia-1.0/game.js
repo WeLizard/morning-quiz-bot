@@ -252,24 +252,53 @@ function renderSelection(){
  $('boardCaption').innerHTML=t?`<strong>${name(t.id)}</strong> + что-то ещё${phone.matches?': выбери второй элемент':'. Выбери элемент в коллекции или на столе.'}`:(state.bench.length?'Нажми на два элемента или перетащи один на другой':'Выбери первый элемент в коллекции ниже или слева');
 }
 function renderAll(freshId=null,failed=[]){syncState();renderCollection();renderProgress();renderBoard(freshId,failed);}
-function freePosition(){
- let best={u:.5,v:.5},score=-1;
- const candidates=[{u:.5,v:.5}];
- for(let y=0;y<5;y++)for(let x=0;x<6;x++)candidates.push({u:.04+x*.184,v:.05+y*.225});
- for(const c of candidates){const p=xy(c);const dist=state.bench.length?Math.min(...state.bench.map(t=>{const k=xy(t);return Math.hypot(p.x-k.x,p.y-k.y);})):10000;
- if(dist>score){score=dist;best=c;}}
- return best;
+// Keep an 8px gap between independent touch targets, including drops near another card.
+function tokenOverlaps(t){
+ const a=xy(t);
+ return state.bench.some(o=>o!==t&&(b=>Math.abs(a.x-b.x)<tokenSize.w+8-.01&&Math.abs(a.y-b.y)<tokenSize.h+8-.01)(xy(o)));
 }
-function addToken(id,pos=null){
+function freePosition(except=null){
+ measureTokens();
+ const others=state.bench.filter(t=>t!==except),xs=[8],ys=[26];
+ for(const t of others){const p=xy(t);xs.push(p.x+tokenSize.w+8);ys.push(p.y+tokenSize.h+8);}
+ // For axis-aligned cards a free rectangle can be slid left/up until it touches an edge or another card.
+ for(const y of ys)for(const x of xs){
+  if(x>board.clientWidth-tokenSize.w-8||y>board.clientHeight-tokenSize.h-padBottom())continue;
+  const pos=uv(x+tokenSize.w/2,y+tokenSize.h/2),candidate={...pos};
+  if(!others.some(o=>{const p=xy(o),q=xy(candidate);return Math.abs(p.x-q.x)<tokenSize.w+8-.01&&Math.abs(p.y-q.y)<tokenSize.h+8-.01;}))return pos;
+ }
+ return null;
+}
+function placeToken(t,pos=null){
+ measureTokens();if(pos)Object.assign(t,pos);
+ if(pos&&!tokenOverlaps(t))return true;
+ const free=freePosition(t);if(free){Object.assign(t,free);return true;}
+ const saved=state.bench.map(x=>[x.u,x.v]);layoutBench();
+ if(!benchCrowded())return true;
+ state.bench.forEach((x,i)=>{[x.u,x.v]=saved[i];});return false;
+}
+function tableFull(){showToast('На столе слишком тесно','Удали лишнее или очисти стол — открытия останутся.',null,'failure');}
+function addToken(id,pos=null,mixing=false){
  if(!found.has(id))return null;
- if(state.bench.length>=MAX_TOKENS){showToast('На столе слишком тесно','Удали лишнее или очисти стол — открытия останутся. ',null,'failure');return null;}
- const t={uid:uid(),id,...(pos||freePosition())};state.bench.push(t);return t;
+ if(!mixing&&state.bench.length>=MAX_TOKENS){tableFull();return null;}
+ const t={uid:uid(),id,u:.5,v:.5};state.bench.push(t);
+ if(mixing){Object.assign(t,pos);return t;} // Explicit drop onto a target is consumed by mix immediately.
+ if(!placeToken(t,pos)){state.bench.pop();tableFull();return null;}
+ return t;
 }
 function chooseFromCollection(id){
  if(!found.has(id))return;
  const first=state.bench.find(t=>t.uid===selected);
- pushUndo();const t=addToken(id);if(!t){undoStack.pop();return;}
- if(first){mix(first.uid,t.uid,false);return;}
+ const previousUndo=undoStack.slice();pushUndo();const t=addToken(id,first?{u:first.u,v:first.v}:null,!!first);
+ if(!t){undoStack=previousUndo;return;}
+ if(first){
+  const mixed=mix(first.uid,t.uid,false);
+  if(!mixed){
+   if(state.bench.length>MAX_TOKENS||!placeToken(t)){state.bench=undoStack.at(-1);undoStack=previousUndo;tableFull();}
+   renderBoard();persist();
+  }
+  return;
+ }
  selected=t.uid;renderBoard();persist();playSound('select');
 }
 function chooseToken(id){
@@ -293,13 +322,13 @@ function mix(id1,id2,snapshot=true){
   isNew=!found.has(r.result);found.add(r.result);knownRecipes.add(key);
   window.MQBAlchemySync?.verifyCraft(t1.id,t2.id);
   state.bench=state.bench.filter(t=>t.uid!==id1&&t.uid!==id2);
-  newToken=addToken(r.result,{u:(t1.u+t2.u)/2,v:(t1.v+t2.v)/2});
+  newToken=addToken(r.result,{u:t1.u,v:t1.v});
   if(isNew){newThisSession.add(r.result);state.latest=r.result;if(state.pinned===r.result)state.pinned=null;if(hint?.recipe?.result===r.result)hint=null;}
  }
  const awards=updateAchievements();
  renderAll(newToken?.uid,r?[]:[id1,id2]);persist();
  if(r){
-  const pos=xy(newToken);burst(pos.x+tokenSize.w/2,pos.y+tokenSize.h/2,isNew);playSound(isNew?'discovery':'success');
+  if(newToken){const pos=xy(newToken);burst(pos.x+tokenSize.w/2,pos.y+tokenSize.h/2,isNew);}playSound(isNew?'discovery':'success');
   let message=`${name(t1.id)} + ${name(t2.id)} · ${found.size} / ${E.size}`;
   if(awards.length)message+=` · ${awards[0].name}`;
   if(oldChapter!==currentChapter()||DATA.chapters.every(chapterComplete)&&oldChapter===DATA.chapters.at(-1)&&isNew)message+=` · Глава завершена!`;
@@ -310,9 +339,15 @@ function mix(id1,id2,snapshot=true){
 }
 function arrangeBench(snapshot=true){
  if(!state.bench.length)return;
- if(snapshot)pushUndo();
+ const previousUndo=undoStack.slice();if(snapshot)pushUndo();
+ const saved=state.bench.map(t=>[t.u,t.v]);layoutBench();
+ if(benchCrowded()){state.bench.forEach((t,i)=>{[t.u,t.v]=saved[i];});if(snapshot){undoStack=previousUndo;tableFull();}return;}
+ selected=null;renderBoard();if(snapshot)persist();
+}
+// Grid positions only (u/v of every token), no render: shared by «Расставить» and by addToken when the table is full.
+function layoutBench(){
  measureTokens();const n=state.bench.length,w=board.clientWidth,h=board.clientHeight,gap=18;
- const maxCols=Math.max(1,Math.floor((w-10)/(tokenSize.w+6)));
+ const maxCols=Math.max(1,Math.floor((w-16+8)/(tokenSize.w+8)));
  let cols=Math.min(maxCols,Math.ceil(Math.sqrt(n)));
  const free=h-26-padBottom();
  while(Math.ceil(n/cols)*(tokenSize.h+10)>free+5&&cols<maxCols)cols++;
@@ -320,13 +355,13 @@ function arrangeBench(snapshot=true){
  const stepX=Math.min(tokenSize.w+gap,(w-tokenSize.w-20)/Math.max(1,cols-1));
  const stepY=Math.min(tokenSize.h+gap,(free-tokenSize.h)/Math.max(1,rows-1));
  const startX=(w-((cols-1)*stepX+tokenSize.w))/2;
- const startY=Math.max(26,(h-((rows-1)*stepY+tokenSize.h))/2+5);
+ // Centred (+5px for the caption), but never so low that xy() clamps the last row up into the one above it.
+ const startY=Math.max(26,Math.min((h-((rows-1)*stepY+tokenSize.h))/2+5,h-padBottom()-(rows-1)*stepY-tokenSize.h));
  state.bench.forEach((t,i)=>{const lastCount=n-(rows-1)*cols,lastRow=Math.floor(i/cols)===rows-1,offset=lastRow?(cols-lastCount)*stepX/2:0;Object.assign(t,uv(startX+(i%cols)*stepX+offset+tokenSize.w/2,startY+Math.floor(i/cols)*stepY+tokenSize.h/2));});
- selected=null;renderBoard();if(snapshot)persist();
 }
 function benchCrowded(){
  const p=state.bench.map(xy);
- return p.some((a,i)=>p.slice(i+1).some(b=>Math.abs(a.x-b.x)<tokenSize.w-4&&Math.abs(a.y-b.y)<tokenSize.h-4));
+ return p.some((a,i)=>p.slice(i+1).some(b=>Math.abs(a.x-b.x)<tokenSize.w+8-.01&&Math.abs(a.y-b.y)<tokenSize.h+8-.01));
 }
 function clearBench(){if(!state.bench.length){showToast('Стол уже свободен','Все открытые элементы доступны в коллекции.',null,'failure',1700);return;}pushUndo();state.bench=[];selected=null;renderBoard();persist();dismissToast();}
 function undo(){if(!undoStack.length)return;cancelDrag();state.bench=undoStack.pop();selected=null;renderBoard();persist();dismissToast();announce('Изменение стола отменено. Открытия сохранены.');}
@@ -403,12 +438,21 @@ function pointerUp(e){
  cleanupDrag();selected=null;
  if(inTrash){pushUndo();state.bench=state.bench.filter(t=>t.uid!==d.uid);renderBoard();persist();return;}
  if(!inBoard){renderSelection();return;}
- pushUndo();let moving;
+ const previousUndo=undoStack.slice();pushUndo();let moving;
  const pos=uv(e.clientX-rect.left-d.offsetX+tokenSize.w/2,e.clientY-rect.top-d.offsetY+tokenSize.h/2);
- if(d.source==='bench'){moving=state.bench.find(t=>t.uid===d.uid);if(moving)Object.assign(moving,pos);}
- else moving=addToken(d.id,pos);
- if(!moving){undoStack.pop();renderBoard();return;}
- if(targetId&&targetId!==moving.uid){mix(moving.uid,targetId,false);return;}
+ if(d.source==='bench'){
+  moving=state.bench.find(t=>t.uid===d.uid);
+  if(moving&&!targetId){const previous={u:moving.u,v:moving.v};if(!placeToken(moving,pos)){Object.assign(moving,previous);undoStack=previousUndo;renderBoard();tableFull();return;}}
+ }else moving=addToken(d.id,pos,!!targetId);
+ if(!moving){undoStack=previousUndo;renderBoard();return;}
+ if(targetId&&targetId!==moving.uid){
+  const mixed=mix(moving.uid,targetId,false);
+  if(!mixed&&d.source==='shelf'){
+   if(state.bench.length>MAX_TOKENS||!placeToken(moving)){state.bench=undoStack.at(-1);undoStack=previousUndo;tableFull();}
+   renderBoard();persist();
+  }
+  return;
+ }
  renderBoard();persist();playSound('select');
 }
 
@@ -472,9 +516,22 @@ function journalRows(){
 function showJournal(){
  openModal('Дневник опытов','Последние '+HISTORY_LIMIT+' опытов · новые записи сверху',`<div class="stat-grid"><div class="stat-box"><strong>${state.attempts}</strong><span>всего экспериментов</span></div><div class="stat-box"><strong>${tried.size}</strong><span>разных сочетаний</span></div><div class="stat-box"><strong>${knownRecipes.size}</strong><span>удачных рецептов</span></div></div><div class="modal-toolbar">${[['all','Все опыты'],['success','Удачные'],['new','Новые открытия']].map(([k,l])=>`<button class="chip ${journalFilter===k?'active':''}" data-journal-filter="${k}">${l}</button>`).join('')}<button class="text-btn" data-action="achievements" style="margin-left:auto">${icon('star')} Достижения</button></div><div id="journalEntries">${journalRows()}</div>`,'journal');
 }
+function alchemyContrastAvailable(){return window.MQBAlchemySync?.contrastAvailable?.()??(!!window.QW?.prefs&&location.protocol!=='file:');}
+function alchemyContrastEnabled(){return window.MQBAlchemySync?.contrastEnabled?.()??!!window.QW?.prefs?.get?.().contrast;}
+function syncAlchemyContrastControl(){
+ const control=$('alchemyContrast');if(control){control.setAttribute('aria-checked',String(alchemyContrastEnabled()));control.disabled=!alchemyContrastAvailable()||!!window.MQBAlchemySync?.isContrastPending?.();}
+}
+async function toggleAlchemyContrast(){
+ const control=$('alchemyContrast');if(!control||control.disabled||!alchemyContrastAvailable())return;
+ const on=!alchemyContrastEnabled();control.disabled=true;
+ try{await window.MQBAlchemySync?.setAccountContrast(on);}
+ catch(error){showToast('Режим не сохранён',error.message,null,'failure');}
+ finally{control.disabled=false;syncAlchemyContrastControl();}
+}
+try{globalThis.addEventListener?.('qw:contrast',syncAlchemyContrastControl)}catch{}
 function showSettings(keepScroll=false){
  const scroll=keepScroll?$('modalBody').scrollTop:0;
- const content=`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section><section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
+ const content=`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Контрастный режим</strong><small>${alchemyContrastAvailable()?'Дополнительный режим для текста, рамок и сцены. Сохраняется в профиле и действует в обеих играх.':'Доступно в приложении'}</small></div><button id="alchemyContrast" class="switch" role="switch" aria-label="Контрастный режим" aria-checked="${alchemyContrastEnabled()}" data-action="contrast" ${!alchemyContrastAvailable()||window.MQBAlchemySync?.isContrastPending?.()?'disabled':''}></button></div><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section><section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
  openModal('Настройки','Настрой уют, не отвлекаясь от чудес',content,'settings');if(keepScroll)$('modalBody').scrollTop=scroll;
 }
 function showHelp(){
@@ -520,7 +577,9 @@ function loadPair(key){
  if(!validPair(key))return;
  const [a,b]=key.split('+');if(!found.has(a)||!found.has(b)){showToast('Ингредиенты ещё не открыты','Подсказка подберёт доступное сейчас сочетание.',null,'failure');return;}
  if(state.bench.length>MAX_TOKENS-2){showToast('Сначала освободи место','Удали две карточки или очисти рабочий стол.',null,'failure');return;}
- closeModal();pushUndo();const t1=addToken(a,{u:.3,v:.43});const t2=addToken(b,{u:.7,v:.43});selected=t1.uid;renderBoard();persist();announce('Ингредиенты на столе. Нажми на второй, чтобы смешать.');
+ closeModal();const previousUndo=undoStack.slice();pushUndo();const t1=addToken(a,{u:.3,v:.43});const t2=t1&&addToken(b,{u:.7,v:.43});
+ if(!t2){state.bench=undoStack.at(-1);undoStack=previousUndo;renderBoard();return;}
+ selected=t1.uid;renderBoard();persist();announce('Ингредиенты на столе. Нажми на второй, чтобы смешать.');
 }
 function pinGoal(id){if(found.has(id)){showDetail(id);return;}state.pinned=id;hint=null;persist();renderProgress();showHint();}
 function requestConfirm(title,body,label,fn,back='settings'){
@@ -554,6 +613,7 @@ async function importSave(file){
 function action(name){
  switch(name){
   case'home':closeModal();break;
+  case'contrast':void toggleAlchemyContrast();break;
   case'help':showHelp();break;
   case'atlas':showAtlas();break;
   case'chapters':showChapters();break;
@@ -595,7 +655,7 @@ listen(document,'click',e=>{
  if(el.dataset.category){if(performance.now()<suppressClickUntil)return;category=el.dataset.category;renderCollection();return;}
  if(el.dataset.goal){pinGoal(el.dataset.goal);return;}
  if(el.dataset.favorite){const id=el.dataset.favorite;favorites.has(id)?favorites.delete(id):favorites.add(id);persist();renderCollection();showDetail(id);return;}
- if(el.dataset.addTable){const id=el.dataset.addTable;closeModal();pushUndo();const t=addToken(id);if(t){selected=t.uid;renderBoard();persist();}return;}
+ if(el.dataset.addTable){const id=el.dataset.addTable;closeModal();const previousUndo=undoStack.slice();pushUndo();const t=addToken(id);if(t){selected=t.uid;renderBoard();persist();}else{undoStack=previousUndo;renderBoard();}return;}
  if(el.dataset.loadRecipe){loadPair(el.dataset.loadRecipe);return;}
  if(el.dataset.locked){showLocked(el.dataset.locked);return;}
  if(el.dataset.journalFilter){journalFilter=el.dataset.journalFilter;showJournal();return;}
@@ -786,7 +846,7 @@ function initShell(){
   QW.menu.register([
    {id:'alchemy-sound',icon:'sound',label:'Звуки превращений',hidden:soundHidden,toggle:()=>state.settings.sound,onSelect:()=>toggleSound()},
    {id:'alchemy-help',icon:'help',label:'Как играть',hidden:helpHidden,onSelect:()=>showHelp()},
-   {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'анимации, экспорт, сброс',onSelect:()=>showSettings()}
+   {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'контраст, анимации, экспорт, сброс',onSelect:()=>showSettings()}
   ],'Alchemia');
   syncShellColor();
  }catch(err){console.warn('QW shell init failed',err);}

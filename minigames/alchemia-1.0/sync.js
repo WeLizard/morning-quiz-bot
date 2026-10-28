@@ -9,7 +9,7 @@
         'alchemia.atlas.v2', 'alchemia.atlas.v1', 'elementAlchemyDiscovered'];
     const RELOADED_KEY = 'mqb-alchemy-restored';
     const strings = value => Array.isArray(value) ? value.filter(item => typeof item === 'string') : [];
-    let busy = false, staleGuest = false, staleMini = false, telegramSession = false, unverifiedNoticeShown = false;
+    let busy = false, guestProfileLoaded = false, staleGuest = false, staleMini = false, telegramSession = false, unverifiedNoticeShown = false;
     let miniUserId = null, hadSession = false, sessionAttempt = null, craftQueue = Promise.resolve();
     let sessionGeneration = 0;
     const claimsInFlight = new Map(), pendingMemory = new Map();
@@ -158,7 +158,30 @@
         renewTimer = setInterval(renewSession, 8 * 60 * 1000);
     }
     async function establishSession() {
-        if (guestId) return !staleGuest;
+        if (guestId) {
+            if (staleGuest) return false;
+            if (guestProfileLoaded) return true;
+            if (sessionAttempt) return sessionAttempt;
+            sessionAttempt = (async () => {
+                try {
+                    const response = await fetch('/api/guest/me', {credentials: 'same-origin'});
+                    if (!response.ok) {
+                        if (!authFailure(response, await errorBody(response))) status('offline');
+                        return false;
+                    }
+                    const profile = await response.json();
+                    // Validate the cookie owner before applying its preferences to this account-scoped game.
+                    if (profile.account_id !== guestId) {
+                        authFailure({status: 409}, {code: 'profile_changed'});
+                        return false;
+                    }
+                    window.QW?.prefs?.applyAccount?.(profile);
+                    guestProfileLoaded = true;
+                    return true;
+                } catch { status('offline'); return false; }
+            })();
+            try { return await sessionAttempt; } finally { sessionAttempt = null; }
+        }
         if (staleMini) return false;
         if (telegramSession) return true;
         if (sessionAttempt) return sessionAttempt;
@@ -188,7 +211,7 @@
     }
     async function sync() {
         if (busy || staleGuest) return;
-        if (!guestId && !telegramSession && !(await establishSession())) return;
+        if (!(await establishSession())) return;
         busy = true;
         try {
             const generation = sessionGeneration;
@@ -281,7 +304,36 @@
         attempt.finally(() => claimsInFlight.delete(stageId));
         return attempt;
     }
-    window.MQBAlchemySync = Object.freeze({verifyCraft, claimStage, hasPendingClaim});
+    let contrastPending = false;
+    const contrastEnabled = () => !!window.QW?.prefs?.get?.().contrast;
+    const contrastAvailable = () => location.protocol !== 'file:' && !!window.QW?.prefs;
+    async function setAccountContrast(enabled) {
+        const prefs = window.QW?.prefs;
+        if (contrastPending) return false;
+        if (!contrastAvailable()) throw new Error('Доступно в приложении');
+        if (!(await establishSession())) throw new Error('Войди в аккаунт, чтобы сохранить контрастный режим.');
+        if (contrastPending) return false;
+        const previous = !!prefs.get().contrast, on = !!enabled, generation = sessionGeneration;
+        contrastPending = true; prefs.setContrast(on);
+        try {
+            const response = await fetch(`/api/account/contrast-mode?identity=${guestId ? 'guest' : 'telegram'}`, {
+                method: 'POST', credentials: 'same-origin', headers: {...headers(), 'X-Guest-CSRF': '1'}, body: JSON.stringify({enabled: on})});
+            if (generation !== sessionGeneration) return false;
+            if (!response.ok) {
+                const error = await errorBody(response);
+                if (prefs.get().contrast === on) prefs.setContrast(previous);
+                authFailure(response, error);
+                throw new Error(typeof error.detail === 'string' ? error.detail : 'Не удалось сохранить контрастный режим.');
+            }
+            const result = await response.json();
+            if (generation === sessionGeneration && prefs.get().contrast === on) prefs.applyAccount(result);
+            return true;
+        } catch (error) {
+            if (generation === sessionGeneration && prefs.get().contrast === on) prefs.setContrast(previous);
+            throw error;
+        } finally { contrastPending = false; }
+    }
+    window.MQBAlchemySync = Object.freeze({verifyCraft, claimStage, hasPendingClaim, setAccountContrast, contrastEnabled, contrastAvailable, isContrastPending: () => contrastPending});
     status('connecting');
     addEventListener('load', async () => {
         if (await establishSession()) await sync();

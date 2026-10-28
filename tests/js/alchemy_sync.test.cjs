@@ -19,7 +19,7 @@ function storage(initial = {}) {
 }
 
 const catalogRevision = 'a'.repeat(64);
-function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {}, response = {}, status = 200, fail = false, request = null, profileRequest = null, protocol = 'https:', uuid = 'command-0001'} = {}) {
+function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {}, response = {}, status = 200, fail = false, request = null, profileRequest = null, protocol = 'https:', uuid = 'command-0001', contrast = false, guestProfile = null, shell = true} = {}) {
     const localStore = storage(local);
     const sessionStore = storage(session);
     const calls = [];
@@ -33,6 +33,7 @@ function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {
     const sandbox = {
         window: {
             MQB_ALCHEMY_GUEST_ID: guestId,
+            QW: shell ? {prefs: {contrast, get() { return {contrast:this.contrast}; }, setContrast(on) {this.contrast=!!on;}, appliedProfiles: [], applyAccount(profile) { this.appliedProfiles.push(profile);if(typeof profile.contrast_mode==='boolean')this.contrast=profile.contrast_mode; }}} : undefined,
             Alchemia: {catalogRevision, setServerStatus: value => statuses.push(value), applyRemoteState: remote => { applied.push(remote); return {added: Array.isArray(remote.discovered) ? remote.discovered.length : 0}; }},
         },
         localStorage: localStore,
@@ -41,10 +42,15 @@ function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {
         crypto: {randomUUID: () => uuid},
         document: {
             hidden: false,
+            documentElement: {attrs:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];}},
             createElement: () => ({style: {}, remove() {}, set textContent(value) { banners.push(value); }, get textContent() { return banners[banners.length - 1]; }}),
             body: {append() {}},
         },
         fetch: async (url, options) => {
+            if (url === '/api/guest/me') {
+                if(guestProfile)return guestProfile();
+                return {ok:true,status:200,json:async()=>({account_id:guestId})};
+            }
             if (url === '/api/mini/me') {
                 profileCalls += 1;
                 if (profileRequest) return profileRequest(profileCalls);
@@ -66,7 +72,7 @@ function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {
         // Игра «не умеет» вливать чужой прогресс — проверяем запасной путь моста.
         set declineRemote(value) { sandbox.window.Alchemia.applyRemoteState = () => ({added: 0}); },
         get declineRemote() { return false; },
-        window: sandbox.window};
+        window: sandbox.window, document: sandbox.document};
     return environment;
 }
 
@@ -458,4 +464,50 @@ test('запоздалый успех после инвалидирования 
     assert.equal(env.statuses.at(-1), 'profile-changed');
     assert.equal(env.applied.length, 0);
     assert.equal(env.window.MQBAlchemySync.hasPendingClaim('origins-1'), true);
+});
+
+test('direct guest entry applies account contrast before sync even when the device cache disagrees',async()=>{
+ for(const enabled of [true,false]){
+  const guestId='11111111-1111-4111-8111-111111111111';let profileCalls=0;
+  const env=bridge({guestId,contrast:!enabled,guestProfile:async()=>{profileCalls++;return reply({account_id:guestId,contrast_mode:enabled});},request:async()=>{assert.equal(env.window.QW.prefs.contrast,enabled,'Account preferences applied before game sync');return reply({});}});
+  await env.listeners.load();assert.equal(env.window.QW.prefs.contrast,enabled);assert.equal(profileCalls,1);assert.equal(env.calls[0].url,'/api/guest/alchemy/sync');
+ }
+});
+test('direct guest entry rejects a changed cookie owner before applying preferences or syncing',async()=>{
+ const guestId='11111111-1111-4111-8111-111111111111';
+ const env=bridge({guestId,guestProfile:async()=>reply({account_id:'22222222-2222-4222-8222-222222222222',contrast_mode:true})});
+ await env.listeners.load();assert.equal(env.window.QW.prefs.appliedProfiles.length,0);assert.equal(env.calls.length,0);assert.equal(env.statuses.at(-1),'profile-changed');
+});
+
+test('in-game contrast switches save the shared Account preference for guest and Telegram with CSRF',async()=>{
+ for(const guestId of ['11111111-1111-4111-8111-111111111111',null]){
+  const env=bridge({guestId,request:async(url,options)=>url.startsWith('/api/account/')?reply({contrast_mode:JSON.parse(options.body).enabled}):reply({})});
+  await env.listeners.load();await env.window.MQBAlchemySync.setAccountContrast(true);
+  const call=env.calls.find(c=>c.url.startsWith('/api/account/'));assert.equal(call.url,`/api/account/contrast-mode?identity=${guestId?'guest':'telegram'}`);assert.equal(call.options.headers['X-Guest-CSRF'],'1');assert.deepEqual(JSON.parse(call.options.body),{enabled:true});assert.equal(env.window.QW.prefs.contrast,true);
+  await env.window.MQBAlchemySync.setAccountContrast(false);assert.equal(env.window.QW.prefs.contrast,false);
+ }
+});
+test('in-game contrast rolls back a rejected save and a file cannot claim account persistence',async()=>{
+ const env=bridge({request:async(url)=>url.startsWith('/api/account/')?reply({detail:'offline'},503):reply({})});await env.listeners.load();
+ await assert.rejects(()=>env.window.MQBAlchemySync.setAccountContrast(true),/offline/);assert.equal(env.window.QW.prefs.contrast,false);
+ const offline=bridge({protocol:'file:',profileRequest:async()=>{throw Error('no API');}});await assert.rejects(()=>offline.window.MQBAlchemySync.setAccountContrast(true),/Доступно в приложении/);assert.equal(offline.window.QW.prefs.contrast,false);assert.equal(offline.calls.length,0);
+});
+test('saved in-game contrast is loaded on repeat entry for either identity',async()=>{
+ for(const guestId of ['11111111-1111-4111-8111-111111111111',null]){
+  let saved=false;
+  const options={guestId,guestProfile:async()=>reply({account_id:guestId,contrast_mode:saved}),profileRequest:async()=>reply({user_id:'42',contrast_mode:saved}),request:async(url,o)=>{if(url.startsWith('/api/account/')){saved=JSON.parse(o.body).enabled;return reply({contrast_mode:saved});}return reply({});}};
+  const first=bridge(options);await first.listeners.load();await first.window.MQBAlchemySync.setAccountContrast(true);assert.equal(saved,true);
+  const second=bridge({...options,contrast:false});await second.listeners.load();assert.equal(second.window.QW.prefs.contrast,true);
+ }
+});
+
+test('real file entry without QW shell shows an unavailable switch without writing attributes or preferences',async()=>{
+ const env=bridge({protocol:'file:',shell:false});assert.equal(env.window.QW,undefined);assert.equal(env.window.MQBAlchemySync.contrastEnabled(),false);assert.equal(env.window.MQBAlchemySync.contrastAvailable(),false);
+ const control={attrs:{},disabled:false,setAttribute(k,v){this.attrs[k]=v;}},game=readFileSync(join(__dirname,'../../minigames/alchemia-1.0/game.js'),'utf8');
+ const context={window:env.window,location:{protocol:'file:'},$:()=>control,addEventListener(){},showToast:()=>assert.fail('disabled toggle does nothing')};
+ runInNewContext(game.slice(game.indexOf('function alchemyContrastAvailable('),game.indexOf('function showSettings(')),context);
+ context.syncAlchemyContrastControl();assert.equal(control.disabled,true);assert.equal(control.attrs['aria-checked'],'false');
+ await context.toggleAlchemyContrast();assert.equal(env.document.documentElement.attrs['data-qw-contrast'],undefined);assert.equal(env.calls.length,0);assert.deepEqual(env.localStore.dump(),{});
+ await assert.rejects(()=>env.window.MQBAlchemySync.setAccountContrast(true),/Доступно в приложении/);
+ assert.match(game,/alchemyContrastAvailable\(\)\?[^:]+:'Доступно в приложении'/);assert.doesNotMatch(source,/standalone-contrast|setStandaloneContrast|setAttribute\('data-qw-contrast'/);
 });

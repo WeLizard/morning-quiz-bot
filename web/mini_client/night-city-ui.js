@@ -185,6 +185,7 @@ const SHELL_FALLBACK = SHELL_ART + 'skyline.svg';
 const SHELL_FILE = /^[a-z0-9_]+\.(svg|webp)$/;
 const ORIENTS = ['portrait', 'landscape'];
 let shellScenes = null, shellPromise = null, lastPage = null;
+let shellMusic = null;                    // shell themes of shell.json (file names), null until it is loaded
 const shellLate = [];                     // repaints waiting for shell.json
 kit.loadShell = () => {
     if (shellPromise) return shellPromise;
@@ -198,6 +199,7 @@ kit.loadShell = () => {
             if (files.portrait || files.landscape) scenes[slot] = {portrait: files.portrait || files.landscape, landscape: files.landscape || files.portrait};
         }
         shellScenes = scenes;
+        shellMusic = (Array.isArray(data?.music) ? data.music : []).map(item => item?.file).filter(file => typeof file === 'string' && MUSIC_SHELL_FILE.test(file));
         // screens drawn before shell.json arrived showed skyline.svg: give them their pictures now
         for (const repaint of shellLate.splice(0)) repaint();
         if (lastPage) kit.pageScene(lastPage);
@@ -287,7 +289,7 @@ kit.icon = (name, {size, alt = ''} = {}) => {
 };
 
 /** Age mark of a world: 12 (no badge), 16 or 18. The server's `world_age` of a room or table, else the index entry's `age`, else the known darker worlds. A mark only. */
-const KNOWN_AGE = {deep_choir: 16, dead_air: 16};
+const KNOWN_AGE = {deep_choir: 16, dead_air: 16, velvet_circle: 18, eternal_hotel: 18};
 const AGES = [12, 16, 18];
 const asAge = value => (AGES.includes(Number(value)) ? Number(value) : 12);
 kit.worldAge = (id, age = null) => Math.max(asAge(age), asAge(kit.worldEntry(id)?.age), asAge(KNOWN_AGE[id]));
@@ -611,6 +613,273 @@ kit.chat = ({title = 'Обсуждение', count = 'видят все за с�
     return kit.panel({icon: 'talk', title, count, cls: 'nc-chat-card'}, feed, tail);
 };
 
+/* --- music (docs/tasks/night_city/MUSIC_BRIEF.md §4) ---
+   Off by default; the ⚙ menu has «Музыка» (on / off) and «Громкость музыки»; both are kept in localStorage (try / catch: no storage → defaults).
+   Sound starts only after a user action: the menu tap itself, or, when it was on last time, the first tap anywhere.
+   Track by place: the shell → one of the shell themes (random per session); a table → the world pack's `music`:
+   lobby, day, voting → day; night → night (no night → day); the final → finale once, then silence (no finale → day).
+   A loop is crossfaded with itself (two <audio> elements, 2.5 s, equal power) so there is no audible seam; a change of
+   track is a 1.5 s crossfade. Tracks are fetched lazily, only for the current place and only while music is on; a load error
+   means silence, the game goes on. A hidden tab pauses the music, coming back resumes it. prefers-reduced-motion does not touch sound.
+   Volume goes through a GainNode (iOS ignores audio.volume); without Web Audio the element's volume is used. */
+const MUSIC_KEY = 'nc-music';
+const MUSIC_VOLUMES = [0.3, 0.5, 0.7, 1];
+const MUSIC_FADE = 1.5, MUSIC_FADE_OFF = 0.5, MUSIC_LOOP_FADE = 2.5;
+const MUSIC_FILE = /^music_(day|night|finale)\.m4a$/, MUSIC_SHELL_FILE = /^music_shell_\d{1,2}\.m4a$/;
+
+/** Slot of a world pack's `music` for a table status → 'day' | 'night' | 'finale' | null (pure). */
+kit.musicSlot = (music, status) => {
+    if (!music || typeof music !== 'object') return null;
+    const has = slot => typeof music[slot]?.file === 'string' && music[slot].file === `music_${slot}.m4a`;
+    const order = status === 'night' ? ['night', 'day'] : status === 'finished' ? ['finale', 'day'] : ['day', 'night'];
+    return order.find(has) || null;
+};
+
+/** The player; `env` carries the platform (tests give fakes). */
+function createMusic(env) {
+    const prefs = {on: false, vol: 0.7};
+    try {
+        const saved = JSON.parse(env.storage()?.getItem(MUSIC_KEY) || 'null');
+        if (saved && typeof saved === 'object') {
+            prefs.on = saved.on === true;
+            if (typeof saved.vol === 'number' && saved.vol >= 0.05 && saved.vol <= 1) prefs.vol = saved.vol;
+        }
+    } catch { /* no storage, broken value: defaults */ }
+    const save = () => { try { env.storage()?.setItem(MUSIC_KEY, JSON.stringify(prefs)); } catch { /* private mode */ } };
+    const gain = () => prefs.vol * prefs.vol;                 // perceived loudness steps
+    let scope = null;                                          // null | {shell: true} | {world, status}
+    let unlocked = false, hidden = false, armed = false, finaleDone = false, shellPick = null;
+    let audio = null, master = null;                           // Web Audio context and the master gain
+    let playing = null;                                        // {key, track, cur, pre, voices[]}
+    const leaving = [];                                        // voices fading out
+    const failed = new Map();                                  // url → time of the last load error (retried after 60 s)
+    let ticker = null, last = 0;
+
+    /* ----- voices: one <audio> element with its gain ----- */
+    const apply = voice => {
+        if (voice.node) voice.node.gain.value = voice.level;
+        else { try { voice.el.volume = Math.max(0, Math.min(1, voice.level * gain())); } catch { /* read-only volume */ } }
+    };
+    function makeVoice(url) {
+        const el = env.makeAudio(url);
+        const voice = {el, node: null, level: 0, fade: null, url};
+        if (audio && master) {
+            try { const source = audio.createMediaElementSource(el); voice.node = audio.createGain(); source.connect(voice.node); voice.node.connect(master); } catch { voice.node = null; }
+        }
+        apply(voice);
+        el.addEventListener?.('error', () => { failed.set(url, env.now()); drop(voice, true); });
+        el.addEventListener?.('ended', () => {
+            const finale = playing && !playing.track.loop && playing.voices.includes(voice);
+            dispose(voice);
+            if (finale) { finaleDone = true; playing = null; }
+            else if (playing?.track.loop && !playing.voices.length) { playing = null; reconcile(); }   // a lap ended before the crossfade ran: start again
+        });
+        return voice;
+    }
+    function play(voice) {
+        let result;
+        try { result = voice.el.play(); } catch { result = null; }
+        result?.catch?.(error => {
+            if (error?.name === 'AbortError') return;          // paused or replaced before it started
+            if (error?.name === 'NotAllowedError') { unlocked = false; arm(); return; }   // the browser wants a tap first
+            failed.set(voice.url, env.now()); drop(voice, true);
+        });
+    }
+    function dispose(voice) {
+        voice.fade = null;
+        for (const list of [leaving, playing?.voices]) { const at = list ? list.indexOf(voice) : -1; if (at >= 0) list.splice(at, 1); }
+        if (playing?.pre === voice) playing.pre = null;
+        try { voice.el.pause(); voice.el.removeAttribute?.('src'); voice.el.load?.(); } catch { /* element gone */ }
+        try { voice.node?.disconnect(); } catch { /* ignored */ }
+        if (playing && playing.cur === voice) playing.cur = playing.voices[playing.voices.length - 1] || null;
+    }
+    /** A voice failed: the whole track goes silent (a loop partner shares the url). */
+    function drop(voice, error) {
+        if (playing && (playing.voices.includes(voice) || playing.pre === voice)) { for (const item of [...playing.voices, playing.pre].filter(Boolean)) dispose(item); playing = null; }
+        else dispose(voice);
+        if (error) reconcile();
+    }
+    function fadeTo(voice, to, seconds, done = null) {
+        if (seconds <= 0 || Math.abs(voice.level - to) < 0.001) { voice.level = to; voice.fade = null; apply(voice); done?.(); return; }
+        voice.fade = {from: voice.level, to, dur: seconds, t: 0, done};
+        run();
+    }
+    function release(seconds) {
+        if (!playing) return;
+        const old = playing;
+        playing = null;
+        if (old.pre) { const pre = old.pre; old.pre = null; try { pre.el.pause(); pre.el.removeAttribute?.('src'); pre.node?.disconnect(); } catch { /* ignored */ } }
+        for (const voice of old.voices) { leaving.push(voice); fadeTo(voice, 0, seconds, () => dispose(voice)); }
+        old.voices = [];
+    }
+
+    /* ----- the clock: fades and the loop watch; stops itself when nothing plays ----- */
+    function run() {
+        if (ticker != null) return;
+        last = env.now();
+        ticker = env.setInterval(tick, 50);
+    }
+    function tick() {
+        const now = env.now();
+        const dt = Math.min(0.2, Math.max(0, (now - last) / 1000));
+        last = now;
+        if (hidden) return;
+        for (const voice of [...leaving, ...(playing?.voices || [])]) {
+            const fade = voice.fade;
+            if (!fade) continue;
+            fade.t += dt;
+            const k = Math.min(1, fade.t / fade.dur);
+            voice.level = fade.to >= fade.from ? fade.from + (fade.to - fade.from) * Math.sin(k * Math.PI / 2) : fade.to + (fade.from - fade.to) * Math.cos(k * Math.PI / 2);
+            apply(voice);
+            if (k >= 1) { voice.fade = null; fade.done?.(); }
+        }
+        const here = playing;
+        if (here?.track.loop && here.cur) {
+            const el = here.cur.el, left = el.duration - el.currentTime;
+            if (Number.isFinite(left) && left <= 12 && !here.pre && !here.cur.crossed) here.pre = makeVoice(here.track.url);   // fetch the next lap early
+            if (Number.isFinite(left) && left <= MUSIC_LOOP_FADE && !here.cur.crossed) loopCrossfade(here, Math.max(0.5, left));
+        }
+        if (!leaving.length && !playing && ticker != null) { env.clearInterval(ticker); ticker = null; }
+    }
+    function loopCrossfade(here, seconds) {
+        const old = here.cur;
+        old.crossed = true;
+        const next = here.pre || makeVoice(here.track.url);
+        here.pre = null;
+        here.voices.push(next);
+        here.cur = next;
+        try { next.el.currentTime = 0; } catch { /* not seekable yet */ }
+        play(next);
+        fadeTo(next, 1, seconds);
+        fadeTo(old, 0, seconds, () => dispose(old));
+    }
+
+    /* ----- which track, and the follow-up ----- */
+    function wanted() {
+        if (!scope) return null;
+        if (scope.shell) {
+            const list = env.shellMusic();
+            if (list === null) { env.loadShell()?.then?.(loaded => { if (loaded) reconcile(); }); return null; }
+            if (!list.length) return null;
+            if (shellPick == null) shellPick = Math.min(list.length - 1, Math.floor(env.random() * list.length));
+            return {key: `shell/${list[shellPick]}`, url: env.shellBase + list[shellPick], loop: true};
+        }
+        const pack = scope.world ? env.packOf(scope.world) : null;
+        const slot = kit.musicSlot(pack?.music, scope.status);
+        if (!slot) return null;
+        if (slot === 'finale' && finaleDone) return null;
+        const version = typeof pack.v === 'string' && pack.v ? '?v=' + pack.v : '';
+        return {key: `${pack.id}/${slot}`, url: `${env.worldBase}${pack.id}/${pack.music[slot].file}${version}`, loop: slot !== 'finale'};
+    }
+    function reconcile() {
+        let track = prefs.on && unlocked ? wanted() : null;
+        if (track && env.now() - (failed.get(track.url) || -1e9) < 60000) track = null;
+        if (hidden) { if (!track || playing?.key !== track.key) { release(0); sweep(); } return; }
+        if (!track) { release(prefs.on ? MUSIC_FADE : MUSIC_FADE_OFF); return; }
+        if (playing?.key === track.key) return;
+        release(MUSIC_FADE);
+        let voice;
+        try { voice = makeVoice(track.url); } catch { failed.set(track.url, env.now()); return; }
+        playing = {key: track.key, track, cur: voice, pre: null, voices: [voice]};
+        play(voice);
+        fadeTo(voice, 1, MUSIC_FADE);
+    }
+    const sweep = () => { for (const voice of [...leaving]) dispose(voice); };
+
+    /* ----- gestures, tab visibility ----- */
+    const gestures = ['pointerdown', 'touchend', 'keydown', 'click'];
+    function onGesture() { unlock(); }
+    function arm() {
+        if (armed || !env.doc?.addEventListener) return;
+        armed = true;
+        for (const type of gestures) env.doc.addEventListener(type, onGesture, true);
+    }
+    function disarm() {
+        if (!armed) return;
+        armed = false;
+        for (const type of gestures) env.doc.removeEventListener?.(type, onGesture, true);
+    }
+    /** Called from a user action: creates the audio context (it must be born in a gesture) and lets the music start. */
+    function unlock() {
+        if (unlocked) return;
+        const AC = env.AudioContext();
+        if (!audio && AC) {
+            try { audio = new AC(); master = audio.createGain(); master.gain.value = gain(); master.connect(audio.destination); } catch { audio = master = null; }
+        }
+        try { audio?.resume?.(); } catch { /* ignored */ }
+        unlocked = true;
+        disarm();
+        reconcile();
+    }
+    function onVisibility() {
+        const now = Boolean(env.doc?.hidden);
+        if (now === hidden) return;
+        hidden = now;
+        const voices = [...leaving, ...(playing?.voices || [])];
+        if (hidden) { for (const voice of voices) { try { voice.el.pause(); } catch { /* ignored */ } } try { audio?.suspend?.(); } catch { /* ignored */ } return; }
+        last = env.now();
+        try { audio?.resume?.(); } catch { /* ignored */ }
+        for (const voice of voices) play(voice);
+        reconcile();
+        if (voices.length) run();
+    }
+    let started = false;
+    function init() {
+        if (started) return;
+        started = true;
+        env.doc?.addEventListener?.('visibilitychange', onVisibility);
+        hidden = Boolean(env.doc?.hidden);
+        if (prefs.on && !unlocked) arm();
+    }
+
+    return {
+        get enabled() { return prefs.on; },
+        get volume() { return prefs.vol; },
+        /** The ⚙ switch; must be called from the tap itself. */
+        setEnabled(on) {
+            init();
+            prefs.on = Boolean(on); save();
+            if (prefs.on) { if (unlocked) reconcile(); else unlock(); } else reconcile();
+        },
+        setVolume(value) {
+            prefs.vol = Math.max(0.05, Math.min(1, Number(value) || prefs.vol)); save();
+            if (master) master.gain.value = gain();
+            for (const voice of [...leaving, ...(playing?.voices || [])]) apply(voice);
+        },
+        /** Next step of the ⚙ volume item: 30 → 50 → 70 → 100 → 30 %. */
+        stepVolume() {
+            const at = MUSIC_VOLUMES.findIndex(step => step >= prefs.vol - 0.001);
+            this.setVolume(MUSIC_VOLUMES[(at + 1) % MUSIC_VOLUMES.length]);
+        },
+        /** Where the player is: null = silence, {shell: true}, {world, status}. Cheap to call on every screen. */
+        follow(place) {
+            init();
+            const next = !place ? null : place.shell ? {shell: true} : {world: place.world || null, status: place.status || 'lobby'};
+            if (scope?.world !== next?.world || next?.status !== 'finished') finaleDone = false;   // a new world or a new game plays its final again
+            scope = next;
+            reconcile();
+        },
+        stop() { scope = null; reconcile(); },
+        state() { return {on: prefs.on, vol: prefs.vol, unlocked, hidden, key: playing?.key ?? null, voices: (playing?.voices.length || 0) + leaving.length, finaleDone}; },
+    };
+}
+kit.music = createMusic({
+    storage: () => { try { return globalThis.localStorage || null; } catch { return null; } },
+    AudioContext: () => globalThis.AudioContext || globalThis.webkitAudioContext || null,
+    makeAudio: url => { const el = new globalThis.Audio(); el.preload = 'auto'; el.src = url; return el; },
+    now: () => Date.now(),
+    random: () => Math.random(),
+    setInterval: (callback, ms) => { const handle = setInterval(callback, ms); handle?.unref?.(); return handle; },
+    clearInterval: handle => clearInterval(handle),
+    get doc() { return typeof document === 'object' ? document : null; },
+    shellMusic: () => shellMusic,
+    loadShell: () => kit.loadShell(),
+    shellBase: SHELL_ART,
+    worldBase: WORLD_ART,
+    packOf: id => (skin.pack?.id === id ? skin.pack : null),
+});
+kit.createMusic = createMusic;
+
 /* --- the persistent game header: eyebrow + title, clock, ⚙ (one per page, the core owns ‹ and ⚙) --- */
 let header = null;
 kit.header = () => {
@@ -730,7 +999,7 @@ function open(options) {
     const token = {};
     let current = token;
     const ctx = {token, view: 'entry', room: null, group: null, data: null, overlay: null, notice: null, net: false, timer: null, poll: null, busy: false, fingerprint: '', worldWanted: null, worldPick: null, worldIndex: undefined, ageAsk: null};
-    NightCity.close = () => { current = null; ctx.timer?.stop(); kit.useWorld(null); document.documentElement?.classList?.remove?.('nc'); };
+    NightCity.close = () => { current = null; ctx.timer?.stop(); kit.music.stop(); kit.useWorld(null); document.documentElement?.classList?.remove?.('nc'); };
     const alive = () => current === token && options.isCurrent();
     const host = options.host;
     document.documentElement?.classList?.add?.('nc');
@@ -741,6 +1010,7 @@ function open(options) {
     /* ---------- frame ---------- */
     function frame({eyebrow, title, clock = null, main = [], dock = null, scene = {}, net = false}) {
         if (!alive()) return;
+        followMusic();
         bar.set({eyebrow, title, clock});
         kit.pageScene(scene);
         const body = put(el('div', `nc-main${dock ? ' has-dock' : ''}`), main);
@@ -751,11 +1021,21 @@ function open(options) {
         host.replaceChildren(...[bar.node, net ? kit.netBanner({onRetry: () => refresh(true)}) : null, body, dock].filter(Boolean));
         host.dataset.page = 'night';
     }
+    /** The player follows the screen: the shell theme outside a table, the world's track by phase at one (silence while the world is unknown). */
+    function followMusic() {
+        const lobby = ctx.view === 'table' ? ctx.data?.lobby : null;
+        kit.music.follow(lobby ? {world: kit.world, status: lobby.status} : {shell: true});
+    }
     function menu(items) { Q.menu.register(items.filter(Boolean), 'Ночной город'); }
     // Menu glyphs come from the shell's vector sprite, never from a world's art.
     const menuIcon = name => `<use href="${SHELL_ART}icons.svg#nc-i-${name}"/>`;
     const contrastItem = () => ({id: 'nc-contrast', label: 'Контрастный режим', icon: menuIcon('eye'),
         toggle: () => Boolean(window.QW?.prefs?.get?.().contrast), onSelect: () => options.setContrast?.(!window.QW?.prefs?.get?.().contrast)});
+    const musicItems = () => [
+        {id: 'nc-music', label: 'Музыка', icon: menuIcon('music'), toggle: () => kit.music.enabled, onSelect: () => kit.music.setEnabled(!kit.music.enabled)},
+        {id: 'nc-music-volume', label: 'Громкость музыки', icon: menuIcon('volume'), hidden: () => !kit.music.enabled, keepOpen: true,
+            value: () => `${Math.round(kit.music.volume * 100)}%`, onSelect: () => kit.music.stepVolume()},
+    ];
     const rulesItem = () => ({id: 'nc-rules', label: 'Правила дела', hint: 'роли, фазы, кто побеждает', icon: menuIcon('papers'), onSelect: () => showOverlay('rules')});
 
     /* ---------- the world of the table: loaded lazily, applied when ready ---------- */
@@ -821,7 +1101,7 @@ function open(options) {
         stopTable(); ctx.view = 'entry'; ctx.room = ctx.group = ctx.data = null; ctx.notice = message;
         kit.useWorld(null); ctx.worldWanted = null;     // the shell has no world
         Q.nav.setRoot(null);
-        menu([rulesItem(), contrastItem()]);
+        menu([rulesItem(), contrastItem(), ...musicItems()]);
         const rooms = kit.panel({icon: 'calendar', title: 'Твои комнаты'}, kit.note('Загружаем…'));
         const tables = el('div', 'nc-open-slot');
         const join = kit.panel({icon: 'key', title: 'Войти по приглашению'},
@@ -966,7 +1246,7 @@ function open(options) {
             revoked: `Хозяин «${title}» отозвал это приглашение.`, exhausted: `Приглашение в «${title}» уже использовали все, кому оно было.`}[reason] || `Приглашение в «${title}» больше не действует.` : error?.message;
         stopTable(); ctx.view = 'expired'; ctx.notice = null; Q.nav.setRoot(() => showEntry());
         kit.useWorld(null); ctx.worldWanted = null;
-        menu([rulesItem(), contrastItem()]);
+        menu([rulesItem(), contrastItem(), ...musicItems()]);
         frame({eyebrow: 'Ночной город · Приглашение', title: 'Ночной город', scene: {shell: 'invite'}, main: [
             kit.scene({shell: 'invite', eyebrow: 'Приглашение', title: 'Ссылка больше не работает',
                 text: `${detail || 'Приглашение больше не действует.'} Попроси у хозяина комнаты новую ссылку — или садись за другой стол.`}),
@@ -1110,7 +1390,7 @@ function open(options) {
         return [
             canPickWorld(lobby) ? {id: 'nc-world', label: 'Сюжет комнаты', hint: `${worldTitle(lobby.world || DEFAULT_WORLD) || 'выбрать'} · сменить до партии`, icon: menuIcon('story'), onSelect: () => openWorldPicker()} : null,
             owner ? {id: 'nc-invite', label: 'Пригласить', hint: 'код и ссылка на этот стол', icon: menuIcon('envelope'), onSelect: () => issueInvite()} : null,
-            rulesItem(), contrastItem(),
+            rulesItem(), contrastItem(), ...musicItems(),
             ctx.room && !lobby.is_host && ((lobby.status === 'lobby' && lobby.joined) || lobby.is_waiting)
                 ? {id: 'nc-unseat', label: 'Покинуть стол', hint: 'место освободится', icon: menuIcon('table'), onSelect: () => confirmLeave(lobby, 'seat')} : null,
             ctx.room && !owner ? {id: 'nc-leave', label: 'Покинуть комнату', hint: 'с подтверждением', icon: menuIcon('door'), danger: true, onSelect: () => confirmLeave(lobby, 'room')} : null,
@@ -1168,7 +1448,7 @@ function open(options) {
 
     /* --- room screens --- */
     function renderNoTable() {
-        menu([rulesItem(), contrastItem()]);
+        menu([rulesItem(), contrastItem(), ...musicItems()]);
         frame({eyebrow: 'Ночной город · Комната', title: tableTitle(), scene: {slot: 'lobby', time: 'evening'}, main: [
             kit.scene({slot: 'lobby', time: 'evening', eyebrow: 'Комната', title: 'Стол ещё не накрыт',
                 text: ctx.group ? 'Сядь за стол первым — остальные присоединятся из группы.' : 'Хозяин комнаты откроет стол, и здесь появятся места.'}),

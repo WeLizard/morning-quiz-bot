@@ -420,7 +420,8 @@
     }
     function activate(item) {
         haptic('selection');
-        if (typeof item.toggle === 'function') { call(() => item.onSelect?.(item)); renderMenu(); return; }
+        // toggle and keepOpen items (a value that steps on tap, e.g. a volume) change in place; the menu stays open
+        if (typeof item.toggle === 'function' || item.keepOpen) { call(() => item.onSelect?.(item)); renderMenu(); return; }
         menu.close();
         call(() => item.onSelect?.(item));
     }

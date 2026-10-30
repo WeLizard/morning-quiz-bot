@@ -189,6 +189,17 @@ def palette(base):
     return p, {k: round(v, 2) for k, v in checks.items()}, failed
 
 
+# ---------------------------------------------------------------- music
+def music_slots(world_id, out):
+    """{slot: {file, duration, bytes}} of the encoded tracks (build_music.py) that exist in the pack folder; no track - no slot."""
+    index = ROOT / '.local/night-city-packs/music.json'
+    if not index.exists():
+        return {}
+    found = json.loads(index.read_text(encoding='utf-8')).get('worlds', {}).get(world_id, {})
+    return {slot: {'file': t['file'], 'duration': t['duration'], 'bytes': (out / t['file']).stat().st_size}
+            for slot in ('day', 'night', 'finale') if (t := found.get(slot)) and (out / t['file']).exists()}
+
+
 # ---------------------------------------------------------------- encoding
 class Writer:
     def __init__(self, out):
@@ -431,7 +442,10 @@ def build(world, defaults, out_root, with_places=False):
             frames[kind] = {'file': file, 'aspect': [im.width, im.height], 'hole': hole(im)}
     total = sum(f['bytes'] for f in writer.files.values())
     over = sorted(name for name, f in writer.files.items() if f['bytes'] > f['budget'])
-    digest = hashlib.sha256(json.dumps({n: f['bytes'] for n, f in sorted(writer.files.items())}).encode()).hexdigest()[:12]
+    music = music_slots(world['id'], out)
+    sizes = {n: f['bytes'] for n, f in sorted(writer.files.items())}
+    sizes.update({t['file']: t['bytes'] for t in music.values()})   # a world without music keeps its old version hash
+    digest = hashlib.sha256(json.dumps(sizes).encode()).hexdigest()[:12]
     pack = {
         'schema': SCHEMA, 'id': world['id'], 'title': world['title'], 'era': world.get('era'), 'style_pack': world['style'],
         'version': digest, 'default': world['id'] == defaults['default_world'],
@@ -439,6 +453,7 @@ def build(world, defaults, out_root, with_places=False):
         'palette': {k: v for k, v in pal.items()},
         'font': {'display': world.get('font')},
         'thumb': 'thumb.webp' if (out / 'thumb.webp').exists() else None,
+        **({'music': {slot: {'file': t['file'], 'duration': t['duration']} for slot, t in music.items()}} if music else {}),
         'scenes': scenes, 'places': places, 'portraits': portraits, 'factions': factions, 'backs': backs, 'frames': frames,
         'checks': {'contrast': checks, 'contrast_failed': failed, 'over_budget': over, 'missing': p['missing']},
         'total_bytes': total, 'files': {n: {'bytes': f['bytes'], 'kind': f['kind'], 'quality': f['quality'], 'source': f['source']}

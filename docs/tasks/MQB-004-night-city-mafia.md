@@ -116,6 +116,16 @@
 Контракт — в [NIGHT_CITY_OPEN_ROOMS](NIGHT_CITY_OPEN_ROOMS.md). Не проверено: реальные Telegram-клиенты,
 кадры телефона и ПК, выкладка.
 
+### Выкладка в песочницу (2026-10-30, музыка и миры 18+)
+
+- 144 файла: музыка всех 15 миров и оболочки (AAC .m4a, `audio/mp4`, CSP `media-src 'self'`), плеер в ⚙
+  («Музыка», громкость; по умолчанию выключена), миры 18+ `velvet_circle` и `eternal_hotel` (пакеты + серверный
+  список с возрастом 18), `web/shell/qw-shell.js` (пункт меню `keepOpen`). Миграций нет; бот не пересобирался.
+- Резервная копия: /home/lizard/mqb-rehearsal/backups/music-20261030-1317/ (files.tar, new-files.txt).
+- Откат: sudo systemctl stop mqb-mini-app; tar -xf backups/music-20261030-1317/files.tar; удалить файлы из
+  new-files.txt; sudo systemctl start mqb-mini-app.
+- Смоук: пакеты, музыка (`audio/mp4`), /app, /app/farm — 200; журнал без ошибок.
+
 ### Выкладка в песочницу (2026-10-30, общая с фермой)
 
 - Выложен 561 файл: ферма (лесоруб, смягчение экономики и снос, диковинки с рисунками, «Пирог до небес» с декором,

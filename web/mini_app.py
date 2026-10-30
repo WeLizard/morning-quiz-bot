@@ -281,7 +281,7 @@ async def bounded_request_body(
 def static_cache_control(path):
     if path in {'/app', '/app/alchemy'}:
         return 'public, max-age=60, must-revalidate'
-    if path.endswith('.webp'):
+    if path.endswith(('.webp', '.m4a')):
         return 'public, max-age=3600'
     return 'public, max-age=300, must-revalidate'
 
@@ -303,10 +303,12 @@ SHELL_ASSET_PATHS = frozenset('/app/shell/' + name for name in SHELL_ASSETS)
 #   night/*.webp                      older style-A art (nothing in the client points at it any more)
 #   night/shell/*                     the neutral shell: shell.json (background slots), skyline.svg, icons.svg, grain.webp, WeLizardNoir-Regular.woff2
 #   night/worlds/index.json           the list of world packs
-#   night/worlds/<id>/pack.json, *.webp   one world pack
+#   night/worlds/<id>/pack.json, *.webp, music_*.m4a   one world pack (the music: AAC in MP4, audio/mp4)
+#   night/shell/music_shell_<n>.m4a   the shell themes
 # Only files that exist at start-up are served, and only from this fixed list of folders and suffixes.
 NIGHT_DIR = Path(__file__).parent / 'mini_client' / 'night'
-NIGHT_FOLDERS = {'shell': frozenset({'.svg', '.webp', '.woff2', '.json'}), 'worlds': frozenset({'.json', '.webp'})}
+NIGHT_FOLDERS = {'shell': frozenset({'.svg', '.webp', '.woff2', '.json', '.m4a'}), 'worlds': frozenset({'.json', '.webp', '.m4a'})}
+NIGHT_MEDIA_TYPES = {'.woff2': 'font/woff2', '.m4a': 'audio/mp4'}
 
 
 def _night_assets():
@@ -513,7 +515,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                         for value in cookies:
                             limits.note_authenticated(client, value)
         # Страницу фермы кэшировать нельзя: она сама отдаёт no-store (ссылки-приглашения).
-        cacheable = static_request and response.status_code == 200 and request.url.path != '/app/farm'
+        cacheable = static_request and response.status_code in {200, 206} and request.url.path != '/app/farm'
         if cacheable and _etag_matches(request, response):
             if hasattr(response, 'body_iterator'):
                 await response.body_iterator.aclose()
@@ -527,7 +529,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             del response.headers['Pragma']
             response.headers['Cache-Control'] = static_cache_control(request.url.path)
         if public_page:
-            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
+            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' blob:; font-src 'self'; media-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
         if static_game_page:
             # Одиночная игра собирается в один HTML: стили, скрипты и графика лежат
             # внутри документа. Политика мини-аппа со `default-src 'none'` такие
@@ -637,7 +639,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def night_asset(asset: str):
         if asset not in NIGHT_ASSETS:
             raise MiniAppError(404, 'Файл не найден')
-        return FileResponse(NIGHT_DIR / asset, media_type='font/woff2' if asset.endswith('.woff2') else None)
+        return FileResponse(NIGHT_DIR / asset, media_type=NIGHT_MEDIA_TYPES.get(Path(asset).suffix))
 
     @app.get('/app/{asset}')
     async def frontend_asset(asset: str):

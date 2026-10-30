@@ -96,6 +96,26 @@
    "slots": {"lobby": "control_room", "night": "studio_two", "day": "apartment_courtyard", "out": "transmitter_hill"},
    "palette": {"page": "#0a0c0a", "text": "#eef0e6", "muted": "#c2c7b6", "line": "#34402f", "edge": "#7f9c78",
                "accent": "#9fd39a", "accent_text": "#b5e6a9", "plate": "#151a14",
-               "shadow": "#ff8f84", "investigation": "#e8dcc0", "independent": "#bcd6e6"}}
+               "shadow": "#ff8f84", "investigation": "#e8dcc0", "independent": "#bcd6e6"}},
+  {"id": "velvet_circle", "age": 18, "title": "Бархатный круг", "era": "наши дни, закрытый клуб", "style": "velvet_flash", "canon": "velvet_circle.md",
+   "cover": "covers/velvet_circle.png",
+   "ui": {"emblem_independent": "ui/emblem_independents.png", "card_back_role": "ui/back_role.png", "card_back_case": "ui/back_case.png", "card_back_event": "ui/back_event.png",
+          "frame_evidence": "ui/frame_clue.png", "frame_place": "ui/frame_location.png", "frame_ending": "ui/frame_finale.png"},
+   "slots": {"lobby": "velvet_lounge", "night": "rooftop_pool", "day": "private_suites", "out": "underground_garage"},
+   "focus": {"night": "50% 55%"},
+   "portrait_crop": {"c_13_party_photographer": [0, -0.125, 0.75]},
+   "palette": {"page": "#0c0707", "text": "#f7ede3", "muted": "#d3c1b4", "line": "#4d2a26", "edge": "#b88a52",
+               "accent": "#b3262f", "accent_text": "#ecc58a", "plate": "#1d0f0e",
+               "shadow": "#ff8f8a", "investigation": "#c9d2d9", "independent": "#f2c4a3"}},
+  {"id": "eternal_hotel", "age": 18, "title": "Отель «Вечный»", "era": "1970-е, отель у трассы", "style": "seventies_film", "canon": "eternal_hotel.md",
+   "cover": "covers/eternal_hotel.png",
+   "ui": {"emblem_independent": "ui/emblem_independents.png", "card_back_role": "ui/back_role.png", "card_back_case": "ui/back_case.png", "card_back_event": "ui/back_event.png",
+          "frame_evidence": "ui/frame_clue.png", "frame_place": "ui/frame_location.png", "frame_ending": "ui/frame_finale.png"},
+   "slots": {"lobby": "cocktail_lounge", "night": "east_corridor", "day": "drained_pool", "out": "neon_sign_lot"},
+   "focus": {"day": "50% 62%", "out": "50% 15%", "title": "50% 48%", "vote": "50% 15%"},
+   "portrait_crop": {"c_13_pool_keeper": [0.22, -0.03, 0.78]},
+   "palette": {"page": "#120a06", "text": "#f7ead3", "muted": "#d8c3a1", "line": "#4f3320", "edge": "#c47a30",
+               "accent": "#ff5a8c", "accent_text": "#ff9dbb", "plate": "#22140c",
+               "shadow": "#ff9278", "investigation": "#c9d79b", "independent": "#f0c66f"}}
  ]
 }

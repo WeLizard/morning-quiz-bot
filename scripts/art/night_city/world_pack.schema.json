@@ -7,6 +7,10 @@
   "required": ["schema", "id", "title", "style_pack", "version", "age", "palette", "scenes", "portraits", "factions", "backs", "frames"],
   "$defs": {
     "file": {"type": "string", "pattern": "^[a-z0-9_]+\\.webp$"},
+    "track": {
+      "type": "object", "required": ["file", "duration"],
+      "properties": {"file": {"type": "string", "pattern": "^music_(day|night|finale)\\.m4a$"}, "duration": {"type": "number", "exclusiveMinimum": 0, "description": "seconds"}}
+    },
     "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
     "time": {"enum": ["morning", "day", "evening", "night"]},
     "scene": {
@@ -84,6 +88,12 @@
     },
     "backs": {"type": "object", "required": ["role"], "propertyNames": {"enum": ["role", "case", "event"]}, "additionalProperties": {"$ref": "#/$defs/file"}},
     "frames": {"type": "object", "required": ["hero"], "propertyNames": {"enum": ["hero", "evidence", "dossier"]}, "additionalProperties": {"$ref": "#/$defs/frame"}},
+    "music": {
+      "type": "object",
+      "description": "AAC .m4a tracks (build_music.py): day = lobby / day / vote (loop), night = night (loop; missing -> day), finale = results screen, once. A missing slot is absent; no group = silence.",
+      "propertyNames": {"enum": ["day", "night", "finale"]},
+      "additionalProperties": {"$ref": "#/$defs/track"}
+    },
     "checks": {"type": "object"},
     "total_bytes": {"type": "integer"},
     "files": {"type": "object"}

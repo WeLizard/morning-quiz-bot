@@ -1,4 +1,4 @@
-# «Ночной город»: музыка для 13 миров и оболочки — заказ на генерацию
+# «Ночной город»: музыка для 15 миров и оболочки — заказ на генерацию
 
 Статус: заказ составлен 2026-10-30. Музыку генерирует владелец проекта, затем подключаем в пакеты миров.
 Арт и шрифты уже разнесены по пакетам (`scripts/art/night_city/README.md`), музыка ложится туда же.
@@ -16,7 +16,7 @@
 Плюс **оболочка** (вход, список комнат, приглашение) — одна дорожка `shell_theme`, 2–3 мин, петля, нейтральный
 нуар без примет какого-либо мира.
 
-Итого 40 дорожек (13 × 3 + 1). Минимум для первой версии — `day` и `night` у всех миров плюс оболочка (27);
+Итого 46 дорожек (15 × 3 + 1). Минимум для первой версии — `day` и `night` у всех миров плюс оболочка (31);
 `finale` можно добавить позже.
 
 ## 2. Общие требования
@@ -145,6 +145,32 @@
 > Dark analog horror ambient, TV static swells, warped tape wow and flutter, low hum of CRT monitors, distorted broadcast tone fragments, slow creeping dread, seamless loop, no vocals
 - `finale`:
 > Short analog horror sting, signal cuts to static then a single warped synth chord, 20 seconds, broadcast ends, no vocals
+
+### Бархатный круг — `velvet_circle` (18+, наши дни, закрытый клуб на верхних этажах стеклянной башни)
+Шантаж, долги-одолжения, соблазн. Дорого, холодно, на грани.
+- `day`: лаунж клуба до полуночи, стекло и огни города внизу.
+> Instrumental deep house lounge, sleek and expensive, warm sub bass, muted Rhodes chords, soft shaker, city lights at night, seductive but cold, 112 bpm, seamless loop, no vocals
+- `night`: вечеринка за закрытой дверью, бас сквозь стену, что-то пошло не так.
+> Dark minimal techno heard through a wall, muffled four-on-the-floor kick, low pulsing bass, distant crowd murmur, glass clinks, tense and claustrophobic, seamless loop, no vocals
+- `finale`:
+> Short dark electronic resolution, bass drop into silence then a single cold synth chord, 20 seconds, flashbulb pop, no vocals
+
+### Отель «Вечный» — `eternal_hotel` (18+, 1970-е, отель у трассы, из которого не уехать, культ «постоянных гостей»)
+Тёплый плёночный звук, который становится жутким. Допустим тихий вокализ без слов ночью.
+- `day`: лобби и коктейль-бар, музыка из колонок под потолком.
+> Instrumental 1970s soft rock lounge, warm electric piano, mellow bass, brushed drums, a little tape-warped, motel cocktail bar, nostalgic and slightly off, 90 bpm, seamless loop, no vocals
+- `night`: коридор с ковром, та же песня, но медленнее и неправильно.
+> Dark 1970s lounge slowed down and detuned, warped tape, echoing electric piano in an empty corridor, distant humming ice machine, very faint wordless choir, eerie and looping, seamless loop
+- `finale`:
+> Short warped 1970s organ chord sliding down in pitch, neon buzz, 20 seconds, a door closing, no vocals
+
+## Ещё не хватает (на 2026-10-30)
+
+- `neon_city_night` — ночь Неон-Сити (промпт выше, раздел «Неон-Сити»).
+- `velvet_circle` — day, night, finale.
+- `eternal_hotel` — day, night, finale.
+
+Итого 7 дорожек. Оболочке хватает двух присланных тем — будут чередоваться.
 
 ## 4. Как подключим (после генерации)
 

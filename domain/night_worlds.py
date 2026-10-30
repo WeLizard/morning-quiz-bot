@@ -5,9 +5,10 @@ deployed separately, so a missing folder must never decide which world is valid:
 is still accepted here (the client lists only the worlds of worlds/index.json). Keep in step with
 scripts/art/night_city/worlds.json and worlds/index.json.
 
-Age mark: 12 (classic worlds), 16 or 18 (darker ones; the 18+ worlds are added here when their packs appear). It is a mark
-only (a badge «16+» / «18+», none for 12): there is no consent screen and no technical age gate. The default world stays
-the pilot one and an older world is only ever chosen explicitly.
+Age mark: 12 (classic worlds), 16 or 18 (darker ones). 12 and 16 are a mark only (a badge «16+», none for 12). An 18+
+world asks the player once «Мне есть 18» when it is chosen, when an open table is taken and when an invitation is used:
+the server needs ``age_ok: true`` (require_age_ok). The default world stays the pilot one and an older world is only ever
+chosen explicitly.
 """
 
 DEFAULT_WORLD = 'manor_lake'
@@ -15,6 +16,7 @@ WORLD_AGES = {
     'manor_lake': 12, 'night_express': 12, 'black_bay': 12, 'newsprint_city': 12, 'palace_masks': 12, 'polar_star': 12,
     'circus': 12, 'campus': 12, 'sand_city': 12, 'neon_city': 12, 'prohibition': 12,
     'deep_choir': 16, 'dead_air': 16,
+    'velvet_circle': 18, 'eternal_hotel': 18,
 }
 WORLD_IDS = tuple(WORLD_AGES)
 AGE_MARKS = (12, 16, 18)

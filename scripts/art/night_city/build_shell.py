@@ -63,7 +63,9 @@ ICONS = {
     'back': '<path d="m15 5-7 7 7 7"/>',
     'home': '<path d="M3 11 12 4l9 7v9h-6v-6H9v6H3Z"/>',
     'full': '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
-    'bug': '<path d="M9 7.5V7a3 3 0 0 1 6 0v.5M7 9h10v5a5 5 0 0 1-10 0Zm5 0v10M3 13h4m10 0h4"/>',
+    'music': '<path d="M9 17.5V5.5l10-2v12"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
+    'volume': '<path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/>',
+    'bug':'<path d="M9 7.5V7a3 3 0 0 1 6 0v.5M7 9h10v5a5 5 0 0 1-10 0Zm5 0v10M3 13h4m10 0h4"/>',
 }
 
 
@@ -220,8 +222,20 @@ def backgrounds(out):
             entry[orient] = name
         scenes[slot] = entry or 'skyline.svg'
     data = {'schema': 'nc-shell/2', 'scenes': scenes}
+    music = music_tracks(out)
+    if music:
+        data['music'] = music
     (out / 'shell.json').write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     return [f for entry in scenes.values() if isinstance(entry, dict) for f in entry.values()]
+
+
+def music_tracks(out):
+    """Shell themes encoded by build_music.py that exist in the shell folder: [{file, duration}]."""
+    index = ROOT / '.local/night-city-packs/music.json'
+    if not index.exists():
+        return []
+    return [{'file': t['file'], 'duration': t['duration']} for t in json.loads(index.read_text(encoding='utf-8')).get('shell', [])
+            if (out / t['file']).exists()]
 
 
 def main():

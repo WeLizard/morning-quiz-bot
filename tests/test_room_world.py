@@ -30,18 +30,33 @@ def pick(lobby, world, who=1, revision=None):
                      expected_revision=lobby['revision'] if revision is None else revision)
 
 
-def test_world_list_is_the_thirteen_known_ids_with_age_marks():
-    assert len(WORLD_IDS) == 13 and len(set(WORLD_IDS)) == 13 and DEFAULT_WORLD in WORLD_IDS
-    assert {'deep_choir', 'dead_air'} <= set(WORLD_IDS)
+def test_world_list_is_the_fifteen_known_ids_with_age_marks():
+    assert len(WORLD_IDS) == 15 and len(set(WORLD_IDS)) == 15 and DEFAULT_WORLD in WORLD_IDS
+    assert {'deep_choir', 'dead_air', 'velvet_circle', 'eternal_hotel'} <= set(WORLD_IDS)
     assert [world_age(world) for world in WORLD_IDS].count(16) == 2 and world_age(DEFAULT_WORLD) == 12
     assert set(AGE_MARKS) == {12, 16, 18} and {world_age(world) for world in WORLD_IDS} <= set(AGE_MARKS)
     assert {world for world in WORLD_IDS if world_age(world) == 16} == {'deep_choir', 'dead_air'}
+    assert {world for world in WORLD_IDS if world_age(world) == 18} == {'velvet_circle', 'eternal_hotel'}
     assert world_age('no_such_world') == 12          # unknown counts as the default world
     lobby = table()
     assert public_lobby(lobby, room_id=ROOM, viewer_account_id=acc(1))['world_age'] == 12
     for world in ('deep_choir', 'dead_air'):         # accepted by the rules, mark in the projection
         picked = pick(lobby, world)
         assert picked['world'] == world and public_lobby(picked, room_id=ROOM, viewer_account_id=acc(1))['world_age'] == 16
+    for world in ('velvet_circle', 'eternal_hotel'):  # 18+: the rules accept the id; age_ok is checked by the commands
+        picked = pick(lobby, world)
+        assert picked['world'] == world and public_lobby(picked, room_id=ROOM, viewer_account_id=acc(1))['world_age'] == 18
+
+
+def test_the_18_plus_worlds_ask_for_age_ok_and_the_others_do_not():
+    from domain.night_worlds import AgeConfirmRequired, require_age_ok
+    for world in ('velvet_circle', 'eternal_hotel'):
+        for answer in (None, False, 'yes', 1):
+            with pytest.raises(AgeConfirmRequired):
+                require_age_ok(world, answer)
+        require_age_ok(world, True)
+    for world in ('manor_lake', 'deep_choir', 'dead_air', 'no_such_world'):
+        require_age_ok(world, None)
 
 
 def test_lobby_defaults_to_the_pilot_world_and_projects_it():

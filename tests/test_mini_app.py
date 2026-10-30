@@ -1536,6 +1536,37 @@ def test_static_assets_are_exempt_from_rate_limits_but_api_is_not():
     asyncio.run(run())
 
 
+def test_night_city_music_is_served_as_audio_mp4_with_ranges_and_a_media_csp(tmp_path, monkeypatch):
+    """«Ночной город»: музыка пакетов (.m4a) отдаётся как audio/mp4, с Range (Safari/iOS без него не играет) и media-src 'self'."""
+    for folder in ('worlds/manor_lake', 'shell'):
+        (tmp_path / folder).mkdir(parents=True)
+    body = b'\x00\x00\x00\x18ftypM4A ' + bytes(range(256)) * 8
+    (tmp_path / 'worlds/manor_lake/music_day.m4a').write_bytes(body)
+    (tmp_path / 'shell/music_shell_1.m4a').write_bytes(body)
+    (tmp_path / 'worlds/manor_lake/music_day.mp3').write_bytes(body)        # suffix outside the list: not served
+    monkeypatch.setattr(mini_app_module, 'NIGHT_DIR', tmp_path)
+    assets = mini_app_module._night_assets()
+    monkeypatch.setattr(mini_app_module, 'NIGHT_ASSETS', assets)
+    monkeypatch.setattr(mini_app_module, 'NIGHT_ASSET_PATHS', frozenset('/app/night/' + name for name in assets))
+    async def run():
+        app = create_app(database=SimpleNamespace(), settings=MiniAppSettings(TOKEN, ORIGIN, offline=True))
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+            for path in ('/app/night/worlds/manor_lake/music_day.m4a', '/app/night/shell/music_shell_1.m4a'):
+                full = await client.get(path)
+                assert full.status_code == 200 and full.content == body
+                assert full.headers['content-type'] == 'audio/mp4'
+                assert full.headers['cache-control'] == 'public, max-age=3600'
+                assert "media-src 'self'" in full.headers['content-security-policy']
+                assert full.headers['x-content-type-options'] == 'nosniff'
+                part = await client.get(path, headers={'Range': 'bytes=100-199'})
+                assert part.status_code == 206 and part.content == body[100:200]
+                assert part.headers['content-range'] == f'bytes 100-199/{len(body)}'
+                assert part.headers['cache-control'] == 'public, max-age=3600'
+                assert part.headers['content-type'] == 'audio/mp4'
+            assert (await client.get('/app/night/worlds/manor_lake/music_day.mp3')).status_code == 404
+    asyncio.run(run())
+
+
 def test_static_assets_have_cache_headers_and_answer_conditional_requests():
     async def run():
         app = create_app(database=SimpleNamespace(), settings=MiniAppSettings(TOKEN, ORIGIN, offline=True))

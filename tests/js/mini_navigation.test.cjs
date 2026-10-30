@@ -626,7 +626,7 @@ test('leaving: a seat in an unstarted table, or the room itself; during a game t
         [ncq(`${NCB}/mafia/lobby/unseat`) + ':POST']: {status: 200, body: {lobby: ncLobby({is_host: false, joined: false})}},
     }, ncRoom({role: 'member'}))});
     await ncTable(seated);
-    assert.deepEqual(Array.from(seated.qw.items, item => item.id), ['nc-rules', 'nc-contrast', 'nc-unseat', 'nc-leave']);
+    assert.deepEqual(Array.from(seated.qw.items, item => item.id), ['nc-rules', 'nc-contrast', 'nc-music', 'nc-music-volume', 'nc-unseat', 'nc-leave']);
     seated.qw.items.find(item => item.id === 'nc-unseat').onSelect(); await flush();
     assert.match(seated.content.textContent, /Место освободится/);
     await findButton(seated.content, 'Покинуть стол').click(); await flush();

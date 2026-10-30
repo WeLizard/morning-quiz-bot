@@ -33,10 +33,12 @@ def test_steps_table_is_consistent():
 
 
 def test_tail_follows_variant_a():
-    """Owner-approved curve (2026-10-14): cost 25000*(s/20)^6 at 3 significant digits, gate 18+5n capped at the last level."""
+    """Owner-approved curve (2026-10-14): cost 25000*(s/20)^6 at 3 significant digits up to 26x26; from 28x28 (E27 L1, 2026-10-29)
+    121000*(s/26)^4 at 3 significant digits; gate 18+5n capped at the last level."""
     tail = {s['size']: s for s in LAND_STEPS}
     assert [(tail[s]['cost'], tail[s]['level']) for s in (22, 24, 26, 28, 30, 32, 40, 60)] == [
-        (44300, 23), (74600, 28), (121000, 33), (188000, 38), (285000, 43), (419000, 48), (1600000, 50), (18200000, 50)]
+        (44300, 23), (74600, 28), (121000, 33), (163000, 38), (214000, 43), (278000, 48), (678000, 50), (3430000, 50)]
+    assert all(abs(tail[s]['cost'] - 121000 * s ** 4 / 26 ** 4) <= 0.005 * tail[s]['cost'] for s in range(28, 61, 2))   # the (s/26)^4 law
     assert all(s['level'] == min(len(LEVELS), 18 + 5 * (s['size'] - 20) // 2) for s in LAND_STEPS[6:])
     assert all(b['cost'] / a['cost'] < 1.8 for a, b in zip(LAND_STEPS[5:], LAND_STEPS[6:]))   # gentle: no cliff between steps
 

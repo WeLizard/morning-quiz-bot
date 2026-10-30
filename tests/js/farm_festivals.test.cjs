@@ -144,9 +144,10 @@ test('Посиделки items all resolve to an icons.svg symbol, and every fes
  const svg=fs.readFileSync(path.join(STATIC,'icons.svg'),'utf8');
  const py=fs.readFileSync(path.join(STATIC,'../festivals.py'),'utf8');
  const ids=[...new Set([...py.matchAll(/'(fest_posid_[a-z_]+)'/g)].map(m=>m[1]))].sort();
- assert.equal(ids.length,14,'festivals.py names 14 Посиделки items');
- for(const id of ids)assert.match(svg,new RegExp(`<symbol id="${id}"`),`icons.svg has no symbol for ${id}`);
- const F=await load(),h=helpers(),drawn=new Set();
+ assert.equal(ids.length,15,'festivals.py names 15 Посиделки items');
+ const F=await load();
+ for(const id of ids)assert.match(svg,new RegExp(`<symbol id="${F.iconId(id)}"`),`icons.svg has no symbol for ${F.iconId(id)}`);
+ const h=helpers(),drawn=new Set();
  const collect=p=>walk(p).filter(n=>n.tag==='svg').forEach(n=>drawn.add(n.text));
  const fair=new Node('div');F.renderFestival(fair,fairView,h);collect(fair);
  const past=new Node('div');F.renderFestival(past,{...fairView,current:null,fair:null,

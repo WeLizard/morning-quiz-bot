@@ -102,9 +102,8 @@ def base_upkeep(farm, upkeep_config=None):
             continue
         spec = BUILDINGS.get(obj['type'])
         if spec and not spec.get('decor'):
-            lvl = obj.get('level', 1)
-            cost_per_level = settings['building_rate_pct']
-            total += (spec['cost'] * (lvl if type(lvl) is int and lvl >= 1 else 1) * cost_per_level + 99) // 100
+            # E27 B1 (2026-10-29): the bill follows the base price only; an upgrade never raises it (it used to be price * level).
+            total += (spec['cost'] * settings['building_rate_pct'] + 99) // 100
     total += settings['field_per_hectare'] * sum(
         f.get('ha', 0) for f in farm.get('fields', []) if isinstance(f, dict)
     )

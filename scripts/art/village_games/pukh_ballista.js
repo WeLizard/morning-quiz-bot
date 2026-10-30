@@ -5,6 +5,8 @@ import {SvgCtx} from '../village/svg_ctx.js';
 
 export const WINDOWS=[[270,330],[430,250],[600,200],[760,300],[900,400]];
 export const WORLD={width:1000,height:600,launch:[60,500],roof:[420,560,360],radius:36};
+// Scene margins: Pukh and the pulled pouch used to sit on the rounded frame's left edge.
+export const CANVAS={x:-60,y:0,width:1060,height:636};
 
 export function pukhScene(night=false){
  const c=new SvgCtx('pb'),s=makeS(c);
@@ -15,13 +17,13 @@ export function pukhScene(night=false){
  const path=(d,col)=>{c.out.push(`<path d="${d}" fill="${col}"/>`)};
  const group=(id,fn)=>{c.out.push(`<g id="pb-${id}">`);fn();c.end()};
  const sky=c.createLinearGradient(0,0,0,600);sky.addColorStop(0,p.sky);sky.addColorStop(1,p.skyLow);
- group('sky',()=>{rect(0,0,1000,600,sky);s.ellipse(830,80,night?30:39,night?30:39,night?'#eee6bf':'#f9e3a1');
+ group('sky',()=>{rect(CANVAS.x,CANVAS.y,CANVAS.width,CANVAS.height,sky);s.ellipse(830,80,night?30:39,night?30:39,night?'#eee6bf':'#f9e3a1');
   if(night){for(const [x,y] of [[72,72],[170,45],[340,90],[465,43],[709,58],[946,126],[90,212]])s.ellipse(x,y,2,2,'#ece7c5');s.ellipse(822,74,5,5,'#d6d4b3')}
   else{for(const [x,y,k] of [[150,112,.8],[397,70,.6],[936,209,.5]]){s.ellipse(x,y,40*k,12*k,'#f4efdc');s.ellipse(x-13*k,y-6*k,19*k,16*k,'#f4efdc');s.ellipse(x+14*k,y-10*k,22*k,19*k,'#f4efdc')}}});
- group('hills',()=>{path('M0 480Q120 352 255 355Q335 340 400 291Q505 233 610 256Q704 281 790 372Q895 427 1000 439V600H0Z',p.hillFar);
-  path('M0 520Q130 432 260 423Q334 400 425 343Q520 304 598 288Q670 313 750 396Q863 464 1000 502V600H0Z',p.hill);
-  path('M0 553Q210 480 340 486Q440 512 590 491Q820 467 1000 553V600H0Z',p.ground);
-  path('M0 552Q170 487 278 464T452 390Q519 348 603 310L620 319Q534 365 472 405Q400 464 287 483T0 579Z',night?'#a69f79':'#dcca98');});
+ group('hills',()=>{path('M-60 480L0 480Q120 352 255 355Q335 340 400 291Q505 233 610 256Q704 281 790 372Q895 427 1000 439V636H-60Z',p.hillFar);
+  path('M-60 520L0 520Q130 432 260 423Q334 400 425 343Q520 304 598 288Q670 313 750 396Q863 464 1000 502V636H-60Z',p.hill);
+  path('M-60 553L0 553Q210 480 340 486Q440 512 590 491Q820 467 1000 553V636H-60Z',p.ground);
+  path('M-60 552L0 552Q170 487 278 464T452 390Q519 348 603 310L620 319Q534 365 472 405Q400 464 287 483T0 579L-60 579Z',night?'#a69f79':'#dcca98');});
  function home(i,x,y){
   const base=y+102,top=y-58,left=x-57,right=x+57;
   group(`home-${i}`,()=>{
@@ -74,7 +76,7 @@ export function pukhScene(night=false){
   group('vane',()=>{s.line(464,323,516,323,p.wood,4);poly([[516,323],[504,315],[504,331]],p.cream);poly([[466,314],[478,318],[478,328],[466,333]],p.roof)});
  });
  group('foreground',()=>{
-  path('M0 558Q250 542 430 557T1000 551V600H0Z',p.grass);
+  path('M-60 558L0 558Q250 542 430 557T1000 551V636H-60Z',p.grass);
   for(const [x,y] of [[179,564],[317,560],[654,557],[799,568],[963,558]]){s.line(x,y,x-4,y-10,p.ground,2);s.line(x,y,x+5,y-8,p.ground,2)}
   for(const [x,y] of [[200,542],[345,530],[683,540]])s.ellipse(x,y,7,3,night?'#a0a68a':'#c4c6a8');
  });
@@ -97,7 +99,7 @@ export function pukhScene(night=false){
   poly([[61,493],[56,501],[60,501],[59,507],[65,498],[61,498]],'#d9a64d');
  });
  const inner=c.svg();
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" role="img" aria-label="Пух у рогатки доставляет баночки в пять окон деревни" data-theme="${night?'night':'day'}"><title>Энергетос-баллиста · предложение сцены</title>${inner}</svg>`;
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${CANVAS.x} ${CANVAS.y} ${CANVAS.width} ${CANVAS.height}" role="img" aria-label="Пух у рогатки доставляет баночки в пять окон деревни" data-theme="${night?'night':'day'}"><title>Энергетос-баллиста · предложение сцены</title>${inner}</svg>`;
 }
 
 function reference(night){

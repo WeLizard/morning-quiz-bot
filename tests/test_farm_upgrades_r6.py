@@ -47,8 +47,9 @@ def test_catalog_validates_and_version_bumped():
 
 
 def test_every_workshop_and_animal_house_is_upgradable_decor_and_house_are_not():
-    for b in {r['building'] for r in RECIPES.values()}:
+    for b in {r['building'] for r in RECIPES.values()} - {'compost_heap'}:
         assert upgrade_kind(b) == 'workshop'
+    assert upgrade_kind('compost_heap') is None      # E27 B3: its batch is fixed, an upgrade only raised the upkeep
     for b in {a['building'] for a in ANIMALS.values()}:
         assert upgrade_kind(b) in {'workshop', 'animals'}
     assert upgrade_kind('barn') == 'barn'
@@ -62,7 +63,7 @@ def test_costs_scale_with_building_and_level():
     assert upgrade_cost('mill', 3) == dict(coins=500, items={'cheese': 2, 'linen': 2}, level=8)
     assert upgrade_cost('confectionery', 2)['coins'] == 2400 and upgrade_cost('confectionery', 3)['coins'] == 4800
     assert upgrade_cost('barn', 2)['coins'] == 200 and upgrade_cost('barn', 3)['coins'] == 500
-    for b in (*{r['building'] for r in RECIPES.values()}, 'barn'):
+    for b in (*({r['building'] for r in RECIPES.values()} - {'compost_heap'}), 'barn'):
         c2, c3 = upgrade_cost(b, 2), upgrade_cost(b, 3)
         assert 0 < c2['coins'] < c3['coins'] and c2['level'] < c3['level']
         assert set(c2['items']) | set(c3['items']) <= set(ITEMS)

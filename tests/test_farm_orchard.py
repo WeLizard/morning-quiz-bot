@@ -33,6 +33,9 @@ def farm(coins=10 ** 7, xp=LEVELS[29], size=20, inv=None, at=T0, fid=None):
              inventory=dict(inv or {}))
     f['progress'].update(day=10 ** 9, dew=10 ** 9, last=10 ** 9, pool=0)    # no Morning dew, no idle-day vigour: exact XP
     economy.state(f)['billed_day'] = 10 ** 9
+    # Legacy orchard/merchant regressions use the pre-v2, already opened visit.
+    if M.visit_at(at):
+        f['merchant']['visit_id'] = M.visit_at(at)['visit_id']
     return f
 
 
@@ -391,11 +394,11 @@ def test_uproot_later_gives_only_wood_and_takes_the_ripe_fruit_first():
     t = clean_tree(f)
     coins = f['coins']
     cmd(f, 'demolish', dict(object=t['id'], revision=t['revision']), T0 + 3 * TREE_CYCLE + 5)
-    assert f['inventory']['apple'] == 6 and f['inventory']['wood'] == 2 and f['coins'] == coins and not [o for o in f['objects'] if o['type'] == 'tree']
+    assert f['inventory']['apple'] == 6 and f['inventory']['wood'] == 2 and f['coins'] == coins + t['cost'] // 2 and not [o for o in f['objects'] if o['type'] == 'tree']
     g = farm()
     u = plant(g)
     cmd(g, 'demolish', dict(object=u['id'], revision=u['revision']), T0 + 3600)
-    assert g['inventory'] == {'wood': 2} and g['coins'] == 10 ** 7 - 1920
+    assert g['inventory'] == {'wood': 2} and g['coins'] == 10 ** 7 - 1920 + 960      # E27 D2: half of the sapling price comes back
 
 
 def test_uproot_in_the_window_returns_a_spent_voucher():

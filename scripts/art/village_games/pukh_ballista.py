@@ -31,7 +31,7 @@ def main():
             assert result == harness.run('village_games/pukh_ballista.js', {'night': night})
             svg = result['svg']
             root = ET.fromstring(svg)
-            assert root.attrib['viewBox'] == '0 0 1000 600'
+            assert root.attrib['viewBox'] == '-60 0 1060 636'
             assert not root.findall('.//{http://www.w3.org/2000/svg}image')
             ids = [el.attrib['id'] for el in root.iter() if 'id' in el.attrib]
             assert len(ids) == len(set(ids)) and all(f'pb-target-{i}' in ids for i in range(5))
@@ -50,7 +50,7 @@ def main():
         second=harness.run('village_games/pukh_ballista.js',{'night':night})
         assert result==second,'Scene output is not deterministic'
         svg=result['svg'];root=ET.fromstring(svg)
-        assert root.attrib['viewBox']=='0 0 1000 600'
+        assert root.attrib['viewBox']=='-60 0 1060 636'
         assert not root.findall('.//{http://www.w3.org/2000/svg}image')
         assert 'data:image' not in svg and '<filter' not in svg
         ids=[el.attrib['id'] for el in root.iter() if 'id' in el.attrib]

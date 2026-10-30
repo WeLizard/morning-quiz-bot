@@ -8,6 +8,9 @@ export function entries(me,now){
  if(merchant&&(merchant.active===true||Number(merchant.next_at)>0))news.push({id:'merchant',title:'Вести от Сороки',source:'Сорока-коробейница',text:merchant.active===true?`Сорока на площади. ${statusText(merchant,now)}.`:`${statusText(merchant,now)}.`});
  const holiday=festival&&(festival.current||festival.upcoming?.soon)?festival.current?.phase==='fair'&&festival.fair?.todo?`${festival.current.name}: деревня отмечает праздник.`:bannerText(festival):'';
  if(holiday)news.push({id:'festival',title:'Праздник в деревне',source:festival.current?.host||'Агата',text:holiday});
+ const tower=festival?.fair?.tower;
+ if(tower)news.push({id:'pie-tower',title:'Пирог до небес',source:'Агата',
+  text:tower.reached?`Башня деревни достроена: «${tower.name}» у всех участников.`:`Башня деревни: ${tower.total} из ${tower.goal}${tower.players?` · участников: ${tower.players}`:''}. Сложи свой пирог на ярмарке.`});
  for(const project of me?.village_build?.projects||[]){
   if(!project.name||!['collecting','working','done'].includes(project.status))continue;
   news.push({id:`build:${project.id}`,title:project.name,source:'Механик Крот',text:siteLabel(project,project.name,now)});

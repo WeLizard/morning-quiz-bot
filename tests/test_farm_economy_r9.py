@@ -60,8 +60,8 @@ def test_upkeep_formula_counts_beds_buildings_by_level_and_ignores_decor():
     f['objects'] += [dict(id='k', type='kitchen', x=0, y=8, w=2, h=2, revision=0, level=1, jobs=[], animal=None, animal_job=None),
                      dict(id='m2', type='mill', x=3, y=8, w=2, h=2, revision=0, level=2, jobs=[], animal=None, animal_job=None),
                      dict(id='b', type='bench', x=7, y=8, w=1, h=1, revision=0, level=1, jobs=[], animal=None, animal_job=None)]
-    # beds 10 * 10 + kitchen ceil(240/100)=3 + mill (new_farm's own, level 1) 1 + level-2 mill 2 + coop 1; house, barn and decor: 0
-    assert economy.base_upkeep(f) == 100 + 3 + 1 + 2 + 1
+    # beds 10 * 10 + kitchen ceil(240/100)=3 + mill (new_farm's own, level 1) 1 + level-2 mill 1 (E27 B1: the level adds nothing) + coop 1; house, barn and decor: 0
+    assert economy.base_upkeep(f) == 100 + 3 + 1 + 1 + 1
     assert economy.upkeep(f, D1) == economy.base_upkeep(f)       # no discount without the tier
 
 
@@ -191,7 +191,7 @@ def test_items_never_disappear_when_the_bill_is_unpaid():
 def test_personal_scale_tiers_rewards_and_season_aligned_record():
     f = farm(lv=12, coins=300_000)
     ref = income_ref(12)
-    assert ref == 13000 and economy.thresholds(ref) == [6500, 19500, 39000, 65000, 104000]
+    assert ref == 13000 and economy.thresholds(ref) == [6500, 19500, 26000, 65000, 104000]
     cmd(f, 'fund_contribute', {'coins': 6000, 'items': {}})
     rec = f['economy']['seasons'][str(economy.season_of(D1 + 3600))]
     assert rec['personal'] == 6000 and rec['tiers'] == 0 and rec['ref'] == ref and f['economy']['unlocked'] == []
@@ -201,11 +201,11 @@ def test_personal_scale_tiers_rewards_and_season_aligned_record():
     # FARM_VILLAGE_CONSTRUCTION.md 4.2: tier 2 is «Покупатель Сороки» (no more 3-day feast), tier 4 is early fair access
     assert rec['tiers'] == 2 and f['economy']['feast_until'] == 0
     assert economy.perk(f, 'magpie', D1 + 3600) and not economy.perk(f, 'early', D1 + 3600)
-    cmd(f, 'fund_contribute', {'coins': 19500, 'items': {}})
+    cmd(f, 'fund_contribute', {'coins': 6500, 'items': {}})
     assert rec['tiers'] == 3 and economy.discount_active(f, D1 + 3600)
     assert economy.upkeep(f, D1) == economy.base_upkeep(f) * 75 // 100
     assert not economy.discount_active(f, D1 + 28 * DAY * 2)                    # a later season has no discount
-    cmd(f, 'fund_contribute', {'coins': 26000, 'items': {}})
+    cmd(f, 'fund_contribute', {'coins': 39000, 'items': {}})
     assert rec['tiers'] == 4 and 'fd_pinwheel' in f['economy']['unlocked'] and economy.perk(f, 'early', D1 + 3600)
     cmd(f, 'fund_contribute', {'coins': 39000, 'items': {}})
     assert rec['tiers'] == 5 and 'fd_cup' in f['economy']['unlocked'] and f['economy']['titles'] == ['Староста деревни']

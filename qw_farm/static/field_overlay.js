@@ -5,7 +5,7 @@
 import {
   gameCfg, Run, growthPermille, yieldQty, quality, conditionQuality, finalConditionQuality, runLeftSec, sprayBonus, timeKeep,
   timeLimits, autoSeconds, maxPath, stepAnchor, stepAnchorOrient, QRULE_TIMED
-} from './tractor_game.js?v=20261028c';
+} from './tractor_game.js?v=20261030a';
 
 const SPEEDS = [
   { id: 'calm', label: 'спокойно', ms: 450 },
@@ -2055,6 +2055,7 @@ export function openFieldGame(opts) {
         </header>
         <div class="qwfr-field" id="fwStage">
           <canvas id="fwCanvas" tabindex="0" aria-label="${title}: поле 8 на ${H}. Стрелки, WASD или свайп — ехать."></canvas>
+          <div class="field-legend" id="fwMobileLegend" aria-label="Обозначения на поле"></div>
         </div>
         <div class="qwfr-console">
           <div class="qwfr-readout">
@@ -2062,17 +2063,19 @@ export function openFieldGame(opts) {
             <div class="qwfr-metric"><span>Охват</span><strong id="fwCoverage">0%</strong><div class="qwfr-bar"><i id="fwCoverageBar"></i></div></div>
             <div class="qwfr-metric extra"><span id="fwExtraLabel">Сорняки</span><strong id="fwExtraVal">0</strong><small id="fwExtraSub">чисто</small><div class="qwfr-bar" id="fwExtraBarWrap" hidden><i id="fwExtraBar"></i></div></div>
           </div>
-          <div class="qwfr-condition" id="fwBonusRow">
-            <span>Бонус</span>
-            <div class="qwfr-condbar"><i id="fwBonusBar"></i></div>
-            <strong id="fwBonusPct">100%</strong>
-            <small id="fwBonusSub">в срок</small>
-          </div>
-          <div class="qwfr-condition" id="fwDamageRow" hidden>
-            <span>Состояние</span>
-            <div class="qwfr-condbar"><i id="fwCondBar"></i></div>
-            <strong id="fwCondPct">100%</strong>
-            <small id="fwCondSub">без ремонта</small>
+          <div class="qwfr-status">
+            <div class="qwfr-condition" id="fwBonusRow">
+              <span>Бонус</span>
+              <div class="qwfr-condbar"><i id="fwBonusBar"></i></div>
+              <strong id="fwBonusPct">100%</strong>
+              <small id="fwBonusSub">в срок</small>
+            </div>
+            <div class="qwfr-condition" id="fwDamageRow" hidden>
+              <span>Состояние</span>
+              <div class="qwfr-condbar"><i id="fwCondBar"></i></div>
+              <strong id="fwCondPct">100%</strong>
+              <small id="fwCondSub">без ремонта</small>
+            </div>
           </div>
           <div class="qwfr-actions">
             <button class="qwfr-btn" id="fwUndo" type="button">Шаг назад</button>
@@ -2092,7 +2095,6 @@ export function openFieldGame(opts) {
               <button class="qwfr-btn" id="fwUnload" type="button" hidden>Выгрузить</button>
             </div>
           </div>
-          <div class="field-legend" id="fwMobileLegend" aria-label="Обозначения на поле"></div>
         </div>
         <div class="qwfr-result" id="fwResult" hidden></div>
         <div class="qwfr-sr" id="fwLive" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -2295,18 +2297,34 @@ export function openFieldGame(opts) {
     const pw = Math.round(r.width * dpr), ph = Math.round(r.height * dpr);
     if (canvas.width !== pw) canvas.width = pw;
     if (canvas.height !== ph) canvas.height = ph;
-    const margin = Math.max(10, Math.min(r.width, r.height) * 0.035);
-    const topReserve = clamp(r.height * 0.11, 28, 52);
-    const bottomReserve = clamp(r.height * 0.06, 14, 28);
-    const roadH = Math.max(18, topReserve * 0.5);
-    const baseCell = Math.max(14, (r.width - margin * 2) / W);
-    const fitCell = Math.max(14, Math.min(baseCell, (r.height - margin * 2 - topReserve - bottomReserve) / Math.min(H, 8)));
-    const cell = H <= 8 ? fitCell : baseCell;
+    // E24: the field takes the whole width (the road runs 10 px past the fence), the barn roof and the road
+    // above it scale with the cell, the block is centred in the stage. The legend sits in the band under the
+    // field only when it costs no cell size and the field does not scroll under it; otherwise it hides.
+    const side = clamp(r.width * 0.03, 12, 18);
+    const air = 6;
+    const rows = Math.min(H, 8);
+    const barnK = Math.min(W * 0.34, 3.2) * 0.62 * 0.82;            // drawBarn: roof height above the fence, in cells
+    const rise = c => Math.max(36, c * barnK);
+    const cellW = Math.max(14, (r.width - side * 2) / W);
+    const cellH = below => {
+      const c = (r.height - air - below) / (rows + barnK);
+      return Math.max(14, c * barnK >= 36 ? c : (r.height - air - below - 36) / rows);
+    };
+    stage.classList.remove('is-tight');
+    const legendH = mobileLegend && mobileLegend.offsetParent ? (mobileLegend.offsetHeight || 0) : 0;
+    const withLegend = legendH ? legendH + 8 : air + 2;
+    const tight = !!legendH && (H > 8 || cellH(withLegend) < cellW - 0.5);
+    stage.classList.toggle('is-tight', tight);
+    const below = tight || !legendH ? air + 2 : withLegend;
+    const cell = H <= 8 ? Math.min(cellW, cellH(below)) : cellW;
     const fieldW = cell * W;
     const fieldH = cell * H;
     const fieldX = (r.width - fieldW) / 2;
-    const fieldY = margin + topReserve;
-    const camMax = Math.max(0, fieldY + fieldH - (r.height - bottomReserve));
+    const top = rise(cell);
+    const spare = H <= 8 ? Math.max(0, r.height - air - below - top - fieldH) : 0;
+    const fieldY = air + top + spare / 2;
+    const roadH = clamp(cell * 0.55, 18, 28);
+    const camMax = Math.max(0, fieldY + fieldH - (r.height - below));
     view = {
       w: r.width,
       h: r.height,

@@ -2,18 +2,21 @@ import './address.js';
 import {mountDashaGame,dashaReasonText,localizeWagerNotice} from './dasha-game.js';
 import {mountOlegGame} from './oleg-game.js';
 import {mountBallistaGame} from './ballista-game.js';
+import {mountPieGame} from './pie-game.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
-import {openFieldGame} from './field_overlay.js?v=20261028c';
-import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261028c';
+import {openFieldGame} from './field_overlay.js?v=20261030a';
+import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261030a';
 import * as FEST from './festivals.js';
 import {horsemanDisplay,openHorsemanDialog,renderHorsemanCard} from './horseman.js';
 import * as MERCH from './merchant.js';
 import * as ORCH from './orchard.js';
+const REFUND=ORCH;   // demolition / cancel-sowing refund helpers live in orchard.js (the ASSETS list of qw_farm/api.py)
 import {createFriendRequests} from './friend_requests.js';
 import {createConstruction} from './construction.js';
 import {renderBulletin} from './village_bulletin.js';
 import * as NAV from './farm_nav.js';
+import {drawPlotCard} from './lumberjack_art.js';
 import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js';
 import {CLASS_LABEL,LONG_HINT,seedStats,sortSeeds,planMachine,planRepeat,planTap,remember} from './farm_runs.js';
 import {parseInvite,parseInviteHint,incomingInvite,clearInvite,openTelegram,shareLink,mailtoUrl} from './invite.js';
@@ -74,7 +77,7 @@ const VILLAGE_VOICES={
 };
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
-let merchantToastKey='',villageResident=null,villageSheet=null,villageBulletinSource=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false,olegGame=null,olegGameOpen=false,ballistaGame=null,ballistaGameOpen=false;
+let merchantToastKey='',villageResident=null,villageSheet=null,villageBulletinSource=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false,olegGame=null,olegGameOpen=false,ballistaGame=null,ballistaGameOpen=false,pieGame=null,pieGameOpen=false;
 let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
 const VILLAGE_SPOTS={'Филиныч':[44.0,41.0],'Агата':[62.6,47.9],'Почтальон Ёж':[33.2,54.6],'Механик Крот':[72.7,57.0],'Кошка Кая':[24.8,44.6],'Кошка Соня':[55.6,59.2],'Суслик Игорь':[42.1,60.0],'Неведома Зверушка':[78.1,23.5],'Медведь Пух':[34.0,77.6],'Лиса Даша':[69.0,72.0],'Петух Олег':[49.0,32.0]};
 // The world is 2400x1800 art units (village.svg, painted with the farm's own building code). Positions above are percentages of the world;
@@ -159,7 +162,7 @@ const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
 const own=()=>S.farm?.is_owner;
 const now=()=>Date.now()/1000+(S.offset||0);
 const el=(tag,txt,cls)=>{let n=document.createElement(tag);if(txt!==undefined&&txt!==null)n.textContent=txt;if(cls)n.className=cls;return n;};
-const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg?v=20261028c#${FEST.iconId(id)}`);n.append(u);return n;};
+const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg?v=20261030a#${FEST.iconId(id)}`);n.append(u);return n;};
 function lakeDoorArt(){const n=document.createElementNS('http://www.w3.org/2000/svg','svg');n.setAttribute('class','lake-door-art');n.setAttribute('viewBox','0 0 160 68');n.setAttribute('preserveAspectRatio','xMidYMid slice');n.setAttribute('aria-hidden','true');n.setAttribute('focusable','false');n.innerHTML='<defs><clipPath id="lake-card-clip"><rect width="160" height="68" rx="13"/></clipPath><linearGradient id="lake-sky" x2="0" y2="1"><stop stop-color="#dcebd1"/><stop offset="1" stop-color="#f3eacb"/></linearGradient><linearGradient id="lake-water" x2="0" y2="1"><stop stop-color="#8ec7c1"/><stop offset="1" stop-color="#5d9d9c"/></linearGradient></defs><g clip-path="url(#lake-card-clip)"><rect width="160" height="68" fill="url(#lake-sky)"/><circle cx="125" cy="15" r="8" fill="#f6d47d" opacity=".82"/><path d="M0 34 24 16l25 19 28-22 34 24 23-15 26 17v29H0Z" fill="#9bb68b"/><path d="M0 43q25-11 48 0t47 0 65 0v34H0Z" fill="#6f966d"/><path d="M0 47q25-9 49 0t47 0 64 0v25H0Z" fill="url(#lake-water)"/><path d="M8 52q12-4 23 0t23 0m18 0q12-4 23 0t23 0m-73 9q11-3 22 0t22 0m36-7q10-3 20 0" fill="none" stroke="#d4ebe1" stroke-width="1.7" stroke-linecap="round" opacity=".85"/><path d="M8 45V29m0 11-5-7m5 4 5-7m-1 15V33m0 8 5-7m-5 4-4-6m135 12V28m0 13-5-7m5 4 5-7m-1 11V34m0 8 5-7m-5 4-4-6" fill="none" stroke="#547952" stroke-width="2" stroke-linecap="round"/><path d="M65 45q10-7 20 0-10 7-20 0Z" fill="#f0d39a" stroke="#7c795a" stroke-width="1.2"/><path d="m82 44 5-4v10l-5-4" fill="#e7c27a"/><circle cx="72" cy="45" r="1" fill="#365b4c"/><path d="M73 23q5-5 10 0m-7 5q4-4 8 0" fill="none" stroke="#fff8df" stroke-width="1.5" stroke-linecap="round" opacity=".9"/></g>';return n;}
 const button=(text,fn,cls='primary',disabled=false)=>{let b=el('button',text,cls);b.type='button';b.disabled=disabled;b.onclick=fn;return b;};
 const itemName=id=>S.catalog?.items[id]?.name||id;
@@ -171,7 +174,7 @@ const timeText=seconds=>{seconds=Math.max(0,Math.ceil(seconds));if(seconds<60)re
 const seedTimeText=seconds=>timeText(seconds).replaceAll(' мин','м').replaceAll(' ч','ч').replaceAll(' с','с');
 const duration=n=>timeText(Math.max(1,Math.ceil(n/S.speed)));
 function timer(t){let n=el('span');n.dataset.until=t;updateTime(n);return n;}
-function updateTime(n){const text=Number(n.dataset.until)<=now()?'Готово':(n.dataset.untilPrefix||'')+timeText(Number(n.dataset.until)-now());if(n.textContent!==text)n.textContent=text;}
+function updateTime(n){const text=Number(n.dataset.until)<=now()?(n.dataset.untilDone??'Готово'):(n.dataset.untilPrefix||'')+timeText(Number(n.dataset.until)-now());if(n.textContent!==text)n.textContent=text;}
 function growthMeter(start,end){const bar=meter(now()-start,end-start);bar.dataset.progressStart=start;bar.dataset.progressUntil=end;return bar;}
 function updateGrowthMeter(bar){const width=`${Math.max(0,Math.min(100,100*(now()-Number(bar.dataset.progressStart))/Math.max(1,Number(bar.dataset.progressUntil)-Number(bar.dataset.progressStart))))}%`;if(bar.firstElementChild.style.width!==width)bar.firstElementChild.style.width=width;}
 // Quiet notices at the top, under the counters: short, translucent, never over the seed strip, and identical ones merge
@@ -210,7 +213,7 @@ function field(label,type='text',value=''){let wrap=el('label',label,'form-field
 function checkbox(label,value){let wrap=el('label',null,'checkbox-field'),input=el('input');input.type='checkbox';input.checked=value;wrap.append(input,el('span',label));return [wrap,input];}
 function heading(title,eyebrow='НЕБОЛЬШИЕ ДЕЛА, БОЛЬШОЙ УЮТ'){let h=el('div',null,'panel-title'),a=el('div');a.append(el('div',eyebrow,'eyebrow'),el('h2',title));h.append(a,button('×',closePanel,'panel-close'));$('panel-head').replaceChildren(h);}
 function note(text,parent=$('panel-content')){parent.append(el('p',text,'note'));}
-const AVATARS={'Филиныч':'avatar_filinych','Агата':'avatar_agata','Почтальон Ёж':'avatar_hedgehog','Механик Крот':'avatar_mole','Кошка Кая':'avatar_kaya','Кошка Соня':'avatar_sonya','Суслик Игорь':'avatar_gopher','Неведома Зверушка':'avatar_mystery','Медведь Пух':'avatar_bear'};
+const AVATARS={'Лесоруб Степан':'avatar_lumberjack','Филиныч':'avatar_filinych','Агата':'avatar_agata','Почтальон Ёж':'avatar_hedgehog','Механик Крот':'avatar_mole','Кошка Кая':'avatar_kaya','Кошка Соня':'avatar_sonya','Суслик Игорь':'avatar_gopher','Неведома Зверушка':'avatar_mystery','Медведь Пух':'avatar_bear'};
 function card(title,subtitle,ico){let c=el('section',null,'card');if(title){let h=el('div',null,'card-header');h.append(ico?icon(ico):AVATARS[title]?icon(AVATARS[title]):el('span',title[0],'avatar'));let t=el('div');t.append(el('strong',title));if(subtitle)t.append(el('small',subtitle));h.append(t);c.append(h);}return c;}
 function goods(needs,showStock=true){let wrap=el('div',null,'goods');for(let [id,q]of Object.entries(needs)){let n=el('span',null,`good ${showStock&&stock(id)<q?'missing':''}`);n.title=itemName(id);n.append(icon(id),el('span',`${itemName(id)} ${showStock?`${stock(id)} / ${q}`:`×${q}`}`));wrap.append(n);}return wrap;}
 function meter(value,max){let b=el('div',null,'progress-bar'),i=el('i');i.style.width=`${Math.min(100,100*value/Math.max(1,max))}%`;b.append(i);return b;}
@@ -350,7 +353,7 @@ function readySnapshot(){
  return JSON.stringify([
   (S.farm?.objects||[]).map(o=>[(o.jobs||[]).map(j=>[due(j.starts_at),due(j.ready_at)]),due(o.animal_job?.ready_at),due(o.crop?.ready_at),due(o.fruit?.ready_at)]),
   (S.me?.trips||[]).map(trip=>[due(trip.ready_at),due(trip.started_at+(S.catalog?.undo?.window||60))]),
-  (S.me?.fields||[]).map(f=>[due(f.crop?.ready_at),due(f.run?.done_at),due(f.run?.expires_at)]),
+  (S.me?.fields||[]).map(f=>[due(f.crop?.ready_at),due(f.run?.done_at),due(f.run?.expires_at),(()=>{const c=REFUND.cancelSowing(S.catalog,f,t);return c?c.kind:null;})()]),
   due(S.me?.economy_status?.feast_until),
   S.tab==='village'?Math.max(0,Math.ceil(((S.me?.economy_status?.season_ends_at||t)-t)/86400)):null,
   due(S.me?.market?.caravan_next_at),due(S.me?.swans?.next_at),
@@ -372,7 +375,7 @@ async function refresh({render=true}={}){
  const beforeScene=sceneSnapshot(),beforeHUD=hudSnapshot(),beforeSeeds=seedsSnapshot(),prevLevel=S.me?.level??null;
  const catalogChanged=!!catalog&&upkeepCatalogSnapshot(catalog)!==upkeepCatalogSnapshot(S.catalog);
  if(catalogChanged)S.catalog=catalog;
- S.form=me.address_form||'n';try{if(!farmContrastPending&&prefsEpoch===farmContrastEpoch)globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();ballistaGame?.render();
+ S.form=me.address_form||'n';try{if(!farmContrastPending&&prefsEpoch===farmContrastEpoch)globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();
  queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();syncMenuBadges();orchardNotices(prevLevel);
  if(lostAccess){farmViewEpoch++;S.tab='neighbors';toast(gf('Хозяин закрыл доступ. Ты вернулся на свою ферму.','Хозяин закрыл доступ. Ты вернулась на свою ферму.','Доступ закрыт владельцем. Открыта твоя ферма.'));}
  if(beforeScene!==sceneSnapshot()||catalogChanged)scene.set(S.farm,S.catalog);
@@ -405,8 +408,8 @@ async function sendPending(){
  if(!S.me||!S.pending||S.pending.actor!==S.me.id||S.busy)return false;clearTimeout(pendingRetryTimer);pendingRetryTimer=null;S.busy=true;connection('Сохраняем действие…');document.body.classList.add('is-saving');
  let payload=S.pending,rejectedWagerRoundId=null,bulkView=S.me;
  try{let r=await request(API+'/commands',{method:'POST',data:payload});rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;if(!S.me)return true;if(!r.neighbor_reward_paid)toast(localizeWagerNotice(r.notice,gf));await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});if(['repeat_once','fill_queues'].includes(payload.kind)&&S.me?.id===payload.actor&&S.me===bulkView)S.bulkAwaitingRefresh={actor:payload.actor,view:bulkView};return true;}
- catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
- finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();olegGame?.render();ballistaGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
+ catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(payload.kind==='field_cancel'?REFUND.cancelErrorText(e):e.code==='stale_visit'?MERCH.STALE_TEXT:e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
+ finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
 }
 // After a real 429 the game recovers by itself: wait out Retry-After, then replay the unconfirmed command with the SAME id
 // (the server is idempotent) or just refresh the screen. No reload is needed.
@@ -438,7 +441,7 @@ function showLogin(message=''){
  if(S.pending)savePending();
  clearTimeout(pendingRetryTimer);pendingRetryTimer=null;pendingRetryAttempt=0;
  clearTimeout(rateRecoveryTimer);rateRecoveryTimer=null;rateRecoveryAttempt=0;
- if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
+ if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();if(pieGameOpen)closePieGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
  S.fieldGame?.close();cancelPlacement();if($('dialog').open)$('dialog').close();closePanel();
  toastList.length=0;renderToasts();connection(message||'Войди через QuizzyWizzy',true);
  document.body.classList.add('farm-login');$('game').hidden=true;$('login').hidden=false;const parent=$('login');parent.replaceChildren();let c=el('div',null,'login-card'),img=el('img',null,'login-hero');img.src='/app/farm-card-v2.webp';img.alt='Филиныч с урожаем на своей ферме';c.append(img);
@@ -537,7 +540,7 @@ async function openMenuTab(id){
  selectTab(id);
  if(wasOpen)$('farm-menu-button')?.focus({preventScroll:true});
 }
-function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
+function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();if(pieGameOpen)closePieGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
 function exitVillage(){villageSheet=null;selectTab('orders');closePanel();}
 function returnToFarm(){if(villageVisible())exitVillage();else backHome();}
 function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkStop();syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
@@ -629,7 +632,10 @@ function levelEffect(kind,lv,type){const u=UP();
  if(kind==='workshop')return fixedTime(type)?`очередь ${Math.min(6,2+lv)} мест`:`очередь ${Math.min(6,2+lv)} мест, рецепты быстрее на ${Math.round((1-u.recipe_speed[lv])*100)}%`;
  if(kind==='animals'){const c=u.animal[lv];return `вместимость ×${c.mult} (корма и продукции), цикл ×${c.time}`}
  return `продажа на складе дороже на ${u.barn_bonus[lv]}%`}
-function upgradeCard(o,p){if(!own())return;const u=UP(),kind=u.kinds[o.type];if(!kind)return;const lv=lvlOf(o),c=card(`Уровень ${lv} из ${u.max}`,levelEffect(kind,lv,o.type),'workshop');
+function upgradeCard(o,p){if(!own())return;const u=UP(),kind=u.kinds[o.type];
+ // E27 B3: a building that cannot be upgraded any more (the compost heap) has no button; one upgraded earlier keeps and shows its level.
+ if(!kind){if(u.kinds[o.type]===null&&lvlOf(o)>1){const keep=card(`Уровень ${lvlOf(o)} из ${u.max}`,'Прежнее улучшение сохранено','workshop');keep.append(el('p','Дальше эту постройку не улучшить: срок партии у неё не меняется.','note'));p.append(keep);}return;}
+ const lv=lvlOf(o),c=card(`Уровень ${lv} из ${u.max}`,levelEffect(kind,lv,o.type),'workshop');
  if(lv>=u.max||(Number.isInteger(o.level)&&o.level>=u.max)){c.append(el('p','Максимальный уровень достигнут.','note'));p.append(c);return}
  const to=lv+1,cost=u.costs[o.type][String(to)];
  c.append(el('p',`Улучшить до ур. ${to} — ${cost.coins} монет и материалы: ${levelEffect(kind,to,o.type)}.`,'note'),goods(cost.items));
@@ -802,7 +808,10 @@ function renderInventory(p){heading('Склад и лавка',gf('ВСЁ, ЧТ�
  p.append(button('Нужны семена на новый старт?',()=>command('rescue'),'text-button'));}
 function invRow(id,qty){let row=el('div',null,'item-row'),txt=el('div',null,'item-copy'),actions=el('div',null,'row-actions');txt.append(el('strong',`${itemName(id)} ×${fmt(qty)}`),el('small',MERCH.isBound(S.catalog,id)?MERCH.BOUND_NOTE:`${Math.floor(S.catalog.items[id].price*(100+barnBonus())/100)} монет за штуку`));if(!MERCH.isBound(S.catalog,id))actions.append(button('−1',()=>command('sell',{item:id,qty:1}),'secondary small'),button('Ещё',()=>itemDialog(id,qty),'light small'));row.append(icon(id),txt,actions);return row;}
 function invPaintList(list,rows){list.replaceChildren(...(rows.length?rows.map(([id,q])=>invRow(id,q)):[el('p','Ничего не нашлось','note')]));}
-function invBar(label,chips,cur,pick){const g=el('div',null,'find-filters inv-filters');g.setAttribute('role','group');g.setAttribute('aria-label',label);for(const [id,name,n] of chips){const b=el('button');b.type='button';b.setAttribute('aria-pressed',String(cur===id));b.append(el('span',name),el('span',String(n),'count'));b.onclick=()=>pick(id);g.append(b);}return g;}
+function invBar(label,chips,cur,pick){const g=el('div',null,'find-filters inv-filters');g.setAttribute('role','group');g.setAttribute('aria-label',label);for(const [id,name,n] of chips){const b=el('button');b.type='button';b.setAttribute('aria-pressed',String(cur===id));b.append(el('span',name),el('span',String(n),'count'));b.onclick=()=>pick(id);g.append(b);}
+ // The row scrolls sideways without a scrollbar: the mouse wheel moves it on a PC (only when it can move, so the dialog keeps its own wheel otherwise).
+ g.addEventListener('wheel',e=>{const d=wheelScrollDelta(e,g.scrollLeft,g.scrollWidth,g.clientWidth);if(!d)return;e.preventDefault();g.scrollLeft+=d;},{passive:false});
+ return g;}
 function invMount(p,entries){const st=S.inv,counts=invCounts(entries,S.catalog);invNormalizeState(st,counts);
  const sw=el('div',null,'inv-search'),input=el('input'),clr=button('×',()=>{st.q='';input.value='';clr.hidden=true;paintList();input.focus();},'inv-clear'),filters=el('div'),list=el('div',null,'inv-list');
  input.type='search';input.value=st.q;input.placeholder='Найти на складе';input.setAttribute('aria-label','Найти на складе');input.autocomplete='off';input.enterKeyHint='search';clr.hidden=!st.q;clr.setAttribute('aria-label','Очистить поиск');sw.append(input,clr);
@@ -1169,9 +1178,7 @@ function renderLessonCard(o,p){
  }
 }
 function confirmDemolish(o){
- const functional=!!S.catalog.buildings[o.type]&&!S.catalog.buildings[o.type].decor;
- const refund=functional?`На склад вернётся древесина ×${4+lvlOf(o)-1}. Монеты не возвращаются.`:'Монеты и материалы не возвращаются.';
- modal(`Удалить «${objName(o)}»?`,`${objName(o)} исчезнет с фермы. ${refund}`, [
+ modal(`Удалить «${objName(o)}»?`,REFUND.demolishText(S.catalog,o,now(),objName(o)), [
   button('Подтвердить удаление',safe(async()=>{const d=$('dialog');d.close();if(await command('demolish',{object:o.id,revision:o.revision})){
    S.selected=null;scene.selected=null;scene.dirty=true;S.tab='objects';renderRail();renderPanel();
   }}),'primary')
@@ -1420,8 +1427,9 @@ function renderTeam(p){
  }else{
   for(let spec of Object.values(S.catalog.helpers)){
    const owned=S.me.helpers[spec.id],c=card(spec.name,owned?'В команде':`${spec.cost} монет · уровень ${spec.level}`,spec.icon);note(spec.description,c);if(AUTO().roles[spec.role])c.append(el('span',AUTO().roles[spec.role],'tag'));
+   if(!owned&&AVATARS[spec.name]){const pt=el('div',null,'hire-portrait');pt.setAttribute('role','img');pt.setAttribute('aria-label',spec.name);pt.append(icon(AVATARS[spec.name]));c.append(pt);}
    if(!owned)c.append(button(`Нанять за ${spec.cost}`,()=>command('hire_helper',{helper:spec.id}),'primary wide',spec.level>S.me.level||spec.cost>S.me.coins));
-   else if(spec.role==='guide'){let trip=S.me.trips.find(t=>t.guide===spec.id);if(trip){c.append(el('p',tripCategory(trip)==='fishing'?'Сейчас на рыбалке':'Сейчас в вылазке','note'),timer(trip.ready_at));}else c.append(button('Выбрать лесную тропу',()=>selectTab('forest'),'secondary wide'),button('Пойти на рыбалку',()=>selectTab('lake'),'secondary wide'));}
+   else if(spec.role==='guide'){let trip=S.me.trips.find(t=>t.guide===spec.id||t.helper===spec.id);if(trip){c.append(el('p',tripCategory(trip)==='fishing'?'Сейчас на рыбалке':trip.helper===spec.id?'Сейчас на делянке: пила у тебя':'Сейчас в вылазке','note'),timer(trip.ready_at));}else c.append(button('Выбрать лесную тропу',()=>selectTab('forest'),'secondary wide'),button('Пойти на рыбалку',()=>selectTab('lake'),'secondary wide'));}
    else shiftControls(c,spec.id,owned,spec);
    p.append(c);
   }
@@ -1549,18 +1557,18 @@ function renderSwans(p){
 function renderTrips(p,category){
  const fishing=category==='fishing';
  for(let trip of S.me.trips.filter(t=>tripCategory(t)===category)){
-  let route=S.catalog.routes[trip.route],c=card(route.name,trip.guide?S.catalog.helpers[trip.guide].name:fishing?'Твоя рыбалка':'Твоя прогулка',route.icon);
+  let route=S.catalog.routes[trip.route],felling=fellRoute(route),c=card(route.name,trip.guide?S.catalog.helpers[trip.guide].name:fishing?'Твоя рыбалка':felling?'Твоя делянка':'Твоя прогулка',route.icon);
   c.append(timer(trip.ready_at),goods(finalOutputs(trip),false));
   if(trip.game?.state==='done')c.append(el('p',bonusLine(trip,itemName),'note'));
   // UI_RULES §9: one primary action, the hint under its button, the destructive action apart in its own zone.
   const stack=el('div',null,'qw-btn-stack trip-actions'),ready=trip.ready_at<=now(),playable=trip.game?.state!=='done'&&canPlay(trip,now());
-  const play=()=>[button(fishing?'Порыбачить самому':'Пройтись самому',()=>launchTripGame(trip),`qw-btn ${ready?'secondary':'primary'} wide`),el('p',fishing?'Самому — до +25% улова':'Самому — до +25% находок','qw-btn-hint')];
+  const play=()=>[button(fishing?'Порыбачить самому':felling?'Валить самому':'Пройтись самому',()=>launchTripGame(trip),`qw-btn ${ready?'secondary':'primary'} wide`),el('p',fishing?'Самому — до +25% улова':felling?'Самому — до ×1,6 древесины':'Самому — до +25% находок','qw-btn-hint')];
   if(ready){
-   const row=el('div',null,'qw-btn-row trip-row'),collect=button(fishing?'Забрать улов':'Разобрать корзину',()=>command('collect_trip',{trip:trip.id}),'qw-btn primary');
+   const row=el('div',null,'qw-btn-row trip-row'),collect=button(fishing?'Забрать улов':felling?'Забрать брёвна':'Разобрать корзину',()=>command('collect_trip',{trip:trip.id}),'qw-btn primary');
    if(playable){const [b,hint]=play();b.classList.remove('wide');row.append(b,collect);stack.append(row,hint);}else{collect.classList.add('wide');stack.append(collect);}
   }else{
    if(playable)stack.append(...play());
-   const wait=el('p',fishing?'Улов можно будет забрать через ':'Корзину можно будет разобрать через ','note qw-btn-hint');wait.append(timer(trip.ready_at));stack.append(wait);
+   const wait=el('p',fishing?'Улов можно будет забрать через ':felling?'Брёвна можно будет забрать через ':'Корзину можно будет разобрать через ','note qw-btn-hint');wait.append(timer(trip.ready_at));stack.append(wait);
    const zone=el('div',null,'qw-danger-zone');zone.append(button(tripUndoLabel(trip),()=>confirmTripReturn(trip),'qw-btn danger wide'));stack.append(zone);
   }
   c.append(stack);
@@ -1570,10 +1578,11 @@ function renderTrips(p,category){
  const routes=Object.values(S.catalog.routes).filter(r=>routeCategory(r)===category);
  if(!routes.length)note(fishing?'Места для рыбалки пока недоступны.':'Лесные тропы пока недоступны.',p);
  for(let route of routes){
+  if(route.helper){renderPlotRoute(route,p);continue;}
   let c=card(route.name,`${duration(route.seconds)} · ${route.cost} монет · ур. ${route.level}`,route.icon);note(route.description,c);c.append(goods(route.outputs,false));
   if(Object.keys(route.inputs).length){c.append(el('p','Взять с собой','note'),goods(route.inputs));}
   let[w,guide]=field((fishing?'Кто рыбачит: ':'Кто идёт: ')+route.name,'select');let solo=el('option',fishing?gf('Порыбачу сам','Порыбачу сама','Рыбалка без проводника'):gf('Пойду сам','Пойду сама','Вылазка без проводника'));solo.value='';solo.disabled=S.me.trips.some(t=>!t.guide);guide.append(solo);
-  for(let [id,owned]of Object.entries(S.me.helpers)){const h=S.catalog.helpers[id];if(h.role!=='guide')continue;let opt=el('option',`${h.name}${h.specialty===route.specialty?fishing?' · бонус улова':' · бонус находок':''}`);opt.value=id;opt.disabled=S.me.trips.some(t=>t.guide===id);guide.append(opt);}
+  for(let [id,owned]of Object.entries(S.me.helpers)){const h=S.catalog.helpers[id];if(h.role!=='guide')continue;let opt=el('option',`${h.name}${h.specialty===route.specialty?fishing?' · бонус улова':' · бонус находок':''}`);opt.value=id;opt.disabled=S.me.trips.some(t=>t.guide===id||t.helper===id);guide.append(opt);}
   let choices=[...guide.options].filter(x=>!x.disabled);guide.value=choices.find(x=>x.value===S.guideChoice?.[route.id])?.value||choices[0]?.value||'';
   const blocked=S.me.trips.length>=2||route.level>S.me.level||route.cost>S.me.coins||!enough(route.inputs)||!choices.length,startBox=el('div',null,'trip-start');
   const paintStart=()=>{
@@ -1587,6 +1596,36 @@ function renderTrips(p,category){
   guide.onchange=()=>{(S.guideChoice||={})[route.id]=guide.value;paintStart();};paintStart();
   c.append(w,startBox);p.append(c);
  }
+}
+function fellRoute(r){return r?.game==='fell';}
+function plotArt(){
+ const cv=el('canvas',null,'plot-art');cv.width=320;cv.height=136;cv.setAttribute('role','img');cv.setAttribute('aria-label','Старый ельник: пни, штабель брёвен, пила Степана');
+ const g=cv.getContext('2d');if(g){g.scale(2,2);drawPlotCard(g,{night:document.documentElement.dataset.farmTheme==='night'});}
+ return cv;
+}
+// "Делянка": needs a hired Stepan who is free. Two ways: "Пилю сам" (the player's place, the Валка minigame) and "Отправить Степана" (the guide's place, no game).
+function plotWhy(route,solo){
+ const h=S.catalog.helpers[route.helper],busy=S.me.trips.some(t=>t.guide===route.helper||t.helper===route.helper);
+ if(S.me.level<route.level)return `Тропа открывается с уровня ${route.level}.`;
+ if(!S.me.helpers[route.helper])return `Для маршрута «${route.name}» сначала найми: ${h.name}.`;
+ if(busy)return `${h.name} ещё не вернулся.`;
+ if(S.me.trips.length>=2)return 'Заняты оба места для лесных вылазок и рыбалки. Сначала забери одну корзину или улов.';
+ if(solo&&S.me.trips.some(t=>!t.guide))return gf('Ты уже занят вылазкой или рыбалкой.','Ты уже занята вылазкой или рыбалкой.','Твоё место для вылазок и рыбалки уже занято.')+' Во вторую можно отправить Степана.';
+ if(route.cost>S.me.coins)return `Не хватает монет: нужно ${route.cost}.`;
+ const miss=Object.entries(route.inputs).find(([k,q])=>stock(k)<q);
+ return miss?`Не хватает: ${itemName(miss[0])}.`:'';
+}
+function renderPlotRoute(route,p){
+ const h=S.catalog.helpers[route.helper],c=card(route.name,`${duration(route.seconds)} · ${route.cost} монет · ур. ${route.level}`,route.icon);
+ c.classList.add('plot-card');c.append(plotArt());note(route.description,c);c.append(goods(route.outputs,false));
+ if(Object.keys(route.inputs).length){c.append(el('p','Взять с собой','note'),goods(route.inputs));}
+ if(!S.me.helpers[route.helper]){
+  c.append(el('p',`Нужен ${h.name}: бензопила его.`,'note'),button(`Нанять ${h.name}`,()=>{S.teamTab='helpers';selectTab('team');},'qw-btn secondary wide'));p.append(c);return;
+ }
+ const solo=plotWhy(route,true),sent=plotWhy(route,false),stack=el('div',null,'qw-btn-stack plot-actions');
+ stack.append(button('Пилю сам',()=>startTrip(route,'',true),'qw-btn primary wide',!!solo),el('p',solo||'Место игрока, мини-игра «Валка»: до ×1,6 древесины. Степан даёт пилу и остаётся занят до сбора.','qw-btn-hint'));
+ stack.append(button('Отправить Степана',()=>startTrip(route,route.helper,false),'qw-btn secondary wide',!!sent),el('p',sent||'Место проводника, без игры: базовая древесина, на 20% быстрее.','qw-btn-hint'));
+ c.append(stack);p.append(c);
 }
 function renderSecrets(p){
  heading('Кабинет находок','ЗНАКОМЫЕ МИРЫ — НЕОЖИДАННЫЕ СЛЕДЫ');
@@ -1611,6 +1650,7 @@ function syncFestivalWorld(){
 }
 function festivalHelpers(){
  return {el,button,card,goods,note,checkbox,stock,fmt,itemName,command,icon,modal,now,
+  pie:()=>S.me?.village_games?.agata_pie||null,pieGame:()=>openPieGame(),
   getHorseman:()=>S.me?.horseman||null,pending:()=>S.busy||!!S.pending,closeDialog:()=>$('dialog').close(),
   horsemanCard:parent=>renderHorsemanCard(parent,festivalHelpers()),
   busy:()=>S.busy,coins:()=>S.me?.coins||0,rerender:()=>{if(S.me)renderPanel();}};
@@ -1638,6 +1678,15 @@ async function openDashaGame(){
 // Oleg's chime: the same nested view as Dasha's; oleg.py owns melodies, rounds and the daily reward.
 function closeOlegGame(){if(!olegGameOpen)return true;olegGameOpen=false;document.body.classList.remove('oleg-game-open');olegGame?.destroy();olegGame=null;navPop('oleg-chime');requestAnimationFrame(()=>document.querySelector('[data-open-oleg]')?.focus({preventScroll:true}));return true;}
 function closeBallistaGame(){if(!ballistaGameOpen)return true;ballistaGameOpen=false;document.body.classList.remove('ballista-game-open');ballistaGame?.destroy();ballistaGame=null;navPop('pukh-ballista');requestAnimationFrame(()=>document.querySelector('[data-open-ballista]')?.focus({preventScroll:true}));return true;}
+function closePieGame(){if(!pieGameOpen)return true;pieGameOpen=false;document.body.classList.remove('pie-game-open');pieGame?.destroy();pieGame=null;navPop('agata-pie');requestAnimationFrame(()=>document.querySelector('[data-open-pie]')?.focus({preventScroll:true}));return true;}
+async function openPieGame(){
+ if(!own()||!S.me)return;
+ if(!S.me.village_games?.agata_pie||!S.me.festival?.fair?.tower){try{await refresh({render:false});}catch(e){toast(e.message,true);return;}}
+ if(!S.me?.festival?.fair?.tower){toast('Пирог до небес ждёт ярмарки.',true);return;}
+ const host=$('pie-game-view');if(pieGameOpen){pieGame?.render();return;}
+ pieGameOpen=true;document.body.classList.add('pie-game-open');
+ pieGame=mountPieGame(host,{getState:()=>S.me?.village_games?.agata_pie,tower:()=>S.me?.festival?.fair?.tower||null,command,isCommandPending:()=>!!S.pending||S.busy,onBack:closePieGame,now,storageKey:S.me.id});navPush('agata-pie',closePieGame);
+}
 async function openBallistaGame(){
  if(!own()||!S.me)return;
  if(!S.me.village_games?.pukh_ballista){try{await refresh({render:false});}catch(e){toast(e.message,true);return;}}
@@ -1856,7 +1905,7 @@ async function retryConnection(){
  else if(S.pending)await sendPending();else await refresh();
 }
 document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(olegGameOpen){e.preventDefault();closeOlegGame();return;}if(ballistaGameOpen){e.preventDefault();closeBallistaGame();return;}if(farmMenuOpen){e.preventDefault();closeFarmMenu();$('farm-menu-button')?.focus({preventScroll:true});return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
+ if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(olegGameOpen){e.preventDefault();closeOlegGame();return;}if(ballistaGameOpen){e.preventDefault();closeBallistaGame();return;}if(pieGameOpen){e.preventDefault();closePieGame();return;}if(farmMenuOpen){e.preventDefault();closeFarmMenu();$('farm-menu-button')?.focus({preventScroll:true});return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
  if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||e.ctrlKey||e.metaKey||e.altKey||$('dialog').open)return;
  if(e.key.toLowerCase()==='f'){e.preventDefault();toggleFullscreen();}
  if(e.key.toLowerCase()==='h'){e.preventDefault();toggleImmersive();}
@@ -2050,7 +2099,7 @@ function upkeepCard(p,e){
  if(!e.active){note(`Содержание начнётся с ${ECON().upkeep_level} уровня. До этого ферма живёт без счетов.`,c);p.append(c);return;}
  const beds=S.me.objects.filter(o=>o.type==='plot').length,rate=ECON().plot_upkeep[S.me.size]||0,buildingRate=Number.isFinite(ECON().building_rate_pct)?ECON().building_rate_pct:1;
  c.append(el('p',`Счёт за сутки: ${fmt(e.upkeep)} мон.${e.discount?' (скидка фонда −25% уже учтена)':''}`,'upkeep-total'));
- note(`Грядки: ${beds} × ${rate} мон. и ${buildingRate}% цены каждой постройки за каждый её уровень. Декор ничего не стоит.`,c);
+ note(`Грядки: ${beds} × ${rate} мон. и ${buildingRate}% базовой цены каждой постройки; уровень не добавляет. Декор ничего не стоит.`,c);
  note(e.billed_today?'Сегодняшний счёт уже учтён.':'Счёт спишется после первого действия в новые сутки по Москве. Если игры не было, суммы не копятся.',c);
  if(e.debt>0){
   const w=el('div',null,'callout debt-note');w.append(el('strong',`Долг: ${fmt(e.debt)} мон.`),el('span','Не хватило заработанных монет. Пока долг не погашен, новые таймеры идут на 20% дольше. Запасы и постройки никуда не деваются.'));c.append(w);
@@ -2240,7 +2289,7 @@ function syncMerchantFlag(){
  if(typeof MERCH==='undefined')return;
  const v=own()?merchantView():null;MERCH.applyFlag(v);
  const b=$('village-scene')?.querySelector?.('.village-cart');if(b?.setAttribute)b.setAttribute('aria-label',merchantLabel(v));
- const key=v?.visit_id||'';if(key&&key!==merchantToastKey){merchantToastKey=key;let seen=null;try{seen=localStorage.getItem('qw-farm.merchant-seen');}catch{}if(seen!==key){try{localStorage.setItem('qw-farm.merchant-seen',key);}catch{}toast('Сорока приехала на рынок!');}}
+ const key=MERCH.arrivalKey(v);if(key&&key!==merchantToastKey){merchantToastKey=key;let seen=null;try{seen=localStorage.getItem('qw-farm.merchant-seen');}catch{}if(seen!==key){try{localStorage.setItem('qw-farm.merchant-seen',key);}catch{}toast('Сорока приехала на рынок!');}}
 }
 function openVillageConstruction(sheet){if(!own())return;villageResident=null;villageSheet=sheet;syncVillageScene();showPanel();renderPanel();}
 function syncVillageSites(){if(typeof CONSTR==='undefined')return;for(const b of $('village-scene')?.querySelectorAll?.('[data-village-site]')||[]){const text=CONSTR.siteLabel(b.dataset.villageSite,b.dataset.siteName);if(b.textContent!==text)b.textContent=text;}}
@@ -2467,10 +2516,13 @@ function fieldCard(f){
  if(ph==='open'){
   const row=el('p',null,'note');row.append('Машина в поле, осталось ',timer(f.run.expires_at),'. Потом работу закончит автопилот.');c.append(row);
   c.append(button('Продолжить за рулём',()=>launchField(f),'primary wide'),button(`Автопилот: качество ${pct1(fieldAutoQ(f,F))}`,()=>command('field_finish',{field:f.id,run:f.run.id,path:null}),'secondary wide'));
+  cancelSowButton(f,c);
  }else if(ph==='auto'){
   const row=el('p',null,'note');row.append('Автопилот закончит через ',timer(f.run.done_at),` (качество ${pct1(fieldAutoQ(f,F))}).`);c.append(row);
+  cancelSowButton(f,c);
  }else if(ph==='growing'){
   const cr=S.catalog.crops[f.crop.id],row=el('p',null,'note');row.append(`${cr?.name||f.crop.id}: созреет через `,timer(f.crop.ready_at),`. Качество посева ${pct1(f.crop.q_sow)}.`);c.append(row);
+  cancelSowButton(f,c);
  }else if(opOf){
   if(!have)note(`Нужна машина: ${machine.name}. Купи её ниже.`,c);
   if(ph==='wild'){
@@ -2507,6 +2559,16 @@ function fieldCard(f){
  }
  return c;
 }
+// «Отменить посев» (E27 F4): the first minute of an unfinished sowing run or of a freshly sown crop; the server returns seeds and fuel in full.
+function cancelSowButton(f,c){
+ const info=REFUND.cancelSowing(S.catalog,f,now());
+ if(!info)return;
+ const b=button('',()=>command(...REFUND.cancelCommand(f)),'light wide field-cancel');
+ const left=el('span','');left.dataset.until=String(now()+Math.max(0,info.left));left.dataset.untilDone='0 с';
+ b.append('Отменить посев · ',left);updateTime(left);
+ b.title=`Семена и топливо вернутся полностью: +${fmt(info.refund)} монет. Отмена доступна первую минуту.`;
+ c.append(b,el('p',`Ошибся с культурой? В первую минуту посев отменяется: вернутся семена и топливо, +${fmt(info.refund)} монет.`,'note'));
+}
 async function startFieldOp(f,op,crop=''){
  const ok=await command('field_start',{field:f.id,op,crop,revision:f.revision});
  if(!ok)return;
@@ -2525,7 +2587,7 @@ function launchTripGame(trip){
  S.fieldGame={};syncScenePause();
  try{S.fieldGame=openTripGame({trip,route:S.catalog.routes[trip.route],rules:S.catalog.trip_games,serverNow:now,itemName,timeText,
   inventory:{...(S.me.inventory||{})},journal:{...(S.me.fish_journal||{})},
-  onFinish:log=>command('trip_play',{trip:id,log}),
+  onFinish:log=>command('trip_play',{trip:id,log}),icon:id=>icon(id),
   tripNow:()=>(S.me.trips||[]).find(t=>t.id===id)||null,
   onClose:()=>{S.fieldGame=null;syncScenePause();navPop('minigame');if(['forest','lake'].includes(S.tab))renderPanel();}});
   navPush('minigame',()=>S.fieldGame?.requestClose?.()??true);

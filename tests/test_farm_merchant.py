@@ -17,6 +17,11 @@ MSK = timezone(timedelta(hours=3))
 EPOCH = date(1970, 1, 1).toordinal()
 
 
+@pytest.fixture(autouse=True)
+def stable_merchant_secret(monkeypatch):
+    monkeypatch.setenv('QW_FARM_MERCHANT_SECRET', 'merchant-regression-test-secret-32-characters')
+
+
 def ts(y, m, d, h=12, minute=0, second=0):
     return int(datetime(y, m, d, h, minute, second, tzinfo=MSK).timestamp())
 
@@ -46,6 +51,9 @@ def farm(coins=10 ** 6, xp=LEVELS[29], inv=None, at=NOW):
     f.update(xp=xp, coins=coins, starter_credit=0, inventory=dict(inv or {}))
     f['progress'].update(day=10 ** 9, dew=10 ** 9)
     economy.state(f)['billed_day'] = 10 ** 9
+    # These regression scenarios finish an already open pre-v2 visit. V2 has its own suite.
+    if M.visit_at(at):
+        f['merchant']['visit_id'] = M.visit_at(at)['visit_id']
     return f
 
 
@@ -105,7 +113,7 @@ def test_next_visit_and_the_herald_teaser_come_a_day_ahead():
     nxt = M.next_visit(NOW)
     assert nxt['day'] > VISIT and nxt['opens_at'] > NOW
     eve = nxt['opens_at'] - 3600
-    assert M.public(eve)['teaser'] and M.public(eve)['teaser'] in {s['name'] for s in M.stock(nxt)}
+    assert M.public(eve)['teaser'] and M.public(eve)['slots'] == [], 'public herald does not promise a farm-specific lot'
     assert M.public(nxt['opens_at'] - 3 * 86400)['teaser'] is None
     away = M.public(M.visit_on(VISIT)['closes_at'] + 3600)
     assert away['active'] is False and away['slots'] == [] and away['next_at'] > away['opens_at'] if away['opens_at'] else away['next_at']
@@ -141,7 +149,7 @@ def test_stock_is_six_deterministic_slots_with_the_value_law_prices():
     assert slots[0]['kind'] == 'exotic_seed' and slots[0]['min_level'] <= 14, 'a cheap slot for a beginner'
     for s in slots:
         if s['kind'] in ('exotic_seed', 'scroll', 'curio'):
-            expect = EXOTIC_BY_SEED[s['item']]['pack_price'] if s['kind'] == 'exotic_seed' else -(-{'scroll': 25}.get(s['kind'], CURIOS.get(s['id'], {}).get('k', 0)) * income_ref(s['min_level']) // 100)
+            expect = EXOTIC_BY_SEED[s['item']]['pack_price'] if s['kind'] == 'exotic_seed' else -(-{'scroll': 12}.get(s['kind'], CURIOS.get(s['id'], {}).get('k', 0)) * income_ref(s['min_level']) // 100)
             assert s['price'] == expect
         if s['kind'] in ('graft', 'voucher'):   # the orchard exists now: the garden goods ride in the last slot of some visits
             assert s['id'] in M.ORCHARD_IDS and s['slot'] == 5 and s['wired'] and s['price'] == M._k_price(MERCHANT['orchard_k'][s['id']], s['min_level'])
@@ -151,7 +159,7 @@ def test_stock_is_six_deterministic_slots_with_the_value_law_prices():
 def test_prices_follow_k_times_income_ref_of_the_item_level():
     e = M.ENTRIES['seed_moon_pumpkin']
     assert e['min_level'] == 14 and e['price'] == EXOTIC_CROPS['moon_pumpkin']['pack_price']
-    assert M.ENTRIES['scroll_pumpkin_latte']['price'] == 25 * income_ref(14) // 100
+    assert M.ENTRIES['scroll_pumpkin_latte']['price'] == 12 * income_ref(14) // 100
     for cid, c in CURIOS.items():
         assert M.ENTRIES[cid]['price'] == -(-c['k'] * income_ref(c['level']) // 100) and 15 <= c['k'] <= 60
     for d in DYES:
@@ -191,7 +199,7 @@ def test_new_visit_resets_the_counters_and_a_stale_or_absent_visit_is_refused():
     cmd(f, 'merchant_buy', buy(s['slot'], 2))
     later = next(d for d in range(VISIT + 1, VISIT + 20) if M.visit_on(d))
     nxt = M.stock(M.visit_on(later))[0]
-    cmd(f, 'merchant_buy', {'visit_id': f'v{later}', 'slot': 0, 'qty': 1}, at=noon(later))
+    cmd(f, 'merchant_buy', {'visit_id': f'v{later}:h2', 'slot': 0, 'qty': 1}, at=noon(later))
     assert f['merchant']['bought'] == {'0': 1} and f['merchant']['visit_id'] == f'v{later}' and f['merchant']['sold_value'] == 0
     assert nxt['id'] != s['id'] or True
     assert code(f, 'merchant_buy', buy(0, 1), at=noon(later)) == 'stale_visit'
@@ -230,6 +238,8 @@ def test_a_curio_is_bought_once_for_ever_and_placed_free_once():
     assert f['merchant']['curios'] == [s['id']]
     assert code(f, 'merchant_buy', buy(s['slot'])) == 'already_owned'
     other = next(d for d in range(VISIT + 1, VISIT + 400) if M.visit_on(d) and any(x['id'] == s['id'] for x in M.stock(M.visit_on(d))))
+    # Model a pre-v2 save at that later visit too: legacy stocks retain slot indices.
+    f['merchant'].update(visit_id=f'v{other}', bought={}, sold_value=0)
     assert code(f, 'merchant_buy', {'visit_id': f'v{other}', 'slot': next(x['slot'] for x in M.stock(M.visit_on(other)) if x['id'] == s['id']), 'qty': 1},
                 at=noon(other)) == 'already_owned'
     coins = f['coins']
@@ -247,6 +257,7 @@ def test_a_scroll_opens_its_recipe_only_after_purchase():
     visit = next(M.visit_on(d) for d in range(VISIT, VISIT + 400) if M.visit_on(d) and any(s['id'] == 'scroll_pepper_gingerbread' for s in M.stock(M.visit_on(d))))
     s = next(x for x in M.stock(visit) if x['id'] == 'scroll_pepper_gingerbread')
     at = noon(visit['day'])
+    f['merchant'].update(visit_id=visit['visit_id'], bought={}, sold_value=0)
     cmd(f, 'merchant_buy', {'visit_id': visit['visit_id'], 'slot': s['slot'], 'qty': 1}, at=at)
     assert f['merchant']['scrolls'] == ['pepper_gingerbread']
     cmd(f, 'queue', {'object': 'bak', 'recipe': 'pepper_gingerbread'}, at=at)

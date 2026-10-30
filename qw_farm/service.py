@@ -9,7 +9,7 @@ import time
 from .domain import new_farm, apply, project, validate_state, can_visit, FarmError, need, event
 from .catalog import tick, public_catalog, VERSION, level, FUND_LEVEL, INVITE
 from .expansion import upgrade_state, settle
-from . import economy, invites, undo, minigames, oleg, progression, trip_games
+from . import economy, invites, undo, minigames, oleg, progression, trip_games, festivals
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
 from . import wagers, friend_requests, construction
@@ -58,7 +58,8 @@ class FarmService:
         await wagers.claim_pending(self.u,farm,self.p.account_id,self.clock())
         requests=await friend_requests.projection(self.u,farm,self.clock())
         now=self.clock();upkeep_config=await self._upkeep_config(now)
-        projection=project(farm,farm,now,upkeep_config);projection['wager']=await wagers.projection(self.u,farm,self.p.account_id,now)
+        tower=await self._tower(farm,now)
+        projection=project(farm,farm,now,upkeep_config,tower);projection['wager']=await wagers.projection(self.u,farm,self.p.account_id,now)
         projection['friend_requests']=requests
         projection['village_build']=await construction.projection(self.u,farm,self.p.account_id,self.clock())
         return dict(farm=projection,catalog=dict(public_catalog(upkeep_config),undo=undo.public_rules(),trip_games=trip_games.public_rules()),speed=self.speed,village=await self._village(farm),
@@ -248,6 +249,69 @@ class FarmService:
         if row is None:row=dict(season=season,total=0,goal=await self.u.village_goal(now))
         return dict(season=season,total=row['total'],goal=row['goal'],ends_at=economy.season_end(season))
 
+    async def _tower_goal(self, cfg, now):
+        """The fair starts with the content goal; a completed previous fund season cuts it by 25% (BOOST)."""
+        goal = cfg['goal']
+        if hasattr(self.u,'village_peek'):
+            previous = await self.u.village_peek(economy.season_of(now)-1)
+            if previous and previous['total'] >= previous['goal']:
+                goal = goal * (100-festivals.BOOST['tower_threshold_cut_pct']) // 100
+        return max(1, goal)
+
+    async def _tower(self, farm, now):
+        """The open fair's shared pie tower for the owner's projection; None when the fair has no tower."""
+        cur = festivals.current(now)
+        if not cur or cur['phase'] != 'fair':
+            return None
+        cfg = festivals.content(cur['id']).get('tower')
+        if not cfg:
+            return None
+        item = festivals.good_of(cur['id'], cfg['item'])
+        row = await self.u.tower_peek(cur['key']) if hasattr(self.u,'tower_peek') else None
+        if row is None:
+            return dict(key=cur['key'], total=0, goal=await self._tower_goal(cfg,now), players=0, reached=False,
+                        item=cfg['item'], name=item['name'])
+        return dict(key=cur['key'], total=row['total'], goal=row['goal'], players=row['players'],
+                    reached=row['reached_at'] is not None, item=cfg['item'], name=item['name'])
+
+    async def _pie_tower(self, farm, before, now):
+        """Add only the new part of the player's best height to the fair's shared row and grant the common lot."""
+        after = (farm.get('village_games') or {}).get('agata_pie') or {}
+        old = (before.get('village_games') or {}).get('agata_pie') or {}
+        delta = after.get('contributed',0)-old.get('contributed',0)
+        if delta <= 0:
+            return ''
+        key = after.get('fair')
+        match = festivals.KEY_RE.match(key) if isinstance(key,str) else None
+        if match is None:
+            return ''
+        cfg = festivals.content(match.group(1)).get('tower')
+        if not cfg:
+            return ''
+        row = await self.u.tower_add(key,delta,1 if old.get('best',0)==0 else 0,await self._tower_goal(cfg,now),now)
+        text = f' Башня деревни: {row["total"]} из {row["goal"]}.'
+        if row['reached_at'] is not None:
+            reward = festivals.grant_tower(farm,key)
+            if reward:
+                text += f' Деревня достроила башню: «{reward}» в коллекции праздника.'
+        return text
+
+    async def _claim_tower(self, farm, now):
+        """Lazy common reward: a participant gets the tower decor once the shared row has reached its goal."""
+        if not hasattr(self.u,'tower_peek'):
+            return
+        cur = festivals.current(now)
+        if not cur or not festivals.content(cur['id']).get('tower'):
+            return
+        keys = [cur['key']] if cur['phase'] == 'fair' else []
+        last = festivals.last_completed(cur['id'], now)
+        if last and last['key'] not in keys:
+            keys.append(last['key'])
+        for key in keys:
+            row = await self.u.tower_peek(key)
+            if row and row['reached_at'] is not None:
+                festivals.grant_tower(farm, key)
+
     async def _claim_village(self, farm, now):
         """Lazy common reward: pay it on the owner's visit when the village counter of a season they joined reached its goal."""
         if not hasattr(self.u,'village_peek'):return
@@ -262,6 +326,7 @@ class FarmService:
         baseline=upgrade_state(deepcopy(before))
         settle(farm,self.clock())
         if own:await self._claim_village(farm,self.clock())
+        if own:await self._claim_tower(farm,self.clock())
         if own:await construction.tick_account(self.u,farm,self.p.account_id,self.clock())  # shared stages, perk mirror, own stall rent
         if farm!=before:
             farm['revision']+=1
@@ -294,7 +359,7 @@ class FarmService:
             await self._settle(farm,await self.u.owner_account(farm['id']))
         requests=await friend_requests.projection(self.u,me,self.clock()) if farm is me else None
         now=self.clock();upkeep_config=await self._upkeep_config(now)
-        projected=project(farm,me,now,upkeep_config)
+        projected=project(farm,me,now,upkeep_config,await self._tower(me,now) if farm is me else None)
         if farm is me:
             projected['wager']=await wagers.projection(self.u,me,self.p.account_id,self.clock())
             projected['friend_requests']=requests
@@ -444,6 +509,8 @@ class FarmService:
                             village_games=farm_village_games.public(me,now))
                 await self.u.remember(self.p.account_id,key,fingerprint,result,now)
                 return result
+            if data.get('game')=='agata_pie' and kind=='vgame_finish':
+                notice+=await self._pie_tower(me,before,now)
             economy.bill(me,now,upkeep_config)
         elif wager_kind:
             need(other is me,'not_owner','Это не твоя ферма.',403)
@@ -501,9 +568,13 @@ class FarmService:
         record_kind=ledger_kind if wager_kind else kind
         if vgame_kind and kind=='vgame_finish':
             outcome=me['village_games'][data['game']]['last_result']
-            ledger_key='vgame:'+outcome['run_id']+':'+str(outcome['stars'])
-            # M2 is a future bonus pool, never an XP award. Keep its actual delta explicit.
-            record_kind='vgame_m2' if outcome['reward_kind']=='vigour' else 'vgame_premium'
+            if data['game']=='agata_pie':
+                ledger_key='vgame:'+outcome['run_id']
+                record_kind='vgame_pie'
+            else:
+                ledger_key='vgame:'+outcome['run_id']+':'+str(outcome['stars'])
+                # M2 is a future bonus pool, never an XP award. Keep its actual delta explicit.
+                record_kind='vgame_m2' if outcome['reward_kind']=='vigour' else 'vgame_premium'
         await self.u.record(self.p.account_id,ledger_key,record_kind,before,me,now)
         if me['id']!=other['id'] and other!=before_other:
             other['revision']+=1;validate_state(other);await self.u.save(other)

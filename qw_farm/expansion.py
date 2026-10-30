@@ -916,24 +916,31 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_c
         need(isinstance(data['guide'], str), 'invalid_command', 'Неверный проводник.', 422)
         need(len(farm['trips']) < 2, 'trip_limit', 'Заняты оба места для лесных вылазок и рыбалки. Сначала забери одну корзину или улов.')
         guide = named(HELPERS, data['guide']) if data['guide'] else None
+        partner = route.get('helper')                      # a route that only a certain guide knows (logging_plot -> lumberjack)
+        if partner:
+            need(not guide or guide['id'] == partner, 'wrong_guide', f'{route["name"]}: здесь работает только {HELPERS[partner]["name"]}.')
+            need(partner in farm['helpers'], 'helper_needed', f'Для маршрута «{route["name"]}» сначала найми: {HELPERS[partner]["name"]}.')
+            need(not any(partner in (t['guide'], t.get('helper')) for t in farm['trips']), 'guide_busy', f'{HELPERS[partner]["name"]} ещё не вернулся.')
         if guide:
             need(guide['role'] == 'guide' and guide['id'] in farm['helpers'], 'not_hired', 'Этот проводник ещё не нанят.')
-            need(not any(t['guide'] == guide['id'] for t in farm['trips']), 'guide_busy', 'Проводник ещё не вернулся.')
+            need(not any(guide['id'] in (t['guide'], t.get('helper')) for t in farm['trips']), 'guide_busy', 'Проводник ещё не вернулся.')
         else:
             need(not any(not t['guide'] for t in farm['trips']), 'trip_active', address_g(form, 'Ты уже занят вылазкой или рыбалкой.', 'Ты уже занята вылазкой или рыбалкой.',
                                                             'Твоё место для вылазок и рыбалки уже занято.') + ' Во вторую можно отправить проводника.')
         inventory(farm, route['inputs'], -1)
         gift = pay(farm, route['cost'])
         outputs = deepcopy(route['outputs'])
-        matched = bool(guide and guide['specialty'] == route['specialty'])
+        matched = bool(guide and guide['specialty'] == route['specialty'] and route.get('guide_bonus', True))
         if matched:
             first = next(iter(outputs))
-            outputs[first] += 1
+            outputs[first] += guide.get('bonus', 1)       # lumberjack: +2 on the Timber path; logging_plot has no guide bonus (the saw game pays)
         seconds = duration(route['seconds'] * (.8 if guide else 1), speed, farm)
         trip = dict(id=command_id, route=route['id'], kind=route.get('kind', 'forest'), guide=data['guide'], started_at=now,
                     ready_at=now + seconds, outputs=outputs, xp=route['xp'],
                     secret=route.get('secret'), version=VERSION,
                     taken=dict(coins=route['cost'], gift=gift, items=deepcopy(route['inputs'])))
+        if partner and not guide:
+            trip['helper'] = partner                       # he lends the saw: busy (cannot guide) until the trip is collected
         if not data['guide']:                              # the player goes himself: an optional minigame for a bonus on top
             trip['game'] = trip_games.make_game(farm, command_id, route, now)
         farm['trips'].append(trip)

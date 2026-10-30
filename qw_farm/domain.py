@@ -440,10 +440,16 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         place(me,data['x'],data['y'],c['w'],c['h'])
         free=c.get('decor') and not c.get('secret') and expansion.market.free_decor(me,typ)  # r8: caravan gift
         if free:expansion.market.take_decor(me,typ)
-        else:pay(me,c['cost']);economy.note_decor_spend(me,typ,c['cost'])
-        me['objects'].append(dict(id=command_id,type=typ,x=data['x'],y=data['y'],w=c['w'],h=c['h'],
-           revision=0,level=1,jobs=[],animal=None,animal_job=None,**({'crop':None} if typ=='plot' else {})))
-        me['stats']['builds']+=1;progression.grant_xp(me,5,'build',now,True);text='Постройка готова.'
+        else:paid_gift=pay(me,c['cost']);economy.note_decor_spend(me,typ,c['cost'])
+        if free:paid_gift=0
+        built=dict(id=command_id,type=typ,x=data['x'],y=data['y'],w=c['w'],h=c['h'],
+           revision=0,level=1,jobs=[],animal=None,animal_job=None,**({'crop':None} if typ=='plot' else {}))
+        # E27 D1: what was paid (0 for a caravan gift), when and from which part of the starter gift, so that a demolition gives back exactly that
+        built.update(paid=0 if free else c['cost'],built_at=now,gift=paid_gift)
+        me['objects'].append(built)
+        me['stats']['builds']+=1;built_xp=progression.grant_xp(me,5,'build',now,True)
+        built['build_xp']=built_xp
+        text='Постройка готова.'
     elif kind=='move':
         place(me,data['x'],data['y'],obj['w'],obj['h'],obj['id'])
         obj['x']=data['x'];obj['y']=data['y'];obj['revision']+=1;text='Новое место сохранено.'
@@ -462,11 +468,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         need(obj['type'] not in {'house','barn'},'cannot_demolish','Дом и склад нельзя снести.')
         need(not (obj.get('crop') or obj.get('jobs') or obj.get('animal_job') or obj.get('animal')),
              'object_busy','Сначала освободи объект от урожая, производства или животных.')
-        building=BUILDINGS.get(obj['type'])
-        wood=4+effective_level(obj.get('level'))-1 if building and not building.get('decor') else 0
-        if wood:inventory(me,{'wood':wood})
-        me['objects'].remove(obj)
-        text=f'Постройка разобрана: древесина ×{wood}.' if wood else 'Объект убран с фермы.'
+        from . import undo
+        text=undo.demolish(me,obj,now)
     elif kind=='upgrade':
         need(upgrade_kind(obj['type']) is not None,'cannot_upgrade','Эту постройку улучшать не нужно.')
         cur=obj.get('level',1)
@@ -475,7 +478,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         need(lv>=cost['level'],'locked',f'Улучшение до {target} уровня открывается с {cost["level"]} уровня фермы.')
         need(me['coins']>=cost['coins'],'insufficient_coins','Недостаточно монет для улучшения.')
         inventory(me,cost['items'],-1)  # validates every good before anything is spent
-        pay(me,cost['coins']);obj['level']=target;obj['revision']+=1
+        paid_gift=pay(me,cost['coins']);obj['level']=target;obj['revision']+=1
+        if paid_gift:obj['gift']=obj.get('gift',0)+paid_gift   # E27 D1: the starter gift part comes back with a refund
         text={'workshop':f'Мастерская улучшена до {target} уровня: очередь длиннее, работа быстрее.',
               'animals':f'Домик улучшен до {target} уровня: животные помещаются в большем количестве.',
               'barn':f'Склад улучшен до {target} уровня: торговля идёт выгоднее.'}[upgrade_kind(obj['type'])]
@@ -657,7 +661,7 @@ def validate_state(farm):
         used|=cells
 
 
-def project(farm, visitor, now, upkeep_config=None):
+def project(farm, visitor, now, upkeep_config=None, tower=None):
     now=tick(now)
     own=farm['id']==visitor['id']
     need(can_visit(visitor,farm),'private_farm','Ферма недоступна.',404)
@@ -673,7 +677,7 @@ def project(farm, visitor, now, upkeep_config=None):
         from . import swans
         result['swans']=swans.public(farm,now)
         from . import festivals
-        result['festival']=festivals.owner_view(farm,now)
+        result['festival']=festivals.owner_view(farm,now,tower=tower)
         from . import horseman
         result['horseman']=horseman.owner_view(farm,now)
         from . import merchant
@@ -691,6 +695,7 @@ def project(farm, visitor, now, upkeep_config=None):
             obj['jobs']=[{'ready_at':j['ready_at']} for j in obj.get('jobs',[])]
             for k in ('last_recipe','recipes_memory','recipe_cursor','animal_repeat'):obj.pop(k,None)
             if obj.get('animal_job'):obj['animal_job']={'ready_at':obj['animal_job']['ready_at']}
+            for k in ('paid','built_at','build_xp','gift'):obj.pop(k,None)   # a visitor never sees what a building cost
             if obj['type']=='tree':   # a visitor sees the look and the ripeness, never the price, the voucher or the care state
                 for k in ('cost','gift','paid_with','pruned_until','prune_at'):obj.pop(k,None)
                 if obj.get('fruit'):obj['fruit']={'ready_at':obj['fruit']['ready_at'],'helped':obj['fruit']['helped'],**({'fert':1} if obj['fruit'].get('fert')==1 else {})}   # fert: look only

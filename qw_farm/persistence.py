@@ -14,12 +14,26 @@ import sqlalchemy as sa
 from .domain import FarmError, need, order_recent
 
 
+def tower_table(metadata: sa.MetaData):
+    if 'farm_festival_towers' in metadata.tables:
+        return metadata.tables['farm_festival_towers']
+    return sa.Table('farm_festival_towers', metadata,
+        sa.Column('key', sa.String(40), primary_key=True),
+        sa.Column('total', sa.BigInteger, nullable=False, server_default='0'),
+        sa.Column('goal', sa.BigInteger, nullable=False),
+        sa.Column('players', sa.Integer, nullable=False, server_default='0'),
+        sa.Column('reached_at', sa.Float, nullable=True),
+        sa.Column('updated_at', sa.Float, nullable=False),
+        sa.CheckConstraint('total >= 0 AND goal > 0 AND players >= 0', name='ck_farm_festival_tower_amounts'))
+
+
 def tables(metadata: sa.MetaData):
     from .friend_requests import table as request_table
     from . import construction
     if 'farm_states' in metadata.tables:
         result={name:metadata.tables['farm_'+name] for name in ['states','receipts','ledger','village','invites','neighbor_pairs','share_invites','share_invite_uses']}
         result['wagers']=metadata.tables.get('farm_wager_rounds')
+        result['festival_towers']=tower_table(metadata)
         result['requests']=request_table(metadata)
         result.update(construction.tables(metadata))
         return result
@@ -106,7 +120,7 @@ def tables(metadata: sa.MetaData):
     sa.Index('uq_farm_wager_active_account',wagers.c.account_id,unique=True,
              postgresql_where=wagers.c.settled_at.is_(None),sqlite_where=wagers.c.settled_at.is_(None))
     sa.Index('ix_farm_wager_daily',wagers.c.account_id,wagers.c.created_at)
-    return dict(states=states,receipts=receipts,ledger=ledger,village=village,invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses,wagers=wagers,requests=request_table(metadata),**construction.tables(metadata))
+    return dict(states=states,receipts=receipts,ledger=ledger,village=village,festival_towers=tower_table(metadata),invites=invites,neighbor_pairs=neighbor_pairs,share_invites=share_invites,share_invite_uses=share_invite_uses,wagers=wagers,requests=request_table(metadata),**construction.tables(metadata))
 
 
 def unpack(row):
@@ -288,6 +302,31 @@ class Unit:
             await self.execute(insert(t).values(season=season,total=0,goal=goal,created_at=now).on_conflict_do_nothing(index_elements=['season']))
         row=(await self.execute(sa.update(t).where(t.c.season==season).values(total=t.c.total+value).returning(t.c.total,t.c.goal))).first()
         return dict(season=season,total=row[0],goal=row[1])
+
+    # ---- the shared pie tower of a festival: one row per fair, added atomically; no farm locks.
+    async def tower_peek(self, key):
+        t=self.t['festival_towers']
+        row=(await self.execute(sa.select(t).where(t.c.key==key))).mappings().first()
+        return dict(key=row['key'],total=row['total'],goal=row['goal'],players=row['players'],reached_at=row['reached_at']) if row else None
+
+    async def tower_add(self, key, value, player_delta, goal, now):
+        """Atomic ``total += value`` and ``players += player_delta``; the goal is fixed when the row is created."""
+        t=self.t['festival_towers']
+        if self.dialect=='postgresql':
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
+        if await self.tower_peek(key) is None:
+            await self.execute(insert(t).values(key=key,total=0,goal=goal,players=0,reached_at=None,updated_at=now)
+                               .on_conflict_do_nothing(index_elements=['key']))
+        row=(await self.execute(sa.update(t).where(t.c.key==key)
+             .values(total=t.c.total+value,players=t.c.players+player_delta,updated_at=now)
+             .returning(t.c.total,t.c.goal,t.c.players,t.c.reached_at))).first()
+        total,row_goal,players,reached=row
+        if reached is None and total>=row_goal:
+            await self.execute(sa.update(t).where(t.c.key==key,t.c.reached_at.is_(None)).values(reached_at=now))
+            reached=now
+        return dict(key=key,total=total,goal=row_goal,players=players,reached_at=reached)
 
     # ---- invitations: who brought whom. One row per invited farm (primary key) = at most one reward per invited farm.
     async def invite_add(self, invitee_id, inviter_id, now):

@@ -293,6 +293,8 @@ HELPERS={
    description='Проводник по грибным тропам: вылазка быстрее на 20%, грибов в корзине немного больше.'),
  'squirrel':dict(id='squirrel',name='Белка Орешка',cost=80,level=2,role='guide',icon='helper_squirrel',specialty='berries',
    description='Проводник по ягодникам и ореховым рощам: быстрее на 20% и дополнительная лесная находка.'),
+ 'lumberjack':dict(id='lumberjack',name='Лесоруб Степан',cost=180,level=5,role='guide',icon='helper_lumberjack',specialty='wood',bonus=1,
+   description='Знает лес и умеет обращаться с бензопилой: проведёт по Лесной тропе быстрее и с запасом брёвен, а на делянке даст пилу тебе или напилит сам.'),
 }
 SHIFTS={
  'short':dict(id='short',name='На полчаса',seconds=1800,actions=12,cost=4),
@@ -306,6 +308,7 @@ ROUTES={
  'herb_meadow':dict(id='herb_meadow',name='Луг четырёх стихий',description='На тропинке кто-то оставил страницу необычного атласа.',level=2,seconds=1200,cost=8,inputs={'carrot':1},outputs={'herbs':4,'wildberry':2},xp=15,specialty='herbs',icon='herbs',secret='atlas'),
  'old_grove':dict(id='old_grove',name='Ореховая роща',description='Долгая спокойная прогулка с корзиной орехов и грибов.',level=3,seconds=7200,cost=14,inputs={'bread':1},outputs={'hazelnut':6,'mushroom':4,'blackberry':3},xp=28,specialty='berries',icon='hazelnut'),
  'night_glade':dict(id='night_glade',name='Тропа Ночного города',description='Город спит. У калитки — конверт с совиной печатью. Без опасностей и потерь.',level=3,seconds=3600,cost=12,inputs={'oat_cookie':1},outputs={'chanterelle':8,'herbs':3},xp=22,specialty='mushrooms',icon='night',secret='night'),
+ 'logging_plot':dict(id='logging_plot',name='Делянка',description='Старый ельник под вырубку. Степан даёт пилу и показывает, куда валить.',level=6,seconds=1200,cost=12,inputs={'bread':1},outputs={'wood':10},xp=18,specialty='wood',icon='logging_plot',helper='lumberjack',guide_bonus=False,game='fell'),
 }
 # Fishing shares the two activity slots and guide rules with woodland trips.
 # Its own category and completion counter keep fish out of the forest quest.
@@ -373,10 +376,18 @@ def _nice(v):
     step=10**max(0,len(str(v))-3)
     return (v+step//2)//step*step
 
+LAND_SOFT_FROM=28                       # E27 (2026-10-29): from 28x28 the price follows 26x26 * (s/26)^4 instead of 25000 * (s/20)^6
+LAND_SOFT_BASE=26
+
 def _tail_step(size):
     n=(size-LAND_TABLE_END)//2
-    # cost = 25000*(s/20)^6 in exact integers; the gate climbs 5 levels per step and stops at the last level (50)
-    return dict(size=size,cost=_nice(LAND_TABLE[-1]['cost']*size**6//LAND_TABLE_END**6),level=min(len(LEVELS),LAND_TABLE[-1]['level']+5*n))
+    # cost = 25000*(s/20)^6 in exact integers up to 26x26, then C26*(s/26)^4; the gate climbs 5 levels per step and stops at the last level (50)
+    old=_nice(LAND_TABLE[-1]['cost']*size**6//LAND_TABLE_END**6)
+    cost=old if size<LAND_SOFT_FROM else _nice(_tail_step_cost(LAND_SOFT_BASE)*size**4//LAND_SOFT_BASE**4)
+    return dict(size=size,cost=cost,level=min(len(LEVELS),LAND_TABLE[-1]['level']+5*n))
+
+def _tail_step_cost(size):
+    return _nice(LAND_TABLE[-1]['cost']*size**6//LAND_TABLE_END**6)
 
 LAND_TAIL=tuple(_tail_step(sz) for sz in range(LAND_TABLE_END+2,LAND_CEILING+1,2))
 LAND_STEPS=LAND_TABLE+LAND_TAIL
@@ -419,6 +430,8 @@ def upgrade_kind(building_type):
     """'workshop' | 'animals' | 'barn' | None (not upgradable)."""
     if building_type == 'barn':
         return 'barn'
+    if building_type == 'compost_heap':
+        return None   # E27 B3: its 8-hour batch is fixed, so an upgrade only added upkeep; old upgraded heaps keep their level
     if any(r['building'] == building_type for r in RECIPES.values()):
         return 'workshop'
     if any(a['building'] == building_type for a in ANIMALS.values()):
@@ -434,6 +447,16 @@ def upgrade_cost(building_type, to_level):
     base = BUILDINGS[building_type]['cost'] if building_type in BUILDINGS else UPGRADE_BASE_COST
     coins = max(spec['coin_min'], int(round(base * spec['coin_factor'] / 10.0)) * 10)
     return dict(coins=coins, items=dict(spec['items']), level=spec['level'])
+
+
+def upgrade_coins(building_type, to_level):
+    """Coins of the upgrade to ``to_level`` by the formula alone, also for a building that cannot be upgraded any more
+    (compost heaps upgraded before E27 B3): used to give back a demolished building's investment."""
+    spec = UPGRADES.get(to_level)
+    if spec is None or building_type not in BUILDINGS and building_type != 'barn':
+        return 0
+    base = BUILDINGS[building_type]['cost'] if building_type in BUILDINGS else UPGRADE_BASE_COST
+    return max(spec['coin_min'], int(round(base * spec['coin_factor'] / 10.0)) * 10)
 
 
 def effective_level(raw):
@@ -579,6 +602,7 @@ def validate():
         assert r['seconds'] > 0 and set(r['inputs'])|set(r['outputs']) <= set(ITEMS)
         assert all(type(q) is int and q>0 for q in r['outputs'].values())
         assert r['kind'] in {'forest', 'fishing'} and r['category'] == r['kind']
+        assert not r.get('helper') or (r['helper'] in HELPERS and HELPERS[r['helper']]['role'] == 'guide' and r['kind'] == 'forest')
         if r['kind'] == 'fishing':
             assert r['level'] >= FISHING_LEVEL and not r.get('secret')
             assert all(ITEMS[k]['kind'] == 'fish' for k in r['outputs'])
@@ -673,12 +697,12 @@ for _s in range(LAND_TABLE_END+2,LAND_CEILING+1,2):  # 30*(s/20)^2, rounded
 def plot_upkeep(size):
     return PLOT_UPKEEP.get(size,0)
 
-UPKEEP_PCT=100                  # a building costs ceil(cost * level / 100) per bill
-FIELD_UPKEEP=1500               # per hectare per bill (fields: stage 15)
+UPKEEP_PCT=100                  # a building costs ceil(base cost / 100) per bill; the level does not add to it (E27 B1, 2026-10-29)
+FIELD_UPKEEP=1000               # per hectare per bill (fields: stage 15; 1500 before E27 F1, 2026-10-29)
 DEBT_SLOW,DEBT_SLOW_DEN=6,5     # new timers take x1.2 while upkeep debt is open
 FUND_LEVEL=8
 SEASON_DAYS=28
-FUND_TIERS=(5,15,30,50,80)      # personal scale thresholds in tenths of INCOME_REF(lv): 0.5 / 1.5 / 3 / 5 / 8
+FUND_TIERS=(5,15,20,50,80)      # personal scale thresholds in tenths of INCOME_REF(lv): 0.5 / 1.5 / 2 / 5 / 8 (tier 3 was 3.0 before E27 V1)
 FUND_MARKUP=125                 # goods count at price x1.25 (percent)
 MIN_SHARE_PCT=10                # minimal personal contribution (percent of INCOME_REF) for the common reward
 MAX_CONTRIBUTION=10**9
@@ -773,7 +797,7 @@ for i,n,p,col in [
  ('servelat','Сервелат',165,'#a9553f'),('kulebyaka','Кулебяка',304,'#d9a05a'),
 ]:
     ITEMS[i]=dict(id=i,name=n,price=p,color=col,kind='product')
-for i,n,c,l in [('creamery','Молокозавод',6000,21),('sausage_shop','Колбасный цех',9000,26),('cattle_barn','Хлев',5000,25)]:
+for i,n,c,l in [('creamery','Молокозавод',4500,21),('sausage_shop','Колбасный цех',7000,26),('cattle_barn','Хлев',4000,25)]:   # E27 B2: were 6000 / 9000 / 5000
     BUILDINGS[i]=dict(id=i,name=n,cost=c,level=l,w=2,h=2,decor=False)
 # calves: hay + feed + a beet -> a batch of meat, like every other animal (~110 coins per hour of cycle net of feed)
 ANIMALS['calf']=dict(id='calf',name='Бычки',building='cattle_barn',inputs={'hay':2,'feed':2,'beet':1},outputs={'meat':2},seconds=4800,level=25,cost=2600)
@@ -922,8 +946,8 @@ R16_ITEM_ROWS = [
  ('harvest_cake', 'Торт урожая', 1247, '#f6d8a8'),
 ]
 # id, name, cost, level (workshops, then animal houses)
-R16_WORKSHOPS = [('syrupery', 'Сироповарня', 15000, 34), ('soapery', 'Мыловарня', 22000, 38), ('noodle_shop', 'Макаронная мастерская', 30000, 43)]
-R16_HOUSES = [('ostrich_farm', 'Страусиная ферма', 9000, 29), ('silk_house', 'Шёлковый дом', 14000, 33), ('yak_pen', 'Горный загон', 22000, 37), ('pheasantry', 'Фазанник', 32000, 42)]
+R16_WORKSHOPS = [('syrupery', 'Сироповарня', 10000, 34), ('soapery', 'Мыловарня', 14000, 38), ('noodle_shop', 'Макаронная мастерская', 18000, 43)]   # E27 B2: were 15000 / 22000 / 30000
+R16_HOUSES = [('ostrich_farm', 'Страусиная ферма', 7000, 29), ('silk_house', 'Шёлковый дом', 10000, 33), ('yak_pen', 'Горный загон', 14000, 37), ('pheasantry', 'Фазанник', 20000, 42)]   # E27 B2: were 9000 / 14000 / 22000 / 32000
 # id, name, house, inputs, outputs, seconds, level, cost
 R16_ANIMAL_ROWS = [
  ('ostrich', 'Страусы', 'ostrich_farm', {'feed': 2, 'hay': 1}, {'ostrich_egg': 1}, 7200, 29, 3000),
@@ -1082,13 +1106,13 @@ FIELD_STEPS=(                  # buy_field {step}: index into this table, each s
  dict(step=4,level=44,ha=3,cost=800000),
 )
 FIELD_MACHINES={               # four machines, one per operation; tier = width of the swath (1 -> 2 -> 3)
- 'cultivator':dict(id='cultivator',name='Культиватор',op='cultivate',icon='cultivator',costs=(5000,30000,120000),levels=(22,27,38),
+ 'cultivator':dict(id='cultivator',name='Культиватор',op='cultivate',icon='cultivator',costs=(5000,15000,45000),levels=(22,27,38),
    description='Культивация: срезает сорняки, объезжает камни. Чем чище работа, тем быстрее растёт урожай (до -30% времени).'),
- 'seeder':dict(id='seeder',name='Сеялка',op='sow',icon='seeder',costs=(7500,30000,120000),levels=(22,27,38),
+ 'seeder':dict(id='seeder',name='Сеялка',op='sow',icon='seeder',costs=(7500,15000,45000),levels=(22,27,38),
    description='Посев по разметке рядов. От аккуратности зависит урожай.'),
- 'combine':dict(id='combine',name='Комбайн',op='harvest',icon='combine',costs=(12500,30000,120000),levels=(22,27,38),
+ 'combine':dict(id='combine',name='Комбайн',op='harvest',icon='combine',costs=(12500,15000,45000),levels=(22,27,38),
    description='Уборка полосами с выгрузкой бункера у края поля. Переполнение бункера — потери урожая.'),
- 'sprayer':dict(id='sprayer',name='Опрыскиватель',op='spray',icon='sprayer',costs=(7000,30000,120000),levels=(22,27,38),
+ 'sprayer':dict(id='sprayer',name='Опрыскиватель',op='spray',icon='sprayer',costs=(7000,15000,45000),levels=(22,27,38),
    description='Опрыскивание созревшего поля: прибавка к урожаю до +20%. Ветер сносит распыл, бак наполняется у цистерны.'),
 }
 FIELD_OPS={                    # operation -> (machine, state before, state after)
@@ -1258,7 +1282,10 @@ for _id, _n, _kind, _l, _k in ORCHARD_ROWS:
 
 MERCHANT = dict(
     visits_per_week=2, visit_hours=24, slots=6,                            # 2 visits a week, 24 h each (Moscow day), 6 slots
-    scroll_k=25, orchard_k={r[0]: r[4] for r in ORCHARD_ROWS},
+    rarity_weights=dict(common=60, uncommon=30, rare=10),
+    rarity_by_kind=dict(exotic_seed='common', dye='common', scroll='uncommon', graft='uncommon', voucher='uncommon', curio='rare'),
+    restock_hours=12, restock_slots=3, lot_day_chance_pct=25,
+    scroll_k=12, orchard_k={r[0]: r[4] for r in ORCHARD_ROWS},
     limits=dict(exotic_seed=2, dye=10, graft=1, voucher=1, scroll=1, curio=1),
     pack=PACK_PLANTINGS,                                                                # plantings in one seed pack
     buyback=dict(bonus_pct=30, cap_pct=2, items=('honey', 'jam', 'peacock_feather', 'bouquet', 'pastila', 'grape_jelly')),

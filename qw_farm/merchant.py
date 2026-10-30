@@ -6,23 +6,34 @@ Schedule (shared by all players, no storage): in every Moscow week (Mon-Sun) two
 never adjacent, chosen from ``sha256(season, week)``; plus every day the festival engine says she is at the fair (``festivals.current``
 -> ``magpie``). A fair day that is also a regular day is ONE visit (a day cannot hold two). ``visit_id`` is ``v<moscow day>``.
 
-Stock (``stock``): six slots computed from the visit day alone (no database): the cheap slot, a seed pack or dye, a recipe scroll, two curios
-of the season's series, one more seed/dye/scroll. Nothing repeats from the previous visit while the pool allows it. Prices follow
-``ceil(k * income_ref(item level) / 100)`` (dyes: the workshop value law, a fixed price). Orchard hooks (grafts, vouchers) are defined in the
-catalog but ``ORCHARD_WIRED`` is False, so they are never offered.
+Stock v2 (docs/tasks/FARM_MERCHANT_V2.md sections 2-4): one cheap beginner pack and five weighted places, derived with HMAC-SHA256
+from a persistent server secret, farm id, visit id and half. Catalog rarity weights are common 60 / uncommon 30 / rare 10; a single
+25-percent visit roll reserves one place for an unowned curio from another seasonal series (the four other series of the cyclic catalog).
+No repeated ids within a set; previous-visit ids are avoided while candidates allow it. Existing catalog rows feed the pool.
+At opens_at + 12 h, three non-fully-bought places 1..5 are replaced; item purchase limits span both halves. Prices retain the value law.
+QW_FARM_MERCHANT_SECRET (32+ chars), otherwise a separated derivation from persistent QW_FARM_INVITE_SECRET or BOT_TOKEN, is required.
+There is no process/public fallback: absent/short persistent configuration fails closed. Do not rotate keys during visits.
 
-State: ``farm['merchant'] = {visit_id, bought{slot: n}, sold_value, curios[], scrolls[], seed_bank{}}`` (``setdefault`` only, the schema
-version is not raised). A new ``visit_id`` zeroes ``bought`` and ``sold_value`` lazily. ``seed_bank`` is reserved for Суслик Игорь (always {}).
+State: ``farm['merchant'] = {visit_id, bought{slot: n}, sold_value, curios[], scrolls[], seed_bank{}, stock_v2?}``. Schema version stays.
+A new visit lazily clears counters and records initial ownership, previous offered ids, purchases by item id, and fully-bought first-half
+slots in stock_v2. No prices/assortment snapshots are stored. Commands persist this metadata; projections are pure. An old current visit
+without stock_v2 finishes entirely under v1 slot-index rules. Known previous command visits replay their actual two halves; no-command
+visits replay deterministic draws without purchases from the launch anchor. ``seed_bank`` remains reserved (always {}).
 Scrolls unlock their recipe on purchase (no scroll item); curios are bound decor placed for free from ``curios``; seed packs and dyes go to the
 warehouse as bound items (``ITEMS[..]['bound']``: never gifted, listed, sold, funded or crated).
 
 Commands (owner only; idempotent through ``command_id`` in the service, one ledger record each; undo does not apply):
   ``merchant_buy {visit_id, slot, qty}`` and ``merchant_sell {visit_id, item, qty}`` (the buy-back: +30 percent on the warehouse price, at most
   2 percent of ``income_ref`` of the player's level per visit, counted at the warehouse price).
-The client sends only the visit id, the slot number and the quantity; item, price and limit are the server's.
+The client sends only the visit id, the slot number and the quantity; item, price and limit are the server's. V2 owner projection uses
+the opaque visit tokens ``v<day>:h1`` and ``v<day>:h2``: stale legacy/first-half buy commands are refused rather than buying another item.
+The stored visit id stays ``v<day>``; sell accepts its canonical id too. Owner slots expose rarity and next_restock_at gives the next supply.
 """
 from hashlib import sha256
+from functools import lru_cache
+import hmac
 import math
+import os
 
 from .catalog import ITEMS, CURIOS, CURIO_SERIES, SCROLL_RECIPES, RECIPES, EXOTIC_CROPS, DYES, MERCHANT, ORCHARD_ROWS, ORCHARD_WIRED, TREE_VOUCHER_DISCOUNT_PCT, income_ref, level, tick
 from .domain import need, inventory, pay
@@ -34,6 +45,7 @@ SLOTS = MERCHANT['slots']
 SCHEMAS = {'merchant_buy': {'visit_id', 'slot', 'qty'}, 'merchant_sell': {'visit_id', 'item', 'qty'}}
 ORCHARD_IDS = tuple(r[0] for r in ORCHARD_ROWS)
 MAX_BOUGHT = 1000
+RESTOCK = MERCHANT['restock_hours'] * 3600
 
 
 def _h(*parts):
@@ -201,9 +213,141 @@ def _chain(day):
     return _CHAIN[day]
 
 
-def stock(visit):
-    """Six slots of a visit: list of dicts (slot, id, kind, item, name, qty, price, limit, min_level, note, ...). Same for every player."""
-    return [dict(e, slot=i) for i, e in enumerate(_chain(visit['day']))]
+def stock_secret():
+    """Stable server key only: explicit key, or a domain-separated existing persistent secret.
+
+    A process secret or a public default would change the goods after restart or make them predictable.
+    Configure QW_FARM_MERCHANT_SECRET (32+ characters) on every API worker; keep it unchanged during visits.
+    """
+    for name in ('QW_FARM_MERCHANT_SECRET', 'QW_FARM_INVITE_SECRET', 'BOT_TOKEN'):
+        value = os.getenv(name, '')
+        if value:
+            if len(value) < 32:
+                raise RuntimeError(f'{name} must contain at least 32 characters for merchant stock')
+            return hmac.new(value.encode(), b'qw-farm:merchant-stock:v2', sha256).digest()
+    raise RuntimeError('Configure QW_FARM_MERCHANT_SECRET or a persistent QW_FARM_INVITE_SECRET/BOT_TOKEN')
+
+
+def _roll(key, farm_id, day, half, *purpose):
+    message = ':'.join(map(str, ('merchant-v2', farm_id, f'v{day}', half, *purpose)))
+    return int.from_bytes(hmac.new(key, message.encode(), sha256).digest(), 'big')
+
+
+def _rarity(entry):
+    return MERCHANT['rarity_by_kind'][entry['kind']]
+
+
+def _weighted(candidates, used, avoid, key, farm_id, day, half, slot):
+    free = [e for e in candidates if e['id'] not in used]
+    free = [e for e in free if e['id'] not in avoid] or free
+    groups = [(r, w, [e for e in free if _rarity(e) == r]) for r, w in MERCHANT['rarity_weights'].items()]
+    groups = [(r, w, es) for r, w, es in groups if es and w > 0]
+    if not groups:
+        return None
+    roll = _roll(key, farm_id, day, half, slot, 'rarity') % sum(w for _, w, _ in groups)
+    for rarity, weight, entries in groups:
+        if roll < weight:
+            return dict(entries[_roll(key, farm_id, day, half, slot, 'item') % len(entries)], rarity=rarity)
+        roll -= weight
+
+
+def _v2_initial(key, farm_id, day, owned, avoid):
+    available = [e for e in ENTRIES.values() if e['wired'] or ORCHARD_WIRED]
+    cheap = [e for e in available if e['cheap']]
+    first = _weighted(cheap, set(), avoid, key, farm_id, day, 1, 0)
+    out, used = [first], {first['id']}
+    candidates = [e for e in available if not e['cheap'] and (e['kind'] != 'curio' or e['series'] == series_of(day))]
+    past = [e for e in available if e['kind'] == 'curio' and e['series'] != series_of(day) and e['id'] not in owned]
+    lottery = past and _roll(key, farm_id, day, 1, 'lot-day') % 100 < MERCHANT['lot_day_chance_pct']
+    # The lot is one of the five weighted places, never a seventh place or a second roll at restock.
+    lot_slot = 1 + _roll(key, farm_id, day, 1, 'lot-slot') % (SLOTS - 1) if lottery else None
+    for slot in range(1, SLOTS):
+        e = _weighted(past if slot == lot_slot else candidates, used, avoid, key, farm_id, day, 1, slot)
+        if slot == lot_slot and e:
+            e['rarity'] = 'lot_day'
+        if e:
+            used.add(e['id'])
+            out.append(e)
+    return [dict(e, slot=i) for i, e in enumerate(out)]
+
+
+def _v2_restock(initial, key, farm_id, day, avoid, full):
+    out = [dict(e) for e in initial]
+    eligible = [e['slot'] for e in initial[1:] if e['slot'] not in full]
+    eligible.sort(key=lambda slot: _roll(key, farm_id, day, 2, 'replace', slot))
+    used = {e['id'] for e in initial}
+    candidates = [e for e in ENTRIES.values() if (e['wired'] or ORCHARD_WIRED) and not e['cheap']
+                  and (e['kind'] != 'curio' or e['series'] == series_of(day))]
+    for slot in eligible[:MERCHANT['restock_slots']]:
+        e = _weighted(candidates, used, avoid, key, farm_id, day, 2, slot)
+        if e:
+            used.add(e['id'])
+            out[slot] = dict(e, slot=slot)
+    return out
+
+
+@lru_cache(maxsize=1024)
+def _v2_replay(key, farm_id, day, owned):
+    """No-command visits are replayed from the launch anchor with no purchases.
+
+    Cache contains only derived ids; secret is part of the key, so changing it cannot reuse an old draw.
+    """
+    days, d = [], day
+    while d is not None and d >= ANCHOR:
+        days.append(d)
+        d = _previous_day(d)
+    previous = {e['id'] for e in _chain(d)} if d is not None else set()
+    for d in reversed(days):
+        initial = _v2_initial(key, farm_id, d, owned, previous)
+        restocked = _v2_restock(initial, key, farm_id, d, previous, ())
+        previous = {e['id'] for e in initial + restocked}
+    return tuple(sorted(previous))
+
+
+def _legacy(farm, visit):
+    m = peek(farm)
+    return visit['day'] < ANCHOR or m['visit_id'] == visit['visit_id'] and 'stock_v2' not in m
+
+
+def _stock_context(farm, visit):
+    m = peek(farm)
+    if m['visit_id'] == visit['visit_id'] and 'stock_v2' in m:
+        return m['stock_v2']
+    previous_day = _previous_day(visit['day'])
+    previous = []
+    if previous_day is not None:
+        try:
+            saved_day = int(m['visit_id'][1:]) if m['visit_id'] else None
+        except (ValueError, TypeError):
+            saved_day = None
+        if saved_day is not None and saved_day <= previous_day and visit_on(saved_day):
+            prior = visit_on(saved_day)
+            previous = {e['id'] for e in stock(prior, farm, prior['opens_at']) + stock(prior, farm, prior['closes_at'] - 1)}
+            # Replay no-command visits FROM actual persisted history, including pins from prior purchases.
+            key = stock_secret()
+            for day in range(saved_day + 1, previous_day + 1):
+                if visit_on(day):
+                    initial = _v2_initial(key, farm['id'], day, m['curios'], previous)
+                    supplied = _v2_restock(initial, key, farm['id'], day, previous, ())
+                    previous = {e['id'] for e in initial + supplied}
+            previous = sorted(previous)
+        else:
+            previous = list(_v2_replay(stock_secret(), farm['id'], previous_day, tuple(sorted(m['curios']))))
+    return dict(owned=list(m['curios']), previous=previous, purchased={}, first_full=[])
+
+
+def stock(visit, farm=None, now=None):
+    """Owner assortment, or the v1 assortment when no farm is supplied (legacy tools/tests).
+
+    Read-only. V2 stores purchase/history metadata, never price/item snapshots; half-two purchases cannot move the slots.
+    """
+    if farm is None or _legacy(farm, visit):
+        return [dict(e, slot=i, rarity=_rarity(e)) for i, e in enumerate(_chain(visit['day']))]
+    context, key = _stock_context(farm, visit), stock_secret()
+    initial = _v2_initial(key, farm['id'], visit['day'], context['owned'], set(context['previous']))
+    if now is not None and tick(now) >= visit['opens_at'] + RESTOCK:
+        return _v2_restock(initial, key, farm['id'], visit['day'], set(context['previous']), context['first_full'])
+    return initial
 
 
 def wants(visit):
@@ -253,7 +397,9 @@ def peek(farm):
 def _enter(farm, visit):
     m = state(farm)
     if m['visit_id'] != visit['visit_id']:
+        context = _stock_context(farm, visit)
         m['visit_id'], m['bought'], m['sold_value'] = visit['visit_id'], {}, 0
+        m['stock_v2'] = context
     return m
 
 
@@ -274,7 +420,8 @@ def validate(farm):
     m = farm.get('merchant')
     if m is None:
         return
-    ok = (isinstance(m, dict) and set(m) == {'visit_id', 'bought', 'sold_value', 'curios', 'scrolls', 'seed_bank'}
+    ok = (isinstance(m, dict) and set(m) in ({'visit_id', 'bought', 'sold_value', 'curios', 'scrolls', 'seed_bank'},
+                                           {'visit_id', 'bought', 'sold_value', 'curios', 'scrolls', 'seed_bank', 'stock_v2'})
           and (m['visit_id'] is None or isinstance(m['visit_id'], str) and m['visit_id'].startswith('v'))
           and isinstance(m['bought'], dict) and all(k in {str(i) for i in range(SLOTS)} and type(v) is int and 0 <= v <= MAX_BOUGHT for k, v in m['bought'].items())
           and type(m['sold_value']) is int and 0 <= m['sold_value'] <= 10 ** 9
@@ -282,29 +429,52 @@ def validate(farm):
           and isinstance(m['scrolls'], list) and len(set(m['scrolls'])) == len(m['scrolls']) and all(s in SCROLL_RECIPES for s in m['scrolls'])
           and m['seed_bank'] == {})
     need(ok, 'invalid_merchant', 'Некорректное состояние торговки.', 500)
+    if 'stock_v2' in m:
+        v = m['stock_v2']
+        ok = (isinstance(v, dict) and set(v) == {'owned', 'previous', 'purchased', 'first_full'}
+              and isinstance(v['owned'], list) and all(type(c) is str and c in CURIOS for c in v['owned'])
+              and len(v['owned']) == len(set(v['owned']))
+              and isinstance(v['previous'], list) and len(v['previous']) <= SLOTS * 2
+              and all(type(i) is str and i in ENTRIES for i in v['previous']) and len(v['previous']) == len(set(v['previous']))
+              and isinstance(v['purchased'], dict) and len(v['purchased']) <= SLOTS * 2
+              and all(k in ENTRIES and type(n) is int and 0 <= n <= MAX_BOUGHT for k, n in v['purchased'].items())
+              and isinstance(v['first_full'], list) and all(type(i) is int and 0 <= i < SLOTS for i in v['first_full'])
+              and len(v['first_full']) == len(set(v['first_full'])))
+        need(ok, 'invalid_merchant', 'Некорректное состояние торговки.', 500)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Commands
 # ----------------------------------------------------------------------------------------------------------------------
-def _open_visit(farm, visit_id, now):
+def _visit_token(farm, visit, now):
+    if _legacy(farm, visit):
+        return visit['visit_id']
+    return visit['visit_id'] + (':h2' if now >= visit['opens_at'] + RESTOCK else ':h1')
+
+
+def _open_visit(farm, visit_id, now, *, buying=False):
     visit = visit_at(now)
     need(isinstance(visit_id, str), 'invalid_command', 'Некорректные параметры действия.', 422)
     need(visit is not None, 'merchant_away', 'Сорока сейчас не в деревне.')
-    need(visit['visit_id'] == visit_id, 'stale_visit', 'Это уже другой визит. Обнови ферму.')
+    expected = _visit_token(farm, visit, now)
+    need(visit_id == expected if buying else visit_id in (visit['visit_id'], expected),
+         'stale_visit', 'Прилавок уже обновился. Обнови ферму.')
     return visit
 
 
 def buy(farm, data, now):
-    visit = _open_visit(farm, data['visit_id'], now)
+    visit = _open_visit(farm, data['visit_id'], now, buying=True)
     slot, qty = data['slot'], data['qty']
     need(type(slot) is int and 0 <= slot < SLOTS, 'invalid_command', 'Такого места на прилавке нет.', 422)
     need(type(qty) is int and 1 <= qty <= 100, 'invalid_number', 'Недопустимое количество.', 422)
-    slots = stock(visit)
+    slots = stock(visit, farm, now)
     need(slot < len(slots), 'unknown_item', 'Этот предмет не найден.', 422)
     e = slots[slot]
     m = state(farm)
-    bought = m['bought'].get(str(slot), 0) if m['visit_id'] == visit['visit_id'] else 0
+    legacy = _legacy(farm, visit)
+    context = None if legacy else _stock_context(farm, visit)
+    bought = ((m['bought'].get(str(slot), 0) if m['visit_id'] == visit['visit_id'] else 0) if legacy
+              else context['purchased'].get(e['id'], 0))
     need(level(farm['xp']) >= e['min_level'], 'locked', f'Нужен уровень {e["min_level"]}.')
     if e['kind'] == 'curio':
         need(e['id'] not in m['curios'], 'already_owned', 'Эта диковинка уже в твоей коллекции.')
@@ -317,7 +487,13 @@ def buy(farm, data, now):
     cost = construction.merchant_price(farm, e['price'] * qty)   # «помощник» торговых рядов: −10%
     pay(farm, cost)
     _enter(farm, visit)
-    m['bought'][str(slot)] = bought + qty
+    m['bought'][str(slot)] = m['bought'].get(str(slot), 0) + qty
+    if not legacy:
+        context = m['stock_v2']
+        context['purchased'][e['id']] = bought + qty
+        if now < visit['opens_at'] + RESTOCK and (e['kind'] in ('curio', 'scroll') or bought + qty >= e['limit'] + construction.merchant_extra(farm, slot, now)):
+            if slot not in context['first_full']:
+                context['first_full'].append(slot)
     if e['kind'] in ('exotic_seed', 'dye', 'graft', 'voucher'):
         inventory(farm, {e['item']: e['qty'] * qty})
     elif e['kind'] == 'curio':
@@ -355,16 +531,15 @@ def apply(farm, kind, data, now):
 # Read models
 # ----------------------------------------------------------------------------------------------------------------------
 def public(now):
-    """Shared part, identical for every player: presence, times, the herald's teaser, slots with prices and limits, the wanted item."""
+    """Shared schedule and buy-back only; an actual assortment/teaser belongs to an owner's projection."""
     now = tick(now)
     visit, nxt = visit_at(now), next_visit(now)
     out = dict(active=visit is not None, visit_id=visit and visit['visit_id'], kind=visit and visit['kind'],
                opens_at=visit and visit['opens_at'], closes_at=visit and visit['closes_at'],
                next_at=nxt and nxt['opens_at'], next_kind=nxt and nxt['kind'],
-               teaser=nxt and nxt['opens_at'] - now <= DAY and teaser(nxt) or None, slots=[], wants=None, fair=None)
+               teaser='Сорока готовит новый привоз.' if nxt and nxt['opens_at'] - now <= DAY else None,
+               slots=[], wants=None, fair=None)
     if visit:
-        out['slots'] = [{k: s[k] for k in ('slot', 'id', 'kind', 'name', 'qty', 'price', 'limit', 'min_level', 'note', 'wired')} | {'series': s.get('series_name')}
-                        for s in stock(visit)]
         out['wants'] = dict(item=wants(visit), bonus_pct=MERCHANT['buyback']['bonus_pct'])
         if visit['fair']:
             fair = festivals.content(visit['fair']['id'])
@@ -377,12 +552,25 @@ def owner_view(farm, now):
     now = tick(now)
     view = public(now)
     m = peek(farm)
+    visit = visit_at(now)
+    context = None
+    view['next_restock_at'] = None
+    view['base_visit_id'] = visit and visit['visit_id']
+    if visit:
+        legacy = _legacy(farm, visit)
+        context = None if legacy else _stock_context(farm, visit)
+        view['slots'] = [{k: s[k] for k in ('slot', 'id', 'kind', 'name', 'qty', 'price', 'limit', 'min_level', 'note', 'wired', 'rarity')}
+                         | {'series': s.get('series_name')} for s in stock(visit, farm, now)]
+        view['visit_id'] = _visit_token(farm, visit, now)
+        if not legacy and now < visit['opens_at'] + RESTOCK:
+            view['next_restock_at'] = visit['opens_at'] + RESTOCK
     lv = level(farm['xp'])
-    live = view['visit_id'] is not None and m['visit_id'] == view['visit_id']
+    live = visit is not None and m['visit_id'] == visit['visit_id']
     bought = m['bought'] if live else {}
     for s in view['slots']:
         s['extra'] = construction.merchant_extra(farm, s['slot'], now)   # rows «мастер» / fund «Покупатель Сороки»
-        left = s['limit'] + s['extra'] - bought.get(str(s['slot']), 0)
+        purchased = context['purchased'].get(s['id'], 0) if context is not None else bought.get(str(s['slot']), 0)
+        left = s['limit'] + s['extra'] - purchased
         s['pay'] = construction.merchant_price(farm, s['price'])
         owned = (s['kind'] == 'curio' and s['id'] in m['curios']) or (s['kind'] == 'scroll' and s['id'][7:] in m['scrolls'])
         s['left'] = max(0, left)

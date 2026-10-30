@@ -201,17 +201,15 @@ def test_upgraded_heap_queue_is_sequential_and_cannot_exceed_six_compost_per_day
     assert all(job['ready_at'] > T0 + 86400 for job in obj['jobs'])
 
 
-def test_heap_upgrade_spends_the_common_cost_and_increases_slots():
+def test_heap_is_not_upgradable_any_more_but_an_old_upgraded_heap_keeps_its_slots():
+    """E27 B3: the 8-hour batch is fixed, so an upgrade only added upkeep; the command is refused, saved levels stay valid."""
     state = farm()
     obj = heap(state)
-    for target in (2, 3):
-        cost = upgrade_cost('compost_heap', target)
-        state['inventory'] = dict(cost['items'])
-        before = state['coins']
-        cmd(state, 'upgrade', {'object': obj['id'], 'revision': obj['revision']})
-        assert obj['level'] == target
-        assert state['coins'] == before - cost['coins']
-        assert all(state['inventory'][item] == 0 for item in cost['items'])
+    assert upgrade_cost('compost_heap', 2) is None and upgrade_cost('compost_heap', 3) is None
+    rejected(state, 'upgrade', {'object': obj['id'], 'revision': obj['revision']}, 'cannot_upgrade')
+    for target in (2, 3):                                   # a heap upgraded before E27
+        obj['level'] = target
+        validate_state(state)
         assert queue_slots(obj['level']) == target + 2
         preview = make_job(obj, RECIPES['compost_manure'], T0, 1, 'preview')
         assert preview['seconds'] == EIGHT_HOURS

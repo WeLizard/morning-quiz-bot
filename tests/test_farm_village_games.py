@@ -130,7 +130,7 @@ def test_owner_allowlist_guest_privacy_and_unknown_version_preserved():
     f['village_games']['future'] = {'secret':'answer'}
     f['village_games'][GAME]['private'] = 'secret'
     view = project(f,f,NOW)['village_games']
-    assert set(view) == {GAME} and 'private' not in view[GAME]
+    assert set(view) == {GAME, 'agata_pie'} and 'private' not in view[GAME] and 'private' not in view['agata_pie']
     assert view[GAME]['active']['plan'] == run['plan']
     other = farm()
     f['settings']['visibility'] = 'public'
@@ -138,7 +138,8 @@ def test_owner_allowlist_guest_privacy_and_unknown_version_preserved():
     f['village_games'][GAME]['version'] = 99
     before = deepcopy(f['village_games'])
     games.validate(f)
-    assert games.public(f,NOW) == {}
+    visible = games.public(f,NOW)
+    assert GAME not in visible and 'agata_pie' in visible
     with pytest.raises(FarmError):
         start(f)
     assert f['village_games'] == before

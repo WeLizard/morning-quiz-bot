@@ -65,9 +65,9 @@ def _url_for(parsed, database_name):
     return urlunsplit((parsed.scheme, parsed.netloc, "/" + database_name, "", ""))
 
 
-def _run(args, env, cwd=None):
+def _run(args, env, cwd=None, *, timeout=120):
     subprocess.run(
-        args, check=True, capture_output=True, text=True, env=env, timeout=120,
+        args, check=True, capture_output=True, text=True, env=env, timeout=timeout,
         cwd=cwd or Path(__file__).resolve().parents[1],
     )
 
@@ -207,7 +207,10 @@ def test_farm_migration_preserves_accounts_and_dump_restores_pre_farm_state(tmp_
         for database_name in reversed(created):
             if _TEMP_DATABASE.fullmatch(database_name):
                 try:
-                    _run(["dropdb", *pg, "--force", "--if-exists", database_name], pg_env)
+                    # FORCE disconnects clients, but DROP DATABASE also waits for
+                    # a shared checkpoint, which can exceed 120s on the Docker volume.
+                    _run(["dropdb", *pg, "--force", "--if-exists", database_name],
+                         pg_env, timeout=600)
                 except (subprocess.SubprocessError, OSError) as exc:
                     cleanup_errors.append((database_name, exc))
         if cleanup_errors:

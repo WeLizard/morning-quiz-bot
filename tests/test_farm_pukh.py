@@ -79,6 +79,10 @@ def test_can_build_and_craft_after_level_11():
 
 
 def _orders(state, n):
+    # The three starting orders stay on the board in this loop (only slot 0 is regenerated). When two of them come from one
+    # resident (a random farm id decides), that resident is capped out for good and the next one in the ring gets its share:
+    # Pukh then asks ~2x as often (or never). Clear the board so the sample measures the draw, not the farm id.
+    state['orders'] = []
     return [make_order(state, 0, 5000) for _ in range(n)]
 
 

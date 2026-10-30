@@ -249,7 +249,11 @@ CONTENT = {
             _g('fest_posid_smoke', 'Дымок над трубой', 'roof', 'roof', 3, 60, source='task:tea'),
             # the memorable item of the year: finishing every task, never sold, never returns
             _g('fest_posid_socks', 'Носки года', 'keepsake', 'fence', 5, 0, source='keepsake', limit=1),
-        ]),
+            # the common pie-tower reward: granted lazily to every participant after the village threshold
+            _g('fest_posid_tower', 'Пирог-башня', 'decor', 'farm1', 1, 60, source='tower', limit=1,
+               note='награда общей башни «Пирог до небес»'),
+        ],
+        tower=dict(goal=40, item='fest_posid_tower')),
 }
 # «Новый год» (design 9.2 item 1, 9.3, 9.10): 4 tasks, the full set of decor forms (1x1, 2x2, fence, roof, path, village square,
 # mascot), one decorative tree (outside the orchard limit), a graft and a voucher (orchard lots, ``wired`` only with the orchard),
@@ -367,7 +371,7 @@ def validate_content():
         assert len(ids) == len(set(ids))
         for g in c['goods']:
             assert g['kind'] in KINDS and g['place'] in PLACES and g['limit'] >= 1 and g['seller'] in ('agata', 'sonya', 'magpie', 'host')
-            assert g['source'] in ('fair', 'keepsake') or g['source'].startswith('task:')
+            assert g['source'] in ('fair', 'keepsake', 'tower') or g['source'].startswith('task:')
             assert g['source'] == 'keepsake' or g['k'] > 0
             assert not g['ref'] or (g['orchard'] and g['ref'] in ITEMS)
         tids = [t['id'] for t in c['tasks']]
@@ -380,6 +384,10 @@ def validate_content():
             if g['source'].startswith('task:'):
                 assert g['source'][5:] in tids
         assert sum(g['source'] == 'keepsake' for g in c['goods']) <= 1
+        tower = c.get('tower')
+        if tower:
+            assert type(tower['goal']) is int and tower['goal'] > 0
+            assert good_of(fid, tower['item'])['source'] == 'tower'
         if c['tasks']:
             assert 3 <= len(c['tasks']) <= 5
     return len(CONTENT)
@@ -392,7 +400,7 @@ validate_content()
 # State
 # ----------------------------------------------------------------------------------------------------------------------
 def blank():
-    return dict(tasks={}, bought={}, rewards={}, keepsake=False)
+    return dict(tasks={}, bought={}, rewards={}, keepsake=False, tower=False)
 
 
 def state(farm):
@@ -416,6 +424,27 @@ def owned(e, item):
     return e['bought'].get(item, 0) + e['rewards'].get(item, 0)
 
 
+def tower_good(fid):
+    """The common pie-tower reward lot of a festival, or None when the festival has no tower."""
+    tower = content(fid).get('tower')
+    return good_of(fid, tower['item']) if tower else None
+
+
+def grant_tower(farm, key):
+    """Lazy common reward: a participant gets the tower lot once, after the shared goal is reached."""
+    m = KEY_RE.match(key) if isinstance(key, str) else None
+    if m is None:
+        return None
+    g = tower_good(m.group(1))
+    if g is None:
+        return None
+    e = entry(farm, key)
+    if not e.get('tower') or owned(e, g['id']) >= g['limit']:
+        return None
+    e['rewards'][g['id']] = 1
+    return g['name']
+
+
 def validate(farm):
     s = farm.get('festivals')
     if s is None:
@@ -428,7 +457,9 @@ def validate(farm):
         c = content(m.group(1))
         tasks = {t['id'] for t in c['tasks']}
         goods = {g['id']: g for g in c['goods']}
-        need(isinstance(e, dict) and set(e) == {'tasks', 'bought', 'rewards', 'keepsake'} and type(e['keepsake']) is bool
+        need(isinstance(e, dict) and set(e) in ({'tasks', 'bought', 'rewards', 'keepsake'},
+                                                       {'tasks', 'bought', 'rewards', 'keepsake', 'tower'})
+             and type(e['keepsake']) is bool and type(e.get('tower', False)) is bool
              and isinstance(e['tasks'], dict) and isinstance(e['bought'], dict) and isinstance(e['rewards'], dict),
              'invalid_festivals', 'Некорректное состояние праздников.', 500)
         need(all(k in tasks and type(v) is int and v >= 0 for k, v in e['tasks'].items()), 'invalid_festivals',
@@ -436,7 +467,8 @@ def validate(farm):
         for part, source in (('bought', ('fair',)), ('rewards', None)):
             for k, q in e[part].items():
                 g = goods.get(k)
-                ok = g is not None and type(q) is int and 0 < q and (g['source'] in source if source else g['source'].startswith('task:'))
+                ok = g is not None and type(q) is int and 0 < q and (
+                    g['source'] in source if source else g['source'].startswith('task:') or g['source'] == 'tower')
                 need(ok, 'invalid_festivals', 'Некорректное состояние праздников.', 500)
         for k in {*e['bought'], *e['rewards']}:
             need(owned(e, k) <= goods[k]['limit'], 'invalid_festivals', 'Некорректное состояние праздников.', 500)
@@ -537,7 +569,7 @@ def _good_view(g, e, lvl, cost, extra=None):
     return row
 
 
-def owner_view(farm, now):
+def owner_view(farm, now, tower=None):
     """Owner-only projection: calendar, the open fair (tasks, stall), the past-festivals shop and the collection."""
     now = tick(now)
     lvl = level(farm['xp'])
@@ -555,7 +587,8 @@ def owner_view(farm, now):
                  for g in c['goods'] if g['source'] == 'fair']
         view['fair'] = dict(id=cur['id'], name=cur['name'], key=cur['key'], host=cur['host'], magpie=cur['magpie'],
                             ends_at=cur['fair_ends_at'], tasks=tasks, goods=goods, todo=not c['tasks'] and not c['goods'],
-                            keepsake=keep and dict(id=keep['id'], name=keep['name'], got=e['keepsake']))
+                            keepsake=keep and dict(id=keep['id'], name=keep['name'], got=e['keepsake']),
+                            tower=tower)
     for fid in FESTIVALS:
         if cur is not None and cur['id'] == fid and cur['phase'] == 'fair':
             continue    # this fair is open: the stall sells at the fair price, so last year's lots (x1.5) are not listed next to it

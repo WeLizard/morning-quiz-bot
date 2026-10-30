@@ -27,6 +27,15 @@ def _farm_fractional_clock(request, monkeypatch):
     monkeypatch.setattr(service.FarmService, '__init__', init)
 
 
+@pytest.fixture(autouse=True)
+def _farm_merchant_secret(request, monkeypatch):
+    """Merchant stock needs a persistent HMAC secret (qw_farm.merchant); farm tests get a fixed test one unless they set their own."""
+    if not request.node.fspath.basename.startswith('test_farm'):
+        return
+    if not any(os.getenv(name) for name in ('QW_FARM_MERCHANT_SECRET', 'QW_FARM_INVITE_SECRET', 'BOT_TOKEN')):
+        monkeypatch.setenv('QW_FARM_MERCHANT_SECRET', 'farm-tests-merchant-secret-of-32-characters')
+
+
 # --- Hermetic PostgreSQL: every pytest run starts from the same schema state ---
 #
 # CI (a fresh service container), the local docker run and a re-run on a long-lived

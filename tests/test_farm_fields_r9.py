@@ -105,13 +105,13 @@ def test_catalog_tables_and_public_projection():
     r16_field = sum(1 for k in catalog.R16_CROP_IDS if CROPS[k]['seconds'] >= catalog.FIELD_MIN_GROW and not CROPS[k].get('orchard'))
     assert validate_fields() == dict(field_steps=5, field_machines=4, field_crops=9 + r16_field)
     assert [(s['level'], s['ha'], s['cost']) for s in FIELD_STEPS] == [(22, 1, 60000), (27, 1, 120000), (32, 2, 250000), (38, 2, 450000), (44, 3, 800000)]
-    assert {k: m['costs'][1:] for k, m in FIELD_MACHINES.items()} == {k: (30000, 120000) for k in FIELD_MACHINES}
+    assert {k: m['costs'][1:] for k, m in FIELD_MACHINES.items()} == {k: (15000, 45000) for k in FIELD_MACHINES}
     assert {m['op'] for m in FIELD_MACHINES.values()} == set(ALL_OPS)
     assert all(c['field'] == (c['seconds'] >= catalog.FIELD_MIN_GROW and not c.get('orchard')) for c in CROPS.values())
     assert not CROPS['wheat']['field'] and CROPS['saffron']['field']
     pub = public_catalog()['fields']
     assert pub['steps'][0]['cost'] == 60000 and set(pub['machines']) == set(FIELD_MACHINES) and 'saffron' in pub['crops']
-    assert pub['hopper'] == HOPPER and pub['max_path'] == 2000 and pub['upkeep'] == 1500
+    assert pub['hopper'] == HOPPER and pub['max_path'] == 2000 and pub['upkeep'] == 1000
 
 
 def test_xp_and_yield_are_not_written_outside_the_funnel(spy):
@@ -344,9 +344,9 @@ def test_machines_are_bought_and_upgraded_by_tiers():
     cmd(f, 'upgrade_machine', dict(machine='seeder'))
     fail(f, 'upgrade_machine', dict(machine='seeder'), code='locked')                       # tier 3 needs L38
     f['xp'] = LEVELS[37]
-    f['coins'] = 119_999
+    f['coins'] = 44_999
     fail(f, 'upgrade_machine', dict(machine='seeder'), code='insufficient_coins')
-    f['coins'] = 120_000
+    f['coins'] = 45_000
     cmd(f, 'upgrade_machine', dict(machine='seeder'))
     assert f['field_machines']['seeder']['tier'] == 3 and f['coins'] == 0
     fail(f, 'upgrade_machine', dict(machine='seeder'), code='max_tier')
@@ -607,13 +607,13 @@ def test_two_fields_run_independently_and_a_debt_slows_only_owner_growth():
 
 
 # ---------------------------------------------------------------------------------------------- upkeep and old farms
-def test_field_upkeep_is_1500_per_hectare_per_day():
+def test_field_upkeep_is_1000_per_hectare_per_day():
     f = farm(44)
     base = economy.base_upkeep(f)
     for step in range(5):
         cmd(f, 'buy_field', dict(step=step))
-    assert economy.base_upkeep(f) == base + FIELD_UPKEEP * 9 and FIELD_UPKEEP == 1500
-    assert economy.status(f, T0)['base_upkeep'] == base + 13500
+    assert economy.base_upkeep(f) == base + FIELD_UPKEEP * 9 and FIELD_UPKEEP == 1000
+    assert economy.status(f, T0)['base_upkeep'] == base + 9000
     f2 = farm(44, coins=5_000_000)
     cmd(f2, 'buy_field', dict(step=4))
     day = T0 - (T0 + market.TZ_OFFSET) % DAY + DAY
@@ -621,7 +621,7 @@ def test_field_upkeep_is_1500_per_hectare_per_day():
     before = f2['coins']
     cmd(f2, 'buy_machine', dict(machine='combine'), at=day + DAY)
     paid = before - f2['coins'] - 12500
-    assert paid == economy.upkeep(f2, day + DAY) == economy.base_upkeep(f2) and paid >= 4500
+    assert paid == economy.upkeep(f2, day + DAY) == economy.base_upkeep(f2) and paid >= 3000
 
 
 def test_old_farms_without_fields_load_and_are_not_touched():
@@ -918,7 +918,8 @@ def test_rules3_spray_completes_the_crop_and_boosts_the_harvest_yield():
                                           version=catalog.VERSION))
     run = start(f, 'spray', T0 + 1)
     assert run['op'] == 'spray' and run['wind'] in (-1, 1)
-    score = fields.simulate(fld(f), run, 'D')
+    fld(f)['run']['rocks'] = []      # the straight path 'D' must not hit rocks drawn from the random farm id
+    score = fields.simulate(fld(f), fld(f)['run'], 'D')
     finish(f, 'D', T0 + 60)
     assert fld(f)['state'] == 'ripe' and fld(f)['crop']['q_spray'] == fields.quality_full(score)
     assert fld(f)['crop']['q_sow'] == 1250

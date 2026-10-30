@@ -1,0 +1,153 @@
+[
+ {
+  "seed": "pie-fixture-1",
+  "plan": {
+   "version": 1,
+   "width": 1000,
+   "height": 600,
+   "base": 560,
+   "x0": 140,
+   "x1": 860,
+   "t0": 4200,
+   "step": 100,
+   "tmin": 1800,
+   "phase": 1323,
+   "fall_ms": 320,
+   "min_gap_ms": 400,
+   "warmup_ms": 700,
+   "limit_ms": 60000,
+   "max_taps": 160
+  },
+  "log": [
+   2530,
+   4500,
+   6380,
+   8150,
+   9830,
+   11400,
+   12880,
+   14250,
+   15530,
+   16700,
+   18580
+  ],
+  "height": 11,
+  "tower": [
+   220,
+   420
+  ],
+  "miss": false,
+  "taps": 11
+ },
+ {
+  "seed": "pie-fixture-2",
+  "plan": {
+   "version": 1,
+   "width": 1000,
+   "height": 600,
+   "base": 560,
+   "x0": 140,
+   "x1": 860,
+   "t0": 4200,
+   "step": 100,
+   "tmin": 1800,
+   "phase": 2224,
+   "fall_ms": 320,
+   "min_gap_ms": 400,
+   "warmup_ms": 700,
+   "limit_ms": 60000,
+   "max_taps": 160
+  },
+  "log": [
+   1630,
+   3600,
+   5480,
+   7250,
+   8930,
+   10500,
+   11980,
+   13350,
+   14630,
+   15800,
+   17680
+  ],
+  "height": 11,
+  "tower": [
+   220,
+   421
+  ],
+  "miss": false,
+  "taps": 11
+ },
+ {
+  "seed": "pie-fixture-3",
+  "plan": {
+   "version": 1,
+   "width": 1000,
+   "height": 600,
+   "base": 560,
+   "x0": 140,
+   "x1": 860,
+   "t0": 4200,
+   "step": 100,
+   "tmin": 1800,
+   "phase": 1606,
+   "fall_ms": 320,
+   "min_gap_ms": 400,
+   "warmup_ms": 700,
+   "limit_ms": 60000,
+   "max_taps": 160
+  },
+  "log": [
+   2240,
+   4220,
+   6090,
+   7870,
+   9540,
+   11120,
+   12590,
+   13970,
+   15240,
+   16420,
+   18290
+  ],
+  "height": 11,
+  "tower": [
+   222,
+   422
+  ],
+  "miss": false,
+  "taps": 11
+ },
+ {
+  "seed": "pie-fixture-miss",
+  "plan": {
+   "version": 1,
+   "width": 1000,
+   "height": 600,
+   "base": 560,
+   "x0": 140,
+   "x1": 860,
+   "t0": 4200,
+   "step": 100,
+   "tmin": 1800,
+   "phase": 3432,
+   "fall_ms": 320,
+   "min_gap_ms": 400,
+   "warmup_ms": 700,
+   "limit_ms": 60000,
+   "max_taps": 160
+  },
+  "log": [
+   3568,
+   5018
+  ],
+  "height": 1,
+  "tower": [
+   580,
+   780
+  ],
+  "miss": true,
+  "taps": 2
+ }
+]

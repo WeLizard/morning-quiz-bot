@@ -85,6 +85,15 @@ def add_vigour(farm, amount, at):
     return credited
 
 
+def revoke_xp(farm, amount):
+    """Take back XP that a command granted a moment ago (cancelling it inside the undo window); never below the current level's start."""
+    from .catalog import LEVELS
+    floor = LEVELS[level(farm['xp']) - 1]
+    taken = max(0, min(amount, farm['xp'] - floor))
+    farm['xp'] -= taken
+    return taken
+
+
 def grant_xp(farm, amount, source, at, owner, seconds=None):
     """The only place that adds XP. Returns the XP actually credited (base + bonuses - fatigue loss)."""
     if amount <= 0:

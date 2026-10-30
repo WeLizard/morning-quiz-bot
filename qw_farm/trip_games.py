@@ -20,6 +20,33 @@ FISHING v1 (plans without ``v``).  ``plan['casts'][i] = {phase, zone, wait}``; t
 ``[bite + REACT, bite + REACT + window]`` (earlier = fish scared, later = fish gone) and scores best in the middle.
 cast = (4 * acc + 6 * timing) // 10 if the strike is valid else 0; score = mean over casts.
 
+FELLING "Валка" (docs/tasks/FARM_LUMBERJACK.md, ``logging_plot`` "Пилю сам", ``game['kind'] == 'fell'``, ``plan['v'] == 1``).  Five trees in a
+row; q = 1000 + 600 * score // 1000 (x1.0 .. x1.6; every other trip keeps +250 at most).  Plan (from sha256(seed), public):
+``{v: 1, mark_period: 1400, trees: [{gap_center, gap_width, phase, girth, pinches: [ms, ...], par}, ...]}``.  Log (absolute ms
+from the start of the trip): ``{v: 1, trees: [[aim_ms, [toggle_ms, ...]], ...]}`` - exactly one entry per tree, in order.
+Per tree, the whole thing is integers:
+  1. AIM.  The mark runs ``mark_position(t, phase, mark_period)`` (triangle wave, permille 0..1000).  The press at ``aim_ms`` sets the
+     notch where the mark points.  d = |mark - gap_center|; accuracy = 1000 for d <= FELL_DEAD (50), then falls linearly to 0 at
+     d = gap_width (a miss: the tree still falls, but crooked).  ``aim_ms`` >= the previous tree's ``free`` (the first: FIRST_AIM_MS).
+  2. SAW.  ``toggles[0]`` is the first press of the saw (it must come >= CUT_DELAY ms after ``aim_ms``) and starts the cut; every
+     next toggle flips hold/release (gap >= TOGGLE_GAP, at most MAX_FELL_TOGGLES).  The cut is replayed on a TICK = 50 ms grid:
+     tick k happens at ``toggles[0] + k * TICK`` and the saw is held if an odd number of toggles is <= that time (tick 0 is held).
+     State: ``prog`` (0..girth), ``heat`` (0..1000), ``stalled``.  Order inside one tick:
+       a) not held and prog >= hinge (= girth * HINGE_PCT // 100): the player let go at the hinge -> the tree FELLS cleanly, end.
+       b) k >= MAX_TREE_TICKS, or not held with no toggle left (nothing can change any more): TIMEOUT, end, the cut scores 0.
+       c) held: not stalled -> prog += CUT_RATE, heat += HEAT_UP (x PINCH_MULT when the tick is inside a pinch window, i.e.
+          ``p <= k * TICK < p + PINCH_MS`` for some ``p`` of ``pinches``, offsets from the first press); heat >= HEAT_MAX -> heat = 1000,
+          stalled = true (the saw dies: for the rest of the tree prog += STALL_RATE per held tick, heat stays).  prog >= girth ->
+          CUT THROUGH (end after this tick: the tree jumped off the hinge, a penalty).  k += 1.
+       d) released and not stalled: heat = max(0, heat - COOL).  k += 1.
+     ``ticks`` = k at the end; end_ms = ``toggles[0] + ticks * TICK``; ``free`` = end_ms + FALL_MS + TREE_PAUSE.  Toggles after the end
+     are ignored (a finger lifted after the fall is fine).  No toggles at all: idle (end_ms = aim_ms + CUT_DELAY, cut 0).
+  3. SCORE.  cut = 1000 - min(TIME_PEN_MAX, max(0, ticks - par) * TIME_PEN_MAX // par) (``par`` is in the plan: the ticks of a clean
+     cut that rests in every pinch, plus PAR_SLACK); cut = min(cut, STALL_CAP) when stalled, then cut -= PREMATURE_PEN on a cut through;
+     cut = 0 on a timeout / idle; cut >= 0.  tree points = (4 * accuracy + 6 * cut) // 10; score = sum // trees.
+  The server also needs end_ms of the last tree <= elapsed + SKEW_MS (nobody plays faster than the clock), the game window is GAME_TTL
+  and a game closes once.  An illegal log -> ``bad_log`` (422).  Not playing at all = the base outputs (q = 1000).
+
 FORAGING.  ``plan = {w, h, start, budget, items: {cell: item_id}, traps: [cell], gold}``; the log is a ``UDLR`` string.  Every move
 costs 1 step of the budget, a trap costs 2 more (once).  score = min(1000, 1000 * collected // gold) where ``gold`` is the number of
 items on a random reference walk of ``budget`` steps (so it is reachable).  Integers only.
@@ -88,6 +115,35 @@ BAITS = {                      # optional extra bait, 1 item spent at trip_play;
 TOD_WAIT = {'dawn': 75, 'day': 100, 'dusk': 75, 'night': 90}
 WEATHERS = ('clear', 'cloud', 'rain', 'wind')
 
+# ---- felling "Валка" (all times in ms, all values integers; mirrored 1:1 by the client simulation)
+FELL_V = 1
+FELL_TREES = 5
+FELL_PERIOD = 1400             # ms, full back-and-forth of the aiming mark
+FELL_DEAD = 50                 # permille around the gap centre that counts as a perfect notch
+GAP_CENTER_MIN, GAP_CENTER_SPAN = 200, 601      # gap_center in 200..800
+GAP_WIDTH_MIN, GAP_WIDTH_SPAN = 140, 81         # gap_width (half width, permille) in 140..220
+GIRTH_MIN, GIRTH_STEP, GIRTH_N = 800, 50, 9     # girth 800..1200 (progress units to cut through)
+CUT_DELAY = 250                # ms from the aim to the first press of the saw
+CUT_RATE = 25                  # progress per held tick
+STALL_RATE = 5                 # progress per held tick with a dead saw
+HEAT_UP = 20                   # heat per held tick
+PINCH_MULT = 4                 # heat multiplier inside a pinch window
+COOL = 40                      # heat lost per released tick
+HEAT_MAX = 1000                # the saw dies here
+PINCH_MS = 400                 # length of a pinch window (8 ticks)
+PINCH_FIRST, PINCH_FIRST_SPAN = 500, 300        # first pinch starts 500..799 ms after the first press
+PINCH_GAP, PINCH_GAP_SPAN = 300, 400            # rest between two pinch windows 300..699 ms
+HINGE_PCT = 80                 # the player must let go once prog >= girth * 80 %
+MAX_TREE_TICKS = 300           # 15 s of sawing at most
+FALL_MS = 1200                 # animation of the falling tree
+TREE_PAUSE = 400               # ms before the next aim
+PAR_SLACK = 12                 # ticks (0.6 s) of reaction time the player gets for free
+TIME_PEN_MAX = 400             # max permille lost for a slow cut
+PREMATURE_PEN = 300            # permille lost when the saw cuts the hinge through
+STALL_CAP = 250                # a stalled cut is never better than this
+MAX_FELL_TOGGLES = 80          # per tree
+FELL_BONUS = 600               # permille over the autopilot at score 1000
+
 
 def public_rules():
     fish2 = dict(v=FISH_V, tick=TICK, fly=FLY_MS, land_pause=LAND_PAUSE, scare_pause=SCARE_PAUSE, toggle_gap=TOGGLE_GAP,
@@ -96,13 +152,18 @@ def public_rules():
                  baits={k: dict(wait=v['wait'], rare=v['rare'], routes=list(v['routes']) if v['routes'] else None) for k, v in BAITS.items()},
                  routes={k: dict(casts=v['casts'], window=v['window'], rare=v['rare'], common=[c for c, _ in v['common']])
                          for k, v in FISH_ROUTES.items()})
-    return dict(ttl=GAME_TTL, bonus=BONUS, mark_period=MARK_PERIOD, dead_zone=DEAD_ZONE, acc_span=ACC_SPAN, react=REACT,
+    fell = dict(v=FELL_V, trees=FELL_TREES, period=FELL_PERIOD, dead=FELL_DEAD, tick=TICK, cut_delay=CUT_DELAY, cut_rate=CUT_RATE,
+                stall_rate=STALL_RATE, heat_up=HEAT_UP, pinch_mult=PINCH_MULT, cool=COOL, heat_max=HEAT_MAX, pinch_ms=PINCH_MS,
+                hinge_pct=HINGE_PCT, max_ticks=MAX_TREE_TICKS, fall_ms=FALL_MS, tree_pause=TREE_PAUSE, time_pen_max=TIME_PEN_MAX,
+                premature_pen=PREMATURE_PEN, stall_cap=STALL_CAP, toggle_gap=TOGGLE_GAP, max_toggles=MAX_FELL_TOGGLES,
+                first_aim_ms=FIRST_AIM_MS, bonus=FELL_BONUS)
+    return dict(ttl=GAME_TTL, bonus=BONUS, fell=fell, mark_period=MARK_PERIOD, dead_zone=DEAD_ZONE, acc_span=ACC_SPAN, react=REACT,
                 window=WINDOW_BASE, casts=CASTS, first_aim_ms=FIRST_AIM_MS, grid=GRID, trap_cost=TRAP_COST, budget=BUDGET,
                 step_cs=STEP_CS, fish2=fish2)
 
 
 def game_kind(route):
-    return 'fish' if route.get('kind') == 'fishing' else 'forage'
+    return route.get('game') or ('fish' if route.get('kind') == 'fishing' else 'forage')
 
 
 def _stream(seed, label):
@@ -211,11 +272,50 @@ def make_forage_plan(seed, route, with_path=False):
     return (plan, moves) if with_path else plan
 
 
+def fell_pinched(tree, ms):
+    """Is the saw gripped by the trunk ``ms`` after the first press?"""
+    return any(p <= ms < p + PINCH_MS for p in tree['pinches'])
+
+
+def fell_hinge(tree):
+    return tree['girth'] * HINGE_PCT // 100
+
+
+def fell_par(tree):
+    """Ticks of a clean cut: saw whenever the trunk does not grip, let go at the hinge (+ PAR_SLACK of reaction time)."""
+    hinge, prog, k = fell_hinge(tree), 0, 0
+    while prog < hinge:
+        if not fell_pinched(tree, k * TICK):
+            prog += CUT_RATE
+        k += 1
+    return k + PAR_SLACK
+
+
+def make_fell_plan(seed):
+    """Felling plan: five trees; everything random comes from the seed."""
+    rng = _stream(seed, 'fell')
+    trees = []
+    for _ in range(FELL_TREES):
+        phase = _u16(rng) % FELL_PERIOD
+        center = GAP_CENTER_MIN + _u16(rng) % GAP_CENTER_SPAN
+        width = GAP_WIDTH_MIN + _u16(rng) % GAP_WIDTH_SPAN
+        girth = GIRTH_MIN + GIRTH_STEP * (next(rng) % GIRTH_N)
+        at, pinches = PINCH_FIRST + _u16(rng) % PINCH_FIRST_SPAN, []
+        for _ in range(2 + next(rng) % 2):
+            pinches.append(at)
+            at += PINCH_MS + PINCH_GAP + _u16(rng) % PINCH_GAP_SPAN
+        tree = dict(gap_center=center, gap_width=width, phase=phase, girth=girth, pinches=pinches)
+        tree['par'] = fell_par(tree)
+        trees.append(tree)
+    return dict(v=FELL_V, mark_period=FELL_PERIOD, trees=trees)
+
+
 def make_game(farm, trip_id, route, now):
     """Plan for a trip made by the player himself (no guide); stored in ``trip['game']``."""
     seed = sha256(f'{farm["id"]}:{trip_id}:{route["id"]}'.encode()).hexdigest()[:24]
     kind = game_kind(route)
-    plan = make_fish_plan(seed, route['id'], now) if kind == 'fish' else make_forage_plan(seed, route)
+    plan = (make_fish_plan(seed, route['id'], now) if kind == 'fish' else make_fell_plan(seed) if kind == 'fell'
+            else make_forage_plan(seed, route))
     return dict(kind=kind, state='open', seed=seed, expires_at=now + GAME_TTL, q=Q_AUTO, score=0, plan=plan)
 
 
@@ -440,8 +540,86 @@ def forage_score(plan, path):
     return min(1000, 1000 * got // max(1, plan['gold']))
 
 
-def quality(score):
-    return Q_AUTO + BONUS * score // 1000
+# ---- felling: pure rules
+def fell_accuracy(aim_ms, tree):
+    d = abs(mark_position(aim_ms, tree['phase'], FELL_PERIOD) - tree['gap_center'])
+    if d <= FELL_DEAD:
+        return 1000
+    return max(0, 1000 - (d - FELL_DEAD) * 1000 // max(1, tree['gap_width'] - FELL_DEAD))
+
+
+def fell_tree(tree, aim, toggles):
+    """Replay one tree -> {acc, cut, points, result (felled | cut_through | timeout | idle), stalled, ticks, end, free}."""
+    acc = fell_accuracy(aim, tree)
+    if not toggles:
+        end = aim + CUT_DELAY
+        return dict(acc=acc, cut=0, points=4 * acc // 10, result='idle', stalled=False, ticks=0, end=end, free=end + TREE_PAUSE)
+    start, hinge, girth = toggles[0], fell_hinge(tree), tree['girth']
+    prog = heat = k = 0
+    hold, j, stalled, result = True, 1, False, ''
+    while not result:
+        t = start + k * TICK
+        while j < len(toggles) and toggles[j] <= t:
+            hold, j = not hold, j + 1
+        if not hold and prog >= hinge:
+            result = 'felled'
+        elif k >= MAX_TREE_TICKS or (not hold and j >= len(toggles)):
+            result = 'timeout'
+        elif hold:
+            if stalled:
+                prog += STALL_RATE
+            else:
+                prog += CUT_RATE
+                heat += HEAT_UP * (PINCH_MULT if fell_pinched(tree, k * TICK) else 1)
+                if heat >= HEAT_MAX:
+                    heat, stalled = HEAT_MAX, True
+            k += 1
+            if prog >= girth:
+                result = 'cut_through'
+        else:
+            heat = heat if stalled else max(0, heat - COOL)
+            k += 1
+    cut = 1000 - min(TIME_PEN_MAX, max(0, k - tree['par']) * TIME_PEN_MAX // tree['par'])
+    if stalled:
+        cut = min(cut, STALL_CAP)
+    if result == 'cut_through':
+        cut -= PREMATURE_PEN
+    if result == 'timeout':
+        cut = 0
+    cut = max(0, cut)
+    end = start + k * TICK
+    return dict(acc=acc, cut=cut, points=(4 * acc + 6 * cut) // 10, result=result, stalled=stalled, ticks=k, end=end,
+                free=end + FALL_MS + TREE_PAUSE)
+
+
+def fell_result(plan, log):
+    """Server replay of a felling log -> {score, end, trees:[...]} or None when it breaks the rules."""
+    if not (isinstance(log, dict) and set(log) == {'v', 'trees'} and type(log['v']) is int and log['v'] == FELL_V):
+        return None
+    entries = log['trees']
+    if not (isinstance(entries, list) and len(entries) == len(plan['trees'])):
+        return None
+    total, free, out, end = 0, FIRST_AIM_MS, [], 0
+    for tree, entry in zip(plan['trees'], entries):
+        if not (isinstance(entry, list) and len(entry) == 2):
+            return None
+        aim, toggles = entry
+        if not (_ms(aim, free) and isinstance(toggles, list) and len(toggles) <= MAX_FELL_TOGGLES):
+            return None
+        prev = aim + CUT_DELAY - TOGGLE_GAP
+        for t in toggles:
+            if not (_ms(t) and t >= prev + TOGGLE_GAP):
+                return None
+            prev = t
+        r = fell_tree(tree, aim, toggles)
+        total += r['points']
+        free, end = r['free'], r['end']
+        out.append(r)
+    return dict(score=total // len(out), end=end, trees=out)
+
+
+def quality(score, kind='forage'):
+    return Q_AUTO + (FELL_BONUS if kind == 'fell' else BONUS) * score // 1000
 
 
 def scaled_outputs(outputs, q):
@@ -476,6 +654,13 @@ def apply_play(farm, data, now):
         score = res['score']
         game.update(catch=res['catch'], bait=res['bait'])
         caught = record_catch(farm, res['catch'])
+    elif game['kind'] == 'fell':
+        res = fell_result(plan, log)
+        need(res is not None, 'bad_log', 'Недопустимая запись игры. Обнови страницу и сыграй ещё раз.', 422)
+        need(res['end'] <= elapsed_ms + SKEW_MS, 'too_fast', 'Слишком быстро для такой игры.', 422)
+        score = res['score']
+        game.update(trees=[dict(acc=r['acc'], cut=r['cut'], points=r['points'], result=r['result'], stalled=r['stalled'])
+                           for r in res['trees']])
     elif game['kind'] == 'fish':
         score = fish_score_v1(plan, log)
         need(score is not None, 'bad_log', 'Недопустимая запись игры.', 422)
@@ -484,12 +669,11 @@ def apply_play(farm, data, now):
         score = forage_score(plan, log)
         need(score is not None, 'bad_log', 'Маршрут нарушает правила игры.', 422)
         need(100 * (now - trip['started_at']) >= STEP_CS * len(log), 'too_fast', 'Слишком быстро для такой игры.', 422)
-    game.update(state='done', score=score, q=quality(score))
-    fishing = game['kind'] == 'fish'
+    game.update(state='done', score=score, q=quality(score, game['kind']))
     extra = {k: v - trip['outputs'][k] for k, v in final_outputs(trip).items() if v > trip['outputs'][k]}
-    tail = ' Добавка к улову: ' if fishing else ' Добавка к находкам: '
+    tail = {'fish': ' Добавка к улову: ', 'fell': ' Добавка к древесине: '}.get(game['kind'], ' Добавка к находкам: ')
     tail = tail + ', '.join(f'{ITEMS[k]["name"]} +{v}' for k, v in extra.items()) + '.' if extra else ' Сегодня как у автопилота.'
-    return ('Рыбалка сыграна.' if fishing else 'Прогулка сыграна.') + caught + tail
+    return {'fish': 'Рыбалка сыграна.', 'fell': 'Валка сыграна.'}.get(game['kind'], 'Прогулка сыграна.') + caught + tail
 
 
 def grams_text(g):
@@ -532,6 +716,6 @@ def validate(farm):
         game = trip.get('game')
         if game is None:
             continue
-        ok = (not trip['guide'] and game.get('state') in {'open', 'done'} and game.get('kind') in {'fish', 'forage'}
-              and type(game.get('q')) is int and Q_AUTO <= game['q'] <= Q_AUTO + BONUS and isinstance(game.get('plan'), dict))
+        ok = (not trip['guide'] and game.get('state') in {'open', 'done'} and game.get('kind') in {'fish', 'forage', 'fell'}
+              and type(game.get('q')) is int and Q_AUTO <= game['q'] <= Q_AUTO + (FELL_BONUS if game.get('kind') == 'fell' else BONUS) and isinstance(game.get('plan'), dict))
         need(ok, 'invalid_trips', 'Некорректная мини-игра поездки.', 500)

@@ -31,11 +31,22 @@ The server derives rocks/weeds from sha256(seed) at ``field_start`` and ships th
   ``18 * width * ha``; a cell that does not fit is LOST.  ``X`` unloads the hopper and is only valid with y == 0 (the truck at
   the top edge).  ``cov`` = taken cells that were not lost / reachable cells; overlap as in cultivation; same score formula.
 
-Manual quality ``q = 850 + 250 * score // 1000`` (0.85 .. 1.10, permille); the autopilot is 950.  For runs with ``qrule == 2`` (all
-runs opened since the owner's 2026-10-14 decision) the bonus over 950 is whole while the run lasts at most 2.5 x the autopilot time
-and melts linearly to 0 at 6 x (``timed_quality``); older open runs keep the plain quality and their 900 s deadline.  Cultivation only moves time:
-growth lasts ``base * (1950 - q_cult) / 1000`` (autopilot 1.0, best manual 0.85).  Yield = ``yield_qty * 16 * ha * q_sow * q_harvest //
-10**6``; XP = ``crop.xp * 8 * ha * q_sow * q_harvest // 10**6`` through ``progression.grant_xp`` (the only XP funnel).
+QUALITY.  Manual quality ``q = 850 + 250 * score // 1000`` (0.85 .. 1.10, permille); the autopilot is 950.  For runs with
+``qrule == 2`` (all runs opened since the owner's 2026-10-14 decision) the bonus over 950 is whole while the run lasts at most
+2.5 x the autopilot time and melts linearly to 0 at 6 x (``timed_quality``); older open runs keep the plain quality and their 900 s
+deadline.  Cultivation only moves time: growth lasts ``base * (1950 - q_cult) / 1000`` (autopilot 1.0, best manual 0.85).
+
+RULES VERSIONS.  A run without ``run['rules']`` is the legacy one above.  ``rules == 2`` adds ``T`` (the implement turns in place)
+and per-cell sowing at the lane anchors under the same economy.  ``rules >= FIELD_RULES`` (= 3) is the full test economy: both
+orientations are workable, a lowercase ``u/d/l/r`` is a bump against a rock or the field edge (-3 condition, 15 coins of repair
+per hit, 4 permille of quality per missing condition point), the fourth operation ``spray`` fills the tank at the tanker and drifts
+with the wind, and ``X`` transfers a quarter of the hopper/tank at a time.  Its manual quality is
+``850 + 400 * score // 1000`` (0.85 .. 1.25) with the autopilot 900, the same timed melt (``timed_quality_full``) and condition 0
+closing the run as the autopilot.  Growth after cultivation is 1950 - q_cult (950 -> 1.0, 900 -> 1.05, 1250 -> 0.70, 850 -> 1.10);
+spray adds 0 .. +20 % (``spray_bonus_permille``).
+
+Yield = ``yield_qty * 16 * ha * q_sow * q_harvest * q_spray // 10**9``; XP = ``crop.xp * 8 * ha * q_sow * q_harvest * q_spray //
+10**9`` through ``progression.grant_xp`` (the only XP funnel); rules < 3 use q_spray = 1000.
 """
 from hashlib import sha256
 import heapq
@@ -56,6 +67,7 @@ SCHEMAS = {
     'upgrade_machine': {'machine'},
     'field_start': {'field', 'op', 'crop', 'revision'},
     'field_finish': {'field', 'run', 'path'},
+    'field_cancel': {'field', 'revision'},      # E27 F4: take back a mistaken sowing during the first UNDO_WINDOW seconds
 }
 DIRS = {'U': (0, -1), 'D': (0, 1), 'L': (-1, 0), 'R': (1, 0)}
 BUMP_DIRS = {'u': (0, -1), 'd': (0, 1), 'l': (-1, 0), 'r': (1, 0)}   # a damaging bump against a rock/wall (rules=3)
@@ -800,6 +812,8 @@ def apply_field(farm, kind, data, now, command_id, speed, upkeep_config=None):
         return f'{spec["name"]}: ширина {tier + 1}.'
     if kind == 'field_start':
         return _start(farm, data, now, speed, lv)
+    if kind == 'field_cancel':
+        return _cancel_sowing(farm, data, now)
     return _finish(farm, data, now, speed)
 
 
@@ -826,16 +840,46 @@ def _start(farm, data, now, speed, lv):
         need(isinstance(f.get('crop'), dict) and not f['crop'].get('q_spray'), 'already_sprayed', 'Это поле уже обработано.')
     fuel = FIELD_FUEL * f['ha']
     need(farm['coins'] >= fuel + seeds, 'insufficient_coins', 'Не хватает монет на топливо и семена.')
-    pay(farm, fuel + seeds)
+    gift = pay(farm, fuel + seeds)
     seed = sha256(f'{farm["id"]}:{f["id"]}:{f["seq"]}:{op}'.encode()).hexdigest()[:24]
     rocks, weeds = make_obstacles(seed, op, f['w'], f['h'], f['ha'])
     f['run'] = dict(id=f'run_{f["seq"]}', op=op, status='open', crop=crop_id, started_at=now, expires_at=now + FIELD_RUN_TTL,
                     width=machine['tier'], seed=seed, rocks=rocks, weeds=weeds, speed=speed, qrule=QRULE_TIMED,
                     rules=FIELD_RULES, unload_zone=(op in {'harvest', 'spray'}),
                     tank=(FIELD_TANK * f['ha'] if op == 'spray' else 0), wind=(1 if int(seed[-1], 16) % 2 else -1) if op == 'spray' else 0)
+    if op == 'sow':      # E27 F4: what the sowing took, so that undoing it gives exactly this back
+        f['run'].update(cost=seeds, fuel=fuel, gift=gift)
     f['seq'] += 1
     f['revision'] += 1
     return f'{FIELD_MACHINES[spec["machine"]]["name"]} выехал в поле (ширина {machine["tier"]}).'
+
+
+def _cancel_sowing(farm, data, now):
+    """E27 F4: take back a mistaken sowing in the first ``undo.UNDO_WINDOW`` seconds (the same canon as digging up a bed): the seeds and the
+    fuel come back in full (and the starter-gift part is restored), nothing was harvested, the field stays cultivated.  It works on an
+    unfinished sowing run (open or autopilot) and on the crop that this run has just planted.  Repair of bumps is not returned."""
+    from . import undo
+    f = find_field(farm, data['field'])
+    need(type(data['revision']) is int and data['revision'] == f['revision'], 'stale_object', 'Поле изменилось. Обнови ферму.')
+    run, crop = f.get('run'), f.get('crop')
+    if run is not None and run['op'] == 'sow' and run['status'] in {'open', 'auto'}:
+        need(now - run['started_at'] <= undo.UNDO_WINDOW, 'undo_expired', 'Отменить посев можно только в первую минуту.')
+        seeds = run['cost'] if type(run.get('cost')) is int else CROPS[run['crop']]['cost'] * FIELD_SEED_MULT * f['ha']
+        fuel = run['fuel'] if type(run.get('fuel')) is int else FIELD_FUEL * f['ha']
+        gift, name = run.get('gift', 0), CROPS[run['crop']]['name']
+        f['run'] = None
+    else:
+        need(f['state'] == 'growing' and isinstance(crop, dict), 'nothing_to_cancel', 'Сейчас на поле нечего отменять.')
+        need(now - crop['planted_at'] <= undo.UNDO_WINDOW, 'undo_expired', 'Отменить посев можно только в первую минуту.')
+        seeds = crop['cost'] if type(crop.get('cost')) is int else CROPS[crop['id']]['cost'] * FIELD_SEED_MULT * f['ha']
+        fuel = crop['fuel'] if type(crop.get('fuel')) is int else FIELD_FUEL * f['ha']
+        gift, name = crop.get('gift', 0), CROPS[crop['id']]['name']
+        f['state'], f['crop'] = 'ready', None
+    refund = seeds + fuel
+    farm['coins'] += refund
+    undo.restore_gift(farm, gift, refund)
+    f['revision'] += 1
+    return f'{FIELD_MACHINES["seeder"]["name"]}: посев отменён ({name}), семена и топливо вернулись полностью: +{refund} монет.'
 
 
 def _finish(farm, data, now, speed):
@@ -897,6 +941,9 @@ def complete(farm, f, run, q, at, owner, condition=100, hits=0):
         f['state'] = 'growing'
         f['crop'] = dict(id=crop['id'], planted_at=at, ready_at=at + duration(seconds, run['speed'], farm if owner else None),
                          base=crop['yield_qty'] * FIELD_YIELD_MULT * f['ha'], xp=crop['xp'], q_sow=q, version=VERSION)
+        for key in ('cost', 'fuel', 'gift'):          # E27 F4: the price of the sowing, kept for the first minute (runs opened before it have none)
+            if type(run.get(key)) is int:
+                f['crop'][key] = run[key]
         text = f'{name}: {crop["name"]} посеяна, качество {pct}.'
     elif op == 'spray':
         c = f['crop']

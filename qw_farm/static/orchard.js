@@ -72,11 +72,13 @@ export function plantSpec(row,option,catalog){
 }
 export const plantCommand=(spec,cell)=>['plant_tree',{species:spec.tree.species,x:cell.x,y:cell.y,voucher:spec.tree.voucher}];
 export const careCommand=(o,action,item=null)=>['tree_care',{object:o.id,action,item}];
-// Uprooting: inside the undo window the whole price comes back; later only wood (the client asks first).
+// Uprooting: inside the undo window the whole price comes back; later (E27 D2) a share of the sapling price and the wood (the client asks first).
+// The share is catalog.undo.late_refund_pct; the wood count is not in the catalog yet, 2 is the server TREE_REFUND_WOOD.
 export function uprootText(catalog,o,t,undoWindow=60){
- const name=treeName(catalog,o),wood=2;   // TREE_REFUND_WOOD
+ const name=treeName(catalog,o),wood=catalog?.orchard?.rules?.refund_wood??2,pct=catalog?.undo?.late_refund_pct??50;
  if(t-o.planted_at<=undoWindow)return {early:true,text:`Саженец «${name}» вернётся полностью: ${o.cost?`+${o.cost} монет`:'талон останется у тебя'}.`};
- return {early:false,text:`${name} будет выкорчевана. Вернётся только древесина ×${wood}; созревший урожай сначала соберётся на склад.`};
+ const refund=Math.floor((Number.isInteger(o.cost)?o.cost:0)*pct/100);
+ return {early:false,refund,wood,text:`${name} будет выкорчевана. Вернётся ${refund?`${pct}% цены саженца: +${refund} монет, и `:''}древесина ×${wood}; созревший урожай сначала соберётся на склад.`};
 }
 export const treeSummary=(catalog,objects)=>{
  const out={};for(const o of objects||[])if(isTree(o))out[o.species]=(out[o.species]||0)+1;
@@ -101,3 +103,100 @@ export function unlockText(list){
 export const movedNotice=v=>Array.isArray(v?.granted)&&v.granted.length>0;
 export const MOVED_TEXT='Фруктовые деревья переехали в Сад: там твои саженцы и талоны';
 export const OPEN_LABEL='Открыть Сад';
+
+/* ---- Refunds (kept in this file: qw_farm/api.py ASSETS lists the servable files). E27 (docs/tasks/FARM_ECONOMY_SOFTENING.md §8): what a demolition and a cancelled sowing give back. Pure helpers, no DOM.
+   The sums repeat the server canon (qw_farm/undo.py building_invested / demolish_refund / demolish, fields._cancel_sowing) and read
+   every number from the catalog (`undo`, `buildings`, `upgrades`, `fields`); tests/js/farm_refund.test.cjs checks the parity. */
+const toInt=v=>Number.isInteger(v)?v:null;
+const windowOf=catalog=>catalog?.undo?.window??60;
+const pctOf=catalog=>catalog?.undo?.late_refund_pct??50;
+// Python's round() goes to the even neighbour on a tie; the server prices use it, so the client must too.
+function roundHalfEven(x){const f=Math.floor(x),d=x-f;return d<.5?f:d>.5?f+1:(f%2===0?f:f+1);}
+const effectiveLevel=(catalog,raw)=>Math.max(1,Math.min(catalog?.upgrades?.max??3,Number.isInteger(raw)?raw:1));
+export function upgradeCoins(catalog,type,to){
+ const spec=catalog?.upgrades?.levels?.[to],building=catalog?.buildings?.[type];
+ if(!spec||(!building&&type!=='barn'))return 0;
+ const base=building?building.cost:catalog.upgrades.base_cost;
+ return Math.max(spec.coin_min,roundHalfEven(base*spec.coin_factor/10)*10);
+}
+// What came with the farm (domain.new_farm): ids building_0..3 and plot_0..5 without a price record. Server: undo.STARTER_IDS.
+const STARTER_IDS=new Set([0,1,2,3].map(i=>`building_${i}`).concat([0,1,2,3,4,5].map(i=>`plot_${i}`)));
+const isStarter=o=>STARTER_IDS.has(o.id)&&!('paid' in o);
+const PLOT_COST=35;   // a bed is not in `buildings`; the server prices it at 35 (domain.apply 'build')
+// Coins put into a placed object: what was paid (recorded since E27, else the catalog price, 35 for a bed, 0 for a starter object) + coin price of its upgrades.
+export function buildingInvested(catalog,o){
+ const spec=catalog?.buildings?.[o.type];
+ if(o.type!=='plot'&&!spec)return 0;
+ let base;
+ if(isStarter(o))base=0;
+ else if(toInt(o.paid)!==null&&o.paid>=0)base=o.paid;
+ else base=o.type==='plot'?PLOT_COST:spec.cost;
+ let upgrades=0;
+ if(spec&&!spec.decor){
+  for(let to=2;to<=effectiveLevel(catalog,o.level);to++)upgrades+=upgradeCoins(catalog,o.type,to);
+ }
+ return base+upgrades;
+}
+// Goods spent on the upgrades of the object (server: undo.upgrade_materials).
+export function upgradeMaterials(catalog,o){
+ const spec=catalog?.buildings?.[o.type],out={};
+ if((spec&&!spec.decor)||o.type==='barn'){
+  for(let to=2;to<=effectiveLevel(catalog,o.level);to++){
+   for(const [k,q] of Object.entries(catalog?.upgrades?.levels?.[to]?.items||{}))out[k]=(out[k]||0)+q;
+  }
+ }
+ return out;
+}
+// {refund, goods, full, wood, xp}: coins and upgrade goods back (all of them in the first minute, else the catalog share, goods rounded down),
+// the wood (later only, working buildings only) and the build XP that every demolition takes back (server: undo.demolish_refund / demolish).
+export function demolishRefund(catalog,o,t){
+ const invested=buildingInvested(catalog,o),spec=catalog?.buildings?.[o.type],pct=pctOf(catalog);
+ const full=toInt(o.built_at)!==null&&t-o.built_at<=windowOf(catalog);
+ const all=upgradeMaterials(catalog,o),goods={};
+ for(const [k,q] of Object.entries(all)){const n=full?q:Math.floor(q*pct/100);if(n>0)goods[k]=n;}
+ const refund=full?invested:Math.floor(invested*pct/100);
+ const wood=!full&&spec&&!spec.decor?4+effectiveLevel(catalog,o.level)-1:0;
+ const xp=toInt(o.build_xp)!==null&&o.build_xp>0?o.build_xp:0;
+ return {refund,goods,full,wood,xp,invested};
+}
+export function demolishText(catalog,o,t,name){
+ const r=demolishRefund(catalog,o,t),pct=pctOf(catalog);
+ const items=Object.entries(r.goods).map(([k,q])=>`${catalog?.items?.[k]?.name||k} ×${q}`);
+ const parts=[];
+ if(r.refund)parts.push(`+${r.refund} монет`);
+ parts.push(...items);
+ if(r.wood)parts.push(`древесина ×${r.wood}`);
+ let back;
+ if(r.full)back=parts.length?`Постройке меньше минуты: вложенное вернётся полностью (${parts.join(', ')}). Древесины не будет.`:'Постройке меньше минуты, но денег за неё не платили.';
+ else back=parts.length?`Вернётся ${pct}% вложенного: ${parts.join(', ')}.`:'Монеты и материалы не возвращаются.';
+ if(r.xp)back+=` Опыт за постройку (${r.xp}) снимется.`;
+ return `${name} исчезнет с фермы. ${back}`;
+}
+// Cancelling a sowing (field_cancel): an unfinished sowing run (open or autopilot) or the crop sown less than a minute ago.
+// null when there is nothing to cancel, else {kind, left (whole seconds), refund (seeds + fuel, whole)}.
+export function cancelSowing(catalog,f,t){
+ const F=catalog?.fields,win=windowOf(catalog);
+ if(!F||!f)return null;
+ const fuelOf=src=>toInt(src.fuel)!==null?src.fuel:F.fuel*f.ha;
+ const run=f.run,crop=f.crop;
+ if(run&&run.op==='sow'&&(run.status==='open'||run.status==='auto')){
+  const left=Math.ceil(run.started_at+win-t);
+  if(left<0)return null;
+  const seeds=toInt(run.cost)!==null?run.cost:(catalog.crops?.[run.crop]?.cost||0)*F.seed_mult*f.ha;
+  return {kind:'run',left,refund:seeds+fuelOf(run)};
+ }
+ if(f.state==='growing'&&crop&&typeof crop==='object'){
+  const left=Math.ceil(crop.planted_at+win-t);
+  if(left<0)return null;
+  const seeds=toInt(crop.cost)!==null?crop.cost:(catalog.crops?.[crop.id]?.cost||0)*F.seed_mult*f.ha;
+  return {kind:'crop',left,refund:seeds+fuelOf(crop)};
+ }
+ return null;
+}
+export const cancelCommand=f=>['field_cancel',{field:f.id,revision:f.revision}];
+export const CANCEL_ERRORS={
+ nothing_to_cancel:'Отменять уже нечего: посев закончился или его уже отменили.',
+ stale_object:'Поле только что изменилось. Данные обновлены, нажми ещё раз, если кнопка осталась.',
+ undo_expired:'Первая минута прошла: посев отменить уже нельзя.',
+};
+export const cancelErrorText=e=>CANCEL_ERRORS[e?.code]||e?.message||'Не удалось отменить посев.';

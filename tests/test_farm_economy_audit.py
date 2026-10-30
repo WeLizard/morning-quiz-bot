@@ -65,7 +65,7 @@ def test_income_reference_recalibrates_late_bands_and_drives_caravan_and_fund():
         assert M.caravan_target(lv) == round(ref * .08)
         assert M.max_extra_daily(lv)['reference'] == ref
         assert M.max_extra_daily(lv)['share'] <= .25
-    assert E.thresholds(C.income_ref(30)) == [38000, 114000, 228000, 380000, 608000]
+    assert E.thresholds(C.income_ref(30)) == [38000, 114000, 152000, 380000, 608000]
 
 
 def test_old_saves_keep_balances_inventory_and_queued_job_rewards_on_repeated_load():

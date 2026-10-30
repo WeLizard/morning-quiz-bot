@@ -69,6 +69,14 @@ export function renderFestival(p,view,h){
  // The gift stays in the festival panel even when the optional decor and scares are hidden.
  if(cur?.id==='pumpkin_night')h.horsemanCard?.(p);
  if(fair){
+  if(fair.tower){
+   const t=fair.tower,pie=h.pie?.(),label=pie?.active?'Продолжить':!pie?'Играть':pie.attempts_left>0?(pie.last_result?'Ещё раз':'Играть'):'Тренировка';
+   const c=card('Пирог до небес','Праздничная игра деревни','journal');c.classList.add('fest-pie');
+   c.append(el('p',`Башня деревни: ${t.total} из ${t.goal}${t.players?` · участников: ${t.players}`:''}.${t.reached?` «${t.name}» уже у участников.`:''}`,'note'));
+   const play=button(label,()=>h.pieGame?.(),'qw-btn primary',!!h.busy?.());play.dataset.openPie='';
+   c.append(play);
+   p.append(c);
+  }
   if(fair.todo){p.append(card('Ярмарка готовится','Содержимое этого праздника ещё в работе','coin'));}
   if(fair.tasks.length){
    const c=card('Праздничные задания','Награда — предмет праздника, без монет и опыта','journal');c.classList.add('fest-tasks');

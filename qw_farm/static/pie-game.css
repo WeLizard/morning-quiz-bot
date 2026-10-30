@@ -1,0 +1,40 @@
+body.pie-game-open .workspace{position:relative;display:block;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding-bottom:0}
+body.pie-game-open .workspace>#rail,body.pie-game-open .workspace>.scene-area,body.pie-game-open .workspace>.side-panel,body.pie-game-open .header-destinations{display:none!important}
+#pie-game-view[hidden],#pie-game-view [hidden]{display:none!important}
+#pie-game-view{min-width:0;min-height:calc(100dvh - var(--qw-header-h));overflow:auto;background:var(--paper);color:var(--qw-game-text)}
+#pie-game-view *{box-sizing:border-box}
+#pie-game-view .pie-page{max-width:1350px;margin:auto;padding:24px var(--qw-gutter) calc(24px + var(--qw-safe-bottom));display:grid;gap:16px}
+#pie-game-view h1,#pie-game-view p{margin:0}
+#pie-game-view h1{font-size:var(--qw-fs-h1);line-height:1.15}
+#pie-game-view .pie-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#pie-game-view .pie-back{min-height:44px;padding:8px 14px;border:1px solid var(--qw-game-line,#b5c8a9);border-radius:var(--qw-r-control);background:var(--qw-game-surface,#fffaf0);color:inherit;font:inherit;font-weight:700;cursor:pointer}
+#pie-game-view .pie-intro{font-size:var(--qw-fs-body)}
+#pie-game-view .pie-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,330px);gap:18px;align-items:start}
+#pie-game-view .pie-stage-card,#pie-game-view .pie-controls{min-width:0;background:var(--qw-game-surface,#fffaf0);border:1px solid var(--qw-game-line,#c8d4b9);border-radius:var(--qw-r-card);padding:12px;box-shadow:0 8px 24px #28463019}
+#pie-game-view .pie-stage{position:relative}
+#pie-game-view .pie-scene{width:100%;aspect-ratio:5/3;overflow:hidden;border-radius:12px;background:var(--qw-game-surface-2);touch-action:none;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#pie-game-view .pie-scene[aria-disabled="true"]{cursor:default}
+#pie-game-view .pie-scene svg{display:block;width:100%;height:100%}
+#pie-game-view .pie-progress{min-height:28px;padding:8px 2px 0;font-size:var(--qw-fs-control);font-weight:700}
+#pie-game-view .pie-controls{display:grid;gap:14px;padding:18px}
+#pie-game-view .pie-status{font-size:var(--qw-fs-h3);font-weight:750}
+#pie-game-view .pie-tower{font-size:var(--qw-fs-body);font-weight:700}
+#pie-game-view .pie-actions{display:grid;gap:8px}
+#pie-game-view .pie-actions button{min-height:48px;font-size:var(--qw-fs-control)}
+#pie-game-view .pie-rules{font-size:var(--qw-fs-small);line-height:1.5}
+/* Height badge over the scene: zone and layers; the same text is in the progress line for screen readers. */
+#pie-game-view .pie-alt{position:absolute;left:8px;top:8px;margin:0;padding:3px 10px;border-radius:999px;background:#fffaf0e6;color:#1f4036;font-size:var(--qw-fs-small,13px);font-weight:750;line-height:1.5;pointer-events:none;box-shadow:0 2px 6px #1f403626}
+#pie-game-view .pie-alt:empty{display:none}
+#pie-game-view .pie-alt-new{animation:pie-alt-new 1.4s ease-out}
+@keyframes pie-alt-new{0%{transform:scale(1)}15%{transform:scale(1.18);background:#fff3c4}100%{transform:scale(1)}}
+#pie-game-view .pie-cut{pointer-events:none}
+:root[data-farm-theme="night"] #pie-game-view .pie-alt{background:#1d3128e6;color:#edf1df}
+#pie-game-view :focus-visible{outline:3px solid var(--qw-game-accent,#5b883c);outline-offset:3px}
+html.qw-telegram #pie-game-view .pie-back{display:none}
+:root[data-qw-contrast="1"] #pie-game-view .pie-stage-card,:root[data-qw-contrast="1"] #pie-game-view .pie-controls{border-width:2px}
+:root[data-qw-contrast="1"] #pie-game-view .pie-scene svg{filter:saturate(1.12) contrast(1.08)}
+:root[data-qw-contrast="1"][data-farm-theme="night"] #pie-game-view .pie-scene svg{filter:brightness(1.55) contrast(1.18) saturate(1.1)}
+:root[data-qw-contrast="1"] #pie-game-view .pie-alt{background:#fff;color:#10231a;border:2px solid #10231a;box-shadow:none}
+:root[data-qw-contrast="1"][data-farm-theme="night"] #pie-game-view .pie-alt{background:#0f1d16;color:#fff;border-color:#ffd34d}
+@media(prefers-reduced-motion:reduce){#pie-game-view .pie-alt-new{animation:none}}
+@media(max-width:850px){#pie-game-view .pie-page{padding-top:14px}#pie-game-view .pie-layout{grid-template-columns:1fr}#pie-game-view .pie-controls{gap:10px}#pie-game-view .pie-title{align-items:start}#pie-game-view .pie-title h1{max-width:70%}}

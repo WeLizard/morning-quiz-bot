@@ -2,6 +2,8 @@
 """Deterministic progression simulator for the farm (qw_farm). Usage:
 
     python scripts/farm_balance_sim.py [--days 150] [--profile all|active|online|casual|grind|skilled] [--helpers] [--craft-masters 0..4] [--craft-capacity] [--visit-queues] [--debug] [--no-fields]
+           [--field-mode auto|reference|manual|max] [--field-q 1100] [--field-hits 1] [--field-elapsed-k 200] [--field-manual-share 100] [--field-payback]
+           [--sim-field-upkeep N] [--sim-field-steps a,b,c,d,e] [--sim-field-machines a,b,c,d] [--sim-field-widths w2,w3] [--sim-field-fuel N] [--sim-land size:cost,...]
     (r9: e.g. --days 90; the run stops at the maximum level L50)
 
 WHAT IS REAL.  Every game action goes through the real ``qw_farm.domain.apply`` (plant, plant_many, harvest via
@@ -39,11 +41,21 @@ PLAYER MODEL (documented simplifications).
     ``fund_contribute``, coins) until the 5th personal tier of the season is full, then up to 30% of the surplus buys the most
     expensive paid decor (including R16 decor/trophies) that is open and not yet owned.  The shared village counter is not simulated (one farm).
   * Fields (stage 15, real ``qw_farm.fields`` through ``domain.apply``): a field step is bought at its price + one day of INCOME_REF
-    in reserve, then the three tier-1 machines (cheapest first); width upgrades come from the surplus. EVERY visit each field gets
-    up to three sequential operations (harvest -> cultivate -> sow, best crop by value per effective hour): ``active``/``casual``/``grind`` use the
-    autopilot (wait until ready after 90 s * ha / width before starting the next operation), ``skilled`` drives the three operations by hand in one visit
-    with the reference driver ``fields.reference_path`` (the real server replay gives q 0.85..1.10; the achieved average is printed).
+    in reserve, then the four tier-1 machines (cheapest first); width upgrades come from the surplus. EVERY visit each field gets
+    up to four sequential operations (spray when it pays -> harvest -> cultivate -> sow, best crop by value per effective hour and by the growth of
+    this field's cultivation): ``active``/``casual``/``online``/``grind`` use the autopilot by default (wait until ready after 90 s * ha / width before
+    starting the next operation), ``skilled`` drives the operations by hand in one visit with the reference driver ``fields.reference_path``
+    (the real server replay; the achieved average is printed); ``--field-mode`` replaces either choice for any profile.
     Field work finished by ``settle`` (autopilot, expiry) is booked to the ``fields`` source too.
+    E27 (rules=3 economy, see docs/tasks/FARM_ECONOMY_SOFTENING.md): ``--field-mode`` chooses who drives the machines.  ``auto`` = autopilot
+    (q 0.90, growth x1.05); ``reference`` = the real server replay of ``fields.reference_path``; ``manual`` = an average realistic player: raw
+    quality ``--field-q`` (default 1.10) damaged by ``--field-hits`` bumps per operation (-3 condition = -12 permille and 15 coins each), the
+    run lasts ``--field-elapsed-k`` % of the autopilot time A (default 200 = inside the 2.5 A where the bonus is whole; 400 shows the melt),
+    the bonus over 0.90 melts exactly as in ``fields._finish``; ``max`` = a perfect 1.25 run without bumps at 1 A.  The manual run is closed
+    through the real ``fields.complete`` (the path is not replayed: the quality is an input of the model, not an output).  With a sprayer a
+    ripe field is sprayed first whenever the expected extra yield is worth more than the fuel (+2.5 % at the autopilot 0.90, up to +20 %).
+    ``--field-payback`` skips the whole-farm run and measures every FIELD_STEP (plus the machines) in isolation per profile and mode.
+    ``--sim-field-*`` / ``--sim-land`` change the numbers of this process only (restored afterwards; the game catalog is untouched).
   * Helpers (--helpers): hire the first available master, animal keeper and harvester, then pay the largest unlocked
     8-hour shift at visits only when the previous one ended. The real scheduler enforces 30-second intervals, quotas,
     remembered recipes, available feed, collection and refeeding; shifts never renew between visits. Reserve inputs for
@@ -94,6 +106,9 @@ PROFILES = {
     'skilled': dict(label='skilled: active, but fields are driven by hand (all three operations per visit, reference driver)',
                     sessions=(8 * 3600, 22 * 3600), orders=12, grind=False, skilled=True),
 }
+FIELD_MODES = ('auto', 'reference', 'manual', 'max')
+# Player models for the fields (rules=3): raw quality (permille before bumps and melt), bumps per operation, run time as % of the autopilot time A.
+FIELD_MODEL = {'manual': dict(q=1100, hits=1, elapsed_k=200), 'max': dict(q=1250, hits=0, elapsed_k=100)}
 ANIMAL_BY_HOUSE = {a['building']: a for a in C.ANIMALS.values()}
 ORCHARD_FRUIT = {t['fruit'] for t in C.TREES.values()}
 FRUIT_RECIPES = frozenset(r['id'] for r in C.RECIPES.values() if r['id'] in C.ORCHARD_RECIPE_IDS or set(r['inputs']) & ORCHARD_FRUIT)
@@ -141,13 +156,33 @@ def fill(recipes, slots, mult, gap, full=False):
     return total, chosen
 
 
+def manual_field_quality(q_raw, ha, width, hits, elapsed_k):
+    """Quality (permille) of a manual rules=3 run: bumps first, then the bonus over the autopilot melts with the run time (``fields._finish``)."""
+    q = FD.condition_quality(q_raw, 100 - hits * C.FIELD_HIT_DAMAGE)
+    a = FD.auto_seconds(ha, width)
+    full, zero = a * C.FIELD_FULL_K // 100, a * C.FIELD_ZERO_K // 100
+    elapsed = a * elapsed_k // 100
+    keep = 1000 if elapsed <= full else 0 if elapsed >= zero else (zero - elapsed) * 1000 // (zero - full)
+    bonus = q - C.Q_AUTO_FULL
+    return C.Q_AUTO_FULL + bonus * keep // 1000 if bonus > 0 else q
+
+
 class Sim:
     def __init__(self, name, days, debug=False, fields=True, orchard=True, helpers=False, full_queues=True,
-                 craft_masters=None, demand_actions_override=None):
+                 craft_masters=None, demand_actions_override=None, field_mode=None, field_q=None, field_hits=None,
+                 field_elapsed_k=None, field_share=None):
         self.name, self.days, self.debug, self.fields, self.orchard = name, days, debug, fields, orchard
         self.helpers, self.full_queues = helpers, full_queues
         self.craft_masters = (1 if helpers else 0) if craft_masters is None else craft_masters
         self.demand_actions_override = demand_actions_override
+        self.field_mode = field_mode or ('reference' if PROFILES[name].get('skilled') else 'auto')
+        assert self.field_mode in FIELD_MODES, self.field_mode
+        model = dict(FIELD_MODEL.get(self.field_mode, {}))
+        for key, value in (('q', field_q), ('hits', field_hits), ('elapsed_k', field_elapsed_k)):
+            if value is not None:
+                model[key] = value
+        self.field_model = model
+        self.field_share = 100 if field_share is None else field_share      # percent of the operations done by hand in manual/max mode, the rest by autopilot
         self.helper_shifts = Counter()
         self.helper_actions = Counter()
         self.fruit_xp = Counter()             # band -> xp of the recipes that eat orchard fruit or orchard goods (approx.: counted when queued)
@@ -830,29 +865,79 @@ class Sim:
             own = self.owned_machines().get(k)
             if own and own['tier'] < 3 and lv >= m['levels'][own['tier']] \
                     and f['coins'] - f['starter_credit'] >= m['costs'][own['tier']] + 2 * C.income_ref(lv):
-                self.cmd('upgrade_machine', {'machine': k}, now, 'capex:machines')
+                self.cmd('upgrade_machine', {'machine': k}, now, 'capex:widths')
 
-    def field_crop(self, now, ha, coins):
+    def field_crop(self, now, ha, coins, q_cult=None):
+        """Best field crop by value per effective hour; growth is shortened/lengthened by the cultivation quality of this field."""
         lv = self.lv()
+        grow = FD.growth_permille(C.Q_AUTO if q_cult is None else q_cult) / 1000
         best = None
         for c in C.CROPS.values():
             if c['field'] and c['level'] <= lv and (c['cost'] * C.FIELD_SEED_MULT + C.FIELD_FUEL) * ha <= coins:
                 value = (c['yield_qty'] * C.FIELD_YIELD_MULT * c['price'] - c['cost'] * C.FIELD_SEED_MULT) * ha
-                rate = value / self.eff(max(c['seconds'], C.FIELD_MIN_GROW), now)
+                rate = value / self.eff(max(c['seconds'], C.FIELD_MIN_GROW) * grow, now)
                 if best is None or rate > best[0]:
                     best = (rate, c['id'])
         return best[1] if best else None
 
+    def spray_pays(self, fld, q_spray):
+        """Spray only when the expected extra yield is worth more than the fuel (the crop is valued at the shop price)."""
+        crop = fld.get('crop')
+        if not isinstance(crop, dict) or crop.get('q_spray') or FD.machines_of(self.f).get('sprayer') is None:
+            return False
+        extra = FD.spray_bonus_permille(q_spray) - 1000
+        base = crop['base'] * crop['q_sow'] / 1000 * price(crop['id']) * 0.95    # ~0.95: the harvest quality is below the sowing one on average
+        return base * extra / 1000 > C.FIELD_FUEL * fld['ha']
+
+    def finish_field(self, fld, run, t, mode):
+        """Close the open run of ``fld`` at ``t`` according to the player model; returns the time the run ended (None: refused)."""
+        op, width, ha = run['op'], run['width'], fld['ha']
+        if mode in ('manual', 'max') and self.field_share < 100:
+            self.fs['shared_ops'] += 1
+            k = self.fs['shared_ops']
+            if k * self.field_share // 100 == (k - 1) * self.field_share // 100:
+                mode = 'auto'
+        if mode == 'reference':
+            path = FD.reference_path(fld, run)
+            t += math.ceil(len(path) * C.FIELD_STEP_CS / 100) + 2
+            self.settle(t)
+            self.fs['ops_manual'] += 1
+            self.fs_q[op].append(FD.quality(FD.simulate(fld, run, path)))
+            self.cmd('field_finish', {'field': fld['id'], 'run': run['id'], 'path': path}, t, 'fields')
+            return t
+        if mode == 'auto':
+            self.fs['ops_auto'] += 1
+            if not self.cmd('field_finish', {'field': fld['id'], 'run': run['id'], 'path': None}, t + 1, 'fields'):
+                return None
+            t = fld['run']['done_at']
+            self.settle(t)
+            return t
+        m = self.field_model        # manual / max: the quality is an input of the model, the run is closed by the real fields.complete
+        q = manual_field_quality(m['q'], ha, width, m['hits'], m['elapsed_k'])
+        t += FD.auto_seconds(ha, width) * m['elapsed_k'] // 100
+        self.settle(t)
+        hits = m['hits']
+        self.settle_source(lambda farm, now: FD.complete(farm, fld, run, q, now, True, condition=100 - hits * C.FIELD_HIT_DAMAGE, hits=hits), t, 'fields')
+        self.fs['ops_manual'] += 1
+        self.fs['repair'] += hits * C.FIELD_HIT_REPAIR
+        self.fs_q[op].append(q)
+        return t
+
     def fields_visit(self, t):
-        """Wait for up to three real operations per field, including autopilot completion, then return visit end."""
-        f, skilled = self.f, self.p.get('skilled', False)
+        """Up to four sequential operations per field per visit (spray -> harvest -> cultivate -> sow), including the wait for the autopilot."""
+        f, mode = self.f, self.field_mode
+        by_hand = mode in ('manual', 'max') and self.field_share >= 50      # the quality the sprayer is expected to reach when deciding whether it pays
+        q_spray = (manual_field_quality(self.field_model['q'], 1, 1, self.field_model['hits'], self.field_model['elapsed_k'])
+                   if by_hand else C.Q_AUTO_FULL)
         for index in range(len(FD.fields_of(f))):
-            for _ in range(3):
+            for _ in range(4):
                 fld = f['fields'][index]
                 op = {'ripe': 'harvest', 'ready': 'sow', 'wild': 'cultivate'}.get(fld['state'])
+                if op == 'harvest' and mode != 'reference' and self.spray_pays(fld, q_spray):    # the reference driver has no spraying route
+                    op = 'spray'
                 if fld['run'] is not None or op is None or FD.machines_of(f).get(C.FIELD_OPS[op]['machine']) is None:
                     break
-                crop = self.field_crop(t, fld['ha'], f['coins'] - f['starter_credit']) if op == 'sow' else ''
+                crop = self.field_crop(t, fld['ha'], f['coins'] - f['starter_credit'], fld['q_cult']) if op == 'sow' else ''
                 if op == 'sow' and not crop:
                     break
                 c0 = f['coins']
@@ -861,20 +946,10 @@ class Sim:
                 fuel = C.FIELD_FUEL * fld['ha']
                 self.fs['fuel'] += fuel
                 self.fs['seeds'] += c0 - f['coins'] - fuel
-                run = fld['run']
-                if skilled:
-                    path = FD.reference_path(fld, run)
-                    t += math.ceil(len(path) * C.FIELD_STEP_CS / 100) + 2
-                    self.settle(t)
-                    self.fs['ops_manual'] += 1
-                    self.fs_q[op].append(FD.quality(FD.simulate(fld, run, path)))
-                    self.cmd('field_finish', {'field': fld['id'], 'run': run['id'], 'path': path}, t, 'fields')
-                else:
-                    self.fs['ops_auto'] += 1
-                    if not self.cmd('field_finish', {'field': fld['id'], 'run': run['id'], 'path': None}, t + 1, 'fields'):
-                        break
-                    t = fld['run']['done_at']
-                    self.settle(t)
+                self.fs['ops_' + op] += 1
+                t = self.finish_field(fld, fld['run'], t, mode)
+                if t is None:
+                    break
         return t
 
     # ---------------------------------------------------------------- grind loop
@@ -1112,14 +1187,17 @@ def field_report(sim, srcs_all, xp_all, sink_tot):
     field_xp = xp_all.get('fields', 0)
     out = ['', f'FIELDS (stage 15): first field on day {first}, {days_ha[-1][1]} ha at the end, machines '
            + ', '.join(f'{k} t{v["tier"]}' for k, v in sorted(FD.machines_of(sim.f).items())) + ';'
-           f' operations {sim.fs["ops_auto"]} autopilot + {sim.fs["ops_manual"]} manual']
-    out.append(f'  crops harvested (shop value) {net + fuel + seeds}, fuel {fuel}, seeds {seeds} -> field income {net} '
+           f' mode {sim.field_mode}, operations {sim.fs["ops_auto"]} autopilot + {sim.fs["ops_manual"]} manual'
+           f' (cultivate {sim.fs["ops_cultivate"]}, sow {sim.fs["ops_sow"]}, spray {sim.fs["ops_spray"]}, harvest {sim.fs["ops_harvest"]})']
+    out.append(f'  crops harvested (shop value) {net + fuel + seeds}, fuel {fuel}, seeds {seeds}, repair {sim.fs["repair"]} -> field income {net} '
                f'({net / span:.0f}/day); upkeep {C.FIELD_UPKEEP}/ha/day x {ha_days} ha-days = {upkeep} ({upkeep / span:.0f}/day assessed)')
     out.append(f'  NET after upkeep {net - upkeep} ({(net - upkeep) / span:.0f}/day since the first field); share of positive income {100 * net / pos:.1f}%, '
-               f'of XP {100 * field_xp / xt:.1f}%; capex fields {cap["capex:fields"]}, machines {cap["capex:machines"]}'
-               + (f'; payback {(cap["capex:fields"] + cap["capex:machines"]) / max(1, (net - upkeep) / span):.0f} days' if net > upkeep else '; not paid back'))
+               f'of XP {100 * field_xp / xt:.1f}%; capex fields {cap["capex:fields"]}, machines {cap["capex:machines"]}, widths {cap["capex:widths"]}'
+               + (f'; payback of fields + tier-1 machines {(cap["capex:fields"] + cap["capex:machines"]) / max(1, (net - upkeep) / span):.0f} days, '
+                  f'with widths {(cap["capex:fields"] + cap["capex:machines"] + cap["capex:widths"]) / max(1, (net - upkeep) / span):.0f} days'
+                  if net > upkeep else '; not paid back'))
     if sim.fs_q:
-        out.append('  manual q (permille, achieved by the server replay): ' + ', '.join(f'{op} {sum(v) / len(v):.0f} (n={len(v)})' for op, v in sorted(sim.fs_q.items())))
+        out.append('  manual q (permille; reference = server replay, manual/max = model after bumps and melt): ' + ', '.join(f'{op} {sum(v) / len(v):.0f} (n={len(v)})' for op, v in sorted(sim.fs_q.items())))
     sinks = sink_tot['upkeep'] + sink_tot['fund'] + sink_tot['decor']
     out.append(f'  sinks share of net income (all sinks, incl. field upkeep): {100 * sinks / max(1, sink_tot["net"]):.0f}%'
                f' (field upkeep alone {100 * upkeep / max(1, sink_tot["net"]):.0f}%)')
@@ -1181,6 +1259,131 @@ def coins_at(self, t):
 
 
 Sim.coins_at = coins_at
+
+
+def fields_net_total(sim):
+    """(value added by the fields in coins, field XP) so far."""
+    return (sum(sim.income[b]['fields'] for b in BANDS), sum(sim.xp_src[b]['fields'] for b in BANDS))
+
+
+def field_payback_run(name, mode, step, days=70, warmup=14, drop=(), **model):
+    """One field step in isolation: only its machines and its visits are simulated, everything else is ignored.
+
+    The player owns just this field (all four tier-1 machines), has unlimited coins and the level at which the step opens.  Visits follow the
+    profile; the first ``warmup`` days are dropped so that the numbers describe steady cycles.  Upkeep is not part of the simulated flow: it is
+    charged analytically (``C.FIELD_UPKEEP`` per hectare per day).  Returns per-day numbers of the whole field.
+    """
+    spec = C.FIELD_STEPS[step]
+    sim = Sim(name, days, orchard=False, field_mode=mode, field_q=model.get('q'), field_hits=model.get('hits'),
+              field_elapsed_k=model.get('elapsed_k'), field_share=model.get('share'))
+    f = sim.f
+    f['xp'] = C.LEVELS[spec['level'] - 1]
+    f['coins'], f['starter_credit'] = 10 ** 9, 0
+    f['fields'] = [FD.new_field(spec)]
+    f['field_machines'] = {k: dict(tier=1, acquired_at=sim.t0) for k in C.FIELD_MACHINES if k not in drop}    # drop=('sprayer',): the machine is not owned
+    snap = None
+    for d in range(days):
+        for s in sim.sessions:
+            t = T_BASE + d * DAY + s
+            sim.settle(t)
+            sim.pay_debt(t)
+            sim.fields_visit(t)
+        if d + 1 == warmup:
+            snap = (fields_net_total(sim), Counter(sim.fs))
+    (coins1, xp1), fs1 = fields_net_total(sim), sim.fs
+    (coins0, xp0), fs0 = snap
+    span = days - warmup
+    ha = spec['ha']
+    fuel, seeds, repair = (fs1[k] - fs0[k] for k in ('fuel', 'seeds', 'repair'))
+    upkeep = C.FIELD_UPKEEP * ha
+    net = (coins1 - coins0) / span
+    ops = {k: (fs1['ops_' + k] - fs0['ops_' + k]) / span for k in ('cultivate', 'sow', 'spray', 'harvest')}
+    return dict(step=step, ha=ha, level=spec['level'], cost=spec['cost'], coins=net, xp=(xp1 - xp0) / span, upkeep=upkeep,
+                net=net - upkeep, fuel=fuel / span, seeds=seeds / span, repair=repair / span, ops=ops,
+                cycle_days=1 / max(1e-9, ops['harvest']),
+                q={op: sum(v) / len(v) for op, v in sim.fs_q.items() if v})
+
+
+def payback_days(capex, per_day):
+    return capex / per_day if per_day > 0 else math.inf
+
+
+def field_payback_report(profiles=('active', 'casual', 'online'), modes=('manual', 'auto'), days=70, **model):
+    """Table: payback of every FIELD_STEP (+ the four tier-1 machines for the first one) per profile and player model."""
+    machines = sum(m['costs'][0] for m in C.FIELD_MACHINES.values())
+    out = [f'FIELD PAYBACK (isolated field, rules={C.FIELD_RULES}, upkeep {C.FIELD_UPKEEP}/ha/day, fuel {C.FIELD_FUEL}/ha/op, tier-1 machines {machines} '
+           f'in total, XP counted at 4 coins in the last column)']
+    out.append(f'{"profile":8} {"mode":7} {"step":>4} {"ha":>2} {"L":>3} {"price":>8} {"cycle,d":>7} {"coins/d":>8} {"upkeep":>7} {"net/d":>8} {"XP/d":>6} '
+               f'{"payback d":>10} {"incl.mach":>10} {"with XP":>8}')
+    for name in profiles:
+        for mode in modes:
+            for step in range(len(C.FIELD_STEPS)):
+                r = field_payback_run(name, mode, step, days, **model)
+                extra = machines if step == 0 else 0
+                net_xp = r['net'] + 4 * r['xp']
+                out.append(f'{name:8} {mode:7} {step:>4} {r["ha"]:>2} {r["level"]:>3} {r["cost"]:>8} {r["cycle_days"]:>7.2f} {r["coins"]:>8.0f} '
+                           f'{r["upkeep"]:>7} {r["net"]:>8.0f} {r["xp"]:>6.0f} {payback_days(r["cost"], r["net"]):>10.0f} '
+                           f'{payback_days(r["cost"] + extra, r["net"]):>10.0f} {payback_days(r["cost"] + extra, net_xp):>8.0f}')
+    return '\n'.join(out)
+
+
+class overrides:
+    """Context manager: change catalog numbers for this process only and restore them afterwards (simulation only, never a game change)."""
+
+    def __init__(self, upkeep=None, steps=None, machines=None, widths=None, fuel=None, land=None):
+        self.upkeep, self.steps, self.machines, self.widths, self.fuel, self.land = upkeep, steps, machines, widths, fuel, land
+
+    def __enter__(self):
+        from qw_farm import upkeep_config as UC
+        self.saved = dict(upkeep=(C.FIELD_UPKEEP, UC.FIELD_UPKEEP), fuel=(C.FIELD_FUEL, FD.FIELD_FUEL),
+                          steps=[dict(x) for x in C.FIELD_STEPS],
+                          machines={k: tuple(m['costs']) for k, m in C.FIELD_MACHINES.items()},
+                          land=[dict(x) for x in C.LAND_STEPS])
+        if self.upkeep is not None:
+            C.FIELD_UPKEEP = UC.FIELD_UPKEEP = FD.FIELD_UPKEEP = self.upkeep
+        if self.fuel is not None:
+            C.FIELD_FUEL = FD.FIELD_FUEL = self.fuel
+        if self.steps is not None:
+            assert len(self.steps) == len(C.FIELD_STEPS)
+            for spec, cost in zip(C.FIELD_STEPS, self.steps):
+                spec['cost'] = cost
+        if self.machines is not None or self.widths is not None:
+            for index, (k, m) in enumerate(C.FIELD_MACHINES.items()):
+                first = m['costs'][0] if self.machines is None else self.machines[index]
+                w2, w3 = (m['costs'][1], m['costs'][2]) if self.widths is None else self.widths
+                m['costs'] = (first, w2, w3)
+        for size, cost in (self.land or {}).items():
+            step = next(x for x in C.LAND_STEPS if x['size'] == size)
+            step['cost'] = cost
+        return self
+
+    def __exit__(self, *exc):
+        from qw_farm import upkeep_config as UC
+        C.FIELD_UPKEEP, UC.FIELD_UPKEEP = self.saved['upkeep']
+        FD.FIELD_UPKEEP = self.saved['upkeep'][0]
+        C.FIELD_FUEL, FD.FIELD_FUEL = self.saved['fuel']
+        for spec, old in zip(C.FIELD_STEPS, self.saved['steps']):
+            spec.update(old)
+        for k, costs in self.saved['machines'].items():
+            C.FIELD_MACHINES[k]['costs'] = costs
+        for spec, old in zip(C.LAND_STEPS, self.saved['land']):
+            spec.update(old)
+        return False
+
+
+def parse_ints(text, count=None):
+    values = tuple(int(x) for x in text.split(','))
+    if count is not None and len(values) != count:
+        raise argparse.ArgumentTypeError(f'expected {count} comma-separated integers')
+    return values
+
+
+def parse_land(text):
+    out = {}
+    for part in text.split(','):
+        size, cost = part.split(':')
+        out[int(size)] = int(cost)
+    return out
 
 
 def craft_capacity_benchmark(master_count, workshop_count=23, action_quota=None, shift_cost=None):
@@ -1282,10 +1485,28 @@ def main():
     ap.add_argument('--sim-demand-actions', type=int, help='simulation-only fixed action budget used by demand planning; isolates demand from shift quota overrides')
     ap.add_argument('--visit-queues', action='store_true', help='historical policy: only queue recipes that finish by the next visit')
     ap.add_argument('--no-fields', action='store_true', help='baseline: the player never buys a field')
+    ap.add_argument('--field-mode', choices=FIELD_MODES, help='who drives the field machines (default: auto; the skilled profile uses reference)')
+    ap.add_argument('--field-q', type=int, help='manual/max model: raw quality in permille before bumps and melt (default 1100 / 1250)')
+    ap.add_argument('--field-hits', type=int, help='manual/max model: bumps per operation (-3 condition, 15 coins each; default 1 / 0)')
+    ap.add_argument('--field-elapsed-k', type=int, help='manual/max model: run time as percent of the autopilot time A (default 200 / 100; 250 keeps the bonus, 600 melts it)')
+    ap.add_argument('--field-manual-share', type=int, help='manual/max model: percent of the operations done by hand, the rest by autopilot (default 100)')
+    ap.add_argument('--field-payback', action='store_true', help='measure the payback of every field step in isolation (profiles active/casual/online, manual and auto)')
+    ap.add_argument('--sim-field-upkeep', type=int, help='SIMULATION ONLY: coins per hectare per day')
+    ap.add_argument('--sim-field-fuel', type=int, help='SIMULATION ONLY: coins per hectare per operation')
+    ap.add_argument('--sim-field-steps', type=lambda x: parse_ints(x, len(C.FIELD_STEPS)), help='SIMULATION ONLY: prices of the five field steps')
+    ap.add_argument('--sim-field-machines', type=lambda x: parse_ints(x, len(C.FIELD_MACHINES)), help='SIMULATION ONLY: tier-1 prices (cultivator,seeder,combine,sprayer)')
+    ap.add_argument('--sim-field-widths', type=lambda x: parse_ints(x, 2), help='SIMULATION ONLY: width 2 and width 3 upgrade price of every machine')
+    ap.add_argument('--sim-land', type=parse_land, help='SIMULATION ONLY: land step prices as size:cost,size:cost')
     ap.add_argument('--no-orchard', action='store_true', help='baseline: the player never buys a fruit tree (fruit beds are closed by the catalog)')
     args = ap.parse_args()
     if args.craft_capacity:
         run_craft_capacity()
+        return
+    patch = overrides(args.sim_field_upkeep, args.sim_field_steps, args.sim_field_machines, args.sim_field_widths, args.sim_field_fuel, args.sim_land)
+    if args.field_payback:
+        model = {k: v for k, v in (('q', args.field_q), ('hits', args.field_hits), ('elapsed_k', args.field_elapsed_k), ('share', args.field_manual_share)) if v is not None}
+        with patch:
+            print(field_payback_report(modes=(args.field_mode,) if args.field_mode else ('manual', 'auto'), days=max(args.days, 30), **model))
         return
     if args.sim_manor_actions is not None and not 1 <= args.sim_manor_actions <= 1920:
         ap.error('--sim-manor-actions must be between 1 and 1920')
@@ -1307,9 +1528,11 @@ def main():
             print(f'SIMULATION ONLY: demand planning action budget={args.sim_demand_actions}; product catalog unchanged')
         for name in (PROFILES if args.profile == 'all' else [args.profile]):
             t = time.time()
-            sim = Sim(name, args.days, args.debug, not args.no_fields, not args.no_orchard, helpers,
-                      not args.visit_queues, args.craft_masters, args.sim_demand_actions).run()
-            print(report(sim))
+            with patch:
+                sim = Sim(name, args.days, args.debug, not args.no_fields, not args.no_orchard, helpers,
+                          not args.visit_queues, args.craft_masters, args.sim_demand_actions, args.field_mode, args.field_q,
+                          args.field_hits, args.field_elapsed_k, args.field_manual_share).run()
+                print(report(sim))
             print(f'(simulated in {time.time() - t:.1f}s)\r\n')
     finally:
         C.SHIFTS['manor']['actions'] = original_actions

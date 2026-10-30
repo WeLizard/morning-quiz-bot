@@ -2,6 +2,10 @@
 // (qw_farm/merchant.py, S.me.merchant_view); this module only shows them and sends merchant_buy / merchant_sell
 // (and festival_buy for the fair row, which the festival engine already prices). The cart art is the village layer driven by html[data-merchant].
 const KIND_LABEL={exotic_seed:'Заморские семена',dye:'Краситель',scroll:'Свиток рецепта',curio:'Диковинка',graft:'Прививка',voucher:'Талон сада'};
+// Rarity of a stall place (server: slot.rarity). Common places carry no mark.
+export const RARITY_LABEL={uncommon:'Необычное',rare:'Редкое',lot_day:'Лот дня'};
+export const rarityLabel=r=>RARITY_LABEL[r]||'';
+export const STALE_TEXT='Сорока обновила прилавок, а ты смотрел старый. Мы уже загрузили свежий: выбери товар ещё раз.';
 const WEEKDAY=new Intl.DateTimeFormat('ru-RU',{weekday:'long',timeZone:'Europe/Moscow'});
 let shopTab='shelf';
 export const setTab=tab=>{shopTab=tab==='sell'?'sell':'shelf';};
@@ -24,6 +28,44 @@ export function duration(seconds){
  if(h<24)return m%60?`${h} ч ${m%60} мин`:`${h} ч`;
  const d=Math.floor(h/24);
  return h%24?`${d} д ${h%24} ч`:`${d} д`;
+}
+// The «Сорока приехала» toast is keyed by the base visit: a mid-visit restock changes visit_id (the command token) but not this key.
+export const arrivalKey=v=>String(v?.base_visit_id||v?.visit_id||'');
+// Restock line. The server sends next_restock_at only while the restock is ahead; after it the line says so once the client has seen
+// the restock coming in this visit (or the local clock passed it). A visit without a restock (old visit, away) has no line.
+const restockSeen={base:''};
+export const resetRestockMemory=()=>{restockSeen.base='';};
+export function restockLine(v,now){
+ if(!present(v))return null;
+ const at=v.next_restock_at,base=arrivalKey(v);
+ if(typeof at==='number'&&Number.isFinite(at)){
+  restockSeen.base=base;
+  return at>now?{at,text:restockText(at,now)}:{at,text:RESTOCKED};
+ }
+ return restockSeen.base===base?{at:null,text:RESTOCKED}:null;
+}
+export const RESTOCKED='Сорока подвезла товар';
+export function restockText(at,now){
+ const left=at-now;
+ if(left<=0)return RESTOCKED;
+ return left<60?'Подвоз совсем скоро':`Подвоз через ${duration(left)}`;
+}
+// One light timer per page: it rewrites only the text of [data-merchant-restock] once a minute and stops when the line is gone.
+let restockTimer=null,restockNow=null;
+export function tickRestock(root=globalThis.document,now=restockNow?.()){
+ const nodes=[...(root?.querySelectorAll?.('[data-merchant-restock]')||[])].filter(n=>n.isConnected!==false);
+ for(const n of nodes){
+  const at=Number(n.dataset.merchantRestock);
+  if(!Number.isFinite(at))continue;
+  const text=restockText(at,now);
+  if(n.textContent!==text)n.textContent=text;
+ }
+ return nodes.length;
+}
+function watchRestock(nowFn){
+ restockNow=nowFn;
+ if(restockTimer||typeof setInterval!=='function'||!globalThis.document)return;
+ restockTimer=setInterval(()=>{if(!tickRestock()){clearInterval(restockTimer);restockTimer=null;}},60000);
 }
 export function statusText(v,now){
  if(!v)return 'Данные Сороки пока недоступны.';
@@ -66,13 +108,22 @@ export const BOUND_NOTE='Вещь от Сороки — только для ва
 export const isBound=(catalog,id)=>!!catalog?.items?.[id]?.bound;
 export function sellQty(w){return w?Math.max(0,Math.min(w.have,w.room)):0;}
 
+function rarityMark(h,s){
+ const label=rarityLabel(s.rarity);
+ if(!label)return null;
+ const mark=h.el('span',label,`mag-rarity mag-rarity-${s.rarity}`);
+ mark.dataset.rarity=s.rarity;
+ return mark;
+}
 function itemMark(h,id){const mark=h.el('span',null,'good');mark.append(h.icon(id));return mark;}
 function slotIcon(s){return s.id;}
 
 function slotRow(s,h){
  const {el,button,coins,fmt,command}=h,row=el('div',null,`mag-slot ${s.status}`);
  const info=el('div');
- info.append(itemMark(h,slotIcon(s)),el('strong',s.name),el('small',`${KIND_LABEL[s.kind]||s.kind}${s.series?` · «${s.series}»`:''} · ${s.note}`),
+ info.append(itemMark(h,slotIcon(s)),el('strong',s.name));
+ const rare=rarityMark(h,s);if(rare)info.append(rare);
+ info.append(el('small',`${KIND_LABEL[s.kind]||s.kind}${s.series?` · «${s.series}»`:''} · ${s.note}`),
              el('small',`Осталось ${s.left} из ${s.limit+(s.extra||0)}${s.qty>1?` · в пакете ×${s.qty}`:''}`));
  const block=slotBlock(s,coins());
  const actions=el('div',null,'qw-btn-stack');
@@ -152,7 +203,15 @@ export function renderShop(p,v,h){
  const head=card('Сорока-коробейница',present(v)?(v.kind==='fair'?'Приехала на ярмарку':'Приехала на рынок'):'Сейчас в разъездах','coin');
  head.classList.add('mag-head');
  head.append(el('p',statusText(v,now),'reward'));
- if(present(v))head.append(el('p','Тр-р-р, налетай! Такого в ваших краях не растёт.','village-dialogue'));
+ if(present(v)){
+  const line=restockLine(v,now);
+  if(line){
+   const r=el('p',line.text,'mag-restock');
+   if(line.at!=null&&line.at>now){r.dataset.merchantRestock=String(line.at);watchRestock(h.now);}
+   head.append(r);
+  }
+  head.append(el('p','Тр-р-р, налетай! Такого в ваших краях не растёт.','village-dialogue'));
+ }
  p.append(head);
  if(!present(v)){
   if(v.teaser)note(`Завтра Сорока обещала привезти: ${v.teaser}.`,head);

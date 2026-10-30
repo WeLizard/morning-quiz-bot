@@ -149,13 +149,13 @@ def test_plans_are_deterministic_and_consistent(route):
                 sp = tg.SPECIES[fish['id']]
                 assert sp['g'][0] <= fish['g'] <= sp['g'][1] and len(fish['pulls']) == tg.SEGMENTS
                 assert all(any(lo <= p <= hi and tl <= t <= th for lo, hi, tl, th in sp['segs']) for t, p in fish['pulls'])
-    else:
+    elif a['kind'] == 'forage':
         assert plan['gold'] >= 1 and len(plan['traps']) == tg.TRAPS.get(route, tg.DEFAULT_TRAPS)
         assert not set(plan['traps']) & {int(k) for k in plan['items']} and plan['start'] not in plan['traps']
         assert tg.forage_score(plan, best_walk(plan)) is not None
 
 
-@pytest.mark.parametrize('route', [r for r in ROUTES if r not in tg.FISH_ROUTES])
+@pytest.mark.parametrize('route', [r for r in ROUTES if r not in tg.FISH_ROUTES and not ROUTES[r].get('game')])
 @pytest.mark.parametrize('seed', ['a', 'b', 'c', 'd', 'e'])
 def test_reference_walk_is_reachable_and_perfect(route, seed):
     plan, moves = tg.make_forage_plan(seed, ROUTES[route], with_path=True)

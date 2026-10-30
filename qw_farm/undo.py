@@ -11,11 +11,20 @@
   (coins for the route, goods taken along) is returned in full; later the player comes back early with
   ``floor(output * elapsed_share * LATE_LOOT_PCT / 100)`` of every item, no XP, no secret, and what was taken is not returned.
 
+* Demolishing an empty building, decor, road or bed (E27 D1, owner decision 2026-10-29): in the first ``UNDO_WINDOW`` seconds after it was
+  built everything comes back (the coins paid and the goods of its upgrades, no wood); later ``LATE_REFUND_PCT`` percent of the coins
+  (the price recorded in ``paid``, the catalog price for older objects without a record, 0 for a caravan gift and for the starter
+  objects of ``new_farm``, plus the coin price of the upgrades) and of the upgrade goods (rounded down), and the wood.  The 5 build XP and
+  the build counter are taken back on EVERY demolition of an object that recorded them (``build_xp``; never below the level start), so a
+  build-and-clear cycle costs coins and gives no XP.
+* Uprooting a tree after the window (E27 D2): ``LATE_REFUND_PCT`` percent of the sapling price (and the wood) instead of wood only.
+
 The starter gift is restored together with the refund (``gift`` is the part of the price that was paid from it), so digging up
 never turns the one-time gift into freely spendable coins.
 """
 from domain.address import g as address_g
-from .catalog import CROPS, ROUTES, ITEMS, RECIPES, trip_kind
+from .catalog import CROPS, ROUTES, ITEMS, RECIPES, BUILDINGS, UPGRADES, trip_kind, upgrade_coins, effective_level
+from . import progression
 from .domain import need, inventory, event
 
 UNDO_WINDOW = 60
@@ -72,6 +81,86 @@ def dig_up(farm, obj, now):
     if full:
         return f'{name}: посадка отменена, семена возвращены полностью: +{refund} монет.'
     return f'{name}: выкопано. Вернулась половина цены семян: +{refund} монет, опыта нет.'
+
+
+STARTER_IDS = frozenset([*(f'building_{i}' for i in range(4)), *(f'plot_{i}' for i in range(6))])   # what ``domain.new_farm`` hands out
+
+
+def is_starter(obj):
+    """An object that came with the farm: ``new_farm`` gives it an id ``building_N`` / ``plot_N`` and no record of a price (bought ones
+    carry ``paid`` since E27, and earlier ones got a command id, never ``building_N`` / ``plot_N``)."""
+    return obj.get('id') in STARTER_IDS and 'paid' not in obj
+
+
+def building_invested(obj):
+    """Coins put into a placed object: what was paid for it (recorded on buildings bought since E27; a building bought earlier
+    has no record and counts at the current catalog price; a bed costs 35) plus the coin price of its upgrades. Decor (roads included)
+    and beds are refunded like buildings; a starter object counts only its upgrades, a caravan gift (``paid == 0``) nothing."""
+    spec = BUILDINGS.get(obj['type'])
+    if obj['type'] != 'plot' and not spec:
+        return 0
+    if is_starter(obj):
+        base = 0
+    elif type(obj.get('paid')) is int and obj['paid'] >= 0:
+        base = obj['paid']
+    else:
+        base = 35 if obj['type'] == 'plot' else spec['cost']
+    upgrades = 0
+    if spec and not spec.get('decor'):
+        upgrades = sum(upgrade_coins(obj['type'], to) for to in range(2, effective_level(obj.get('level')) + 1))
+    return base + upgrades
+
+
+def upgrade_materials(obj):
+    """Goods spent on the upgrades of this object up to its level (the sum of ``UPGRADES[n]['items']``)."""
+    spec = BUILDINGS.get(obj['type'])
+    out = {}
+    if (spec and not spec.get('decor')) or obj['type'] == 'barn':
+        for to in range(2, effective_level(obj.get('level')) + 1):
+            for item, qty in UPGRADES[to]['items'].items():
+                out[item] = out.get(item, 0) + qty
+    return out
+
+
+def demolish_refund(obj, now):
+    """(coins, goods, full?) given back for demolishing this empty object now: everything inside the first ``UNDO_WINDOW`` seconds after it
+    was built (a mis-tap), later ``LATE_REFUND_PCT`` percent of the coins and of the upgrade goods (rounded down)."""
+    coins, goods = building_invested(obj), upgrade_materials(obj)
+    if type(obj.get('built_at')) is int and now - obj['built_at'] <= UNDO_WINDOW:
+        return coins, goods, True
+    return (coins * LATE_REFUND_PCT // 100,
+            {k: q * LATE_REFUND_PCT // 100 for k, q in goods.items() if q * LATE_REFUND_PCT // 100 > 0}, False)
+
+
+def demolish(farm, obj, now):
+    """Remove an empty building, decor or bed (the caller has checked that nothing is growing, cooking or living in it)."""
+    building = BUILDINGS.get(obj['type'])
+    name = building['name'] if building else 'Объект'
+    refund, goods, full = demolish_refund(obj, now)
+    farm['coins'] += refund
+    restore_gift(farm, obj.get('gift', 0), refund)
+    if goods:
+        inventory(farm, goods)
+    xp = obj.get('build_xp')
+    if type(xp) is int:        # always, in the window and after it: the 5 XP of building must not be farmed (never below the level start)
+        if xp > 0:
+            progression.revoke_xp(farm, xp)
+        if farm['stats'].get('builds', 0) > 0:
+            farm['stats']['builds'] -= 1
+    wood = 0
+    if not full and building and not building.get('decor'):
+        wood = 4 + effective_level(obj.get('level')) - 1
+        inventory(farm, {'wood': wood})
+    farm['objects'].remove(obj)
+    back = []
+    if refund:
+        back.append(f'+{refund} монет')
+    back += [f'{ITEMS[k]["name"] if k in ITEMS else k} ×{q}' for k, q in goods.items()]
+    if wood:
+        back.append(f'древесина ×{wood}')
+    if full:
+        return f'{name}: убрано в первую минуту, вложенное вернулось полностью' + (': ' + ', '.join(back) if back else '') + '.'
+    return f'{name}: разобрано. Вернулась половина вложенного' + (': ' + ', '.join(back) if back else ', ничего не вернулось') + '.'
 
 
 def job_refund(job, now):

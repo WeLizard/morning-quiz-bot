@@ -33,8 +33,8 @@ def demolish(state, obj, revision=None, other=None):
     }, NOW + 1, str(uuid4()))
 
 
-@pytest.mark.parametrize('kind', ['road', 'flowerbed', 'plot'])
-def test_road_decor_and_empty_plot_are_removed_without_refund(kind):
+@pytest.mark.parametrize(('kind', 'coins'), [('road', 2), ('flowerbed', 17), ('plot', 17)])   # E27 D1: half of the catalog price (5 / 35 / 35)
+def test_road_decor_and_empty_plot_are_removed_with_half_of_the_price_and_no_wood(kind, coins):
     state = farm()
     obj = put(state, kind, w=1 if kind == 'road' else 2,
               h=1 if kind == 'road' else 2, crop=None if kind == 'plot' else None)
@@ -45,11 +45,11 @@ def test_road_decor_and_empty_plot_are_removed_without_refund(kind):
 
     assert obj not in state['objects']
     assert state['inventory'].get('wood', 0) == before_wood
-    assert (state['coins'], state['xp']) == (before_coins, before_xp)
+    assert (state['coins'], state['xp']) == (before_coins + coins, before_xp)
 
 
-@pytest.mark.parametrize(('level', 'wood'), [(1, 4), (3, 6)])
-def test_functional_building_returns_level_scaled_wood_without_rewards(level, wood):
+@pytest.mark.parametrize(('level', 'wood', 'coins'), [(1, 4, 50), (3, 6, 400)])   # E27 D1: half of 100 (+ 200 + 500 of the upgrades)
+def test_functional_building_returns_level_scaled_wood_and_half_of_the_investment(level, wood, coins):
     state = farm()
     obj = put(state, 'mill', level=level)
     before_coins, before_xp = state['coins'], state['xp']
@@ -59,7 +59,7 @@ def test_functional_building_returns_level_scaled_wood_without_rewards(level, wo
 
     assert obj not in state['objects']
     assert state['inventory']['wood'] == before_wood + wood
-    assert (state['coins'], state['xp']) == (before_coins, before_xp)
+    assert (state['coins'], state['xp']) == (before_coins + coins, before_xp)
     # A new object can occupy the demolished building's footprint.
     apply(state, state, 'build', {'type': 'plot', 'x': obj['x'], 'y': obj['y']},
           NOW + 1, str(uuid4()))

@@ -6,6 +6,7 @@
  * Fishing v2 (docs/tasks/FARM_TRIP_MINIGAMES.md §10): the fight is a 50 ms integer simulation over the fish's pull schedule.
  */
 import {smallAnimal} from './scene_expansion.js';
+import {drawFellScene,fellVerdict,FELL_ANIM} from './lumberjack_art.js';
 export const FISH2={v:2,tick:50,fly:600,land_pause:1000,scare_pause:600,toggle_gap:40,max_toggles:200,rare_acc:800,
  fight:{d0:600,d_max:1000,t0:450,hold_base:200,hold_k:15,rel_k:5,up:5,down:6,reel:9,drag:8,run:4,tire_hold:4,tire_rel:1,floor:500,snap:1000,slack:60,slack_ticks:24,ticks:400},
  species:{crucian:{name:'Карась',rare:false,par:90},perch:{name:'Окунь',rare:false,par:150},pike:{name:'Щука',rare:false,par:200},
@@ -13,7 +14,10 @@ export const FISH2={v:2,tick:50,fly:600,land_pause:1000,scare_pause:600,toggle_g
  baits:{bread:{wait:70,rare:0,routes:null},corn:{wait:100,rare:40,routes:['pond_bank','lake_inlet']},crucian:{wait:90,rare:50,routes:['river_bend']}},
  routes:{pond_bank:{casts:4,window:900,rare:'golden_crucian',common:['crucian']},lake_inlet:{casts:4,window:800,rare:'tench',common:['perch','crucian']},
   river_bend:{casts:4,window:700,rare:'catfish',common:['pike','perch']}}};
-export const RULES={ttl:900,bonus:250,mark_period:1600,dead_zone:60,acc_span:300,react:150,first_aim_ms:500,grid:6,trap_cost:2,step_cs:20,fish2:FISH2};
+/** Felling "Валка" (trip_games.py FELLING, public_rules()['fell']): every number the replay needs. */
+export const FELL={v:1,trees:5,period:1400,dead:50,tick:50,cut_delay:250,cut_rate:25,stall_rate:5,heat_up:20,pinch_mult:4,cool:40,heat_max:1000,pinch_ms:400,
+ hinge_pct:80,max_ticks:300,fall_ms:1200,tree_pause:400,time_pen_max:400,premature_pen:300,stall_cap:250,toggle_gap:40,max_toggles:80,first_aim_ms:500,bonus:600};
+export const RULES={ttl:900,bonus:250,fell:FELL,mark_period:1600,dead_zone:60,acc_span:300,react:150,first_aim_ms:500,grid:6,trap_cost:2,step_cs:20,fish2:FISH2};
 const DIRS={U:[0,-1],D:[0,1],L:[-1,0],R:[1,0]};
 const idiv=(a,b)=>(a-a%b)/b;                       // exact integer division for non-negative integers
 export const Q_AUTO=1000,MAX_MS=600000;
@@ -119,6 +123,68 @@ export function walk(plan,path){
  return st;
 }
 export function forageScore(plan,path){const st=walk(plan,path);return st?Math.min(1000,idiv(1000*st.got,Math.max(1,plan.gold))):null;}
+/* ---------------------------------------------------------------- felling pure rules (trip_games.py fell_*) */
+const FL=rules=>(rules&&rules.fell)||FELL;
+export const fellPinched=(tree,t,rules=RULES)=>tree.pinches.some(p=>p<=t&&t<p+FL(rules).pinch_ms);
+export const fellHinge=(tree,rules=RULES)=>idiv(tree.girth*FL(rules).hinge_pct,100);
+/** Accuracy of the notch set at aim_ms: 1000 inside the dead zone of the gap centre, 0 at the gap edge and beyond. */
+export function fellAccuracy(aim,tree,rules=RULES,period=FL(rules).period){
+ const f=FL(rules),d=Math.abs(markPosition(aim,tree.phase,rules,period)-tree.gap_center);
+ return d<=f.dead?1000:Math.max(0,1000-idiv((d-f.dead)*1000,Math.max(1,tree.gap_width-f.dead)));
+}
+export const fellStart=()=>({k:0,prog:0,heat:0,stalled:false,hold:true,j:1,result:''});
+/** One 50 ms tick of the saw. live=true: a released saw with no later toggle yet is not a timeout (the player may press again). */
+export function fellStep(st,tree,start,toggles,live,rules=RULES){
+ const f=FL(rules),t=start+st.k*f.tick;
+ while(st.j<toggles.length&&toggles[st.j]<=t){st.hold=!st.hold;st.j++;}
+ if(!st.hold&&st.prog>=fellHinge(tree,rules))st.result='felled';
+ else if(st.k>=f.max_ticks||(!live&&!st.hold&&st.j>=toggles.length))st.result='timeout';
+ else if(st.hold){
+  if(st.stalled)st.prog+=f.stall_rate;
+  else{st.prog+=f.cut_rate;st.heat+=f.heat_up*(fellPinched(tree,st.k*f.tick,rules)?f.pinch_mult:1);if(st.heat>=f.heat_max){st.heat=f.heat_max;st.stalled=true;}}
+  st.k++;if(st.prog>=tree.girth)st.result='cut_through';
+ }else{if(!st.stalled)st.heat=Math.max(0,st.heat-f.cool);st.k++;}
+ return st;
+}
+/** One tree (trip_games.fell_tree): {acc, cut, points, result: felled|cut_through|timeout|idle, stalled, ticks, end, free}. */
+export function fellTree(tree,aim,toggles,rules=RULES){
+ const f=FL(rules),acc=fellAccuracy(aim,tree,rules,f.period);
+ if(!toggles.length){const end=aim+f.cut_delay;return {acc,cut:0,points:idiv(4*acc,10),result:'idle',stalled:false,ticks:0,end,free:end+f.tree_pause};}
+ const start=toggles[0],st=fellStart();
+ while(!st.result)fellStep(st,tree,start,toggles,false,rules);
+ let cut=1000-Math.min(f.time_pen_max,idiv(Math.max(0,st.k-tree.par)*f.time_pen_max,tree.par));
+ if(st.stalled)cut=Math.min(cut,f.stall_cap);
+ if(st.result==='cut_through')cut-=f.premature_pen;
+ if(st.result==='timeout')cut=0;
+ cut=Math.max(0,cut);
+ const end=start+st.k*f.tick;
+ return {acc,cut,points:idiv(4*acc+6*cut,10),result:st.result,stalled:st.stalled,ticks:st.k,end,free:end+f.fall_ms+f.tree_pause};
+}
+/** Replay of a felling log (trip_games.fell_result) or null when it breaks the rules. */
+export function fellResult(plan,log,rules=RULES){
+ const f=FL(rules);
+ if(!log||typeof log!=='object'||Array.isArray(log)||Object.keys(log).sort().join()!=='trees,v'||log.v!==f.v)return null;
+ const entries=log.trees;
+ if(!Array.isArray(entries)||entries.length!==plan.trees.length)return null;
+ let total=0,free=f.first_aim_ms,end=0;const out=[];
+ for(let i=0;i<entries.length;i++){
+  const e=entries[i];if(!Array.isArray(e)||e.length!==2)return null;
+  const [aim,toggles]=e;
+  if(!ms(aim,free)||!Array.isArray(toggles)||toggles.length>f.max_toggles)return null;
+  let prev=aim+f.cut_delay-f.toggle_gap;
+  for(const t of toggles){if(!(ms(t)&&t>=prev+f.toggle_gap))return null;prev=t;}
+  const r=fellTree(plan.trees[i],aim,toggles,rules);
+  total+=r.points;free=r.free;end=r.end;out.push(r);
+ }
+ return {score:idiv(total,out.length),end,trees:out};
+}
+export function fellScore(plan,log,rules=RULES){const r=fellResult(plan,log,rules);return r?r.score:null;}
+export const fellQuality=(score,rules=RULES)=>Q_AUTO+idiv(FL(rules).bonus*score,1000);
+/** Cut positions (permille of the girth) where each pinch window opens for a player who rests in every earlier pinch. */
+export function pinchMarks(tree,rules=RULES){
+ const f=FL(rules);
+ return tree.pinches.map(p=>{let prog=0;for(let k=0;k*f.tick<p;k++)if(!fellPinched(tree,k*f.tick,rules))prog+=f.cut_rate;return Math.min(1000,idiv(prog*1000,tree.girth));});
+}
 export const quality=(score,rules=RULES)=>Q_AUTO+idiv(rules.bonus*score,1000);
 export function scaledOutputs(outputs,q){const r={};for(const [k,v] of Object.entries(outputs))r[k]=Math.max(v,idiv(v*q+500,1000));return r;}
 export function finalOutputs(trip){return trip.game&&trip.game.state==='done'?scaledOutputs(trip.outputs,trip.game.q):{...trip.outputs};}
@@ -244,6 +310,7 @@ const FORAGE_HELP='Тапни соседнюю клетку, чтобы сдел
  * Returns {close(), requestClose()}.
  */
 export function openTripGame(opts){
+ if(opts.trip.game.kind==='fell')return openFellGame(opts);
  const trip=opts.trip,game=trip.game,plan=game.plan,fish=game.kind==='fish',rules={...RULES,...(opts.rules||{})},f2=F2(rules);
  if(fish&&plan.v!==f2.v)throw new Error('old fishing plan');
  const name=opts.itemName||(id=>id),speciesName=id=>f2.species[id]?.name||id;
@@ -672,6 +739,236 @@ export function openTripGame(opts){
   g.fillStyle=used>=plan.budget?'#d9805c':'#4f9d5d';rrect(g,lx,ly+plan.h*cell+8,bw*(1-used/plan.budget),8,4);g.fill();
  }
 
+ layout();paint();
+ window.addEventListener('resize',layout);
+ const resizeObs=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(!closed)layout();}):null;resizeObs?.observe(stage);
+ raf=requestAnimationFrame(draw);
+ layoutTimer=setTimeout(()=>{layoutTimer=0;if(!closed)layout();},60);
+ showIntro();
+ return {close:finishClose,requestClose:backClose};
+}
+
+/* ---------------------------------------------------------------- "Валка": the felling minigame (docs/tasks/FARM_LUMBERJACK.md)
+ * Five trees. Press = set the notch where the mark points; then hold = saw, release = let the chain cool. The 50 ms simulation below is the
+ * server's own (fellStep / fellTree); the log {v:1, trees:[[aim_ms,[toggle_ms,...]],...]} is replayed by the server, which decides the reward. */
+const FELL_HELP='Жми, когда метка в просвете между соседними елями — туда ляжет дерево. Потом держи «Пилить»: цепь греется, в зажиме — сильнее; перегреешь — пила заглохнет. Отпусти после зелёной отметки — дерево пойдёт.';
+const isContrast=()=>document.documentElement.getAttribute('data-qw-contrast')==='1';
+function openFellGame(opts){
+ const trip=opts.trip,game=trip.game,plan=game.plan,rules={...RULES,...(opts.rules||{})},f=FL(rules),trees=plan.trees,N=trees.length,period=plan.mark_period||f.period;
+ if(plan.v!==f.v)throw new Error('old felling plan');
+ const name=opts.itemName||(id=>id),prev=document.activeElement,inerted=[];
+ let closed=false,done=false,sending=false,started=false,raf=0,confirming=false,srTimer=0,t0=0,layoutTimer=0;
+ const title=`Валка: ${opts.route?.name||'Делянка'}`,root=node('div','fg-overlay tg-overlay lj-game');root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-label',title);
+ const top=node('div','fg-top'),head=node('strong','',title),timer=node('span','fg-timer'),close=btn('×','fg-close',()=>requestClose());
+ close.setAttribute('aria-label','Закрыть игру');timer.title='Осталось на игру';top.append(head,timer,close);
+ const stage=node('div','fg-stage'),canvas=node('canvas','fg-canvas');canvas.tabIndex=0;stage.append(canvas);
+ const hud=node('div','fg-hud'),forecast=node('div','fg-forecast'),stat=node('div','fg-stat'),help=node('p','fg-help',FELL_HELP),status=node('div','fg-status');
+ status.setAttribute('role','status');hud.append(forecast,stat,help,status);
+ const sr=node('div','fg-sr');sr.setAttribute('role','status');sr.setAttribute('aria-live','polite');
+ const controls=node('div','fg-controls tg-controls'),act=btn('','fg-act primary tg-big'),skip=btn('Без игры','fg-act',()=>requestClose());
+ skip.title='Закрыть игру: вылазка продолжится как обычно, без бонуса (можно вернуться к игре, пока не вышло время)';
+ controls.append(act,skip);root.append(top,stage,hud,controls,sr);document.body.append(root);document.body.classList.add('fg-open');
+ for(const el of [...document.body.children])if(el!==root&&!el.inert){el.inert=true;inerted.push(el);}
+ let size={w:300,h:300,dpr:1};
+ const say=(text,bad=false)=>{status.textContent=text;status.classList.toggle('bad',bad);};
+ const announce=text=>{clearTimeout(srTimer);srTimer=setTimeout(()=>{srTimer=0;if(!closed)sr.textContent=text;},500);};
+ const tNow=()=>performance.now()-t0;
+ const left=()=>Number.isFinite(game.expires_at)&&typeof opts.serverNow==='function'?game.expires_at-opts.serverNow():rules.ttl;
+ const deadline=performance.now()+Math.max(0,left())*1000;
+ const buzz=n=>{try{if(!reducedMotion())navigator.vibrate?.(n);}catch{}};
+ const marks=trees.map(t=>pinchMarks(t,rules));
+
+ /* ---- state of the plot */
+ const log=[],results=[];
+ let ti=0,phase='aim',freeAt=f.first_aim_ms,aimAt=0,acc=0,toggles=[],holding=false,sim=null,start=0,last=null,nextAt=0,statusKey='';
+ const tree=()=>trees[Math.min(ti,N-1)];
+ const girthPct=()=>sim?Math.min(1000,idiv(sim.prog*1000,tree().girth)):0;
+
+ function layout(){
+  if(closed)return;
+  const r=stage.getBoundingClientRect(),w=Math.max(120,Math.floor(r.width)),h=Math.max(120,Math.floor(r.height));
+  const dpr=Math.min(2,window.devicePixelRatio||1,Math.sqrt(4e6/(w*h)));
+  const pw=Math.floor(w*dpr),ph=Math.floor(h*dpr);if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;
+  size={w,h,dpr};
+ }
+ /* ---- flow: aim -> saw (first press >= cut_delay after the aim) -> the tree falls -> verdict -> next tree */
+ function toggle(){
+  if(toggles.length>=f.max_toggles)return false;
+  // never earlier than a tick already simulated, never closer than the human gap to the previous toggle
+  toggles.push(Math.max(Math.ceil(tNow()),toggles[toggles.length-1]+f.toggle_gap,start+(sim.k-1)*f.tick+1));
+  return true;
+ }
+ function advance(t){
+  while(sim&&!sim.result&&start+sim.k*f.tick<=t)fellStep(sim,tree(),start,toggles,true,rules);
+  if(sim&&sim.result&&phase==='saw')endTree();
+ }
+ function endTree(){
+  const r=fellTree(tree(),aimAt,toggles,rules);
+  log.push([aimAt,toggles.slice()]);results.push(r);last=r;holding=false;phase='done';
+  nextAt=Math.max(r.free,r.end+FELL_ANIM.fall_ms+FELL_ANIM.result_ms);
+  const v=fellVerdict(r);buzz(v.tone==='good'?[20,40,20]:30);announce(v.text);paint();
+ }
+ function press(){
+  if(done||sending||confirming||!started)return;
+  const t=Math.round(tNow());
+  if(phase==='aim'){
+   if(t<freeAt)return;
+   aimAt=t;acc=fellAccuracy(t,tree(),rules,period);toggles=[];holding=false;sim=null;phase='saw';buzz(10);announce('Подпил поставлен.');paint();
+  }else if(phase==='saw'){
+   if(!sim){if(t<aimAt+f.cut_delay)return;toggles=[t];start=t;sim=fellStart();holding=true;buzz(10);paint();}
+   else if(!holding){advance(tNow());if(phase==='saw'&&toggle()){holding=true;paint();}}
+  }
+ }
+ function release(){
+  if(phase==='saw'&&sim&&holding){advance(tNow());holding=false;if(phase==='saw'&&!toggle())holding=true;paint();}
+ }
+ function nextTree(){
+  ti++;
+  if(ti>=N){phase='over';paint();submit({v:f.v,trees:log});return;}
+  phase='aim';freeAt=last.free;sim=null;toggles=[];holding=false;paint();
+ }
+ function tick(t){
+  if(phase==='saw')advance(t);
+  if(phase==='done'&&t>=nextAt)nextTree();
+ }
+
+ /* ---- texts and the button */
+ function view(){
+  const sw=phase==='saw'&&sim&&!sim.result,hinge=fellHinge(tree(),rules);
+  if(!started)return {label:'…',cls:'',text:'',bad:false};
+  if(phase==='aim')return {label:'Наметить подпил',cls:'',text:'Метка бежит по дуге. Жми, когда она в жёлтом просвете.',bad:false};
+  if(phase==='saw'&&!sim)return {label:'Пилить: нажми и держи',cls:'',text:acc>=800?'Точно в просвет! Теперь пили: нажми и держи.':acc>0?'Рядом с центром просвета. Теперь пили: нажми и держи.':'Мимо просвета: дерево ляжет криво. Всё равно допили.',bad:acc<=0};
+  if(sw){
+   const pinch=holding&&!sim.stalled&&fellPinched(tree(),Math.max(0,tNow()-start),rules);
+   if(holding&&sim.prog>=hinge)return {label:'Отпусти — дерево пойдёт!',cls:'tg-hold tg-ready',text:'Зелёная отметка — отпускай, дерево пойдёт.',bad:false};
+   if(holding&&sim.stalled)return {label:'Дорезать — держи',cls:'tg-hold tg-stalled',text:'Пила заглохла: держи — дорежем медленно.',bad:true};
+   if(pinch)return {label:'Отпусти — зажим!',cls:'tg-hold tg-hot',text:'Ствол зажал пилу: цепь греется вчетверо быстрее.',bad:true};
+   if(holding&&sim.heat>=800)return {label:'Отпусти — горячо!',cls:'tg-hold tg-hot',text:'Цепь горячая — отпусти, пусть остынет.',bad:true};
+   if(holding)return {label:'Пилю — держи',cls:'tg-hold',text:'Пила режет. Цепь греется — отпускай, чтобы остыла.',bad:false};
+   return {label:'Пилить: нажми и держи',cls:'',text:'Цепь остывает. Нажми и держи, чтобы пилить дальше.',bad:false};
+  }
+  if(phase==='done'){const v=fellVerdict(last);return {label:tNow()-last.end<FELL_ANIM.fall_ms?'Дерево падает…':'Следующее дерево…',cls:'',text:v.text,bad:v.tone==='bad'};}
+  return {label:'…',cls:'',text:'',bad:false};
+ }
+ function paint(){
+  const sum=results.reduce((s,r)=>s+r.points,0),v=view();
+  const setText=(el,x)=>{if(el.textContent!==x)el.textContent=x;};
+  setText(stat,`Дерево ${Math.min(ti+1,N)} из ${N} · свалено: ${results.length}`);
+  setText(forecast,results.length?`Прогноз: ×${(fellQuality(idiv(sum,N),rules)/1000).toFixed(2).replace('.',',')} древесины`:`Бонус до ×${(fellQuality(1000,rules)/1000).toFixed(1).replace('.',',')} к древесине`);
+  setText(act,v.label);
+  for(const c of ['tg-hold','tg-hot','tg-ready','tg-stalled'])act.classList.toggle(c,v.cls.split(' ').includes(c));
+  act.disabled=done||sending||!started||phase==='done'||phase==='over'||(phase==='aim'&&tNow()<freeAt)||(phase==='saw'&&!sim&&tNow()<aimAt+f.cut_delay);
+  const key=v.text+'|'+v.bad;if(key!==statusKey){statusKey=key;say(v.text,v.bad);}
+ }
+
+ /* ---- input: one hand, one big button (the canvas works the same) */
+ function onKey(e){
+  if(closed||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.code==='Escape'){e.preventDefault();e.stopPropagation();if(confirming)cancelClose();else requestClose();return;}
+  if(confirming||done)return;
+  if(e.code==='Tab'){const scope=root.querySelector('.fg-confirm')||root.querySelector('.fg-result')||root,items=[...scope.querySelectorAll('button:not(:disabled),canvas')];
+   if(items.length){const i=items.indexOf(document.activeElement),n=e.shiftKey?(i<=0?items.length-1:i-1):(i<0||i>=items.length-1?0:i+1);e.preventDefault();e.stopPropagation();items[n].focus();}return;}
+  const other=document.activeElement&&document.activeElement.tagName==='BUTTON'&&document.activeElement!==act;
+  if((e.code==='Space'||e.code==='Enter')&&!other&&started){e.preventDefault();e.stopPropagation();if(!e.repeat)press();}
+ }
+ function onKeyUp(e){if(closed)return;if(e.code==='Space'||e.code==='Enter'){if(phase==='saw')e.preventDefault();release();}}
+ const onHide=()=>{if(document.hidden)release();};
+ window.addEventListener('keydown',onKey,true);window.addEventListener('keyup',onKeyUp,true);document.addEventListener('visibilitychange',onHide);window.addEventListener('blur',release);
+ const holdTarget=el=>{
+  el.addEventListener('pointerdown',e=>{if(e.button>0)return;e.preventDefault();try{el.setPointerCapture?.(e.pointerId);}catch{}canvas.focus({preventScroll:true});press();});
+  for(const ev of ['pointerup','pointercancel','lostpointercapture'])el.addEventListener(ev,()=>release());
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+ };
+ holdTarget(canvas);holdTarget(act);
+
+ /* ---- sending / result / closing */
+ async function submit(payload){
+  if(sending||done||closed)return;
+  sending=true;paint();
+  let ok=false;try{ok=await opts.onFinish(payload);}catch{ok=false;}
+  sending=false;if(closed)return;
+  if(!ok){
+   const t=opts.tripNow?.();
+   if(!t||!t.game||t.game.state!=='open'){done=true;showNote('Игра уже закрыта','Эта вылазка уже собрана или игра сыграна. Закрой окно и обнови раздел.');return;}
+   if(performance.now()>=deadline-1500){done=true;showNote('Время вышло','Окно мини-игры закрылось. Вылазка идёт как обычно, без бонуса.');return;}
+   say('Не получилось отправить запись. Нажми «Повторить».',true);act.textContent='Повторить отправку';act.disabled=false;act.onclick=()=>{act.onclick=null;submit(payload);};return;
+  }
+  done=true;showResult();
+ }
+ function showResult(){
+  const t=opts.tripNow?.()||trip,tg=t.game&&t.game.state==='done'?t.game:null,local=fellResult(plan,{v:f.v,trees:log},rules);
+  const score=tg?tg.score:local?local.score:0,q=tg?tg.q:fellQuality(score,rules),rows=tg&&Array.isArray(tg.trees)?tg.trees:local?local.trees:[];
+  const final=scaledOutputs(trip.outputs,q),box=node('div','fg-result');box.setAttribute('role','dialog');box.setAttribute('aria-label','Итог делянки');
+  const sum=node('div','lj-sum');if(opts.icon){const first=Object.keys(final)[0];if(first)sum.append(opts.icon(first));}
+  const txt=node('div');txt.append(node('div','lj-big',goodsText(final,name)),node('div','fg-compare',`база ${goodsText(trip.outputs,name)} · ×${(q/1000).toFixed(2).replace('.',',')} за ручную работу`));sum.append(txt);
+  const list=node('ol','lj-trees');rows.forEach((r,i)=>{const v=fellVerdict(r);list.append(node('li',v.tone==='bad'?'bad':'',`${i+1}. ${v.text}`));});
+  const extra=extraText({outputs:trip.outputs,game:{state:'done',q}},name);
+  box.append(node('h2','','Делянка готова'),sum,list,node('p',extra?'fg-proud':'fg-compare',extra?`Сам справился: ${extra}`:'Как у автопилота. В следующий раз получится лучше!'),
+   node('p','fg-compare','Время вылазки не изменилось. Вернись за брёвнами, когда таймер дойдёт до нуля.'),btn('Готово','primary wide',()=>finishClose()));
+  root.append(box);box.querySelector('button.primary').focus();
+ }
+ function showNote(headText,text){
+  root.querySelector('.fg-result')?.remove();
+  const box=node('div','fg-result');box.setAttribute('role','alertdialog');box.append(node('h2','',headText),node('p','',text),btn('Закрыть','primary wide',()=>finishClose()));root.append(box);box.querySelector('button').focus();
+ }
+ function requestClose(){
+  if(closed)return;
+  if(done||!started||(!log.length&&phase==='aim')){finishClose();return;}
+  if(confirming)return;
+  release();confirming=true;
+  const box=node('div','fg-confirm');box.setAttribute('role','alertdialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label','Выйти из игры?');
+  box.append(node('h2','','Выйти из игры?'),node('p','','Результат не засчитается: вылазка пойдёт как обычно, без бонуса. Пока не вышло время — можно вернуться.'),
+   btn('Продолжить','primary wide',()=>cancelClose()),btn('Выйти','secondary wide',()=>finishClose()));
+  root.append(box);box.querySelector('button').focus();
+ }
+ function cancelClose(){root.querySelector('.fg-confirm')?.remove();confirming=false;canvas.focus({preventScroll:true});}
+ function backClose(){if(closed)return true;if(confirming){cancelClose();return false;}requestClose();return closed;}
+ function finishClose(){
+  if(closed)return;closed=true;cancelAnimationFrame(raf);raf=0;clearTimeout(srTimer);clearTimeout(layoutTimer);
+  for(const el of inerted)el.inert=false;inerted.length=0;
+  window.removeEventListener('keydown',onKey,true);window.removeEventListener('keyup',onKeyUp,true);window.removeEventListener('resize',layout);resizeObs?.disconnect();
+  document.removeEventListener('visibilitychange',onHide);window.removeEventListener('blur',release);
+  canvas.width=0;canvas.height=0;root.remove();document.body.classList.remove('fg-open');
+  try{prev?.focus?.();}catch{}
+  opts.onClose?.();
+ }
+
+ /* ---- start card */
+ function showIntro(){
+  const box=node('div','fg-result tg-intro');box.setAttribute('role','dialog');box.setAttribute('aria-label','Правила');
+  const base=goodsText(trip.outputs,name),best=goodsText(scaledOutputs(trip.outputs,fellQuality(1000,rules)),name);
+  const go=btn('Начать','primary wide',()=>{box.remove();started=true;t0=performance.now();stage.classList.add('tg-live');paint();canvas.focus({preventScroll:true});});
+  box.append(node('h2','','Пилю сам'),node('p','',`${N} деревьев подряд: поставь подпил в просвет между соседними елями, потом держи пилу — цепь греется, в зажиме сильнее. Отпусти после зелёной отметки: дерево ляжет в просвет.`),
+   node('p','fg-compare',`Без игры делянка даст: ${base}. Идеальная валка: ${best}. Время вылазки и опыт не меняются.`));
+  const stack=node('div','qw-btn-stack');stack.append(go,btn('Без игры','secondary wide',()=>finishClose()));box.append(stack);root.append(box);go.focus();
+ }
+
+ /* ---- drawing */
+ const lastAim=()=>log.length?log[log.length-1][0]:0;
+ function scene(t){
+  const i=Math.min(ti,N-1),tr=trees[i],over=phase==='over',fallMs=last?t-last.end:0,resting=phase==='done'&&fallMs>=FELL_ANIM.fall_ms;
+  const shown=phase==='done'&&!resting?results.slice(0,-1):results;
+  const aim=phase==='aim'?markPosition(t,tr.phase,rules,period):markPosition(over?lastAim():aimAt,tr.phase,rules,period);
+  const st={t,calm:reducedMotion(),night:isNight(),contrast:isContrast(),index:i,total:N,felled:shown.map(r=>({crooked:fellVerdict(r).crooked})),
+   gap:{center:tr.gap_center,width:tr.gap_width},pinches:marks[i],aim};
+  st.phase=!started?'intro':over?'over':phase==='aim'?'aim':phase==='saw'?'cut':resting?'tree_result':'fall';
+  if(phase==='saw'){
+   st.cut=girthPct();st.heat=sim?sim.heat:0;st.holding=holding;st.stalled=!!sim&&sim.stalled;st.pinch=!!sim&&holding&&!sim.stalled&&fellPinched(tr,Math.max(0,t-start),rules);
+  }
+  if(phase==='done'||over){st.fallMs=Math.max(0,fallMs);st.crooked=!!last&&last.acc<=0;if(!over)st.verdict=fellVerdict(last);}
+  return st;
+ }
+ function draw(){
+  if(closed)return;
+  const t=started?tNow():0;
+  const lf=Math.max(0,(deadline-performance.now())/1000);timer.textContent=`Осталось ${mmss(lf)}`;timer.classList.toggle('warn',lf<=60);
+  if(lf<=0&&!done&&!sending&&started){done=true;showNote('Время вышло','Окно мини-игры закрылось. Вылазка идёт как обычно, без бонуса.');}
+  if(started&&!done&&!confirming){tick(t);paint();}
+  const g=canvas.getContext('2d'),{w,h,dpr}=size;
+  g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+  drawFellScene(g,w,h,scene(t));
+  raf=requestAnimationFrame(draw);
+ }
  layout();paint();
  window.addEventListener('resize',layout);
  const resizeObs=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(!closed)layout();}):null;resizeObs?.observe(stage);

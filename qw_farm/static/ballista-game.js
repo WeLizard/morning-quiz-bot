@@ -32,23 +32,42 @@ export function mountBallistaGame(host,{getState,command,onBack,isCommandPending
   catch{if(!disposed&&epoch===sceneEpoch){theme='';stage.textContent='Не удалось загрузить сцену. Проверь соединение и открой игру снова.';}}
  }
  function projectile(x=60,y=500,hidden=false){const n=stage.querySelector('#pb-projectile');if(n){n.setAttribute('transform',`translate(${x-60} ${y-500})`);n.style.visibility=hidden?'hidden':'visible';}}
+ function guideNode(){
+  const ball=stage.querySelector('#pb-projectile');if(!ball)return null;
+  let guide=stage.querySelector('#pb-aim-guide');
+  if(!guide){guide=document.createElementNS('http://www.w3.org/2000/svg','g');guide.id='pb-aim-guide';guide.setAttribute('aria-hidden','true');const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1','82');line.setAttribute('y1','478');line.setAttribute('stroke','#245c3c');line.setAttribute('stroke-width','6');line.setAttribute('stroke-dasharray','10 9');line.setAttribute('stroke-linecap','round');const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');dot.setAttribute('r','9');dot.setAttribute('fill','#245c3c');guide.append(line,dot);ball.parentNode.insertBefore(guide,ball);}
+  return guide;
+ }
+ function placeGuide(angleMilli,powerValue,opacity){
+  const guide=guideNode();if(!guide)return;
+  const angle=angleMilli/1000*Math.PI/180,length=190+(powerValue-200)*.25,gx=82+length*Math.cos(angle),gy=478-length*Math.sin(angle);
+  guide.querySelector('line').setAttribute('x2',String(gx));guide.querySelector('line').setAttribute('y2',String(gy));guide.querySelector('circle').setAttribute('cx',String(gx));guide.querySelector('circle').setAttribute('cy',String(gy));
+  guide.style.visibility='visible';guide.style.opacity=String(opacity);
+ }
+ function showKeyboardAim(){
+  if(aim)return;
+  const guide=stage.querySelector('#pb-aim-guide'),open=$('.ballista-keyboard').open;
+  if(flight||!open||shoot.hidden||shoot.disabled){if(guide)guide.style.visibility='hidden';return;}
+  placeGuide(Number(angle.value)*1000,Number(power.value),.5);
+ }
  function aimVisual(back=0,down=0,angleMilli=45000,powerValue=600){
   const ball=stage.querySelector('#pb-projectile');if(!ball)return;
   let band=stage.querySelector('#pb-aim-band');
   if(!band){band=document.createElementNS('http://www.w3.org/2000/svg','g');band.id='pb-aim-band';for(const [x1,y1] of [[48,490],[79,491]]){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1',String(x1));line.setAttribute('y1',String(y1));line.setAttribute('stroke','#795f46');line.setAttribute('stroke-width','4');line.setAttribute('stroke-linecap','round');band.append(line);}ball.parentNode.insertBefore(band,ball);}
-  let guide=stage.querySelector('#pb-aim-guide');
-  if(!guide){guide=document.createElementNS('http://www.w3.org/2000/svg','g');guide.id='pb-aim-guide';guide.setAttribute('aria-hidden','true');const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1','82');line.setAttribute('y1','478');line.setAttribute('stroke','#245c3c');line.setAttribute('stroke-width','6');line.setAttribute('stroke-dasharray','10 9');line.setAttribute('stroke-linecap','round');const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');dot.setAttribute('r','9');dot.setAttribute('fill','#245c3c');guide.append(line,dot);ball.parentNode.insertBefore(guide,ball);}
-  const x=Math.max(10,60-back*1000/Math.max(1,stage.clientWidth)),y=Math.min(580,500+down*600/Math.max(1,stage.clientHeight));
+  const guide=guideNode();if(!guide)return;
+  const view=stage.querySelector('svg').viewBox.baseVal;
+  const x=Math.max(10,60-back*view.width/Math.max(1,stage.clientWidth)),y=Math.min(580,500+down*view.height/Math.max(1,stage.clientHeight));
   band.querySelectorAll('line').forEach(line=>{line.setAttribute('x2',String(x));line.setAttribute('y2',String(y));});
-  const angle=angleMilli/1000*Math.PI/180,length=190+(powerValue-200)*.25,gx=82+length*Math.cos(angle),gy=478-length*Math.sin(angle);
-  guide.querySelector('line').setAttribute('x2',String(gx));guide.querySelector('line').setAttribute('y2',String(gy));guide.querySelector('circle').setAttribute('cx',String(gx));guide.querySelector('circle').setAttribute('cy',String(gy));
-  stage.classList.toggle('is-aiming',!!(back||down));band.style.visibility=guide.style.visibility=back||down?'visible':'hidden';projectile(x,y);
+  stage.classList.toggle('is-aiming',!!(back||down));band.style.visibility=back||down?'visible':'hidden';
+  if(back||down)placeGuide(angleMilli,powerValue,1);else guide.style.visibility='hidden';
+  projectile(x,y);
  }
  function paint(){
   const active=getState()?.active,target=active?.plan?.targets?.[Math.min(log.length,4)];
   stage.querySelectorAll('[id^="pb-target-"]').forEach(n=>{const selected=target&&Number(n.getAttribute('cx'))===target.x&&Number(n.getAttribute('cy'))===target.y;n.classList.toggle('ballista-target',!!selected);});
   const vane=stage.querySelector('#pb-vane');if(vane)vane.setAttribute('transform',target?.wind<0?'translate(980 0) scale(-1 1)':'');
   if(!flight&&!aim)projectile();
+  showKeyboardAim();
  }
  async function submit(){
   if(disposed||sending||isCommandPending())return;const active=getState()?.active;if(!active||log.length!==5)return;
@@ -107,13 +126,15 @@ export function mountBallistaGame(host,{getState,command,onBack,isCommandPending
   if(!aim||aim.id!==event.pointerId)return;
   const shot=aim;aim=null;if(stage.hasPointerCapture(event.pointerId))stage.releasePointerCapture(event.pointerId);aimVisual();
   if(shot.moved)fire(shot.angle,shot.power);else status.textContent='Оттяни баночку назад и вниз, затем отпусти.';
+  showKeyboardAim();
  });
- stage.addEventListener('pointercancel',event=>{if(aim?.id===event.pointerId){aim=null;aimVisual();}});
+ stage.addEventListener('pointercancel',event=>{if(aim?.id===event.pointerId){aim=null;aimVisual();showKeyboardAim();}});
  stage.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&stage.getAttribute('aria-disabled')==='false'){event.preventDefault();fire(Number(angle.value)*1000,Number(power.value));}});
  finish.addEventListener('click',()=>void submit());
  $('.ballista-back').addEventListener('click',onBack);
- angle.addEventListener('input',()=>{$('.ballista-angle-value').textContent=`${angle.value}°`;});
- power.addEventListener('input',()=>{$('.ballista-power-value').textContent=`${Math.round(Number(power.value)/10)}%`;});
+ angle.addEventListener('input',()=>{$('.ballista-angle-value').textContent=`${angle.value}°`;showKeyboardAim();});
+ power.addEventListener('input',()=>{$('.ballista-power-value').textContent=`${Math.round(Number(power.value)/10)}%`;showKeyboardAim();});
+ $('.ballista-keyboard').addEventListener('toggle',showKeyboardAim);
  const observer=new MutationObserver(()=>void loadScene());observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-farm-theme']});
  const timer=setInterval(()=>{if(!disposed&&!flight)render();},1000);
  render();

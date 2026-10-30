@@ -8,6 +8,8 @@ from .domain import object_cells
 from .catalog import BUILDINGS
 
 TZ = timezone(timedelta(hours=3))
+UTC_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+MOSCOW_OFFSET = timedelta(hours=3)
 HOUR = 3600
 EPOCH = 3 * HOUR
 
@@ -35,14 +37,24 @@ DOORS = {
 }
 
 
+def _moscow_datetime(at):
+    """Decode a Unix timestamp without relying on the platform C runtime."""
+    return (UTC_EPOCH + timedelta(seconds=at)).astimezone(TZ)
+
+
+def _moscow_month_start(year, month):
+    local_start = datetime(year, month, 1)
+    return (local_start - datetime(1970, 1, 1)).total_seconds() - MOSCOW_OFFSET.total_seconds()
+
+
 def season_at(at):
-    month = datetime.fromtimestamp(at, TZ).month
+    month = _moscow_datetime(at).month
     return 'spring' if month <= 5 and month >= 3 else 'summer' if 6 <= month <= 8 else 'autumn' if 9 <= month <= 11 else 'winter'
 
 
 def _season_start(at):
-    dt = datetime.fromtimestamp(at, TZ)
-    return datetime(dt.year, dt.month, 1, tzinfo=TZ).timestamp()
+    dt = _moscow_datetime(at)
+    return _moscow_month_start(dt.year, dt.month)
 
 
 def growth_seconds(start, end):
@@ -51,13 +63,12 @@ def growth_seconds(start, end):
     total = 0.0
     cursor = start
     while cursor < end:
-        dt = datetime.fromtimestamp(cursor, TZ)
+        dt = _moscow_datetime(cursor)
         if dt.month == 12:
-            next_month = datetime(dt.year + 1, 1, 1, tzinfo=TZ).timestamp()
+            next_month = _moscow_month_start(dt.year + 1, 1)
             season, rate = 'winter', 0
         else:
-            next_month = (datetime(dt.year + 1, 1, 1, tzinfo=TZ).timestamp() if dt.month == 12
-                          else datetime(dt.year + (dt.month == 12), (dt.month % 12) + 1, 1, tzinfo=TZ).timestamp())
+            next_month = _moscow_month_start(dt.year, dt.month + 1)
             season = season_at(cursor)
             rate = {'spring': 1.5, 'summer': 1.0, 'autumn': 0.75, 'winter': 0}[season]
         stop = min(end, next_month)

@@ -15,6 +15,11 @@ def at(month, day=15, hour=12):
     return int(datetime(2026, month, day, hour, tzinfo=MOSCOW).timestamp())
 
 
+def moscow_timestamp(year, month, day=1):
+    local = datetime(year, month, day)
+    return int((local - datetime(1970, 1, 1)).total_seconds()) - 3 * 3600
+
+
 def farm(now=at(6)):
     result = domain.new_farm('meadow-test', 'Farm', now)
     upgrade_state(result, now)
@@ -212,6 +217,26 @@ def test_stage_thresholds_season_multipliers_and_winter_pause():
     winter = at(1)
     assert meadow.season_at(winter) == 'winter'
     assert meadow.stage(winter - 10 * 86400, winter) == 0
+
+
+def test_small_and_negative_timestamps_use_moscow_calendar_and_day_boundaries():
+    assert meadow.season_at(-1) == 'winter'  # 1970-01-01 02:59:59 Moscow
+    assert meadow.season_at(0) == 'winter'   # 1970-01-01 03:00 Moscow
+    assert meadow.season_at(1000) == 'winter'
+    assert meadow.season_at(-86400) == 'winter'  # 1969-12-31 03:00 Moscow
+    moscow_new_year = -3 * 3600
+    assert meadow._season_start(moscow_new_year - 1) == moscow_timestamp(1969, 12)
+    assert meadow._season_start(moscow_new_year) == moscow_timestamp(1970, 1)
+    assert meadow.growth_seconds(moscow_new_year - 1, moscow_new_year + 86400) == 0
+
+
+def test_pre_epoch_season_boundary_and_next_stage_crossing():
+    spring = moscow_timestamp(1969, 3)
+    assert meadow.season_at(spring - 1) == 'winter'
+    assert meadow.season_at(spring) == 'spring'
+    assert meadow.growth_seconds(spring - 2 * 3600, spring) == 0
+    assert meadow.growth_seconds(spring, spring + 2 * 3600) == 3 * 3600
+    assert meadow.next_stage_at(spring, spring, 1) == spring + 2 * 3600
 
 
 def test_winter_pause_preserves_growth_across_winter():

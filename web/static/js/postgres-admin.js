@@ -460,7 +460,7 @@
                 const {data: upkeep} = await api('/api/control/farm-upkeep');
                 const upkeepCard = card(body, 'Налог и содержание фермы');
                 const values = upkeep.values;
-                notice(upkeepCard, `Порог: с ${values.upkeep_level} уровня · земля: ${values.land_rate_pct}% от текущей шкалы участка · здания: ${values.building_rate_pct}% цены за уровень · поля: ${values.field_per_hectare} мон./га · деревья: +${values.tree_rate_per_extra_tree} мон. за каждое дерево сверх бесплатного лимита.`);
+                notice(upkeepCard, `Порог: с ${values.upkeep_level} уровня · земля: ${values.land_rate_pct}% от текущей шкалы участка · здания: ${values.building_rate_pct}% базовой цены, уровень не добавляет · поля: ${values.field_per_hectare} мон./га · деревья: +${values.tree_rate_per_extra_tree} мон. за каждое дерево сверх бесплатного лимита.`);
                 if (upkeep.pending) {
                     notice(upkeepCard, `Новые ставки начнут действовать с ${moscowDayDate(upkeep.pending.effective_from_moscow_day)} по Москве. До этого используется текущая ставка.`);
                 } else {
@@ -470,7 +470,7 @@
                     notice(form, `Версия ${upkeep.revision}. Новые ставки вступят в силу со следующих московских суток; выставленный счёт и долг сохранят сумму.`);
                     const level = field(form, 'Уровень начала содержания', values.upkeep_level, 'number', {min: 1, max: 50, required: true});
                     const land = field(form, 'Земля · процент текущей шкалы участка', values.land_rate_pct, 'number', {min: 0, max: 500, required: true});
-                    const building = field(form, 'Здания · процент цены за уровень', values.building_rate_pct, 'number', {min: 0, max: 100, required: true});
+                    const building = field(form, 'Здания · процент базовой цены (уровень не добавляет)', values.building_rate_pct, 'number', {min: 0, max: 100, required: true});
                     const fields = field(form, 'Поля · монет за гектар в сутки', values.field_per_hectare, 'number', {min: 0, max: 100000, required: true});
                     const trees = field(form, 'Деревья · надбавка за каждое дерево сверх бесплатного лимита', values.tree_rate_per_extra_tree, 'number', {min: 0, max: 100000, required: true});
                     const actionId = crypto.randomUUID();

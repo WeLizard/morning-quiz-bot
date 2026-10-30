@@ -415,7 +415,7 @@ def apply(farm, kind, data, now, command_id, speed):
 
 def uproot(farm, obj, now, speed=1):
     """Remove a tree. A ripe harvest is taken first. In the undo window the whole sapling price comes back (and a spent voucher);
-    later only wood x2 does, and the client asks for confirmation first."""
+    later half of the price (E27 D2) and the wood do, and the client asks for confirmation first."""
     from . import undo
     taken = ''
     if ripe(obj, now):
@@ -433,9 +433,12 @@ def uproot(farm, obj, now, speed=1):
         elif paid:
             inventory(farm, {paid: 1})
         text = f'{spec["name"]}: посадка отменена, саженец возвращён.' + (f' Монет: +{obj["cost"]}.' if obj['cost'] else '')
-    else:
+    else:     # E27 D2: half of the sapling price comes back besides the wood (the first minute still returns everything)
+        refund = obj['cost'] * undo.LATE_REFUND_PCT // 100
+        farm['coins'] += refund
+        undo.restore_gift(farm, obj.get('gift', 0), refund)
         inventory(farm, {'wood': TREE_REFUND_WOOD})
-        text = f'{spec["name"]}: дерево выкорчевано, древесина ×{TREE_REFUND_WOOD}.'
+        text = f'{spec["name"]}: дерево выкорчевано, древесина ×{TREE_REFUND_WOOD}.' + (f' Вернулась половина цены саженца: +{refund} монет.' if refund else '')
     farm['objects'].remove(obj)
     return text + taken
 

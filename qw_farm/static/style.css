@@ -947,6 +947,25 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 .tg-big{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;transition:background .12s,transform .08s}
 .tg-big.tg-hold{transform:scale(.985);box-shadow:inset 0 3px 0 #0002}
 .tg-big.tg-hot,:root[data-farm-theme=night] .tg-big.tg-hot{background:#c9632f;border-color:#a44d22;color:#fff}
+/* Hold-button states of fishing (hot) and "Валка" (hot, ready, stalled). The ":root .fg-controls" prefix is needed: at night
+   ":root[data-farm-theme=night] :is(.primary,.fg-act.primary,.pill-row button.active)" (0,4,1) repaints every .primary and swallowed .tg-hot;
+   the contrast-mode counterparts are at the end of the file, inside the contrast block. */
+:root .fg-controls .tg-big.tg-hot{background:#c9632f;border-color:#a44d22;color:#fff}
+:root .fg-controls .tg-big.tg-ready{background:#2f7a43;border-color:#1f5a32;color:#fff}
+:root .fg-controls .tg-big.tg-stalled{background:#c9c2b2;border-color:#8f8a80;color:#2f2a22}
+:root[data-farm-theme=night] .fg-controls .tg-big.tg-hot{background:#c9632f;border-color:#a44d22;color:#fff}
+:root[data-farm-theme=night] .fg-controls .tg-big.tg-ready{background:#8fd39a;border-color:#8fd39a;color:#10231a}
+:root[data-farm-theme=night] .fg-controls .tg-big.tg-stalled{background:#4a4a42;border-color:#8f8a80;color:#f2edc4}
+.tg-overlay .fg-canvas{filter:var(--qw-scene-filter,none)}
+/* "Валка": the plot summary, the hire portrait of Stepan and the "Делянка" card art */
+.lj-trees{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:3px;font-weight:650;font-size:14px;text-align:left}
+.lj-trees li.bad{color:#9a4b2a}:root[data-farm-theme=night] .lj-trees li.bad{color:#ffb7a0}
+.lj-sum{display:flex;align-items:center;gap:12px;justify-content:center;margin:6px 0}.lj-sum svg{width:56px;height:56px;flex:none}
+.lj-big{font-size:26px;font-weight:850}
+.lj-game .fg-status{min-height:3em}
+.hire-portrait{display:flex;justify-content:center;margin:2px 0 6px}.hire-portrait svg{width:84px;height:84px}
+.plot-art{display:block;width:100%;height:auto;aspect-ratio:160/68;border-radius:12px;margin:2px 0 6px;border:1px solid var(--line)}
+.plot-actions{margin-top:6px}
 .tg-intro{text-align:left}.tg-intro h2{text-align:center}.tg-intro p{margin:6px 0;font-size:14px}
 .tg-sky{font-weight:700;color:var(--green2)}:root[data-farm-theme=night] .tg-sky{color:var(--ink)}
 .tg-label{margin:10px 0 4px!important;font-size:12px!important;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -1388,6 +1407,11 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 /* shop slots, festival goods and hand-ins: the action column on the right */
 .mag-slot,.fest-good{grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--qw-s-3)}
 .mag-slot>.qw-btn-stack,.fest-good>.qw-btn-stack{min-width:var(--qw-action-w);max-width:min(13rem,44vw)}
+/* rarity plate of a stall place (merchant.js): shell tokens only; common places have none, uncommon is outlined, rare is accent text, the lot of the day is filled */
+.mag-rarity{display:block;width:fit-content;margin:var(--qw-s-1) 0;padding:2px var(--qw-s-2);border:var(--qw-outline-w,1px) solid var(--qw-game-line);border-radius:var(--qw-r-pill);background:var(--qw-game-surface-2);color:var(--qw-game-text);font-size:var(--qw-fs-caption);font-weight:700;letter-spacing:.04em;line-height:1.4}
+.mag-rarity-rare{border-color:var(--qw-game-accent);color:var(--qw-game-accent)}
+.mag-rarity-lot_day{border-color:var(--qw-game-accent-fill);background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink)}
+.mag-restock{margin:var(--qw-s-1) 0 0;color:var(--qw-game-muted);font-size:var(--qw-fs-small);font-variant-numeric:tabular-nums}
 .fest-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--qw-s-3)}
 .fest-option .goods{margin:0}.fest-option>.qw-btn{min-width:var(--qw-action-w)}
 .stall-own>.qw-btn{margin-left:auto}
@@ -1455,6 +1479,9 @@ dialog.entry-info-dialog{max-width:520px}
 .bulk-info-preview ul{margin:4px 0 8px;padding-left:22px}
 .bulk-info-preview li{margin:4px 0;overflow-wrap:anywhere}
 .bulk-action>button:not(.bulk-info-btn){margin-block-start:var(--qw-btn-gap)}
+/* ===== E27 F4: «Отменить посев» on the field card: a full-width 44px tap, the countdown in the label does not jump the width. ===== */
+.field-cancel{min-height:44px}.field-cancel span{font-variant-numeric:tabular-nums}
+
 /* ==== «Контрастный режим» (UI_RULES §16, E3 .local/mockups-2026-10-23) ====
    Only with <html data-qw-contrast="1">, set by qw-shell.js from the Account setting; the regular style is untouched.
    Solid backings (white by day, dark at night), 2 px outlines (--qw-outline-w), text 1–2 px larger,
@@ -1564,3 +1591,19 @@ dialog.entry-info-dialog{max-width:520px}
 
 /* Long bulk previews stay readable inside the existing info dialog. */
 .bulk-info-preview{max-height:min(35dvh,360px);overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+/* hold-button states of fishing and "Валка" in the contrast mode (the ".primary" repaint of this block must not swallow them) */
+:root[data-qw-contrast="1"] .fg-controls .tg-big.tg-hot{background:#a3461c;border-color:var(--ink);color:#fff}
+:root[data-qw-contrast="1"] .fg-controls .tg-big.tg-ready{background:#1f5a32;border-color:var(--ink);color:#fff}
+:root[data-qw-contrast="1"] .fg-controls .tg-big.tg-stalled{background:#e4ded0;border-color:var(--ink);color:#10231a}
+:root[data-qw-contrast="1"][data-farm-theme=night] .fg-controls .tg-big.tg-hot{background:#c9632f;border-color:var(--ink);color:#fff}
+:root[data-qw-contrast="1"][data-farm-theme=night] .fg-controls .tg-big.tg-ready{background:#8fd39a;border-color:var(--ink);color:#10231a}
+:root[data-qw-contrast="1"][data-farm-theme=night] .fg-controls .tg-big.tg-stalled{background:#4a4a42;border-color:var(--ink);color:#ffffff}
+:root[data-qw-contrast="1"] .plot-art{border:var(--qw-outline-w,2px) solid var(--ink)}
+:root[data-qw-contrast="1"] .lj-trees li.bad{color:#8a2f14;font-weight:750}
+:root[data-qw-contrast="1"][data-farm-theme=night] .lj-trees li.bad{color:#ffd2bf}
+
+/* Merchant rarity plates in the contrast mode: solid backing and an ink outline; the lot of the day keeps the filled pick colour. */
+:root[data-qw-contrast="1"] .mag-rarity{background:var(--surface);border:var(--qw-outline-w) solid var(--ink);color:var(--ink);font-size:var(--qw-fs-small,14px)}
+:root[data-qw-contrast="1"] .mag-rarity-rare{box-shadow:inset 0 0 0 1px var(--ink)}
+:root[data-qw-contrast="1"] .mag-rarity-lot_day{background:var(--hc-pick);color:var(--hc-pick-ink)}
+:root[data-qw-contrast="1"] .mag-restock{color:var(--ink);font-weight:700}

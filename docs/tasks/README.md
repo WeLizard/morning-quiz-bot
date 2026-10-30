@@ -20,6 +20,7 @@
 | MQB-007 | [Приёмка и dev-интеграция Farm 0.2.0](MQB-007-farm-020-integration.md) | `in_progress` | high | 2026-10-09 |
 | MQB-009 | [Завершение платформы и новый «Ночной город»](MQB-009-platform-and-night-city.md) | `proposed` | critical | 2026-10-12 |
 | MQB-010 | [«Ночной город»: недельный режим, этапы](MQB-010-night-city-weekly-stages.md) (дизайн: [NIGHT_CITY_WEEKLY_DESIGN](NIGHT_CITY_WEEKLY_DESIGN.md)) | `proposed` | high | 2026-10-15 |
+| NC-OPEN | [«Ночной город»: открытые комнаты](NIGHT_CITY_OPEN_ROOMS.md) | `queued` | medium | 2026-10-28 |
 | MQB-011 | [Форма обращения к игроку (он / она / не указывать)](MQB-011-address-form.md) | `in_progress` | medium | 2026-10-15 |
 
 ## Дополнительные направления (вне MQB-реестра)
@@ -30,7 +31,7 @@ MQB автоматически: перед изменением сверяй д�
 
 | Направление | Где смотреть | Что проверить |
 |---|---|---|
-| **Следующая задача фермы — плантация (`queued`)** | [FARM_PLANTATIONS](FARM_PLANTATIONS.md) | Самостоятельная механика рядом с полями для массового выращивания винограда, кофе, чая и хлопка; параметры дизайна ещё не согласованы |
+| **Плантации фермы (`queued`, дизайн утверждён 2026-10-29)** | [FARM_PLANTATIONS](FARM_PLANTATIONS.md) | Многолетние виноградник, чай, кофе, хлопок на гектарах с L32 (решения владельца: L32, гектары); ручной сбор бригадой и автосбор, обрезка, переработка; следующая после лесоруба |
 | Ферма: обратная связь, рост, экономика | [FARM_FEEDBACK_2026-10-21](FARM_FEEDBACK_2026-10-21.md), [FARM_GROWTH_PLAN](FARM_GROWTH_PLAN.md), [FARM_ECONOMY_AUDIT](FARM_ECONOMY_AUDIT.md) | Какие пункты уже в git/песочнице, какие локальны, какие только дизайн |
 | Ферма: стройка, просьбы, сад, текстиль | [FARM_VILLAGE_CONSTRUCTION](FARM_VILLAGE_CONSTRUCTION.md), [FARM_FRIEND_REQUESTS](FARM_FRIEND_REQUESTS.md), [FARM_ORCHARD](FARM_ORCHARD.md), [FARM_TEXTILE_CHAIN](FARM_TEXTILE_CHAIN.md) | Шапка документа может отставать от git — сверить перед правкой |
 | UI-аудит web shell и фермы (2026-10-25) | [UI_AUDIT_2026-10-25](UI_AUDIT_2026-10-25.md) | Публичная песочница обновлена; приёмка Пуха ожидается, фото-маска остаётся P2 |

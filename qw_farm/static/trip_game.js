@@ -15,7 +15,7 @@ export const FISH2={v:2,tick:50,fly:600,land_pause:1000,scare_pause:600,toggle_g
  routes:{pond_bank:{casts:4,window:900,rare:'golden_crucian',common:['crucian']},lake_inlet:{casts:4,window:800,rare:'tench',common:['perch','crucian']},
   river_bend:{casts:4,window:700,rare:'catfish',common:['pike','perch']}}};
 /** Felling "Валка" (trip_games.py FELLING, public_rules()['fell']): every number the replay needs. */
-export const FELL={v:1,trees:5,period:1400,dead:50,tick:50,cut_delay:250,cut_rate:25,stall_rate:5,heat_up:20,pinch_mult:4,cool:40,heat_max:1000,pinch_ms:400,
+export const FELL={v:1,trees:5,period:2100,dead:50,tick:50,cut_delay:250,cut_rate:25,stall_rate:5,heat_up:20,pinch_mult:4,cool:40,heat_max:1000,pinch_ms:400,
  hinge_pct:80,max_ticks:300,fall_ms:1200,tree_pause:400,time_pen_max:400,premature_pen:300,stall_cap:250,toggle_gap:40,max_toggles:80,first_aim_ms:500,bonus:600};
 export const RULES={ttl:900,bonus:250,fell:FELL,mark_period:1600,dead_zone:60,acc_span:300,react:150,first_aim_ms:500,grid:6,trap_cost:2,step_cs:20,fish2:FISH2};
 const DIRS={U:[0,-1],D:[0,1],L:[-1,0],R:[1,0]};
@@ -147,8 +147,8 @@ export function fellStep(st,tree,start,toggles,live,rules=RULES){
  return st;
 }
 /** One tree (trip_games.fell_tree): {acc, cut, points, result: felled|cut_through|timeout|idle, stalled, ticks, end, free}. */
-export function fellTree(tree,aim,toggles,rules=RULES){
- const f=FL(rules),acc=fellAccuracy(aim,tree,rules,f.period);
+export function fellTree(tree,aim,toggles,rules=RULES,period=FL(rules).period){
+ const f=FL(rules),acc=fellAccuracy(aim,tree,rules,period);
  if(!toggles.length){const end=aim+f.cut_delay;return {acc,cut:0,points:idiv(4*acc,10),result:'idle',stalled:false,ticks:0,end,free:end+f.tree_pause};}
  const start=toggles[0],st=fellStart();
  while(!st.result)fellStep(st,tree,start,toggles,false,rules);
@@ -173,7 +173,7 @@ export function fellResult(plan,log,rules=RULES){
   if(!ms(aim,free)||!Array.isArray(toggles)||toggles.length>f.max_toggles)return null;
   let prev=aim+f.cut_delay-f.toggle_gap;
   for(const t of toggles){if(!(ms(t)&&t>=prev+f.toggle_gap))return null;prev=t;}
-  const r=fellTree(plan.trees[i],aim,toggles,rules);
+  const r=fellTree(plan.trees[i],aim,toggles,rules,plan.mark_period||f.period);
   total+=r.points;free=r.free;end=r.end;out.push(r);
  }
  return {score:idiv(total,out.length),end,trees:out};
@@ -803,7 +803,7 @@ function openFellGame(opts){
   if(sim&&sim.result&&phase==='saw')endTree();
  }
  function endTree(){
-  const r=fellTree(tree(),aimAt,toggles,rules);
+  const r=fellTree(tree(),aimAt,toggles,rules,period);
   log.push([aimAt,toggles.slice()]);results.push(r);last=r;holding=false;phase='done';
   nextAt=Math.max(r.free,r.end+FELL_ANIM.fall_ms+FELL_ANIM.result_ms);
   const v=fellVerdict(r);buzz(v.tone==='good'?[20,40,20]:30);announce(v.text);paint();

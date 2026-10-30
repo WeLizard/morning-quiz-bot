@@ -22,7 +22,7 @@ cast = (4 * acc + 6 * timing) // 10 if the strike is valid else 0; score = mean 
 
 FELLING "Валка" (docs/tasks/FARM_LUMBERJACK.md, ``logging_plot`` "Пилю сам", ``game['kind'] == 'fell'``, ``plan['v'] == 1``).  Five trees in a
 row; q = 1000 + 600 * score // 1000 (x1.0 .. x1.6; every other trip keeps +250 at most).  Plan (from sha256(seed), public):
-``{v: 1, mark_period: 1400, trees: [{gap_center, gap_width, phase, girth, pinches: [ms, ...], par}, ...]}``.  Log (absolute ms
+``{v: 1, mark_period: 2100, trees: [{gap_center, gap_width, phase, girth, pinches: [ms, ...], par}, ...]}``.  Log (absolute ms
 from the start of the trip): ``{v: 1, trees: [[aim_ms, [toggle_ms, ...]], ...]}`` - exactly one entry per tree, in order.
 Per tree, the whole thing is integers:
   1. AIM.  The mark runs ``mark_position(t, phase, mark_period)`` (triangle wave, permille 0..1000).  The press at ``aim_ms`` sets the
@@ -118,7 +118,7 @@ WEATHERS = ('clear', 'cloud', 'rain', 'wind')
 # ---- felling "Валка" (all times in ms, all values integers; mirrored 1:1 by the client simulation)
 FELL_V = 1
 FELL_TREES = 5
-FELL_PERIOD = 1400             # ms, full back-and-forth of the aiming mark
+FELL_PERIOD = 2100             # ms, full back-and-forth of the aiming mark (was 1400; x1.5 slower)
 FELL_DEAD = 50                 # permille around the gap centre that counts as a perfect notch
 GAP_CENTER_MIN, GAP_CENTER_SPAN = 200, 601      # gap_center in 200..800
 GAP_WIDTH_MIN, GAP_WIDTH_SPAN = 140, 81         # gap_width (half width, permille) in 140..220
@@ -541,16 +541,16 @@ def forage_score(plan, path):
 
 
 # ---- felling: pure rules
-def fell_accuracy(aim_ms, tree):
-    d = abs(mark_position(aim_ms, tree['phase'], FELL_PERIOD) - tree['gap_center'])
+def fell_accuracy(aim_ms, tree, period=FELL_PERIOD):
+    d = abs(mark_position(aim_ms, tree['phase'], period) - tree['gap_center'])
     if d <= FELL_DEAD:
         return 1000
     return max(0, 1000 - (d - FELL_DEAD) * 1000 // max(1, tree['gap_width'] - FELL_DEAD))
 
 
-def fell_tree(tree, aim, toggles):
+def fell_tree(tree, aim, toggles, period=FELL_PERIOD):
     """Replay one tree -> {acc, cut, points, result (felled | cut_through | timeout | idle), stalled, ticks, end, free}."""
-    acc = fell_accuracy(aim, tree)
+    acc = fell_accuracy(aim, tree, period)
     if not toggles:
         end = aim + CUT_DELAY
         return dict(acc=acc, cut=0, points=4 * acc // 10, result='idle', stalled=False, ticks=0, end=end, free=end + TREE_PAUSE)
@@ -611,7 +611,7 @@ def fell_result(plan, log):
             if not (_ms(t) and t >= prev + TOGGLE_GAP):
                 return None
             prev = t
-        r = fell_tree(tree, aim, toggles)
+        r = fell_tree(tree, aim, toggles, plan.get('mark_period', FELL_PERIOD))   # the period the player saw (older plans: 1400)
         total += r['points']
         free, end = r['free'], r['end']
         out.append(r)

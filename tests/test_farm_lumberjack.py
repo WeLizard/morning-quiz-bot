@@ -235,7 +235,7 @@ def test_game_seed_comes_from_the_trip():
 
 def test_public_rules_describe_felling():
     r = tg.public_rules()['fell']
-    assert r['tick'] == 50 and r['bonus'] == 600 and r['trees'] == 5 and r['hinge_pct'] == 80 and r['period'] == 1400
+    assert r['tick'] == 50 and r['bonus'] == 600 and r['trees'] == 5 and r['hinge_pct'] == 80 and r['period'] == 2100
 
 
 # ------------------------------------------------------------------------------------------------ the replay
@@ -470,3 +470,15 @@ def test_js_fixture_is_current():
     assert scores['perfect'] == 1000 and scores['bad_version'] is None and scores['fast_toggle'] is None
     assert scores['idle'] < scores['miss'] or scores['idle'] <= 400
     assert 0 <= scores['hold'] < 500
+
+
+def test_fell_replay_uses_the_period_of_the_plan_the_player_saw():
+    """A run started before the aim was slowed (plan mark_period 1400) is replayed with 1400, not the current FELL_PERIOD."""
+    plan = tg.make_fell_plan('period-check')
+    old = dict(plan, mark_period=1400)
+    tree = old['trees'][0]
+    aim = next(t for t in range(tg.FIRST_AIM_MS, tg.FIRST_AIM_MS + 6000)
+               if abs(tg.mark_position(t, tree['phase'], 1400) - tree['gap_center']) <= 5
+               and abs(tg.mark_position(t, tree['phase'], tg.FELL_PERIOD) - tree['gap_center']) > tree['gap_width'])
+    assert tg.fell_accuracy(aim, tree, 1400) == 1000 and tg.fell_accuracy(aim, tree) < 1000
+    assert tg.fell_tree(tree, aim, [], old['mark_period'])['acc'] == 1000

@@ -5,7 +5,7 @@
 import {
   gameCfg, Run, growthPermille, yieldQty, quality, conditionQuality, finalConditionQuality, runLeftSec, sprayBonus, timeKeep,
   timeLimits, autoSeconds, maxPath, stepAnchor, stepAnchorOrient, QRULE_TIMED
-} from './tractor_game.js?v=20261030a';
+} from './tractor_game.js?v=20261030b';
 
 const SPEEDS = [
   { id: 'calm', label: 'спокойно', ms: 450 },

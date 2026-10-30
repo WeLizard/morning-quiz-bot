@@ -5,8 +5,8 @@ import {mountBallistaGame} from './ballista-game.js';
 import {mountPieGame} from './pie-game.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
-import {openFieldGame} from './field_overlay.js?v=20261030a';
-import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261030a';
+import {openFieldGame} from './field_overlay.js?v=20261030b';
+import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261030b';
 import * as FEST from './festivals.js';
 import {horsemanDisplay,openHorsemanDialog,renderHorsemanCard} from './horseman.js';
 import * as MERCH from './merchant.js';
@@ -17,7 +17,7 @@ import {createConstruction} from './construction.js';
 import {renderBulletin} from './village_bulletin.js';
 import * as NAV from './farm_nav.js';
 import {drawPlotCard} from './lumberjack_art.js';
-import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js';
+import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js?v=20261030b';
 import {CLASS_LABEL,LONG_HINT,seedStats,sortSeeds,planMachine,planRepeat,planTap,remember} from './farm_runs.js';
 import {parseInvite,parseInviteHint,incomingInvite,clearInvite,openTelegram,shareLink,mailtoUrl} from './invite.js';
 // The Telegram bridge (SDK, safe-area, fullscreen, BackButton, header colors) is the shared shell: window.QW from /app/shell/qw-shell.js.
@@ -162,7 +162,7 @@ const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
 const own=()=>S.farm?.is_owner;
 const now=()=>Date.now()/1000+(S.offset||0);
 const el=(tag,txt,cls)=>{let n=document.createElement(tag);if(txt!==undefined&&txt!==null)n.textContent=txt;if(cls)n.className=cls;return n;};
-const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg?v=20261030a#${FEST.iconId(id)}`);n.append(u);return n;};
+const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg?v=20261030b#${FEST.iconId(id)}`);n.append(u);return n;};
 function lakeDoorArt(){const n=document.createElementNS('http://www.w3.org/2000/svg','svg');n.setAttribute('class','lake-door-art');n.setAttribute('viewBox','0 0 160 68');n.setAttribute('preserveAspectRatio','xMidYMid slice');n.setAttribute('aria-hidden','true');n.setAttribute('focusable','false');n.innerHTML='<defs><clipPath id="lake-card-clip"><rect width="160" height="68" rx="13"/></clipPath><linearGradient id="lake-sky" x2="0" y2="1"><stop stop-color="#dcebd1"/><stop offset="1" stop-color="#f3eacb"/></linearGradient><linearGradient id="lake-water" x2="0" y2="1"><stop stop-color="#8ec7c1"/><stop offset="1" stop-color="#5d9d9c"/></linearGradient></defs><g clip-path="url(#lake-card-clip)"><rect width="160" height="68" fill="url(#lake-sky)"/><circle cx="125" cy="15" r="8" fill="#f6d47d" opacity=".82"/><path d="M0 34 24 16l25 19 28-22 34 24 23-15 26 17v29H0Z" fill="#9bb68b"/><path d="M0 43q25-11 48 0t47 0 65 0v34H0Z" fill="#6f966d"/><path d="M0 47q25-9 49 0t47 0 64 0v25H0Z" fill="url(#lake-water)"/><path d="M8 52q12-4 23 0t23 0m18 0q12-4 23 0t23 0m-73 9q11-3 22 0t22 0m36-7q10-3 20 0" fill="none" stroke="#d4ebe1" stroke-width="1.7" stroke-linecap="round" opacity=".85"/><path d="M8 45V29m0 11-5-7m5 4 5-7m-1 15V33m0 8 5-7m-5 4-4-6m135 12V28m0 13-5-7m5 4 5-7m-1 11V34m0 8 5-7m-5 4-4-6" fill="none" stroke="#547952" stroke-width="2" stroke-linecap="round"/><path d="M65 45q10-7 20 0-10 7-20 0Z" fill="#f0d39a" stroke="#7c795a" stroke-width="1.2"/><path d="m82 44 5-4v10l-5-4" fill="#e7c27a"/><circle cx="72" cy="45" r="1" fill="#365b4c"/><path d="M73 23q5-5 10 0m-7 5q4-4 8 0" fill="none" stroke="#fff8df" stroke-width="1.5" stroke-linecap="round" opacity=".9"/></g>';return n;}
 const button=(text,fn,cls='primary',disabled=false)=>{let b=el('button',text,cls);b.type='button';b.disabled=disabled;b.onclick=fn;return b;};
 const itemName=id=>S.catalog?.items[id]?.name||id;
@@ -1562,10 +1562,12 @@ function renderTrips(p,category){
   if(trip.game?.state==='done')c.append(el('p',bonusLine(trip,itemName),'note'));
   // UI_RULES §9: one primary action, the hint under its button, the destructive action apart in its own zone.
   const stack=el('div',null,'qw-btn-stack trip-actions'),ready=trip.ready_at<=now(),playable=trip.game?.state!=='done'&&canPlay(trip,now());
-  const play=()=>[button(fishing?'Порыбачить самому':felling?'Валить самому':'Пройтись самому',()=>launchTripGame(trip),`qw-btn ${ready?'secondary':'primary'} wide`),el('p',fishing?'Самому — до +25% улова':felling?'Самому — до ×1,6 древесины':'Самому — до +25% находок','qw-btn-hint')];
+  const play=()=>[button(fishing?'Порыбачить самому':felling?'Валить самому':'Пройтись самому',()=>launchTripGame(trip),`qw-btn ${ready&&!felling?'secondary':'primary'} wide`),el('p',fishing?'Самому — до +25% улова':felling?'Самому — до ×1,6 древесины':'Самому — до +25% находок','qw-btn-hint')];
   if(ready){
    const row=el('div',null,'qw-btn-row trip-row'),collect=button(fishing?'Забрать улов':felling?'Забрать брёвна':'Разобрать корзину',()=>command('collect_trip',{trip:trip.id}),'qw-btn primary');
-   if(playable){const [b,hint]=play();b.classList.remove('wide');row.append(b,collect);stack.append(row,hint);}else{collect.classList.add('wide');stack.append(collect);}
+   // Felling: the hand-played saw goes first and is the main action; collecting the base logs is secondary below it.
+   if(playable&&felling){const [b,hint]=play();collect.classList.replace('primary','secondary');collect.classList.add('wide');stack.append(b,hint,collect);}
+   else if(playable){const [b,hint]=play();b.classList.remove('wide');row.append(b,collect);stack.append(row,hint);}else{collect.classList.add('wide');stack.append(collect);}
   }else{
    if(playable)stack.append(...play());
    const wait=el('p',fishing?'Улов можно будет забрать через ':felling?'Брёвна можно будет забрать через ':'Корзину можно будет разобрать через ','note qw-btn-hint');wait.append(timer(trip.ready_at));stack.append(wait);

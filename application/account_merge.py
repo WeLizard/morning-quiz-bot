@@ -53,6 +53,7 @@ MERGE_POLICY = {
     ('rooms', 'owner_account_id'): 'move',
     ('room_memberships', 'account_id'): 'union',
     ('room_invites', 'created_by_account_id'): 'move',
+    ('room_join_attempts', 'account_id'): 'history',  # rate-limit ledger, expires on its own
     ('guest_sessions', 'account_id'): 'move',
     ('users', 'account_id'): 'move',
     ('game_players', 'account_id'): 'move_no_conflict',

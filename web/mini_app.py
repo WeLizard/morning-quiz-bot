@@ -1,6 +1,7 @@
 """Player ASGI service for browser guests and Telegram Mini App."""
 import asyncio
 from collections import deque
+from hashlib import sha256
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import ipaddress
@@ -11,6 +12,7 @@ import re
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
@@ -32,8 +34,12 @@ class MiniAppSettings:
     offline: bool = False
     bot_username: str = ''
     telegram_proxy: str = field(default='', repr=False)
+    # Registered Main Mini App short name for t.me/<bot>/<short>?startapp=...; '' = bot-level link.
+    mini_app_short_name: str = 'play'
 
     def __post_init__(self):
+        if self.mini_app_short_name and not re.fullmatch(r'[A-Za-z0-9_]{3,30}', self.mini_app_short_name):
+            raise ValueError('Invalid Telegram Mini App short name')
         if self.bot_username and not re.fullmatch(r'[A-Za-z0-9_]{5,32}', self.bot_username):
             raise ValueError('Invalid Telegram bot username')
         if self.bot_token and not re.fullmatch(r'[0-9]+:[A-Za-z0-9_-]{30,}', self.bot_token):
@@ -59,6 +65,7 @@ class MiniAppSettings:
             os.getenv('MINI_APP_OFFLINE', '') == '1',
             os.getenv('MINI_APP_BOT_USERNAME', ''),
             os.getenv('TELEGRAM_PROXY_URL', '').strip(),
+            os.getenv('MINI_APP_SHORT_NAME', 'play').strip(),
         )
 
 
@@ -158,11 +165,78 @@ class RequestLimits:
     write bucket instead of sharing the general 120/min that is meant for the other games' writes."""
     def __init__(self, clock=time.monotonic):
         self.clock, self.global_requests, self.frequent_reads, self.farm_writes, self.clients = clock, deque(), deque(), deque(), {}
+        self.room_requests, self.accounts, self.auth_failures, self.trusted = deque(), {}, {}, {}
+        self._accounts_swept = 0.0
 
-    def allow(self, client, auth=False, frequent_read=False, farm_write=False):
+    ROOM_ACCOUNT_LIMIT = 300  # per account and minute: a table polls lobby, role and chat about once a second each
+    ROOM_CLIENT_LIMIT = 1500  # per address with a session cookie: several players behind one NAT
+    ROOM_GLOBAL_LIMIT = 4000
+
+    ROOM_AUTH_FAIL_LIMIT = 20  # 401 answers per address and minute before unknown cookies lose the wide bucket
+    TRUSTED_TTL = 600
+    MAX_TRACKED = 20000
+
+    def allow_account(self, account_id):
+        """Per-account bucket for room/Mafia traffic, charged after authentication."""
         now = self.clock()
-        global_bucket = self.farm_writes if farm_write else self.frequent_reads if frequent_read else self.global_requests
-        global_limit = 3000 if farm_write else 5000 if frequent_read else 600
+        if now - self._accounts_swept > 30:  # sweep idle accounts now and then, not on every call
+            self._accounts_swept = now
+            self.accounts = {key: values for key, values in self.accounts.items() if values and values[-1] > now - 60}
+        bucket = self.accounts.setdefault(account_id, deque())
+        while bucket and bucket[0] <= now - 60:
+            bucket.popleft()
+        if len(bucket) >= self.ROOM_ACCOUNT_LIMIT:
+            return False
+        bucket.append(now)
+        return True
+
+    @staticmethod
+    def cookie_shape(value):
+        """Both session cookies are 43 URL-safe characters; anything else cannot be a session."""
+        return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_-]{43}', value) is not None
+
+    @staticmethod
+    def _cookie_key(client, cookie):
+        return client, sha256(cookie.encode('ascii')).digest()[:12]
+
+    def note_auth_failure(self, client):
+        now = self.clock()
+        bucket = self.auth_failures.setdefault(client, deque())
+        while bucket and bucket[0] <= now - 60:
+            bucket.popleft()
+        bucket.append(now)
+        if len(self.auth_failures) > self.MAX_TRACKED:
+            self.auth_failures = {key: values for key, values in self.auth_failures.items()
+                                  if values and values[-1] > now - 60}
+
+    def note_authenticated(self, client, cookie):
+        """Remember a cookie that a room route accepted, so a noisy neighbour cannot demote it."""
+        now = self.clock()
+        if len(self.trusted) > self.MAX_TRACKED:
+            self.trusted = {key: at for key, at in self.trusted.items() if at > now - self.TRUSTED_TTL}
+        if len(self.trusted) <= self.MAX_TRACKED:
+            self.trusted[self._cookie_key(client, cookie)] = now
+
+    def room_bucket_for(self, client, cookies):
+        """Wide room bucket only for a well-formed cookie and, once this address keeps failing
+        authentication, only for a cookie that was accepted here recently. Others use the strict bucket."""
+        shaped = [value for value in cookies if self.cookie_shape(value)]
+        if not shaped:
+            return False
+        now = self.clock()
+        failures = self.auth_failures.get(client)
+        while failures and failures[0] <= now - 60:
+            failures.popleft()
+        if failures and len(failures) >= self.ROOM_AUTH_FAIL_LIMIT:
+            seen = [self.trusted.get(self._cookie_key(client, value)) for value in shaped]
+            return any(at is not None and at > now - self.TRUSTED_TTL for at in seen)
+        return True
+
+    def allow(self, client, auth=False, frequent_read=False, farm_write=False, room=False):
+        now = self.clock()
+        global_bucket = (self.farm_writes if farm_write else self.frequent_reads if frequent_read
+                         else self.room_requests if room else self.global_requests)
+        global_limit = 3000 if farm_write else 5000 if frequent_read else self.ROOM_GLOBAL_LIMIT if room else 600
         while global_bucket and global_bucket[0] <= now - 60:
             global_bucket.popleft()
         if len(global_bucket) >= global_limit:
@@ -171,9 +245,10 @@ class RequestLimits:
         self.clients = {key: values for key, values in self.clients.items() if values[-1] > now - 60}
         # A frequent, read-only game refresh must not consume the much smaller
         # bucket for login or write operations from the same Telegram client.
-        key = (client, auth, frequent_read, farm_write)
+        key = (client, auth, frequent_read, farm_write, room)
         recent = [value for value in self.clients.get(key, ()) if value > now - 60]
-        per_client_limit = 10 if auth else 300 if farm_write else 600 if frequent_read else 120
+        per_client_limit = (10 if auth else 300 if farm_write else 600 if frequent_read
+                            else self.ROOM_CLIENT_LIMIT if room else 120)
         if len(recent) >= per_client_limit:
             return False
         self.clients[key] = recent + [now]
@@ -224,6 +299,31 @@ SHELL_DIR = Path(__file__).parent / 'shell'
 # vendor/telegram-web-app.js: pinned Telegram SDK, loaded by qw-shell.js only for Telegram launches (UI_RULES §7).
 SHELL_ASSETS = frozenset({'qw-tokens.css', 'qw-shell.css', 'qw-shell.js', 'vendor/telegram-web-app.js'})
 SHELL_ASSET_PATHS = frozenset('/app/shell/' + name for name in SHELL_ASSETS)
+# «Ночной город»: art of the client kit (web/mini_client/night), served at /app/night/<path>.
+#   night/*.webp                      older style-A art (nothing in the client points at it any more)
+#   night/shell/*                     the neutral shell: shell.json (background slots), skyline.svg, icons.svg, grain.webp, WeLizardNoir-Regular.woff2
+#   night/worlds/index.json           the list of world packs
+#   night/worlds/<id>/pack.json, *.webp   one world pack
+# Only files that exist at start-up are served, and only from this fixed list of folders and suffixes.
+NIGHT_DIR = Path(__file__).parent / 'mini_client' / 'night'
+NIGHT_FOLDERS = {'shell': frozenset({'.svg', '.webp', '.woff2', '.json'}), 'worlds': frozenset({'.json', '.webp'})}
+
+
+def _night_assets():
+    found = {path.name for path in NIGHT_DIR.glob('*.webp')}
+    for folder, suffixes in NIGHT_FOLDERS.items():
+        for path in (NIGHT_DIR / folder).rglob('*'):
+            parts = path.relative_to(NIGHT_DIR / folder).parts
+            if path.is_file() and path.suffix in suffixes and len(parts) <= 2 \
+                    and all(re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]*', part) for part in parts):
+                found.add(f'{folder}/' + '/'.join(parts))
+    return frozenset(found)
+
+
+NIGHT_ASSETS = _night_assets()
+NIGHT_ASSET_PATHS = frozenset('/app/night/' + name for name in NIGHT_ASSETS)
+CLIENT_ASSETS = frozenset({'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js', 'rating-ui.js', 'styles.css',
+                           'night-city-ui.js', 'night-city.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'})
 
 
 def create_app(*, database=None, settings=None, membership=None, clock=time.time, allowed_user_ids=None,
@@ -314,6 +414,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     from web.telegram_share import TelegramShare
     app.state.telegram_share = (None if settings.offline or not settings.bot_token
                                 else TelegramShare(settings.bot_token, proxy=settings.telegram_proxy))
+    from application import room_limits as _room_limits
+    _room_limits.configure_code_secret(settings.bot_token)  # persistent HMAC key for short invite codes
     mini_cookie = 'mqb_mini'
     mini_cookie_secure = urlsplit(settings.origin).scheme == 'https'
 
@@ -341,13 +443,15 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         public_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app', '/app/alchemy', '/app/app.js', '/app/address.js', '/app/telegram-ui.js', '/app/play-ui.js', '/app/rating-ui.js', '/app/styles.css', '/app/host.webp', '/app/photo.webp', '/app/mafia.webp', '/app/alchemy.webp', '/app/host-card.webp', '/app/mafia-card.webp', '/app/farm-card-v2.webp'}
         public_page = public_page or (request.method in {'GET', 'HEAD'} and
             (request.url.path == '/app/farm' or request.url.path.startswith('/app/farm/assets/')
-             or request.url.path in SHELL_ASSET_PATHS))
+             or request.url.path in SHELL_ASSET_PATHS or request.url.path in NIGHT_ASSET_PATHS
+             or request.url.path in {'/app/night-city-ui.js', '/app/night-city.css'}))
         # Файлы интерфейса — не API: их качает каждый клиент при каждом открытии, и за общим
         # NAT/VPN они съедали лимит API. Персональный /app/alchemy (с гостевым cookie) ходит в БД,
         # его оставляем под лимитом и без кэша.
         static_request = public_page and not (request.url.path == '/app/alchemy' and request.cookies.get('mqb_guest'))
         farm_rate = getattr(app.state, 'farm_shared_rate', None)
         shared_farm_api = farm_rate is not None and request.url.path.startswith('/api/farm/v1/')
+        room_route = request.url.path.startswith('/api/guest/rooms')
         origin = f'{request.url.scheme}://{request.url.netloc}'
         allowed = origin == settings.origin
         if request.url.scheme != 'https':
@@ -378,7 +482,13 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         elif not static_request and not shared_farm_api and not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
                 request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/mini/session/resume', '/api/guest/start', '/api/guest/resume', '/api/account/register', '/api/account/login', '/api/account/telegram-login/start', '/api/account/telegram-login/complete', '/api/account/password', '/api/account/credentials', '/api/account/telegram-login/merge', '/api/account/telegram-link/merge'},
                 frequent_read=request.url.path.startswith('/api/farm/') and request.method in {'GET', 'HEAD'},
-                farm_write=request.url.path.startswith('/api/farm/') and request.method not in {'GET', 'HEAD'}):
+                farm_write=request.url.path.startswith('/api/farm/') and request.method not in {'GET', 'HEAD'},
+                # Authenticated room/Mafia traffic: wide address bucket (players share an address);
+                # the real per-account limit is charged in room_principal. A request without any session
+                # cookie stays in the strict general bucket.
+                room=room_route and limits.room_bucket_for(
+                    request.client.host if request.client else '',
+                    (request.cookies.get(guest_cookie), request.cookies.get(mini_cookie)))):
             response = JSONResponse({'detail': 'Слишком много запросов'}, 429, headers={'Retry-After': '60'})
         else:
             if shared_farm_api:
@@ -392,6 +502,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                     response = await call_next(request)
             else:
                 response = await call_next(request)
+                if room_route:
+                    # Feeds room_bucket_for: a garbage cookie that keeps failing loses the wide bucket.
+                    client = request.client.host if request.client else ''
+                    cookies = [value for value in (request.cookies.get(guest_cookie), request.cookies.get(mini_cookie))
+                               if limits.cookie_shape(value)]
+                    if response.status_code == 401 and cookies:
+                        limits.note_auth_failure(client)
+                    elif cookies and response.status_code < 400:
+                        for value in cookies:
+                            limits.note_authenticated(client, value)
         # Страницу фермы кэшировать нельзя: она сама отдаёт no-store (ссылки-приглашения).
         cacheable = static_request and response.status_code == 200 and request.url.path != '/app/farm'
         if cacheable and _etag_matches(request, response):
@@ -407,7 +527,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             del response.headers['Pragma']
             response.headers['Cache-Control'] = static_cache_control(request.url.path)
         if public_page:
-            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
+            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
         if static_game_page:
             # Одиночная игра собирается в один HTML: стили, скрипты и графика лежат
             # внутри документа. Политика мини-аппа со `default-src 'none'` такие
@@ -513,6 +633,12 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(404, 'Файл не найден')
         return FileResponse(SHELL_DIR / asset)
 
+    @app.get('/app/night/{asset:path}')
+    async def night_asset(asset: str):
+        if asset not in NIGHT_ASSETS:
+            raise MiniAppError(404, 'Файл не найден')
+        return FileResponse(NIGHT_DIR / asset, media_type='font/woff2' if asset.endswith('.woff2') else None)
+
     @app.get('/app/{asset}')
     async def frontend_asset(asset: str):
         if asset == 'host.webp':
@@ -523,7 +649,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-mafia.webp')
         if asset == 'alchemy.webp':
             return FileResponse(Path(__file__).parent / 'prototypes' / 'mini-app' / 'assets' / 'host-atlas.webp')
-        if asset not in {'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js', 'rating-ui.js', 'styles.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'}:
+        if asset not in CLIENT_ASSETS:
             raise MiniAppError(404, 'Файл не найден')
         return FileResponse(Path(__file__).parent / 'mini_client' / asset)
 
@@ -787,10 +913,49 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(exc.status, exc.message, code=exc.code) from None
         return JSONResponse({'accepted': True, 'report_id': report_id, 'new': is_new}, 202)
 
+    def room_identity(request: Request, identity):
+        """Pick the channel for a room route; the guest switch applies to the guest channel only.
+
+        With both cookies and no explicit ``identity`` the choice stays open (None) and
+        ``resolve_principal`` answers ``identity_required`` instead of guessing.
+        """
+        if identity is None:
+            guest, telegram = request.cookies.get(guest_cookie), request.cookies.get(mini_cookie)
+            if guest and telegram:
+                return None
+            identity = 'telegram' if telegram else 'guest'
+        if identity == 'guest':
+            guest_access()
+        return identity
+
+    @asynccontextmanager
+    async def room_principal(request: Request, identity, *, lock=False, write=False):
+        """``(session, Principal)`` for room routes: Telegram Mini App and guest/password alike."""
+        from web.principal import PrincipalError, resolve_principal
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=lock, write=write,
+                                         identity=identity) as pair:
+                if not limits.allow_account(pair[1].account_id):
+                    raise MiniAppError(429, 'Слишком много запросов')
+                yield pair
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
+
+    def room_invite_links(invite_code: str) -> dict:
+        from modules.mini_app_launch import room_invite_param, startapp_url
+        param = room_invite_param(invite_code)
+        try:
+            telegram_url = startapp_url(settings.bot_username, param, settings.mini_app_short_name)
+        except ValueError:
+            telegram_url = None
+        return {'telegram_url': telegram_url, 'startapp_param': param,
+                'web_url': f'{settings.origin}/app#room={invite_code}'}  # fragment: never reaches logs or Referer
+
     @app.post('/api/guest/rooms')
-    async def guest_create_room(request: Request):
+    async def guest_create_room(request: Request, identity: str | None = Query(None)):
         from application.rooms import RoomApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
         raw = await bounded_request_body(request, max_bytes=2000)
@@ -800,19 +965,19 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректные параметры комнаты') from None
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+        async with room_principal(request, identity, write=True) as (session, who):
             try:
                 return await RoomApplicationService(session).create(
-                    account_id=account.id, request_id=value['request_id'], title=value['title'])
+                    account_id=UUID(who.account_id), request_id=value['request_id'], title=value['title'])
             except RuntimeError as error:
                 raise MiniAppError(409, str(error)) from None
             except ValueError as error:
                 raise MiniAppError(400, str(error)) from None
 
     @app.post('/api/guest/rooms/{room_id}/invites')
-    async def guest_create_room_invite(request: Request, room_id: str):
+    async def guest_create_room_invite(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.rooms import RoomApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
         raw = await bounded_request_body(request, max_bytes=2000)
@@ -823,105 +988,185 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректные параметры приглашения') from None
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
-                return await RoomApplicationService(session).create_invite(
-                    account_id=account.id, room_id=room_id,
+                invite = await RoomApplicationService(session).create_invite(
+                    account_id=UUID(who.account_id), room_id=room_id,
                     expires_in_seconds=value['expires_in_seconds'], max_uses=value['max_uses'],
                 )
+                # The bearer code exists only in this response, so the ready links are built here.
+                return {**invite, **room_invite_links(invite['invite_code'])}
             except ValueError as error:
                 raise MiniAppError(400, str(error)) from None
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
+            except RuntimeError as error:  # no free short code after several tries: retry shortly
+                raise MiniAppError(503, str(error)) from None
 
     @app.get('/api/guest/rooms/{room_id}/invites')
-    async def guest_list_room_invites(request: Request, room_id: str):
+    async def guest_list_room_invites(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.rooms import RoomApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity) as (session, who):
             try:
                 return {'items': await RoomApplicationService(session).list_invites(
-                    account_id=account.id, room_id=room_id)}
+                    account_id=UUID(who.account_id), room_id=room_id)}
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
 
     @app.delete('/api/guest/rooms/{room_id}/invites/{invite_id}')
-    async def guest_revoke_room_invite(request: Request, room_id: str, invite_id: str):
+    async def guest_revoke_room_invite(request: Request, room_id: str, invite_id: str, identity: str | None = Query(None)):
         from application.rooms import RoomApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
                 await RoomApplicationService(session).revoke_invite(
-                    account_id=account.id, room_id=room_id, invite_id=invite_id)
+                    account_id=UUID(who.account_id), room_id=room_id, invite_id=invite_id)
                 return Response(status_code=204)
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
 
+    def rate_limited(error) -> JSONResponse:
+        return JSONResponse({'detail': str(error), 'code': 'rate_limited'}, 429,
+                            headers={'Retry-After': str(error.retry_after)})
+
     @app.post('/api/guest/rooms/join')
-    async def guest_join_room(request: Request):
-        from application.rooms import RoomApplicationService
-        guest_access()
+    async def guest_join_room(request: Request, identity: str | None = Query(None)):
+        """Join by the long link token (``invite_code``) or the typed short code (``short_code``)."""
+        from application.rooms import InviteRejected, RoomApplicationService, RoomRateLimited
+        from domain.night_worlds import AgeConfirmRequired
+        identity = room_identity(request, identity)
         if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             raise MiniAppError(415, 'Ожидается JSON')
         raw = await bounded_request_body(request, max_bytes=2000)
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
-            if not isinstance(value, dict) or set(value) != {'invite_code'}:
+            if (not isinstance(value, dict) or set(value) - {'invite_code', 'short_code', 'age_ok'}
+                    or len(set(value) & {'invite_code', 'short_code'}) != 1 or type(value.get('age_ok', False)) is not bool):
                 raise ValueError()
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректный код приглашения') from None
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        from storage import problem_reports
+        client = problem_reports.ip_hash(settings.bot_token, request.client.host if request.client else '')
+        async with room_principal(request, identity, lock=True) as (session, who):
+            service = RoomApplicationService(session)
             try:
-                return await RoomApplicationService(session).join_by_invite(
-                    account_id=account.id, invite_code=value['invite_code'])
+                if 'short_code' in value:
+                    return await service.join_by_short_code(
+                        account_id=UUID(who.account_id), code=value['short_code'], client=client, age_ok=value.get('age_ok', False))
+                return await service.join_by_invite(
+                    account_id=UUID(who.account_id), invite_code=value['invite_code'], age_ok=value.get('age_ok', False))
+            except InviteRejected as error:
+                # Answered INSIDE the transaction so that the failed attempt stays counted.
+                return JSONResponse({'detail': str(error), 'code': 'invite_' + error.reason,
+                                     'reason': error.reason, 'room_title': error.room_title},
+                                    404 if error.reason == 'unknown' else 410)
+            except RoomRateLimited as error:
+                return rate_limited(error)
+            except AgeConfirmRequired as error:
+                raise MiniAppError(422, str(error), code=error.code) from None
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
 
-    @app.get('/api/guest/rooms')
-    async def guest_list_rooms(request: Request):
+    @app.get('/api/guest/rooms/open')
+    async def guest_list_open_rooms(request: Request, identity: str | None = Query(None)):
         from application.rooms import RoomApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
-            return {'items': await RoomApplicationService(session).list_mine(account_id=account.id)}
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity) as (session, who):
+            return {'items': await RoomApplicationService(session).list_open(account_id=UUID(who.account_id))}
+
+    @app.post('/api/guest/rooms/{room_id}/open')
+    async def guest_set_room_open(request: Request, room_id: str, identity: str | None = Query(None)):
+        from application.rooms import RoomApplicationService
+        identity = room_identity(request, identity)
+        value = await guest_mafia_json(request, keys={'open'}, error_message='Некорректная команда комнаты')
+        async with room_principal(request, identity, lock=True) as (session, who):
+            try:
+                return await RoomApplicationService(session).set_open(
+                    account_id=UUID(who.account_id), room_id=room_id, open=value['open'])
+            except LookupError as error:
+                raise MiniAppError(404, str(error)) from None
+            except ValueError as error:
+                raise MiniAppError(400, str(error)) from None
+
+    @app.post('/api/guest/rooms/{room_id}/join-open')
+    async def guest_join_open_room(request: Request, room_id: str, identity: str | None = Query(None)):
+        """Sit at (or wait for) the table of an open room without a code."""
+        from application.mafia import MafiaApplicationService
+        from application.rooms import RoomRateLimited
+        from domain.night_worlds import AgeConfirmRequired
+        identity = room_identity(request, identity)
+        value = await guest_mafia_json(request, keys=set(), optional=frozenset({'age_ok'}))
+        if type(value.get('age_ok', False)) is not bool:
+            raise MiniAppError(400, 'Некорректная команда комнаты')
+        command_id = guest_mafia_command_id(request, identity)
+        try:
+            async with room_principal(request, identity, lock=True) as (session, who):
+                try:
+                    return await MafiaApplicationService(session).room_join_open(
+                        room_id=room_id, account_id=UUID(who.account_id),
+                        name=who.display_name or 'Игрок', command_id=command_id, age_ok=value.get('age_ok', False))
+                except AgeConfirmRequired as error:
+                    raise MiniAppError(422, str(error), code=error.code) from None
+                except LookupError as error:
+                    raise MiniAppError(404, str(error)) from None
+                except PermissionError as error:
+                    raise MiniAppError(403, str(error), code='removed_from_room') from None
+                except (RuntimeError, ValueError) as error:
+                    raise MiniAppError(409, str(error), code='table_full' if 'полон' in str(error) or '12' in str(error) else None) from None
+        except RoomRateLimited as error:  # raised before any change: the transaction is rolled back
+            return rate_limited(error)
+
+    @app.get('/api/guest/rooms')
+    async def guest_list_rooms(request: Request, identity: str | None = Query(None)):
+        from application.rooms import RoomApplicationService
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity) as (session, who):
+            return {'items': await RoomApplicationService(session).list_mine(account_id=UUID(who.account_id))}
 
     @app.post('/api/guest/rooms/{room_id}/leave')
-    async def guest_leave_room(request: Request, room_id: str):
-        from application.rooms import RoomApplicationService
-        guest_access()
+    async def guest_leave_room(request: Request, room_id: str, identity: str | None = Query(None)):
+        from application.rooms import RoomApplicationService, RoomRateLimited
+        identity = room_identity(request, identity)
         value = await guest_mafia_json(request, keys={'membership_version'},
                                       error_message='Некорректная команда выхода')
         # Shared moderation fence is acquired by authorized. Avoid an Account
         # FOR UPDATE before game locks (game writes may need Account FK locks).
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=False) as (session, account, _):
-            try:
-                return await RoomApplicationService(session).leave(
-                    account_id=account.id, room_id=room_id,
-                    membership_version=value['membership_version'])
-            except LookupError as error:
-                raise MiniAppError(404, str(error)) from None
-            except PermissionError as error:
-                raise MiniAppError(403, str(error)) from None
-            except ValueError as error:
-                raise MiniAppError(400, str(error)) from None
-            except RuntimeError as error:
-                raise MiniAppError(409, str(error)) from None
+        try:
+            async with room_principal(request, identity, write=True) as (session, who):
+                try:
+                    return await RoomApplicationService(session).leave(
+                        account_id=UUID(who.account_id), room_id=room_id,
+                        membership_version=value['membership_version'])
+                except LookupError as error:
+                    raise MiniAppError(404, str(error)) from None
+                except PermissionError as error:
+                    raise MiniAppError(403, str(error)) from None
+                except ValueError as error:
+                    raise MiniAppError(400, str(error)) from None
+                except RuntimeError as error:
+                    raise MiniAppError(409, str(error)) from None
+        except RoomRateLimited as error:  # raised before any change: the transaction is rolled back
+            return rate_limited(error)
 
     @app.get('/api/guest/rooms/{room_id}')
-    async def guest_get_room(request: Request, room_id: str):
+    async def guest_get_room(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.rooms import RoomApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity) as (session, who):
             try:
                 return await RoomApplicationService(session).get_mine(
-                    account_id=account.id, room_id=room_id)
+                    account_id=UUID(who.account_id), room_id=room_id)
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
 
-    def guest_mafia_command_id(request: Request) -> str:
+    def guest_mafia_command_id(request: Request, identity=None) -> str:
         value = request.headers.get('idempotency-key')
         if value is None or not re.fullmatch(r'[A-Za-z0-9._:-]{8,64}', value):
             raise MiniAppError(400, 'Не указан корректный идентификатор команды')
-        return 'guest:' + value if len(value) <= 58 else value
+        # Each channel keeps its own key space; the guest prefix is unchanged for old clients.
+        prefix = 'mini:' if identity == 'telegram' else 'guest:'
+        return prefix + value if len(prefix + value) <= 64 else value
 
     async def guest_mafia_json(request: Request, *, keys: set[str], max_bytes: int = 500,
                                error_message: str = 'Некорректная команда Mafia', optional: frozenset = frozenset()):
@@ -936,9 +1181,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, error_message) from None
 
-    async def guest_classic_call(request, room_id, action):
+    async def guest_classic_call(request, room_id, action, identity=None):
         from application.room_classic import RoomClassicApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         values = {}
         command_id = None
         if action not in {'current', 'setup'}:
@@ -946,7 +1191,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             values = await guest_mafia_json(request, keys=keys, **(
                 {'optional': frozenset({'category_mode', 'categories', 'random_categories'}), 'max_bytes': 4000}
                 if action == 'start' else {}))
-            command_id = guest_mafia_command_id(request)
+            command_id = guest_mafia_command_id(request, identity)
             if action != 'start' and (not isinstance(values.get('game_id'), str) or not 1 <= len(values['game_id']) <= 64):
                 raise MiniAppError(400, 'Некорректная викторина')
             if action == 'answer' and (not isinstance(values['round_id'], str) or not 1 <= len(values['round_id']) <= 64 or type(values['selected_option']) is not int):
@@ -954,16 +1199,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         try:
             # Translate failures outside the transaction so receipts, scores and
             # random selection are rolled back together on rejected commands.
-            async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+            async with room_principal(request, identity, write=True) as (session, who):
                 service = RoomClassicApplicationService(session, rules=scoring_rules)
                 if action == 'current':
-                    return {'current': await service.current(room_id=room_id, account_id=account.id)}
+                    return {'current': await service.current(room_id=room_id, account_id=UUID(who.account_id))}
                 if action == 'setup':
-                    return await service.setup(room_id=room_id, account_id=account.id)
+                    return await service.setup(room_id=room_id, account_id=UUID(who.account_id))
                 if action == 'start':
-                    return await service.start(room_id=room_id, account_id=account.id, command_id=command_id,
+                    return await service.start(room_id=room_id, account_id=UUID(who.account_id), command_id=command_id,
                         enabled=room_classic_enabled, **values)
-                return await service.command(room_id=room_id, account_id=account.id, command_id=command_id,
+                return await service.command(room_id=room_id, account_id=UUID(who.account_id), command_id=command_id,
                                              kind=action, **values)
         except LookupError as error:
             raise MiniAppError(404, str(error)) from None
@@ -975,28 +1220,28 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(400, str(error)) from None
 
     @app.get('/api/guest/rooms/{room_id}/classic/current')
-    async def guest_classic_current(request: Request, room_id: str):
-        return await guest_classic_call(request, room_id, 'current')
+    async def guest_classic_current(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_classic_call(request, room_id, 'current', identity)
 
     @app.get('/api/guest/rooms/{room_id}/classic/setup')
-    async def guest_classic_setup(request: Request, room_id: str):
-        return await guest_classic_call(request, room_id, 'setup')
+    async def guest_classic_setup(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_classic_call(request, room_id, 'setup', identity)
 
     @app.post('/api/guest/rooms/{room_id}/classic/start')
-    async def guest_classic_start(request: Request, room_id: str):
-        return await guest_classic_call(request, room_id, 'start')
+    async def guest_classic_start(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_classic_call(request, room_id, 'start', identity)
 
     @app.post('/api/guest/rooms/{room_id}/classic/answer')
-    async def guest_classic_answer(request: Request, room_id: str):
-        return await guest_classic_call(request, room_id, 'answer')
+    async def guest_classic_answer(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_classic_call(request, room_id, 'answer', identity)
 
     @app.post('/api/guest/rooms/{room_id}/classic/stop')
-    async def guest_classic_stop(request: Request, room_id: str):
-        return await guest_classic_call(request, room_id, 'stop')
+    async def guest_classic_stop(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_classic_call(request, room_id, 'stop', identity)
 
-    async def guest_photo_call(request, room_id, action):
+    async def guest_photo_call(request, room_id, action, identity=None):
         from application.room_photo import RoomPhotoApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         values = {}
         command_id = None
         if action not in {'current', 'setup', 'image'}:
@@ -1004,16 +1249,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                     else {'game_id', 'round_id', 'answer'} if action == 'answer'
                     else {'game_id', 'expected_revision'})
             values = await guest_mafia_json(request, keys=keys)
-            command_id = guest_mafia_command_id(request)
+            command_id = guest_mafia_command_id(request, identity)
             if action != 'start' and (not isinstance(values.get('game_id'), str) or not 1 <= len(values['game_id']) <= 64):
                 raise MiniAppError(400, 'Некорректная фото-серия')
             if action == 'answer' and (not isinstance(values['round_id'], str)
                     or not 1 <= len(values['round_id']) <= 64 or not isinstance(values['answer'], str)):
                 raise MiniAppError(400, 'Некорректный ответ')
         try:
-            async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+            async with room_principal(request, identity, write=True) as (session, who):
                 service = RoomPhotoApplicationService(session)
-                scope = {'room_id': room_id, 'account_id': account.id}
+                scope = {'room_id': room_id, 'account_id': UUID(who.account_id)}
                 if action == 'current':
                     result = await service.current(**scope)
                     occupied = bool(result and result.get('occupied'))
@@ -1039,53 +1284,53 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(400, str(error)) from None
 
     @app.get('/api/guest/rooms/{room_id}/photo/setup')
-    async def guest_photo_setup(request: Request, room_id: str):
-        return await guest_photo_call(request, room_id, 'setup')
+    async def guest_photo_setup(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_photo_call(request, room_id, 'setup', identity)
 
     @app.get('/api/guest/rooms/{room_id}/photo/current')
-    async def guest_photo_current(request: Request, room_id: str):
-        return await guest_photo_call(request, room_id, 'current')
+    async def guest_photo_current(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_photo_call(request, room_id, 'current', identity)
 
     @app.get('/api/guest/rooms/{room_id}/photo/current/image')
-    async def guest_photo_image(request: Request, room_id: str):
-        return await guest_photo_call(request, room_id, 'image')
+    async def guest_photo_image(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_photo_call(request, room_id, 'image', identity)
 
     @app.post('/api/guest/rooms/{room_id}/photo/start')
-    async def guest_photo_start(request: Request, room_id: str):
-        return await guest_photo_call(request, room_id, 'start')
+    async def guest_photo_start(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_photo_call(request, room_id, 'start', identity)
 
     @app.post('/api/guest/rooms/{room_id}/photo/answer')
-    async def guest_photo_answer(request: Request, room_id: str):
-        return await guest_photo_call(request, room_id, 'answer')
+    async def guest_photo_answer(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_photo_call(request, room_id, 'answer', identity)
 
     @app.post('/api/guest/rooms/{room_id}/photo/stop')
-    async def guest_photo_stop(request: Request, room_id: str):
-        return await guest_photo_call(request, room_id, 'stop')
+    async def guest_photo_stop(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_photo_call(request, room_id, 'stop', identity)
 
     @app.get('/api/guest/rooms/{room_id}/mafia/lobby')
-    async def guest_mafia_lobby(request: Request, room_id: str):
+    async def guest_mafia_lobby(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity, write=True) as (session, who):
             try:
                 return {'lobby': await MafiaApplicationService(session).room_lobby(
-                    room_id=room_id, account_id=account.id)}
+                    room_id=room_id, account_id=UUID(who.account_id))}
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
             except PermissionError as error:
                 raise MiniAppError(404, 'Игровая комната не найдена.') from None
 
     @app.post('/api/guest/rooms/{room_id}/mafia/lobby')
-    async def guest_mafia_create_lobby(request: Request, room_id: str):
+    async def guest_mafia_create_lobby(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         await guest_mafia_json(request, keys=set())
-        command_id = guest_mafia_command_id(request)
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
                 lobby = await MafiaApplicationService(session).create_room_lobby(
-                    room_id=room_id, account_id=account.id,
-                    name=account.display_name or 'Игрок', command_id=command_id,
+                    room_id=room_id, account_id=UUID(who.account_id),
+                    name=who.display_name or 'Игрок', command_id=command_id,
                 )
                 return {'lobby': lobby}
             except LookupError as error:
@@ -1098,16 +1343,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise MiniAppError(409, str(error)) from None
 
     @app.post('/api/guest/rooms/{room_id}/mafia/lobby/join')
-    async def guest_mafia_join(request: Request, room_id: str):
+    async def guest_mafia_join(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         await guest_mafia_json(request, keys=set())
-        command_id = guest_mafia_command_id(request)
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
                 lobby = await MafiaApplicationService(session).room_join(
-                    room_id=room_id, account_id=account.id,
-                    name=account.display_name or 'Игрок', command_id=command_id,
+                    room_id=room_id, account_id=UUID(who.account_id),
+                    name=who.display_name or 'Игрок', command_id=command_id,
                 )
                 return {'lobby': lobby}
             except LookupError as error:
@@ -1118,17 +1363,17 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise MiniAppError(409, str(error)) from None
 
     @app.post('/api/guest/rooms/{room_id}/mafia/lobby/ready')
-    async def guest_mafia_ready(request: Request, room_id: str):
+    async def guest_mafia_ready(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         value = await guest_mafia_json(request, keys={'ready', 'expected_revision'})
         if type(value['ready']) is not bool or type(value['expected_revision']) is not int or value['expected_revision'] < 0:
             raise MiniAppError(400, 'Некорректная готовность')
-        command_id = guest_mafia_command_id(request)
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
                 lobby = await MafiaApplicationService(session).room_ready(
-                    room_id=room_id, account_id=account.id, ready=value['ready'],
+                    room_id=room_id, account_id=UUID(who.account_id), ready=value['ready'],
                     expected_revision=value['expected_revision'], command_id=command_id,
                 )
                 return {'lobby': lobby}
@@ -1142,17 +1387,17 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise MiniAppError(409, str(error)) from None
 
     @app.post('/api/guest/rooms/{room_id}/mafia/lobby/start')
-    async def guest_mafia_start(request: Request, room_id: str):
+    async def guest_mafia_start(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         value = await guest_mafia_json(request, keys={'expected_revision'})
         if type(value['expected_revision']) is not int or value['expected_revision'] < 0:
             raise MiniAppError(400, 'Некорректная ревизия стола')
-        command_id = guest_mafia_command_id(request)
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
                 lobby = await MafiaApplicationService(session).room_start(
-                    room_id=room_id, account_id=account.id,
+                    room_id=room_id, account_id=UUID(who.account_id),
                     expected_revision=value['expected_revision'], command_id=command_id,
                 )
                 return {'lobby': lobby}
@@ -1166,13 +1411,13 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise MiniAppError(409, str(error)) from None
 
     @app.get('/api/guest/rooms/{room_id}/mafia/role')
-    async def guest_mafia_role(request: Request, room_id: str):
+    async def guest_mafia_role(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity, write=True) as (session, who):
             try:
                 role = await MafiaApplicationService(session).room_role(
-                    room_id=room_id, account_id=account.id)
+                    room_id=room_id, account_id=UUID(who.account_id))
             except (LookupError, PermissionError) as error:
                 raise MiniAppError(404, 'Игровая комната не найдена.') from None
             if role is None:
@@ -1180,30 +1425,30 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             return role
 
     @app.get('/api/guest/rooms/{room_id}/mafia/discussion')
-    async def guest_mafia_discussion(request: Request, room_id: str):
+    async def guest_mafia_discussion(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
-        async with guest_store.authorized(request.cookies.get(guest_cookie)) as (session, account, _):
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity, write=True) as (session, who):
             try:
                 return await MafiaApplicationService(session).room_discussion(
-                    room_id=room_id, account_id=account.id)
+                    room_id=room_id, account_id=UUID(who.account_id))
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
             except PermissionError as error:
                 raise MiniAppError(403, str(error)) from None
 
     @app.post('/api/guest/rooms/{room_id}/mafia/discussion')
-    async def guest_mafia_post_discussion(request: Request, room_id: str):
+    async def guest_mafia_post_discussion(request: Request, room_id: str, identity: str | None = Query(None)):
         from application.mafia import MafiaApplicationService
-        guest_access()
+        identity = room_identity(request, identity)
         value = await guest_mafia_json(request, keys={'message'}, max_bytes=5000)
         if not isinstance(value['message'], str):
             raise MiniAppError(400, 'Некорректное сообщение')
-        command_id = guest_mafia_command_id(request)
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
                 return await MafiaApplicationService(session).room_post_discussion(
-                    room_id=room_id, account_id=account.id,
+                    room_id=room_id, account_id=UUID(who.account_id),
                     message=value['message'], command_id=command_id,
                 )
             except LookupError as error:
@@ -1215,7 +1460,80 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             except ValueError as error:
                 raise MiniAppError(409, str(error)) from None
 
-    async def guest_mafia_command(request: Request, room_id: str, method: str, *, target=False):
+    async def guest_table_call(request: Request, room_id: str, method: str, identity, *, keys=frozenset(),
+                                validate=None, with_name=False, as_is=False, optional=frozenset(), drop=()):
+        from application.mafia import MafiaApplicationService
+        identity = room_identity(request, identity)
+        value = await guest_mafia_json(request, keys=set(keys), optional=optional)
+        if validate is not None and not validate(value):
+            raise MiniAppError(400, 'Некорректное действие стола')
+        for name in drop:
+            value.pop(name, None)
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
+            try:
+                kwargs = {'room_id': room_id, 'account_id': UUID(who.account_id), 'command_id': command_id, **value}
+                if with_name:
+                    kwargs['name'] = who.display_name or 'Игрок'
+                result = await getattr(MafiaApplicationService(session), method)(**kwargs)
+                return result if as_is else {'lobby': result}
+            except LookupError as error:
+                raise MiniAppError(404, str(error)) from None
+            except PermissionError as error:
+                raise MiniAppError(403, str(error)) from None
+            except (RuntimeError, ValueError) as error:
+                raise MiniAppError(409, str(error)) from None
+
+    @app.post('/api/guest/rooms/{room_id}/mafia/lobby/wait')
+    async def guest_mafia_wait(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_table_call(request, room_id, 'room_wait', identity, with_name=True)
+
+    @app.post('/api/guest/rooms/{room_id}/mafia/lobby/unseat')
+    async def guest_mafia_unseat(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_table_call(request, room_id, 'room_unseat', identity)
+
+    @app.post('/api/guest/rooms/{room_id}/mafia/lobby/remove')
+    async def guest_mafia_remove(request: Request, room_id: str, identity: str | None = Query(None)):
+        def valid(value):
+            return (type(value['expected_revision']) is int and value['expected_revision'] >= 0
+                    and isinstance(value['target'], str) and re.fullmatch(r'[pw](?:[1-9]|1[0-2])', value['target']))
+        return await guest_table_call(request, room_id, 'room_remove_player', identity,
+                                      keys={'expected_revision', 'target'}, validate=valid)
+
+    @app.post('/api/guest/rooms/{room_id}/mafia/lobby/portrait')
+    async def guest_mafia_portrait(request: Request, room_id: str, identity: str | None = Query(None)):
+        def valid(value):
+            return (type(value['expected_revision']) is int and value['expected_revision'] >= 0
+                    and type(value['portrait']) is int and 1 <= value['portrait'] <= 99)
+        return await guest_table_call(request, room_id, 'room_portrait', identity,
+                                      keys={'expected_revision', 'portrait'}, validate=valid)
+
+    def age_required(world, age_ok):
+        """18+ worlds need the player's own confirmation in the body; 12 and 16 never ask. Nothing is stored."""
+        from domain.night_worlds import AgeConfirmRequired, require_age_ok
+        try:
+            require_age_ok(world, age_ok)
+        except AgeConfirmRequired as error:
+            raise MiniAppError(422, str(error), code=error.code) from None
+
+    @app.post('/api/guest/rooms/{room_id}/world')
+    async def guest_mafia_world(request: Request, room_id: str, identity: str | None = Query(None)):
+        """The host picks the story of the room while the table is still a lobby (Night City world packs)."""
+        from domain.night_worlds import is_world
+
+        def valid(value):
+            if not (type(value['expected_revision']) is int and value['expected_revision'] >= 0):
+                return False
+            if not is_world(value['world']):  # the server's own list, never the files on disk
+                raise MiniAppError(400, 'Неизвестный сюжет.')
+            if 'age_ok' in value and type(value['age_ok']) is not bool:
+                return False
+            age_required(value['world'], value.get('age_ok'))   # 18+: the host confirms it (not stored)
+            return True
+        return await guest_table_call(request, room_id, 'room_set_world', identity, keys={'expected_revision', 'world'},
+                                      optional=frozenset({'age_ok'}), drop=('age_ok',), validate=valid, as_is=True)
+
+    async def guest_mafia_command(request: Request, room_id: str, method: str, *, target=False, identity=None):
         from application.mafia import MafiaApplicationService
         keys = {'expected_revision', 'target'} if target else {'expected_revision'}
         value = await guest_mafia_json(request, keys=keys)
@@ -1223,10 +1541,10 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 or (target and (not isinstance(value['target'], str)
                                 or not re.fullmatch(r'p(?:[1-9]|1[0-2])', value['target'])))):
             raise MiniAppError(400, 'Некорректное действие партии')
-        command_id = guest_mafia_command_id(request)
-        async with guest_store.authorized(request.cookies.get(guest_cookie), lock=True) as (session, account, _):
+        command_id = guest_mafia_command_id(request, identity)
+        async with room_principal(request, identity, lock=True) as (session, who):
             try:
-                kwargs = {'room_id': room_id, 'account_id': account.id,
+                kwargs = {'room_id': room_id, 'account_id': UUID(who.account_id),
                           'expected_revision': value['expected_revision'],
                           'command_id': command_id}
                 if target:
@@ -1242,20 +1560,20 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise MiniAppError(409, str(error)) from None
 
     @app.post('/api/guest/rooms/{room_id}/mafia/action')
-    async def guest_mafia_action(request: Request, room_id: str):
-        return await guest_mafia_command(request, room_id, 'room_action', target=True)
+    async def guest_mafia_action(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_mafia_command(request, room_id, 'room_action', target=True, identity=identity)
 
     @app.post('/api/guest/rooms/{room_id}/mafia/vote')
-    async def guest_mafia_vote(request: Request, room_id: str):
-        return await guest_mafia_command(request, room_id, 'room_vote', target=True)
+    async def guest_mafia_vote(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_mafia_command(request, room_id, 'room_vote', target=True, identity=identity)
 
     @app.post('/api/guest/rooms/{room_id}/mafia/advance')
-    async def guest_mafia_advance(request: Request, room_id: str):
-        return await guest_mafia_command(request, room_id, 'room_advance')
+    async def guest_mafia_advance(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_mafia_command(request, room_id, 'room_advance', identity=identity)
 
     @app.post('/api/guest/rooms/{room_id}/mafia/restart')
-    async def guest_mafia_restart(request: Request, room_id: str):
-        return await guest_mafia_command(request, room_id, 'room_restart')
+    async def guest_mafia_restart(request: Request, room_id: str, identity: str | None = Query(None)):
+        return await guest_mafia_command(request, room_id, 'room_restart', identity=identity)
 
     async def login(request: Request, *, provision=True):
         if not settings.bot_token:

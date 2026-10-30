@@ -7,11 +7,11 @@ import os
 import time
 
 from telegram import InputPollOption, InlineKeyboardButton as Button, InlineKeyboardMarkup, Poll, Update
-from telegram.error import RetryAfter, TelegramError
+from telegram.error import Forbidden, RetryAfter, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler
 
 from application.mafia import MafiaApplicationService
-from modules.mini_app_launch import direct_mafia_link
+from modules.mini_app_launch import direct_mafia_link, room_open_param, short_name_from_env, startapp_url
 from modules.telegram_menu import acknowledge, card
 from storage.repositories import OperationalRepository
 
@@ -21,6 +21,34 @@ logger = logging.getLogger(__name__)
 def command_id(query):
     value = getattr(query, 'id', None)
     return f'tg:{value}' if value else None
+
+
+ROOM_PHASE_LINES = {
+    'night': 'наступила ночь — загляни в партию.',
+    'day': 'наступил день — время обсуждения.',
+    'voting': 'открыто голосование — отдай свой голос.',
+    'finished': 'партия завершена — итоги за столом.',
+}
+
+
+def room_phase_url(bot_username, room_id):
+    """Mini App link that opens one room (``startapp=roomid_<room id>``), or None."""
+    try:
+        return startapp_url(bot_username, room_open_param(room_id), short_name_from_env())
+    except ValueError:
+        return None
+
+
+def render_room_phase(payload: dict, *, url: str | None = None):
+    """Private phase nudge for a room game. Public facts only: never roles, targets or votes."""
+    status = payload.get('status')
+    line = ROOM_PHASE_LINES.get(status)
+    if line is None:
+        return None
+    title = escape(str(payload.get('room_title') or 'комната'))
+    text = f'🌒 <b>Ночной город</b> · {title}: {line}'
+    rows = [[Button('Открыть партию', url=url)]] if url else []
+    return text, rows
 
 
 def render_classic_result(result: dict) -> str:
@@ -381,10 +409,13 @@ class MafiaHandlers:
         kinds = {'mafia.phase', 'classic.question', 'classic.finished',
                  'photo.question', 'photo.hint', 'photo.feedback',
                  'photo.result', 'photo.finished', 'farm.request',
-                 'problem_report.text', 'problem_report.images'}
+                 'problem_report.text', 'problem_report.images', 'mafia.room_phase'}
         # Pause this delivery kind before claiming: pending rows and their deadlines stay intact.
         if os.getenv('MQB_FARM_REQUEST_DELIVERY_ENABLED', '1') == '0':
             kinds.discard('farm.request')
+        # Private room-phase nudges can be paused independently; pending rows are kept.
+        if os.getenv('MQB_ROOM_MAFIA_DELIVERY_ENABLED', '1') == '0':
+            kinds.discard('mafia.room_phase')
         for _ in range(20):
             item = await queue.claim(worker_id, kinds=kinds)
             if item is None:
@@ -397,6 +428,9 @@ class MafiaHandlers:
                     from handlers.problem_report_delivery import deliver as deliver_problem_report
                     await deliver_problem_report(context, self.database, item)
                     await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
+                    continue
+                if item['kind'] == 'mafia.room_phase':
+                    await self._deliver_room_phase(context, queue, worker_id, item)
                     continue
                 if item['kind'] == 'farm.request':
                     payload = item['payload']
@@ -472,6 +506,39 @@ class MafiaHandlers:
                 await queue.uncertain(item['id'], worker_id, type(error).__name__, claim_version=item['claim_version'])
             else:
                 await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
+
+    async def _deliver_room_phase(self, context, queue, worker_id, item):
+        """Send one private room-phase nudge; a closed private chat is a quiet skip."""
+        payload = item['payload']
+        rendered = render_room_phase(
+            payload, url=room_phase_url(getattr(context.bot, 'username', None), payload.get('room_id', '')))
+        stale = rendered is None
+        if not stale:
+            async with self.database.transaction() as session:
+                stale = not await MafiaApplicationService(session).room_phase_is_current(
+                    game_id=item['game_id'], phase_revision=payload.get('phase_revision'))
+        if stale:
+            await queue.skipped(item['id'], worker_id, claim_version=item['claim_version'])
+            return
+        text, rows = rendered
+        try:
+            await context.bot.send_message(
+                item['chat_id'], text, parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup(rows) if rows else None,
+            )
+        except Forbidden:
+            # The player never opened the bot or blocked it: Telegram refuses, nothing to retry.
+            await queue.skipped(item['id'], worker_id, claim_version=item['claim_version'])
+        except RetryAfter as error:
+            seconds = error.retry_after
+            if hasattr(seconds, 'total_seconds'):
+                seconds = seconds.total_seconds()
+            await queue.retry_after(item['id'], worker_id, float(seconds), claim_version=item['claim_version'])
+        except Exception as error:
+            # Unknown outcome of a non-idempotent send: never resend blindly.
+            await queue.uncertain(item['id'], worker_id, type(error).__name__, claim_version=item['claim_version'])
+        else:
+            await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
 
     async def _deliver_photo_question(self, context, item):
         from application.photo import PhotoApplicationService

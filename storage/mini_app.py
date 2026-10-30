@@ -182,9 +182,37 @@ class MiniAppStore:
                     Chat.bot_blocked.is_(False), Chat.is_active.is_(True),
                     (Chat.id == user.id) | ((Chat.id < 0) & Chat.type.in_(['group', 'supergroup']))
                 ).order_by(Chat.id).offset(offset).limit(limit + 1))).all()
+            page = rows[:limit]
+            tables = await self.mafia_tables(session, [chat.id for chat, _ in page if chat.id < 0], user.id)
             return {'items': [{'chat_id': str(chat.id), 'title': chat.title, 'type': chat.type,
-                'own_statistics': self.own_stats(member), 'membership_verified': chat.id == user.id}
-                for chat, member in rows[:limit]], 'has_more': len(rows) > limit}
+                'own_statistics': self.own_stats(member), 'membership_verified': chat.id == user.id,
+                **({'mafia': tables[chat.id]} if chat.id < 0 else {})}
+                for chat, member in page], 'has_more': len(rows) > limit}
+
+    @staticmethod
+    async def mafia_tables(session, chat_ids, user_id):
+        """Mafia table status per group from stored data only (no Telegram calls, no names).
+
+        ``status``: none | gathering | playing | full | finished; ``seated`` is the roster size;
+        ``joined`` says whether this user sits at the table. The group list itself comes from the
+        bot's stored chat membership, so it is as fresh as the bot's last sight of the group.
+        """
+        from domain.mafia import open_table_summary
+        result = {chat_id: {'status': 'none', 'seated': 0, 'joined': False} for chat_id in chat_ids}
+        if not chat_ids:
+            return result
+        games = (await session.scalars(select(Game).where(
+            Game.chat_id.in_(chat_ids), Game.mode == 'mafia', Game.is_current.is_(True)))).all()
+        seated_ids = set((await session.scalars(select(GamePlayer.game_id).where(
+            GamePlayer.game_id.in_([game.id for game in games] or ['']), GamePlayer.user_id == user_id))).all())
+        for game in games:
+            summary = open_table_summary(game.state, room_id=f'telegram:{game.chat_id}')
+            if summary is None:
+                continue
+            status = 'finished' if summary['phase'] == 'finished' else summary['status']
+            result[game.chat_id] = {'status': status, 'seated': summary['seated'],
+                                    'joined': game.id in seated_ids}
+        return result
 
     async def require_chat(self, session, uid, chat_id):
         row = (await session.execute(select(Chat, ChatMember).join(ChatMember, ChatMember.chat_id == Chat.id).where(

@@ -267,18 +267,16 @@ def test_guest_standalone_mafia_http_lifecycle_is_account_scoped(guest_pg_url, m
                 )
                 assert action.status_code == 200 and action.json()['role']['role'] == 'mafia'
                 assert all(account_id not in action.text for account_id in account_ids)
-                due_time = datetime.fromtimestamp(action.json()['lobby']['ends_at'], tz=timezone.utc)
+                # The only night role acted, yet the night runs to its deadline; then the day deadline is next.
+                assert action.json()['lobby']['status'] == 'night'
+                night_due = datetime.fromtimestamp(action.json()['lobby']['ends_at'], tz=timezone.utc)
+                assert (await GameDeadlineProcessor(db).run_once(now=night_due))['mafia'] == 1
+                day_lobby = (await owner.get(f'{base}/lobby')).json()['lobby']
+                assert day_lobby['status'] == 'day'
+                due_time = datetime.fromtimestamp(day_lobby['ends_at'], tz=timezone.utc)
                 assert (await GameDeadlineProcessor(db).run_once(now=due_time))['mafia'] == 1
                 lobby = (await owner.get(f'{base}/lobby')).json()['lobby']
-                assert lobby['status'] == 'day'
-
-                opened = await owner.post(
-                    f'{base}/advance',
-                    headers={**HEADERS, 'Idempotency-Key': 'mafia-advance-day'},
-                    json={'expected_revision': lobby['revision']},
-                )
-                assert opened.status_code == 200 and opened.json()['lobby']['status'] == 'voting'
-                lobby = opened.json()['lobby']
+                assert lobby['status'] == 'voting'
                 voters = [(p3, 'p1'), (p4, 'p1'), (owner, 'p3')]
                 for index, (client, target) in enumerate(voters):
                     response = await client.post(
@@ -288,14 +286,7 @@ def test_guest_standalone_mafia_http_lifecycle_is_account_scoped(guest_pg_url, m
                     )
                     assert response.status_code == 200
                     lobby = response.json()['lobby']
-                assert lobby['can_advance']
-                finished = await owner.post(
-                    f'{base}/advance',
-                    headers={**HEADERS, 'Idempotency-Key': 'mafia-advance-vote'},
-                    json={'expected_revision': lobby['revision']},
-                )
-                assert finished.status_code == 200
-                lobby = finished.json()['lobby']
+                # All living players voted: the vote closed early.
                 assert lobby['status'] == 'finished' and lobby['winner'] == 'citizens'
                 restarted = await owner.post(
                     f'{base}/restart',

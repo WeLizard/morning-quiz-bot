@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nc-world-pack/1",
+  "title": "Night City world pack (pack.json)",
+  "description": "What one story (world) brings to the shared Night City shell. Built by build_world_pack.py from docs/tasks/night_city/art_batch2/<style_pack>. File names are relative to the pack folder (client: /app/night/worlds/<id>/).",
+  "type": "object",
+  "required": ["schema", "id", "title", "style_pack", "version", "age", "palette", "scenes", "portraits", "factions", "backs", "frames"],
+  "$defs": {
+    "file": {"type": "string", "pattern": "^[a-z0-9_]+\\.webp$"},
+    "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
+    "time": {"enum": ["morning", "day", "evening", "night"]},
+    "scene": {
+      "type": "object",
+      "description": "One slot: a single picture (file) or time-of-day variants (times + default). focus = CSS background-position of the strip crop.",
+      "properties": {
+        "file": {"$ref": "#/$defs/file"},
+        "times": {"type": "object", "propertyNames": {"$ref": "#/$defs/time"}, "additionalProperties": {"$ref": "#/$defs/file"}},
+        "default": {"$ref": "#/$defs/time"},
+        "focus": {"type": "string"}
+      },
+      "anyOf": [{"required": ["file"]}, {"required": ["times"]}]
+    },
+    "frame": {
+      "type": "object",
+      "required": ["file", "aspect", "hole"],
+      "properties": {
+        "file": {"$ref": "#/$defs/file"},
+        "aspect": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
+        "hole": {"description": "transparent window as fractions [left, top, right, bottom]", "type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}, "minItems": 4, "maxItems": 4}
+      }
+    }
+  },
+  "properties": {
+    "schema": {"const": "nc-world-pack/1"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$", "description": "world_id of the canon (manor_lake, neon_city …); the room / case field `world`"},
+    "title": {"type": "string"},
+    "era": {"type": ["string", "null"]},
+    "style_pack": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$", "description": "art_batch2 folder (case.schema.json style_pack)"},
+    "version": {"type": "string", "description": "content hash; part of asset URLs for caching (…/pack.json?v=)"},
+    "default": {"type": "boolean", "description": "the world of the test mafia when a room has none"},
+    "age": {"type": "integer", "enum": [12, 16, 18], "description": "editorial age frame of the world (worlds.json `age`, default 12; deep_choir and dead_air are 16+; 18+ worlds ask once «Мне есть 18», the server requires age_ok)"},
+    "thumb": {"anyOf": [{"$ref": "#/$defs/file"}, {"type": "null"}], "description": "240 px cover for room lists and the story picker (≤ 20 KB)"},
+    "font": {"type": "object", "properties": {"display": {"type": ["string", "null"], "description": "CSS font-family for titles; null = the shell's WeLizard Noir"}}},
+    "palette": {
+      "type": "object",
+      "description": "Base colours from worlds.json plus derived ones; the builder checks text ≥ 4.5:1 (body text ≥ 7:1) and edges ≥ 3:1. contrast = stronger values for «Контрастный режим».",
+      "required": ["page", "page_rgb", "surface", "surface_2", "line", "edge", "text", "muted", "accent", "accent_hi", "accent_lo", "accent_ink", "accent_text",
+                   "accent_soft", "rule", "tint", "btn", "btn_text", "field", "field_line", "plate", "shadow", "investigation", "independent", "contrast"],
+      "properties": {
+        "page": {"$ref": "#/$defs/color"}, "page_rgb": {"type": "string"}, "surface": {"$ref": "#/$defs/color"}, "surface_2": {"$ref": "#/$defs/color"},
+        "line": {"$ref": "#/$defs/color"}, "edge": {"$ref": "#/$defs/color", "description": "frames of cards, buttons, avatar rings"},
+        "text": {"$ref": "#/$defs/color"}, "muted": {"$ref": "#/$defs/color"},
+        "accent": {"$ref": "#/$defs/color", "description": "fill of the primary button"}, "accent_hi": {"$ref": "#/$defs/color"}, "accent_lo": {"$ref": "#/$defs/color"},
+        "accent_ink": {"$ref": "#/$defs/color"}, "accent_text": {"$ref": "#/$defs/color", "description": "accent as text and thin marks on the page"},
+        "accent_soft": {"type": "string"}, "rule": {"type": "string"}, "tint": {"$ref": "#/$defs/color"}, "btn": {"$ref": "#/$defs/color"}, "btn_text": {"$ref": "#/$defs/color"},
+        "field": {"$ref": "#/$defs/color"}, "field_line": {"$ref": "#/$defs/color"}, "plate": {"$ref": "#/$defs/color", "description": "background behind portrait cut-outs"},
+        "shadow": {"$ref": "#/$defs/color"}, "investigation": {"$ref": "#/$defs/color"}, "independent": {"$ref": "#/$defs/color"},
+        "contrast": {"type": "object", "additionalProperties": {"$ref": "#/$defs/color"}}
+      }
+    },
+    "scenes": {
+      "type": "object",
+      "description": "Semantic slots. Screens never name a place: lobby (room before the game), night, day (morning after the night), vote, finale, out (a spectator who left the game), title (case title), cover (world / case cover). Missing slot → fallback chain in the client.",
+      "propertyNames": {"enum": ["cover", "title", "lobby", "night", "day", "vote", "finale", "out"]},
+      "additionalProperties": {"$ref": "#/$defs/scene"},
+      "required": ["cover", "lobby", "night", "day", "vote", "finale"]
+    },
+    "places": {
+      "type": "object",
+      "description": "Weekly mode: every place of the world × time of day (file null = not built yet, lazy set, build with --places). Keys are art ids; the canon ids may differ (see inventory).",
+      "additionalProperties": {"type": "object", "properties": {"times": {"type": "object", "additionalProperties": {"anyOf": [{"$ref": "#/$defs/file"}, {"type": "null"}]}}}}
+    },
+    "portraits": {
+      "type": "array", "minItems": 12,
+      "description": "Seat portraits: role-neutral heroes only (no detective, doctor, police …), men and women alternating. n = the room's portrait number.",
+      "items": {"type": "object", "required": ["n", "file", "hero", "sex"], "properties": {
+        "n": {"type": "integer", "minimum": 1}, "file": {"$ref": "#/$defs/file"}, "hero": {"type": "string"}, "title": {"type": ["string", "null"]},
+        "sex": {"enum": ["m", "f", "x"]}}}
+    },
+    "factions": {
+      "type": "object", "required": ["shadow", "investigation"],
+      "propertyNames": {"enum": ["shadow", "investigation", "independent"]},
+      "additionalProperties": {"type": "object", "required": ["emblem"], "properties": {"emblem": {"$ref": "#/$defs/file"}}}
+    },
+    "backs": {"type": "object", "required": ["role"], "propertyNames": {"enum": ["role", "case", "event"]}, "additionalProperties": {"$ref": "#/$defs/file"}},
+    "frames": {"type": "object", "required": ["hero"], "propertyNames": {"enum": ["hero", "evidence", "dossier"]}, "additionalProperties": {"$ref": "#/$defs/frame"}},
+    "checks": {"type": "object"},
+    "total_bytes": {"type": "integer"},
+    "files": {"type": "object"}
+  }
+}

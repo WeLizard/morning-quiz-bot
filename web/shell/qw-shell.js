@@ -384,7 +384,12 @@
         button.dataset.qwItem = item.id || '';
         const disabled = typeof item.disabled === 'function' ? item.disabled() : item.disabled;
         if (disabled) button.setAttribute('aria-disabled', 'true');
-        button.insertAdjacentHTML('beforeend', svg(item.icon));
+        if (item.image) {
+            // A game's own art icon (same-origin URL), e.g. Night City's style-A icons; the core glyphs stay vector.
+            const img = document.createElement('img');
+            img.className = 'qw-menu-img'; img.src = item.image; img.alt = ''; img.width = 28; img.height = 28;
+            button.append(img);
+        } else button.insertAdjacentHTML('beforeend', svg(item.icon));
         const text = document.createElement('span');
         text.className = 'qw-grow';
         text.textContent = item.label;

@@ -60,3 +60,96 @@
 чат, запуск личек каждым игроком, Main Mini App в BotFather и проверка на реальных
 клиентах. Production не менялся. Автономная регрессия 2026-09-01:
 **420 passed, 1 skipped**, JS **11/11**.
+
+## 2026-10-28 — комнатная Мафия для Telegram-канала (серверная часть)
+
+Изменилось:
+- Все комнатные маршруты `/api/guest/rooms…` (комнаты, приглашения, `join`, `leave`, classic/photo,
+  `mafia/*`) принимают оба канала через `web/principal.py:resolve_principal`: cookie `mqb_mini`
+  (Telegram) или `mqb_guest`. Пути не менялись. Канал выбирает `?identity=guest|telegram`; с одной
+  cookie он определяется сам, с двумя без `identity` — `401 identity_required`, неизвестное значение — 422.
+  `guest_access()` (закрытый тест) действует только на гостевой канал. Origin/CSRF как раньше
+  (`Origin` + `X-Guest-CSRF: 1` на не-GET). Порядок блокировок прежний: operation_fence до блокировок аккаунта.
+  В `resolve_principal` добавлен параметр `write` (запись без блокировки строк User/Account) для команд,
+  которые берут собственные блокировки игры/комнаты, и для «чтений» с `FOR UPDATE`.
+- Ключ идемпотентности: гость `guest:<ключ>` (как раньше), Telegram `mini:<ключ>`.
+- Создание приглашения возвращает `telegram_url`, `startapp_param` (`room_<код>`, 48 символов), `web_url`
+  (`<origin>/app#room=<код>`: код во фрагменте, не в query, чтобы не попадать в логи прокси и Referer; клиент по-прежнему понимает старый `?room=`). `telegram_url` строится из `MINI_APP_BOT_USERNAME` и нового
+  `MINI_APP_SHORT_NAME` (по умолчанию `play`; пустое — ссылка `t.me/<бот>?startapp=…`), без бота — `null`.
+  Код хранится только хешем, поэтому GET списка приглашений ссылок не содержит.
+- Личные уведомления о смене фазы комнатной партии (`kind=mafia.room_phase`): ночь, день, голосование,
+  финал; игрокам с подтверждённой неотозванной Telegram identity и активным User/Account. Актёр ручной команды
+  пропускается, дубль исключён ключом `игра:phase_revision:пользователь`. Текст без ролей и целей.
+  Кнопка: `https://t.me/<бот>/<short>?startapp=roomid_<id комнаты>`. Выключатель
+  `MQB_ROOM_MAFIA_DELIVERY_ENABLED=0`. `Forbidden` от Telegram — тихий `skipped`; устаревшая фаза — `skipped`.
+  Отдельных настроек уведомлений аккаунта в коде нет, учитываются только archived/bot_blocked.
+
+Проверено: `tests/test_room_telegram_channel.py` (полная партия Telegram + 3 гостя до победы, приватность
+ролей, идемпотентность, два cookie, ссылки, уведомления), `tests/test_notifications.py`,
+`tests/test_principal.py`, `tests/test_mini_app.py`. Полный `Test-LocalMilestone.ps1`: **2396 passed, 1 skipped, 1 xpassed**, exit 0 (первый прогон дал один сбой таймаута `dropdb` во временной БД `test_farm_migration`, не связанный с изменением; повтор зелёный). `project_checks --worktree` без ошибок.
+
+Проекция (по пожеланиям превью): `server_now`; `history[].eliminated_name` рядом с seat; `players[].voted` (только живые, только в голосовании, без цели); `players[].role` только при `finished`; `own_role.teammates [{seat,name}]` для мафии.
+Не проверено: реальный Telegram WebView и доставка в Telegram; клиент (`web/mini_client`) не менялся.
+
+## 2026-10-28 — открытые комнаты и правила стола (серверная часть)
+
+Сделано на сервере (подробности и контракт для клиента — [NIGHT_CITY_OPEN_ROOMS](NIGHT_CITY_OPEN_ROOMS.md)):
+открытые комнаты и список «Открытые столы», вход без кода, «Ждать следующую», «убрать из лобби», короткий код
+приглашения `K7Q4-MD2X` с защитой от перебора, правило старта «≥ 4 готовых» (константа
+`START_REQUIRES_ALL_READY`, только для комнатных столов), досрочное закрытие голосования через общий путь перехода
+фазы (ночь досрочно не закрывается, решено 2026-10-29: быстрый конец выдал бы, что детектив или доктор мертвы),
+обсуждение только для живых, портреты за столом, лимит запросов по аккаунту, статус стола в `GET /api/mini/chats`.
+Миграция `20261028_0042` (в ней же `room_join_attempts.client_hash` и индекс `ix_rooms_open_activity`). Старые тесты
+полного цикла обновлены: ночь заканчивает воркер дедлайнов (`tests/phase_helpers.py::end_phase`), голосование
+закрывается само, когда проголосовали все живые.
+
+Не сделано: клиент и дизайн; проверка на реальных Telegram-клиентах; выкладка.
+
+
+## 2026-10-29 — клиент «Ночного города» подключён, выход из комнаты, 17 портретов
+
+Клиент подключён: `web/mini_client/night-city-ui.js`, `web/mini_client/night-city.css`, арт
+`web/mini_client/night/*.webp` (отдаётся по `/app/night/<имя>.webp`). Серверная часть: `PORTRAIT_COUNT` = 17;
+выход из комнаты в любой момент для всех, кроме хозяина (за столом — встаёт, идёт партия — герой «пропал»,
+запись `vanished` в историю без роли, проверка победы и досрочное закрытие фазы); для мафии в роли
+`teammates[].target_name`. `night_acted/night_needed` не добавлены (утечка роли убитого по изменению числа).
+Контракт — в [NIGHT_CITY_OPEN_ROOMS](NIGHT_CITY_OPEN_ROOMS.md). Не проверено: реальные Telegram-клиенты,
+кадры телефона и ПК, выкладка.
+
+### Выкладка в песочницу (2026-10-30, общая с фермой)
+
+- Выложен 561 файл: ферма (лесоруб, смягчение экономики и снос, диковинки с рисунками, «Пирог до небес» с декором,
+  Сорока v2 — сервер и клиент, правка баллисты, экран поля E24, склад E26) и «Ночной город» (мир комнаты, оболочка с
+  фонами, 13 пакетов миров, плашки 16+/18+ и вопрос «Мне есть 18», приёмка вида). Кэш фермы `?v=20261030a`.
+- Миграции 20261028_0042 → 20261029_0043 (башня пирога) → 20261030_0044 (мир комнаты).
+- Проверки: полный gate 2567 passed (единственное падение — нестабильный тест Пуха, исправлен в тесте), предпроверка
+  нового кода по 53 фермам песочницы — 0 ошибок.
+- В /etc/mqb/mini-app.env и в env бота добавлен постоянный QW_FARM_MERCHANT_SECRET (набор Сороки; не менять).
+- Бот: образ mqb-trial-bot:0044-20261030-combo, контейнер mqb-trial-bot-nc0044; прежний остановлен как
+  mqb-trial-bot-nc0042-old.
+- Резервная копия: /home/lizard/mqb-rehearsal/backups/combo-20261030-1230/ (players.dump, files.tar, new-files.txt,
+  mini-app.env.before, trial-bot.env.before, trial-bot-image.txt, alembic-current.txt).
+- Откат: sudo systemctl stop mqb-mini-app mqb-game-worker; docker stop mqb-trial-bot-nc0044;
+  venv/bin/python -m alembic downgrade 20261028_0042; tar -xf backups/combo-20261030-1230/files.tar; удалить файлы из
+  new-files.txt; sudo cp backups/combo-20261030-1230/mini-app.env.before /etc/mqb/mini-app.env; docker rm mqb-trial-bot-nc0044;
+  docker rename mqb-trial-bot-nc0042-old mqb-trial-bot-nc0042; docker update --restart=unless-stopped mqb-trial-bot-nc0042;
+  docker start mqb-trial-bot-nc0042; sudo systemctl start mqb-mini-app mqb-game-worker.
+- Смоук: /healthz, /app, /app/farm, ассеты фермы и пирога, /app/night/shell/*, /app/night/worlds/* — 200;
+  /api/guest/rooms/open без входа — 401; журналы служб без ошибок; бот healthy.
+
+### Выкладка в песочницу (2026-10-29)
+
+- Выложено 76 файлов (сервер комнат и «Мафии» через resolve_principal, открытые комнаты, короткие коды, выход
+  из комнаты, исправления по ревью, новый клиент «Ночного города» с артом noir_print_a), миграция
+  20261025_0041 → 20261028_0042. Полный gate перед выкладкой: 2433 passed.
+- В /etc/mqb/mini-app.env добавлен постоянный MQB_ROOM_CODE_SECRET (HMAC коротких кодов; не менять).
+- Бот песочницы пересобран слоем: образ mqb-trial-bot:0042-20261029-0727-nightcity, контейнер mqb-trial-bot-nc0042
+  (доставка mafia.room_phase); прежний mqb-trial-bot-slice0040-old остановлен.
+- Резервная копия: /home/lizard/mqb-rehearsal/backups/nc-20261029-0727/ (players.dump, files.tar, new-files.txt,
+  mini-app.env.before, trial-bot-image.txt, trial-bot.env).
+- Откат: sudo systemctl stop mqb-mini-app mqb-game-worker; docker stop mqb-trial-bot-nc0042;
+  venv/bin/python -m alembic downgrade 20261025_0041; tar -xf backups/nc-20261029-0727/files.tar; удалить файлы из
+  new-files.txt; sudo cp backups/nc-20261029-0727/mini-app.env.before /etc/mqb/mini-app.env; docker rm mqb-trial-bot-nc0042;
+  docker rename mqb-trial-bot-slice0040-old mqb-trial-bot-slice0040; docker update --restart=unless-stopped
+  mqb-trial-bot-slice0040; docker start mqb-trial-bot-slice0040; sudo systemctl start mqb-mini-app mqb-game-worker.
+- Смоук: /healthz, /app, клиент и арт /app/night/* — 200; /api/guest/rooms/open без входа — 401; журналы без ошибок.

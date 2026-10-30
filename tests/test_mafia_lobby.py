@@ -64,7 +64,8 @@ def test_full_night_day_vote_cycle_keeps_secrets_private(monkeypatch):
     for actor, seat in [(1, 'p3'), (2, 'p3'), (6, 'p1'), (7, 'p4')]:
         lobby = night_action(lobby, chat_id=-300, account_id=_account(actor), target_seat=seat,
                              expected_revision=night_phase)
-    lobby = resolve_night(lobby, chat_id=-300, account_id=_account(1), expected_revision=lobby['revision'])
+    lobby = resolve_night(lobby, chat_id=-300, account_id=_account(1), expected_revision=lobby['revision'],
+                           allow_incomplete=True)  # the night ends by its deadline only
     public = public_lobby(lobby, chat_id=-300, viewer_account_id=_account(4))
     assert lobby['status'] == 'day' and _account(3) not in lobby['alive']
     assert 'assignments' not in public and 'user_id' not in str(public)
@@ -85,7 +86,8 @@ def test_full_night_day_vote_cycle_keeps_secrets_private(monkeypatch):
     for actor, seat in [(2, 'p4'), (6, 'p2'), (7, 'p5')]:
         lobby = night_action(lobby, chat_id=-300, account_id=_account(actor), target_seat=seat,
                              expected_revision=night_phase)
-    lobby = resolve_night(lobby, chat_id=-300, account_id=_account(1), expected_revision=lobby['revision'])
+    lobby = resolve_night(lobby, chat_id=-300, account_id=_account(1), expected_revision=lobby['revision'],
+                           allow_incomplete=True)  # the night ends by its deadline only
     lobby = open_voting(lobby, chat_id=-300, account_id=_account(1), expected_revision=lobby['revision'])
     voting_phase = lobby['phase_revision']
     for actor in (2, 5, 6, 7):

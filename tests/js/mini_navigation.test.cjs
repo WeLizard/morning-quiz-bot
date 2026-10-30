@@ -3,7 +3,7 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
-const {runInNewContext} = require('node:vm');
+const {runInNewContext, createContext, runInContext} = require('node:vm');
 
 class Element {
     constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.attrs = {}; this.events = {}; this.className = ''; this.text = '';
@@ -111,7 +111,7 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         assigned.push(path);
     }};
     if (replaceAvailable) navigationLocation.replace = path => replacedNavigation.push(path);
-    runInNewContext(source('app.js'), {
+    const sandbox = createContext({
         window: {addEventListener: (event, handler) => windowEvents.set(event, handler), QWAddress: addressModule, QW: qw, QuizTelegram: ui, QuizRating: {async render(context) { ratingCalls.push(context); }}, QuizPlay: {stop() {}, async mount(options) { mounts.push(options); }, roomApi: (roomId, request, extra) => ({kind: 'room', roomId, request, extra})}, Telegram: {WebApp: {BackButton: {hide() {}, show() {}}, initData, initDataUnsafe: {start_param: startParam}}}, location: navigationLocation},
         location: currentLocation, URL, URLSearchParams,
         history: {state: null, replaceState(state, title, path) {
@@ -142,6 +142,9 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         AbortController, crypto: {randomUUID: (() => { let id = 0; return () => `00000000-0000-4000-8000-${String(++id).padStart(12, '0')}`; })()},
         setTimeout: schedule, clearTimeout: cancel, queueMicrotask, Intl, console,
     });
+    // index.html loads night-city-ui.js before app.js; both share window.
+    runInContext(source('night-city-ui.js'), sandbox);
+    runInContext(source('app.js'), sandbox);
     await flush();
     if (autoLogin && !guestMode && !savedGuest && !miniCookie && ids.content.querySelectorAll('button').some(n => n.textContent === 'Войти как dev-игрок')) {
         await findButton(ids.content, 'Войти как dev-игрок').click(); await flush();
@@ -431,141 +434,490 @@ test('standalone Classic displays the final submitted answer after game completi
     await findButton(app.content, 'Открыть классический квиз').click();
     for (const text of ['Викторина завершена', 'Последний вопрос', 'Верно! Очки: 1', 'Последнее пояснение']) assert.ok(app.content.textContent.includes(text), text);
 });
-const guestMafiaBase = '/api/guest/rooms/room-test/mafia';
-const guestLobby = () => ({revision: 4, phase_revision: 2, status: 'lobby', players: [{name: 'Гость', is_me: true, ready: false, alive: true}], joined: true, is_host: true, can_start: true});
-const guestMafiaOverrides = (lobby, extra = {}) => ({
-    '/api/guest/rooms': {status: 200, body: {items: [guestRoom]}},
-    [guestMafiaBase + '/lobby']: {status: 200, body: {lobby}},
-    [guestMafiaBase + '/discussion']: {status: 200, body: {items: [], enabled: true}},
+// «Ночной город» (night-city-ui.js): one entry for Telegram and browser, rooms, invitations and links, the short
+// mafia test game as a thin layer over the kit. Room routes carry the channel explicitly (?identity=).
+const ncModule = () => { const scope = {window: {}, document: {}, URL}; runInNewContext(source('night-city-ui.js'), scope); return scope.window.NightCity; };
+const ncRoomId = 'room-test';
+const NCB = `/api/guest/rooms/${ncRoomId}`;
+const ncq = (path, identity = 'guest') => `${path}?identity=${identity}`;
+const ncRoom = (extra = {}) => ({id: ncRoomId, title: 'Пятничный стол', role: 'owner', membership_version: 'v1', open: false, ...extra});
+const ncPlayers = () => [
+    {name: 'Гость', seat: 'p1', portrait: 1, ready: false, is_me: true, alive: true},
+    {name: 'Марина', seat: 'p2', portrait: 2, ready: true, is_me: false, alive: true},
+    {name: 'Лёша', seat: 'p3', portrait: 3, ready: true, is_me: false, alive: true},
+    {name: 'Вера', seat: 'p4', portrait: 4, ready: true, is_me: false, alive: true},
+];
+const ncLobby = (extra = {}) => ({status: 'lobby', revision: 4, phase_revision: 2, server_now: 1000, joined: true, is_host: true, can_start: true,
+    min_players: 4, ready_count: 3, start_requires_all_ready: false, portrait_count: 12, players: ncPlayers(), waiting: [], is_waiting: false, ...extra});
+const ncOverrides = (lobby, extra = {}, room = ncRoom()) => ({
+    [ncq('/api/guest/rooms')]: {status: 200, body: {items: [room]}},
+    [ncq('/api/guest/rooms/open')]: {status: 404, body: {detail: 'Комната не найдена.'}},
+    [ncq(`${NCB}/mafia/lobby`)]: {status: 200, body: {lobby}},
+    [ncq(`${NCB}/mafia/discussion`)]: {status: 200, body: {items: [], enabled: true}},
     ...extra,
 });
-test('standalone Mafia reuses the table and sends guest readiness and start without Telegram identity', async () => {
-    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby(), {
-        [guestMafiaBase + '/lobby/ready:POST']: {status: 200, body: {lobby: guestLobby()}},
-        [guestMafiaBase + '/lobby/start:POST']: {status: 200, body: {lobby: guestLobby()}},
+const ncWrites = (app, suffix) => app.requests.filter(r => r.path === ncq(`${NCB}/mafia${suffix}`) && r.options.method === 'POST');
+async function ncEntry(app) { await findButton(app.content, 'Открыть дело').click(); await flush(); await flush(); }
+async function ncTable(app) { await ncEntry(app); await findButton(app.content, 'Открыть').click(); await flush(); await flush(); await flush(); }
+
+test('Night City entry is one screen for Telegram and the browser: company, invitation, rooms, open tables, Telegram group', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby())});
+    await ncEntry(app);
+    assert.equal(app.qw.mode, 'game');
+    assert.equal(app.content.dataset.page, 'night');
+    for (const text of ['Город засыпает', 'Войти по приглашению', 'Твои комнаты', 'Пятничный стол', 'Играть в Telegram-группе'])
+        assert.ok(app.content.textContent.includes(text), text);
+    assert.ok(findButton(app.content, 'Собрать компанию'));
+    assert.doesNotMatch(app.content.textContent, /групповой чат|только черновик|Открытые столы/, 'no dead end; open tables hide while the route is absent');
+    assert.ok(app.requests.some(r => r.path === ncq('/api/guest/rooms')));
+    assert.ok(!app.requests.some(r => r.path.includes('/api/mini/mafia')));
+    assert.equal(app.content.querySelectorAll('.nc-bar').length, 1);
+});
+
+test('open tables list seats, waits and full tables; sitting down needs no code', async () => {
+    const tables = [
+        {room_id: 'open-1', title: 'Поздний рейс', host_name: 'Гоша', seated: 3, waiting: 0, needs_from: 4, capacity: 12, status: 'gathering', joined: false},
+        {room_id: 'open-2', title: 'Тихий переулок', host_name: 'Кира', seated: 8, waiting: 1, needs_from: 4, capacity: 12, status: 'playing', joined: false},
+        {room_id: 'open-3', title: 'Большая игра', host_name: 'Олег', seated: 12, waiting: 0, needs_from: 4, capacity: 12, status: 'full', joined: false},
+    ];
+    const joined = {id: 'open-1', title: 'Поздний рейс', role: 'member', membership_version: 'v2', open: true};
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: {
+        ...ncOverrides(ncLobby()),
+        [ncq('/api/guest/rooms/open')]: {status: 200, body: {items: tables}},
+        [ncq('/api/guest/rooms/open-1/join-open')]: {status: 200, body: {room: joined, joined: true, seat: 'seated', lobby: ncLobby({is_host: false})}},
+        [ncq('/api/guest/rooms/open-1/mafia/lobby')]: {status: 200, body: {lobby: ncLobby({is_host: false})}},
+        [ncq('/api/guest/rooms/open-1/mafia/discussion')]: {status: 200, body: {items: [], enabled: true}},
+    }});
+    await ncEntry(app);
+    assert.match(app.content.textContent, /Открытые столы/);
+    assert.match(app.content.textContent, /хозяин Гоша · сидит 3 · нужно от 4/);
+    assert.match(app.content.textContent, /мест нет/);
+    assert.ok(findButton(app.content, 'Ждать следующую'));
+    await findButton(app.content, 'Сесть за стол').click(); await flush(); await flush();
+    const post = app.requests.find(r => r.path === ncq('/api/guest/rooms/open-1/join-open'));
+    assert.deepEqual(JSON.parse(post.options.body), {});
+    assert.ok(post.options.headers['Idempotency-Key'] && post.options.headers['X-Guest-CSRF'] === '1');
+    assert.match(app.content.textContent, /Поздний рейс/);
+    assert.ok(app.requests.some(r => r.path === ncq('/api/guest/rooms/open-1/mafia/lobby')));
+});
+
+test('«Собрать компанию» creates the room and the owner\'s table with idempotent empty commands', async () => {
+    let lobby = null;
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: {
+        ...ncOverrides(null),
+        [ncq('/api/guest/rooms')]: {status: 200, body: {items: []}},
+        [ncq('/api/guest/rooms') + ':POST']: {status: 200, body: ncRoom()},
+        [ncq(`${NCB}/mafia/lobby`)]: () => ({status: 200, body: {lobby}}),
+        [ncq(`${NCB}/mafia/lobby`) + ':POST']: () => { lobby = ncLobby(); return {status: 200, body: {lobby}}; },
+    }});
+    await ncEntry(app);
+    await findButton(app.content, 'Собрать компанию').click(); await flush(); await flush(); await flush();
+    const create = app.requests.find(r => r.path === ncq('/api/guest/rooms') && r.options.method === 'POST');
+    assert.equal(JSON.parse(create.options.body).title, 'Ночной город');
+    assert.match(JSON.parse(create.options.body).request_id, /^00000000-/);
+    const table = ncWrites(app, '/lobby')[0];
+    assert.deepEqual(JSON.parse(table.options.body), {});
+    assert.ok(table.options.headers['Idempotency-Key'] && table.options.headers['X-Guest-CSRF'] === '1');
+    assert.ok(findButton(app.content, 'Начать ночь'));
+    assert.equal(typeof app.qw.rootBack, 'function', 'inside a room back leads to the Night City entry');
+});
+
+test('lobby readiness and start go through the room scope with the server revision', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby(), {
+        [ncq(`${NCB}/mafia/lobby/ready`) + ':POST']: {status: 200, body: {lobby: ncLobby()}},
+        [ncq(`${NCB}/mafia/lobby/start`) + ':POST']: {status: 200, body: {lobby: ncLobby()}},
     })});
-    await findButton(app.content, 'Открыть Ночной город').click();
-    assert.match(app.content.textContent, /Ночной город|Стол игроков/);
-    assert.doesNotMatch(app.content.textContent, /Состав дела|Telegram-группе/);
-    await findButton(app.content, 'Отметить готовность').click();
-    await findButton(app.content, 'Начать ночь').click();
-    const writes = app.requests.filter(r => r.path.startsWith(guestMafiaBase) && r.options.method === 'POST');
-    assert.deepEqual(writes.map(r => JSON.parse(r.options.body)), [{ready: true, expected_revision: 4}, {expected_revision: 4}]);
-    for (const {options} of writes) { assert.equal(options.headers['X-Guest-CSRF'], '1'); assert.ok(options.headers['Idempotency-Key']); }
+    await ncTable(app);
+    assert.match(app.content.textContent, /Готовы 3 из 4/);
+    await findButton(app.content, 'Отметить готовность').click(); await flush();
+    await findButton(app.content, 'Начать ночь').click(); await flush();
+    assert.deepEqual(ncWrites(app, '/lobby/ready').map(r => JSON.parse(r.options.body)), [{ready: true, expected_revision: 4}]);
+    assert.deepEqual(ncWrites(app, '/lobby/start').map(r => JSON.parse(r.options.body)), [{expected_revision: 4}]);
+    for (const r of [...ncWrites(app, '/lobby/ready'), ...ncWrites(app, '/lobby/start')]) {
+        assert.equal(r.options.headers['X-Guest-CSRF'], '1'); assert.match(r.options.headers['Idempotency-Key'], /^[A-Za-z0-9._:-]{8,64}$/);
+    }
     assert.ok(!app.requests.some(r => r.path.includes('/api/mini/mafia')));
 });
 
-test('standalone Mafia creates or joins with an empty command and limits creation to room owner', async () => {
-    for (const owner of [true, false]) {
-        const lobby = owner ? null : {...guestLobby(), joined: false};
-        const suffix = owner ? '/lobby' : '/lobby/join';
-        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(lobby, {
-            '/api/guest/rooms': {status: 200, body: {items: [{...guestRoom, role: owner ? 'owner' : 'member'}]}},
-            '/api/guest/rooms/room-test/invites': {status: 200, body: {items: []}},
-            [guestMafiaBase + suffix + ':POST']: {status: 200, body: {lobby: guestLobby()}},
-        })});
-        await findButton(app.content, 'Открыть Ночной город').click();
-        await findButton(app.content, owner ? 'Создать лобби' : 'Сесть за стол').click();
-        assert.deepEqual(JSON.parse(app.requests.find(r => r.path === guestMafiaBase + suffix && r.options.method === 'POST').options.body), {});
-    }
-});
-
-test('standalone Mafia lobby shows the invite block to the owner only and issues a code', async () => {
-    const inviteCode = 'B'.repeat(43);
-    const invitesPath = '/api/guest/rooms/room-test/invites';
-    const open = async owner => {
-        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby(), {
-            '/api/guest/rooms': {status: 200, body: {items: [{...guestRoom, role: owner ? 'owner' : 'member'}]}},
-            [invitesPath]: {status: 200, body: {items: []}},
-            [invitesPath + ':POST']: {status: 200, body: {id: 'inv-1', invite_code: inviteCode, expires_at: '2099-10-09T12:00:00+00:00', max_uses: 5}},
-        })});
-        await findButton(app.content, 'Открыть Ночной город').click();
-        return app;
-    };
-    const member = await open(false);
-    assert.doesNotMatch(member.content.textContent, /Позвать друзей/);
-    assert.match(member.content.textContent, /Стол игроков/);
-    const owner = await open(true);
-    assert.match(owner.content.textContent, /Друзья вводят код в разделе «Войти по приглашению»/);
-    const before = owner.requests.filter(r => r.path === invitesPath && r.options.method === 'POST').length;
-    assert.equal(before, 0);
-    await findButton(owner.content, 'Позвать друзей').click(); await flush(); await flush();
-    const post = owner.requests.find(r => r.path === invitesPath && r.options.method === 'POST');
-    assert.ok(post);
-    assert.equal(post.options.headers['X-Guest-CSRF'], '1');
-    assert.deepEqual(JSON.parse(post.options.body), {expires_in_seconds: 86400, max_uses: 5});
-    const code = owner.content.querySelectorAll('input').find(node => node.attrs['aria-label'] === 'Одноразово показанный код приглашения');
-    assert.equal(code?.value, inviteCode);
-    assert.ok(findButton(owner.content, 'Скопировать'));
-});
-
-test('standalone Mafia sends private targets, votes, phase advancement and restart through guest scope', async () => {
-    for (const [phase, label, suffix] of [['night', 'Цель', '/action'], ['voting', 'Цель', '/vote'], ['day', 'Открыть голосование', '/advance'], ['finished', 'Собрать реванш', '/restart']]) {
-        const lobby = {...guestLobby(), status: phase, can_advance: true};
-        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(lobby, {
-            [guestMafiaBase + '/role']: {status: 200, body: {phase, role: 'mafia', title: 'Мафия', round: 1, alive: true, targets: [{name: 'Цель', seat: 'p2'}]}},
-            [guestMafiaBase + suffix + ':POST']: {status: 200, body: {lobby}},
-        })});
-        await findButton(app.content, 'Открыть Ночной город').click();
-        await findButton(app.content, label).click();
-        const body = JSON.parse(app.requests.find(r => r.path === guestMafiaBase + suffix && r.options.method === 'POST').options.body);
-        assert.deepEqual(body, ['night', 'voting'].includes(phase) ? {target: 'p2', expected_revision: 2} : {expected_revision: 4});
-    }
-});
-
-test('standalone Mafia preserves an uncertain discussion command across retry and room navigation', async () => {
-    let attempts = 0;
-    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby(), {
-        [guestMafiaBase + '/discussion:POST']: () => { if (++attempts === 1) throw new TypeError('network'); return {status: attempts === 2 ? 503 : 200, body: {}}; },
+test('the host removes a player or a waiting guest only after confirming', async () => {
+    const lobby = ncLobby({waiting: [{name: 'Олег', ref: 'w1', is_me: false}]});
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+        [ncq(`${NCB}/mafia/lobby/remove`) + ':POST']: {status: 200, body: {lobby}},
     })});
-    await findButton(app.content, 'Открыть Ночной город').click();
-    app.content.querySelector('textarea').value = 'Привет';
-    await findButton(app.content, 'Отправить').click();
-    assert.ok(findButton(app.feedback, 'Проверить / повторить'));
-    await app.ui.back(); await flush();
-    await findButton(app.content, 'Открыть Ночной город').click();
-    await findButton(app.feedback, 'Проверить / повторить').click();
-    await findButton(app.feedback, 'Проверить / повторить').click();
-    const sent = app.requests.filter(r => r.path === guestMafiaBase + '/discussion' && r.options.method === 'POST');
-    assert.equal(sent.length, 3);
-    assert.equal(sent[0].options.headers['Idempotency-Key'], sent[1].options.headers['Idempotency-Key']);
-    assert.equal(sent[0].options.headers['Idempotency-Key'], sent[2].options.headers['Idempotency-Key']);
-    assert.equal(sent[0].options.body, sent[1].options.body);
+    await ncTable(app);
+    assert.match(app.content.textContent, /Олег.*ждёт следующую партию/);
+    const removeButtons = () => app.content.querySelectorAll('button').filter(b => b.textContent === 'Убрать');
+    assert.equal(removeButtons().length, 4, 'three seated players and one waiting guest, never the host');
+    await removeButtons()[0].click(); await flush();
+    assert.match(app.content.textContent, /Убрать Марина из-за стола\?/);
+    await findButton(app.content, 'Оставить').click(); await flush();
+    assert.equal(ncWrites(app, '/lobby/remove').length, 0);
+    await removeButtons().at(-1).click(); await flush();
+    const confirm = app.content.querySelectorAll('.nc-alert')[0].querySelectorAll('button').find(b => b.textContent === 'Убрать');
+    await confirm.click(); await flush();
+    assert.deepEqual(JSON.parse(ncWrites(app, '/lobby/remove')[0].options.body), {target: 'w1', expected_revision: 4});
+    const member = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby({is_host: false}), {}, ncRoom({role: 'member'}))});
+    await ncTable(member);
+    assert.equal(member.content.querySelectorAll('button').filter(b => b.textContent === 'Убрать').length, 0);
 });
 
-test('standalone Mafia ignores a late role response after returning to rooms', async () => {
+test('a player picks a free portrait; portraits taken by others are disabled', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby(), {
+        [ncq(`${NCB}/mafia/lobby/portrait`) + ':POST']: {status: 200, body: {lobby: ncLobby()}},
+    })});
+    await ncTable(app);
+    await findButton(app.content, 'Портрет').click(); await flush();
+    const portraits = app.content.querySelectorAll('.nc-portrait');
+    assert.equal(portraits.length, 12);
+    assert.equal(portraits[0].attrs['aria-pressed'], 'true');
+    assert.deepEqual(portraits.filter(b => b.disabled).map(b => b.attrs['aria-label']), ['Портрет 2: занят', 'Портрет 3: занят', 'Портрет 4: занят']);
+    await portraits[4].click(); await flush();
+    assert.deepEqual(JSON.parse(ncWrites(app, '/lobby/portrait')[0].options.body), {expected_revision: 4, portrait: 5});
+    await findButton(app.content, 'Готово').click(); await flush();
+    assert.ok(findButton(app.content, 'Начать ночь'));
+});
+
+test('the owner opens the room to the public list; the switch reports until when it stays listed', async () => {
+    const until = '2026-10-29T18:30:00+00:00';
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby(), {
+        [ncq(`${NCB}/open`) + ':POST']: {status: 200, body: ncRoom({open: true, open_expires_at: until})},
+    })});
+    await ncTable(app);
+    const toggle = () => app.content.querySelectorAll('button').find(b => b.attrs.role === 'switch');
+    assert.equal(toggle().attrs['aria-checked'], 'false');
+    await toggle().click(); await flush();
+    const post = app.requests.find(r => r.path === ncq(`${NCB}/open`));
+    assert.deepEqual(JSON.parse(post.options.body), {open: true});
+    assert.equal(toggle().attrs['aria-checked'], 'true');
+    assert.match(app.content.textContent, /Без активности уйдёт из списка в \d\d:\d\d/);
+});
+
+test('during a game a room member waits for the next one and can leave the queue', async () => {
+    for (const waiting of [false, true]) {
+        const lobby = ncLobby({status: 'night', round: 1, joined: false, is_host: false, is_waiting: waiting, history: [{type: 'started', round: 1}],
+            players: ncPlayers().slice(1), waiting: waiting ? [{name: 'Гость', ref: 'w1', is_me: true}] : []});
+        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+            [ncq(`${NCB}/mafia/lobby/${waiting ? 'unseat' : 'wait'}`) + ':POST']: {status: 200, body: {lobby}},
+        }, ncRoom({role: 'member'}))});
+        await ncTable(app);
+        assert.ok(!app.requests.some(r => r.path === ncq(`${NCB}/mafia/role`)), 'a queued player never asks for a role');
+        assert.match(app.content.textContent, waiting ? /Ты в очереди/ : /Партия уже идёт/);
+        await findButton(app.content, waiting ? 'Не ждать' : 'Ждать следующую').click(); await flush();
+        assert.deepEqual(JSON.parse(ncWrites(app, waiting ? '/lobby/unseat' : '/lobby/wait')[0].options.body), {});
+    }
+});
+
+test('an eliminated player reads the discussion without a composer (can_post)', async () => {
+    const lobby = ncLobby({status: 'day', round: 2, history: [{type: 'started', round: 1}, {type: 'night_result', round: 1, eliminated: 'p1', eliminated_name: 'Гость'}],
+        players: ncPlayers().map(p => (p.is_me ? {...p, alive: false} : p))});
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+        [ncq(`${NCB}/mafia/discussion`)]: {status: 200, body: {enabled: true, can_post: false, items: [{id: 1, author: 'Марина', is_me: false, message: 'Кто это был?'}]}},
+        [ncq(`${NCB}/mafia/role`)]: {status: 200, body: {phase: 'day', round: 2, role: 'doctor', title: 'Доктор', alive: false, seat: 'p1'}},
+    })});
+    await ncTable(app);
+    assert.match(app.content.textContent, /Смотришь партию/);
+    assert.match(app.content.textContent, /Кто это был\?/);
+    assert.equal(app.content.querySelector('textarea'), null);
+    assert.match(app.content.textContent, /Выбывшие читают обсуждение, но не пишут/);
+});
+
+test('leaving: a seat in an unstarted table, or the room itself; during a game the hero drops out of the case', async () => {
+    const seated = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby({is_host: false}), {
+        [ncq(`${NCB}/mafia/lobby/unseat`) + ':POST']: {status: 200, body: {lobby: ncLobby({is_host: false, joined: false})}},
+    }, ncRoom({role: 'member'}))});
+    await ncTable(seated);
+    assert.deepEqual(Array.from(seated.qw.items, item => item.id), ['nc-rules', 'nc-contrast', 'nc-unseat', 'nc-leave']);
+    seated.qw.items.find(item => item.id === 'nc-unseat').onSelect(); await flush();
+    assert.match(seated.content.textContent, /Место освободится/);
+    await findButton(seated.content, 'Покинуть стол').click(); await flush();
+    assert.deepEqual(JSON.parse(ncWrites(seated, '/lobby/unseat')[0].options.body), {});
+    const lobby = ncLobby({status: 'day', round: 1, is_host: false, history: [{type: 'started', round: 1}]});
+    const playing = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+        [ncq(`${NCB}/mafia/role`)]: {status: 200, body: {phase: 'day', round: 1, role: 'citizen', title: 'Мирный', alive: true, seat: 'p1'}},
+        [ncq(`${NCB}/leave`) + ':POST']: {status: 200, body: {left: true}},
+    }, ncRoom({role: 'member'}))});
+    await ncTable(playing);
+    assert.ok(!playing.qw.items.some(item => item.id === 'nc-unseat'));
+    playing.qw.items.find(item => item.id === 'nc-leave').onSelect(); await flush();
+    assert.match(playing.content.textContent, /твой герой выбудет из дела/);
+    await findButton(playing.content, 'Остаться').click(); await flush();
+    assert.doesNotMatch(playing.content.textContent, /выбудет из дела/);
+    playing.qw.items.find(item => item.id === 'nc-leave').onSelect(); await flush();
+    await findButton(playing.content, 'Покинуть комнату').click(); await flush(); await flush();
+    const leave = playing.requests.find(r => r.path === ncq(`${NCB}/leave`));
+    assert.deepEqual(JSON.parse(leave.options.body), {membership_version: 'v1'});
+    assert.match(playing.content.textContent, /Твои комнаты/);
+    const owner = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby())});
+    await ncTable(owner);
+    assert.ok(!owner.qw.items.some(item => ['nc-leave', 'nc-unseat'].includes(item.id)), 'the owner never leaves own room');
+});
+
+test('the portrait choice follows the server count, up to the 17 portraits of the kit', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby({portrait_count: 17}))});
+    await ncTable(app);
+    await findButton(app.content, 'Портрет').click(); await flush();
+    assert.equal(app.content.querySelectorAll('.nc-portrait').length, 17);
+    assert.equal(ncModule().kit.PORTRAITS, 17);
+});
+
+test('the host invites with a short code and a link; members see no invitation', async () => {
+    const invite = {id: 'inv-1', invite_code: 'B'.repeat(43), short_code: 'K7Q4-MD2X', expires_at: '2099-10-09T12:00:00+00:00', max_uses: 10,
+        web_url: 'https://qw.example/app#room=' + 'B'.repeat(43), telegram_url: null, startapp_param: 'room_' + 'B'.repeat(43)};
+    const owner = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby(), {
+        [ncq(`${NCB}/invites`) + ':POST']: {status: 200, body: invite}})});
+    await ncTable(owner);
+    assert.ok(owner.qw.items.some(item => item.id === 'nc-invite'));
+    await findButton(owner.content, 'Создать приглашение').click(); await flush();
+    const post = owner.requests.find(r => r.path === ncq(`${NCB}/invites`) && r.options.method === 'POST');
+    assert.deepEqual(JSON.parse(post.options.body), {expires_in_seconds: 86400, max_uses: 10});
+    assert.match(owner.content.textContent, /K7Q4-MD2X/);
+    assert.doesNotMatch(owner.content.textContent, /BBBBBBBB/, 'the ticket shows the short code; the long token stays in the link');
+    await findButton(owner.content, 'Поделиться ссылкой').click(); await flush();
+    assert.match(owner.content.textContent, /app#room=B{43}/, 'without share and clipboard the link is shown to copy by hand');
+    const member = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby({is_host: false}), {}, ncRoom({role: 'member'}))});
+    await ncTable(member);
+    assert.doesNotMatch(member.content.textContent, /Пригласить|Создать приглашение/);
+    assert.ok(!member.qw.items.some(item => item.id === 'nc-invite'));
+    assert.ok(member.qw.items.some(item => item.id === 'nc-leave' && item.danger));
+});
+
+test('invitation parsing: link token, short code, room_ and roomid_ start parameters', () => {
+    const nc = ncModule();
+    const token = 'C'.repeat(43), uuid = '0d5c3a9e-1111-4222-8333-444455556666';
+    assert.deepEqual({...nc.parseInvite(`https://qw.example/app?room=${token}`)}, {code: token});
+    assert.deepEqual({...nc.parseInvite(`https://qw.example/app#room=${token}`)}, {code: token}, 'the fragment form is the one the server hands out');
+    assert.equal(nc.parseInvite('https://qw.example/app#room=не код'), null);
+    assert.deepEqual({...nc.parseInvite(`https://t.me/quiz_bot/play?startapp=room_${token}`)}, {code: token});
+    assert.deepEqual({...nc.parseInvite(`room_${token}`)}, {code: token});
+    assert.deepEqual({...nc.parseInvite(' k7q4-md2x ')}, {short: 'k7q4-md2x'});
+    assert.deepEqual({...nc.parseInvite(token)}, {code: token});
+    assert.deepEqual({...nc.parseLaunch(`roomid_${uuid}`)}, {roomId: uuid});
+    assert.equal(nc.parseInvite('не код!'), null);
+    assert.equal(nc.parseLaunch('roomid_not-a-uuid'), null);
+});
+
+test('joining by a pasted link sits at the table; a typed short code goes as short_code', async () => {
+    const token = 'C'.repeat(43);
+    let lobby = ncLobby({joined: false, is_host: false, players: ncPlayers().slice(1)});
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+        [ncq('/api/guest/rooms') + ':POST']: {status: 500},
+        [ncq('/api/guest/rooms/join') + ':POST']: {status: 200, body: {...ncRoom({role: 'member'}), joined: true}},
+        [ncq(`${NCB}/mafia/lobby`)]: () => ({status: 200, body: {lobby}}),
+        [ncq(`${NCB}/mafia/lobby/join`) + ':POST']: () => { lobby = ncLobby({is_host: false}); return {status: 200, body: {lobby}}; },
+    }, ncRoom({role: 'member'}))});
+    await ncEntry(app);
+    const field = app.content.querySelectorAll('input').find(n => n.attrs['aria-label'] === 'Код или ссылка приглашения');
+    field.value = `https://qw.example/app?room=${token}`;
+    await findButton(app.content, 'Войти').click(); await flush(); await flush(); await flush();
+    const joins = app.requests.filter(r => r.path === ncq('/api/guest/rooms/join'));
+    assert.deepEqual(JSON.parse(joins[0].options.body), {invite_code: token});
+    assert.deepEqual(JSON.parse(ncWrites(app, '/lobby/join')[0].options.body), {});
+    assert.ok(findButton(app.content, 'Отметить готовность'));
+    await app.ui.back(); await flush(); await flush();
+    const again = app.content.querySelectorAll('input').find(n => n.attrs['aria-label'] === 'Код или ссылка приглашения');
+    again.value = 'k7q4-md2x';
+    await findButton(app.content, 'Войти').click(); await flush(); await flush();
+    assert.deepEqual(JSON.parse(app.requests.filter(r => r.path === ncq('/api/guest/rooms/join')).at(-1).options.body), {short_code: 'k7q4-md2x'});
+});
+
+test('a dead invitation link shows the expired screen; a mistyped code stays a note on the entry', async () => {
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby(), {
+        [ncq('/api/guest/rooms/join') + ':POST']: options => (JSON.parse(options.body).short_code
+            ? {status: 404, body: {detail: 'Код не подходит. Проверь буквы и цифры.', reason: 'unknown', code: 'invite_unknown'}}
+            : {status: 410, body: {detail: 'Срок приглашения истёк.', reason: 'expired', room_title: 'Пятничный стол', code: 'invite_expired'}}),
+    })});
+    await ncEntry(app);
+    const field = () => app.content.querySelectorAll('input').find(n => n.attrs['aria-label'] === 'Код или ссылка приглашения');
+    field().value = 'ABCD-EFGH';
+    await findButton(app.content, 'Войти').click(); await flush(); await flush();
+    assert.match(app.content.textContent, /Код не подходит/);
+    assert.match(app.content.textContent, /Твои комнаты/);
+    field().value = 'room_' + 'E'.repeat(43);
+    await findButton(app.content, 'Войти').click(); await flush(); await flush();
+    assert.match(app.content.textContent, /Ссылка больше не работает/);
+    assert.match(app.content.textContent, /Срок приглашения в «Пятничный стол» истёк/);
+    assert.ok(findButton(app.content, 'Собрать компанию'));
+});
+
+test('room links: room_ joins after sign-in and is used once, roomid_ opens by id, ?room= leaves the URL; none goes to the farm', async () => {
+    const token = 'F'.repeat(43), uuid = '0d5c3a9e-1111-4222-8333-444455556666';
+    const joinOverrides = {...ncOverrides(ncLobby({is_host: false}), {}, ncRoom({role: 'member'})),
+        [ncq('/api/guest/rooms/join') + ':POST']: {status: 200, body: {...ncRoom({role: 'member'}), joined: true}}};
+    const first = await application(true, 'room_' + token, {savedGuest: true, manualTimers: true, farmEnabled: true, overrides: joinOverrides});
+    await flush(); await flush();
+    assert.deepEqual(JSON.parse(first.requests.find(r => r.path === ncq('/api/guest/rooms/join')).options.body), {invite_code: token});
+    assert.equal(first.content.dataset.page, 'night');
+    assert.equal(first.storage.get('qw-night.launch-consumed'), token);
+    assert.equal(first.assigned.length, 0, 'a room code never opens the farm');
+    const reload = await application(true, 'room_' + token, {savedGuest: true, manualTimers: true, overrides: joinOverrides,
+        sessionValues: {'qw-night.launch-consumed': token}});
+    assert.ok(!reload.requests.some(r => r.path === ncq('/api/guest/rooms/join')), 'Telegram keeps start_param on reload: used once');
+    assert.equal(reload.content.dataset.page, 'guest');
+    const byId = await application(true, 'roomid_' + uuid, {savedGuest: true, manualTimers: true, overrides: {
+        ...ncOverrides(ncLobby()), [ncq(`/api/guest/rooms/${uuid}`)]: {status: 200, body: ncRoom({id: uuid})},
+        [ncq(`/api/guest/rooms/${uuid}/mafia/lobby`)]: {status: 200, body: {lobby: ncLobby()}},
+        [ncq(`/api/guest/rooms/${uuid}/mafia/discussion`)]: {status: 200, body: {items: [], enabled: true}}}});
+    await flush(); await flush();
+    assert.ok(byId.requests.some(r => r.path === ncq(`/api/guest/rooms/${uuid}`)));
+    assert.ok(!byId.requests.some(r => r.path === ncq('/api/guest/rooms/join')));
+    const browser = await application(true, '', {savedGuest: true, manualTimers: true, farmEnabled: true, locationSearch: '?room=' + token, overrides: joinOverrides});
+    await flush(); await flush();
+    assert.ok(browser.requests.some(r => r.path === ncq('/api/guest/rooms/join')));
+    assert.ok(browser.replaced.some(path => path === '/app'), 'the invitation leaves the address bar');
+    assert.equal(browser.assigned.length, 0);
+    const fragment = await application(true, '', {savedGuest: true, manualTimers: true, farmEnabled: true, locationHash: '#room=' + token, overrides: joinOverrides});
+    await flush(); await flush();
+    assert.deepEqual(JSON.parse(fragment.requests.find(r => r.path === ncq('/api/guest/rooms/join')).options.body), {invite_code: token});
+    assert.ok(fragment.replaced.some(path => path === '/app'), 'the fragment is cleared once it is used');
+    assert.equal(fragment.assigned.length, 0, 'a fragment room code never opens the farm');
+});
+
+test('night: the role card turns face up, then the target is chosen in two steps', async () => {
+    const lobby = ncLobby({status: 'night', round: 1, ends_at: 1090, history: [{type: 'started', round: 1}], can_advance: false});
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+        [ncq(`${NCB}/mafia/role`)]: {status: 200, body: {phase: 'night', round: 1, role: 'mafia', title: 'Мафия', alive: true, seat: 'p1', acted: false,
+            phase_revision: 2, targets: [{name: 'Цель', seat: 'p2'}, {name: 'Вера', seat: 'p4'}], teammates: [{seat: 'p3', name: 'Лёша'}]}},
+        [ncq(`${NCB}/mafia/action`) + ':POST']: {status: 200, body: {}},
+    })});
+    await ncTable(app);
+    assert.match(app.content.textContent, /Роль увидишь только ты/);
+    await findButton(app.content, 'Открыть свою роль').click(); await flush();
+    assert.match(app.content.textContent, /Мафия/);
+    assert.match(app.content.textContent, /Напарники: Лёша/);
+    assert.equal(app.content.querySelectorAll('.nc-clock-text')[0]?.textContent, '1:30', 'the clock counts from server_now');
+    await findButton(app.content, 'Понятно, к ночи').click(); await flush();
+    const confirmEmpty = findButton(app.content, 'Выбери цель');
+    assert.equal(confirmEmpty.disabled, true);
+    await findButton(app.content, 'Цель').click(); await flush();
+    assert.equal(findButton(app.content, 'Цель').attrs['aria-pressed'], 'true');
+    assert.equal(ncWrites(app, '/action').length, 0, 'picking alone sends nothing');
+    await findButton(app.content, 'Выбрать: Цель').click(); await flush();
+    assert.deepEqual(JSON.parse(ncWrites(app, '/action')[0].options.body), {target: 'p2', expected_revision: 2});
+});
+
+test('vote, host advance and rematch use the shared command routes', async () => {
+    const role = phase => ({phase, round: 2, role: 'citizen', title: 'Мирный', alive: true, seat: 'p1', voted: false, phase_revision: 2,
+        targets: [{name: 'Цель', seat: 'p2'}]});
+    for (const [phase, label, suffix, body] of [
+        ['voting', 'Голосовать против: Цель', '/vote', {target: 'p2', expected_revision: 2}],
+        ['day', 'Открыть голосование сейчас', '/advance', {expected_revision: 4}],
+        ['finished', 'Сыграть ещё', '/restart', {expected_revision: 4}]]) {
+        const lobby = ncLobby({status: phase, round: 2, can_advance: true, winner: phase === 'finished' ? 'citizens' : null, history: [{type: 'started', round: 1}],
+            players: ncPlayers().map(p => ({...p, role: phase === 'finished' ? 'citizen' : undefined, voted: phase === 'voting' ? false : undefined}))});
+        const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+            [ncq(`${NCB}/mafia/role`)]: {status: 200, body: role(phase)},
+            [ncq(`${NCB}/mafia${suffix}`) + ':POST']: {status: 200, body: {lobby}},
+        })});
+        await ncTable(app);
+        if (phase === 'voting') { await findButton(app.content, 'Цель').click(); await flush(); }
+        await findButton(app.content, label).click(); await flush();
+        assert.deepEqual(JSON.parse(ncWrites(app, suffix)[0].options.body), body, phase);
+        if (phase === 'finished') assert.match(app.content.textContent, /Кто был кем/);
+    }
+});
+
+test('a lost discussion command is retried with the same key until the server answers; the draft survives', async () => {
+    let attempts = 0;
+    const lobby = ncLobby({status: 'day', round: 1, history: [{type: 'started', round: 1}, {type: 'night_result', round: 1, eliminated: 'p4', eliminated_name: 'Вера'}]});
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(lobby, {
+        [ncq(`${NCB}/mafia/role`)]: {status: 200, body: {phase: 'day', round: 1, role: 'citizen', title: 'Мирный', alive: true, seat: 'p1'}},
+        [ncq(`${NCB}/mafia/discussion`) + ':POST']: () => { if (++attempts === 1) throw new TypeError('network'); return {status: attempts === 2 ? 503 : 200, body: {id: 3, accepted: true}}; },
+    })});
+    await ncTable(app);
+    assert.match(app.content.textContent, /Вера выбывает/);
+    const box = app.content.querySelector('textarea');
+    box.value = 'Привет, город'; box.events.input();
+    await findButton(app.content, 'Отправить').click(); await flush();
+    assert.match(app.content.textContent, /Нет связи/);
+    assert.equal(app.content.querySelector('textarea').value, 'Привет, город', 'the draft is kept on the redrawn screen');
+    for (let i = 0; i < 2; i++) { await app.timers.filter(t => t.delay === 3000).at(-1).callback(); await flush(); }
+    const sent = app.requests.filter(r => r.path === ncq(`${NCB}/mafia/discussion`) && r.options.method === 'POST');
+    assert.equal(sent.length, 3);
+    assert.ok(sent.every(r => r.options.headers['Idempotency-Key'] === sent[0].options.headers['Idempotency-Key'] && r.options.body === sent[0].options.body));
+    assert.doesNotMatch(app.content.textContent, /Нет связи/);
+    assert.equal(app.content.querySelector('textarea').value, '', 'an accepted message clears the draft');
+});
+
+test('a late role answer after leaving the table never reaches the screen', async () => {
     let release, started;
     const waiting = new Promise(resolve => { started = resolve; });
-    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides({...guestLobby(), status: 'night'}, {
-        [guestMafiaBase + '/role']: () => { started(); return new Promise(resolve => { release = resolve; }); },
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby({status: 'night', round: 2, history: []}), {
+        [ncq(`${NCB}/mafia/role`)]: () => { started(); return new Promise(resolve => { release = resolve; }); },
     })});
-    const opening = findButton(app.content, 'Открыть Ночной город').click();
+    await ncEntry(app);
+    const opening = findButton(app.content, 'Открыть').click();
     await waiting;
     await app.ui.back(); await flush();
-    release({status: 200, body: {phase: 'night', title: 'Секретная роль', role: 'citizen', alive: true}});
-    await opening;
+    release({status: 200, body: {phase: 'night', round: 2, title: 'Секретная роль', role: 'detective', alive: true, seat: 'p1', targets: []}});
+    await opening; await flush();
     assert.match(app.content.textContent, /Твои комнаты/);
-    assert.doesNotMatch(app.content.textContent, /Секретная роль|Полный ход дела/);
+    assert.doesNotMatch(app.content.textContent, /детектив|Кого проверить/);
 });
 
-test('standalone Mafia polling preserves discussion drafts and stops after leaving the room', async () => {
-    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestMafiaOverrides(guestLobby())});
-    await findButton(app.content, 'Открыть Ночной город').click();
-    const before = app.requests.length;
-    const poll = app.timers.find(t => t.delay === 5000);
-    assert.ok(poll);
-    app.content.querySelector('textarea').value = 'Пишу сообщение';
-    poll.callback(); await flush();
-    assert.equal(app.requests.length, before);
+test('polling redraws without losing the draft and stops after leaving the game', async () => {
+    let revision = 4;
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(null, {
+        [ncq(`${NCB}/mafia/lobby`)]: () => ({status: 200, body: {lobby: ncLobby({revision})}}),
+    })});
+    await ncTable(app);
+    const box = app.content.querySelector('textarea');
+    box.value = 'Пишу сообщение'; box.events.input();
+    revision = 5;
+    await app.timers.filter(t => t.delay === 4000).at(-1).callback(); await flush();
+    assert.notEqual(app.content.querySelector('textarea'), box, 'the screen was redrawn');
     assert.equal(app.content.querySelector('textarea').value, 'Пишу сообщение');
-    app.content.querySelector('textarea').value = '';
-    app.timers.filter(t => t.delay === 5000).at(-1).callback(); await flush();
-    assert.ok(app.requests.length > before);
-    const nextPoll = app.timers.filter(t => t.delay === 5000).at(-1);
-    await app.ui.back(); await flush();
-    const after = app.requests.length;
-    nextPoll.callback(); await flush();
-    assert.equal(app.requests.length, after);
+    const poll = app.timers.filter(t => t.delay === 4000).at(-1);
+    await app.ui.back(); await flush();     // room → Night City entry
+    await app.ui.back(); await flush();     // entry (game root) → main menu
+    assert.equal(app.qw.mode, 'hub');
+    const before = app.requests.length;
+    await poll.callback(); await flush();
+    assert.equal(app.requests.length, before);
+});
+
+test('Telegram: the group table is a secondary path; messages stay text and commands carry the Mini App CSRF', async () => {
+    const chat = '-880000000044', base = `/api/mini/mafia/chats/${chat}`;
+    const app = await application(true, '', {overrides: {
+        '/api/mini/chats?limit=50': {status: 200, body: {items: [{chat_id: chat, title: 'Дело', type: 'supergroup', mafia: {status: 'playing', seated: 5, joined: true}}], has_more: false}},
+        [ncq('/api/guest/rooms', 'telegram')]: {status: 200, body: {items: []}},
+        [ncq('/api/guest/rooms/open', 'telegram')]: {status: 200, body: {items: []}},
+        [`${base}/lobby`]: {status: 200, body: {lobby: ncLobby({is_host: false, players: [{name: '<Игрок>', seat: 'p1', portrait: 1, is_me: true, ready: false, alive: true}]})}},
+        [`${base}/discussion`]: {status: 200, body: {enabled: true, items: [{id: 1, author: '<Игрок>', is_me: false, message: '<script>не HTML</script>', created_at: null}]}},
+        [`${base}/discussion:POST`]: {status: 200, body: {id: 2, accepted: true}},
+    }});
+    await ncEntry(app);
+    assert.match(app.content.textContent, /Играть в Telegram-группе/);
+    assert.match(app.content.textContent, /Открытых столов сейчас нет/);
+    assert.match(app.content.textContent, /за столом 5 · ты за столом/);
+    assert.match(app.content.textContent, /идёт партия/);
+    await findButton(app.content, 'Вернуться').click(); await flush(); await flush();
+    assert.match(app.content.textContent, /<script>не HTML<\/script>/);
+    const box = app.content.querySelector('textarea');
+    box.value = 'Голосуем после обсуждения'; box.events.input();
+    await findButton(app.content, 'Отправить').click(); await flush(); await flush();
+    const post = app.requests.find(r => r.path === `${base}/discussion` && r.options.method === 'POST');
+    assert.equal(post.options.headers['X-Mini-CSRF'], '1');
+    assert.match(post.options.headers['Idempotency-Key'], /^[A-Za-z0-9._:-]{8,64}$/);
+    assert.equal(JSON.parse(post.options.body).message, 'Голосуем после обсуждения');
+    assert.ok(!app.requests.some(r => r.path.startsWith(`${base}/`) && r.path.includes('identity=')));
+});
+
+test('Night City runs in game mode: no hub chrome, back leads to the main menu, hub mode comes back', async () => {
+    const app = await application(true, '', {overrides: {
+        [ncq('/api/guest/rooms', 'telegram')]: {status: 200, body: {items: []}},
+        [ncq('/api/guest/rooms/open', 'telegram')]: {status: 404, body: {detail: 'нет'}},
+    }});
+    await ncEntry(app);
+    assert.equal(app.qw.mode, 'game');
+    assert.equal(app.qw.rootBack, null, 'game root: BackButton and ⚙ lead to the main menu via onHome');
+    assert.equal(typeof app.qw.onHome, 'function');
+    assert.equal(app.content.querySelector('h1').textContent, 'Ночной город');
+    assert.match(app.content.textContent, /Ночной город · Дело 01/);
+    assert.equal(app.content.querySelectorAll('button').some(b => /К играм|К комнатам/.test(b.textContent)), false);
+    assert.ok(app.qw.items.some(item => item.id === 'nc-rules') && app.qw.items.some(item => item.id === 'nc-contrast'));
+    await app.ui.back(); await flush(); await flush();
+    assert.equal(app.qw.mode, 'hub', 'the main menu is a hub screen');
+    assert.equal(app.content.dataset.page, 'home');
 });
 
 test('guest starts in a browser, resumes and logs out without a Telegram session', async () => {
@@ -1220,30 +1572,6 @@ test('native help opens without starting a game or reading bot messages', async 
     assert.equal(app.mounts.length, 0);
 });
 
-test('Mafia discussion renders messages as text and sends an idempotent player command', async () => {
-    const chat = '-880000000044';
-    const app = await application(true, '', {overrides: {
-        '/api/mini/chats?limit=50': {status: 200, body: {items: [{chat_id: chat, title: 'Дело', type: 'supergroup'}], has_more: false}},
-        '/api/mini/mafia/draft': {status: 200, body: {title: 'Ночной город', revision: 0, players: 4,
-            roles: [{id: 'mafia', title: 'Мафия', count: 1}, {id: 'citizen', title: 'Мирные', count: 3}]}},
-        [`/api/mini/mafia/chats/${chat}/lobby`]: {status: 200, body: {lobby: {status: 'lobby', revision: 1,
-            players: [{name: '<Игрок>', is_me: true, ready: false}], joined: true, can_start: false, history: []}}},
-        [`/api/mini/mafia/chats/${chat}/discussion`]: {status: 200, body: {enabled: true, items: [
-            {id: 1, author: '<Игрок>', is_me: true, message: '<script>не HTML</script>', created_at: null},
-        ]}},
-        [`/api/mini/mafia/chats/${chat}/discussion:POST`]: {status: 200, body: {id: 2, accepted: true}},
-    }});
-    await findButton(app.content, 'Открыть дело').click(); await flush();
-    assert.match(app.content.textContent, /<script>не HTML<\/script>/);
-    const input = app.content.querySelector('textarea'); assert.ok(input);
-    input.value = 'Голосуем после обсуждения';
-    await findButton(app.content, 'Отправить').click(); await flush(); await flush();
-    const post = app.requests.find(item => item.path === `/api/mini/mafia/chats/${chat}/discussion` && item.options.method === 'POST');
-    assert.ok(post);
-    assert.match(post.options.headers['Idempotency-Key'], /^[A-Za-z0-9._:-]{8,64}$/);
-    assert.equal(JSON.parse(post.options.body).message, input.value);
-});
-
 test('deep link opens the requested page and falls back on unknown parameters', async () => {
     const achievements = await application(true, 'achievements');
     assert.equal(achievements.content.querySelector('h1').textContent, 'Достижения');
@@ -1457,23 +1785,6 @@ test('guest classic screen goes back to the guest home, without a «К комн�
     assert.equal(app.qw.rootBack, null);
 });
 
-test('Night City runs in game mode: no hub chrome, back leads to the main menu, hub mode comes back', async () => {
-    const app = await application(true, '', {overrides: {
-        '/api/mini/mafia/draft': {status: 200, body: {title: 'Ночной город', revision: 0, players: 4, roles: [{id: 'citizen', count: 2, title: 'Горожане'}]}},
-    }});
-    findButton(app.content, 'Открыть дело').click(); await flush(); await flush();
-    assert.equal(app.qw.mode, 'game');
-    assert.equal(app.qw.rootBack, null, 'game root: BackButton and ⚙ lead to the main menu via onHome');
-    assert.equal(typeof app.qw.onHome, 'function');
-    assert.equal(app.content.querySelector('h1').textContent, 'Ночной город');
-    assert.match(app.content.textContent, /Ночной город · Дело 01/);
-    assert.equal(app.content.querySelectorAll('button').some(b => /К играм|К комнатам/.test(b.textContent)), false);
-    assert.equal(app.content.querySelectorAll('.game-bar').length, 1);
-    await app.ui.back(); await flush(); await flush();
-    assert.equal(app.qw.mode, 'hub', 'the main menu is a hub screen');
-    assert.equal(app.content.dataset.page, 'home');
-});
-
 test('/app#settings opens Profile → Settings after login and consumes the hash', async () => {
     const app = await application(true, '', {locationHash: '#settings'});
     assert.equal(app.content.dataset.page, 'settings');
@@ -1605,7 +1916,7 @@ test('guest home shows every HOME_GAME_CARDS game, disabled as "Скоро" when
     const card = id => off.content.querySelectorAll('article').find(n => n.dataset.gameMode === id);
     assert.ok(findButton(card('classic'), 'Скоро').disabled);
     assert.ok(findButton(card('photo'), 'Скоро').disabled);
-    assert.ok(findButton(card('night'), 'Собрать компанию'));
+    assert.ok(findButton(card('night'), 'Открыть дело'));
     assert.ok(findButton(card('atlas'), 'Открыть атлас'));
     const on = await application(true, '', {savedGuest: true, overrides: {
         '/api/mini/config': {status: 200, body: {offline: false, room_classic_enabled: true, room_photo_enabled: true}}}});
@@ -1861,7 +2172,7 @@ const pressed = node => node.querySelectorAll('button').filter(n => n.attrs['ari
 test('an already chosen form skips the first-entry card and shows a collapsed example in guest settings', async () => {
     const examples = {m: 'Ты собрал урожай', f: 'Ты собрала урожай', n: 'Урожай собран'};
     for (const [form, example] of Object.entries(examples)) {
-        const chosen = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Ира', authentication: 'guest',
+        const chosen = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Игрок', authentication: 'guest',
             capabilities: ['guest-profile'], address_form: form, address_form_chosen: true};
         const app = await application(true, '', {savedGuest: true, overrides: {
             '/api/guest/me': {status: 200, body: chosen}, '/api/guest/resume:POST': {status: 200, body: chosen}}});
@@ -1878,7 +2189,7 @@ test('an already chosen form skips the first-entry card and shows a collapsed ex
 });
 
 test('«Исправить» opens the choice with the current form marked, a pick is saved and the card collapses again', async () => {
-    const chosen = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Ира', authentication: 'guest',
+    const chosen = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Игрок', authentication: 'guest',
         capabilities: ['guest-profile'], address_form: 'm', address_form_chosen: true};
     const sent = [];
     const app = await application(true, '', {savedGuest: true, overrides: {
@@ -1953,7 +2264,7 @@ test('the account lives in «Настройки» for a guest and no screen send
 test('player-facing profile text follows the chosen form and stays neutral by default', async () => {
     const cases = [['m', /Ты вошёл как «ira»/], ['f', /Ты вошла как «ira»/], ['n', /Вход выполнен как «ira»/], [undefined, /Вход выполнен как «ira»/]];
     for (const [form, expected] of cases) {
-        const profile = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Ира', authentication: 'guest',
+        const profile = {account_id: '00000000-0000-4000-8000-000000000001', display_name: 'Игрок', authentication: 'guest',
             login: 'ira', capabilities: ['guest-profile'], ...(form ? {address_form: form, address_form_chosen: true} : {})};
         const app = await application(true, '', {savedGuest: true, overrides: {
             '/api/guest/me': {status: 200, body: profile}, '/api/guest/resume:POST': {status: 200, body: profile}}});
@@ -2323,4 +2634,57 @@ test('Telegram login polls every 3 s for the first minute and every 5 s afterwar
     }
     assert.deepEqual(delays.slice(0, 20), Array(20).fill(3000));
     assert.deepEqual(delays.slice(20), [5000, 5000]);
+});
+
+test('an 18+ open table asks one question first; «Назад» enters nothing, «Мне есть 18» joins with age_ok and is remembered; 16+ asks nothing', async () => {
+    const table = (id, extra) => ({room_id: id, title: 'Стол ' + id, host_name: 'Гоша', seated: 3, waiting: 0, needs_from: 4, capacity: 12, status: 'gathering', joined: false, ...extra});
+    const tables = [table('adult-1', {world: 'dead_air', world_age: 18}), table('teen-1', {world: 'deep_choir', world_age: 16})];
+    const joined = id => ({id, title: 'Стол ' + id, role: 'member', membership_version: 'v2', open: true});
+    const overrides = {...ncOverrides(ncLobby()), [ncq('/api/guest/rooms/open')]: {status: 200, body: {items: tables}}};
+    for (const id of ['adult-1', 'teen-1']) Object.assign(overrides, {
+        [ncq(`/api/guest/rooms/${id}/join-open`)]: {status: 200, body: {room: joined(id), joined: true, seat: 'seated', lobby: ncLobby({is_host: false})}},
+        [ncq(`/api/guest/rooms/${id}/mafia/lobby`)]: {status: 200, body: {lobby: ncLobby({is_host: false})}},
+        [ncq(`/api/guest/rooms/${id}/mafia/discussion`)]: {status: 200, body: {items: [], enabled: true}},
+    });
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides});
+    await ncEntry(app);
+    const joins = id => app.requests.filter(r => r.path === ncq(`/api/guest/rooms/${id}/join-open`) && r.options.method === 'POST');
+    const sit = async index => { await app.content.querySelectorAll('button').filter(b => b.textContent.startsWith('Сесть за стол'))[index].click(); await flush(); await flush(); };
+
+    await sit(0);
+    assert.match(app.content.textContent, /В этом сюжете есть сцены для взрослых\. Тебе есть 18\?/);
+    assert.equal(joins('adult-1').length, 0, 'nothing is sent before the answer');
+    assert.ok(findButton(app.content, 'Мне есть 18')); assert.ok(findButton(app.content, 'Назад'));
+    await findButton(app.content, 'Назад').click(); await flush();
+    assert.equal(joins('adult-1').length, 0, '«Назад» enters nothing');
+    assert.match(app.content.textContent, /Открытые столы/, 'back to the list');
+    assert.equal(app.storage.get('nc-age18-ok'), undefined);
+
+    await sit(0);
+    await findButton(app.content, 'Мне есть 18').click(); await flush(); await flush(); await flush();
+    assert.deepEqual(JSON.parse(joins('adult-1')[0].options.body), {age_ok: true});
+    assert.equal(app.storage.get('nc-age18-ok'), '1', 'remembered on this device');
+
+    // A device that already answered: no question, age_ok goes with the join.
+    const again = await application(true, '', {savedGuest: true, manualTimers: true, sessionValues: {'nc-age18-ok': '1'}, overrides});
+    await ncEntry(again);
+    await again.content.querySelectorAll('button').filter(b => b.textContent.startsWith('Сесть за стол'))[0].click(); await flush(); await flush();
+    assert.doesNotMatch(again.content.textContent, /Тебе есть 18\?/, 'not asked again');
+    const second = again.requests.filter(r => r.path === ncq('/api/guest/rooms/adult-1/join-open') && r.options.method === 'POST');
+    assert.deepEqual(JSON.parse(second[0].options.body), {age_ok: true});
+});
+
+test('16+ tables ask nothing and send no age_ok', async () => {
+    const tables = [{room_id: 'teen-1', title: 'Хор', host_name: 'Гоша', seated: 3, waiting: 0, needs_from: 4, capacity: 12, status: 'gathering', joined: false, world: 'deep_choir', world_age: 16}];
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: {
+        ...ncOverrides(ncLobby()), [ncq('/api/guest/rooms/open')]: {status: 200, body: {items: tables}},
+        [ncq('/api/guest/rooms/teen-1/join-open')]: {status: 200, body: {room: {id: 'teen-1', title: 'Хор', role: 'member', membership_version: 'v2'}, joined: true, seat: 'seated', lobby: ncLobby({is_host: false})}},
+        [ncq('/api/guest/rooms/teen-1/mafia/lobby')]: {status: 200, body: {lobby: ncLobby({is_host: false})}},
+        [ncq('/api/guest/rooms/teen-1/mafia/discussion')]: {status: 200, body: {items: [], enabled: true}},
+    }});
+    await ncEntry(app);
+    await findButton(app.content, 'Сесть за стол').click(); await flush(); await flush();
+    const post = app.requests.find(r => r.path === ncq('/api/guest/rooms/teen-1/join-open') && r.options.method === 'POST');
+    assert.deepEqual(JSON.parse(post.options.body), {});
+    assert.doesNotMatch(app.content.textContent, /Тебе есть 18/);
 });

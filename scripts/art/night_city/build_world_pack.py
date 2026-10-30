@@ -1,0 +1,536 @@
+"""Build Night City world packs (one folder per world) from the style folders of docs/tasks/night_city/art_batch2.
+
+A world pack is everything a story brings to the shared Night City shell: scene slots (cover, title, lobby, night, day,
+vote, finale, out) with time-of-day variants, role-neutral seat portraits, faction emblems, card backs, card frames with
+their transparent holes, and a palette checked for contrast. Screens ask for slots, never for place names; the pack
+decides which picture fills a slot. Format: world_pack.schema.json; sources and slot choices: worlds.json.
+
+Generalises .local/night-city-design/v2/build_assets.py + install_client_art.py (noir_print_a only) to all 11 worlds.
+
+    python -I scripts/art/night_city/build_world_pack.py                       # the three preview worlds
+    python -I scripts/art/night_city/build_world_pack.py --all                 # all worlds of worlds.json
+    python -I scripts/art/night_city/build_world_pack.py neon_city circus      # chosen worlds
+    python -I scripts/art/night_city/build_world_pack.py --inventory           # art per slot for all worlds, no encoding
+    options: --out DIR (default .local/night-city-packs/worlds), --places (also every canon place × time, lazy set)
+
+Budgets (as in v2): scene ≤ 150 KB, card back / hero frame ≤ 90 KB, evidence frame ≤ 60 KB, icon / emblem / portrait ≤ 30 KB,
+world thumbnail ≤ 20 KB. WebP; quality steps down by 4 until the file fits. Output is reproducible (no timestamps).
+"""
+import argparse
+import colorsys
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+ART = ROOT / 'docs/tasks/night_city/art_batch2'
+CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
+TIMES = ['morning', 'day', 'evening', 'night']
+PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
+SCHEMA = 'nc-world-pack/1'
+
+BUDGET = {'scene': 150_000, 'back': 90_000, 'frame': 90_000, 'frame_small': 60_000, 'icon': 30_000, 'thumb': 20_000}
+
+
+# ---------------------------------------------------------------- source selection
+class Source:
+    """Files of one style folder: manifest entries marked selected=false are skipped; of name, name_v2, name_v3 the
+    highest version wins (the art queue keeps rejected originals next to the chosen replacement)."""
+
+    def __init__(self, style):
+        self.dir = ART / style
+        if not self.dir.is_dir():
+            raise SystemExit(f'no style folder {self.dir}')
+        self.rejected = set()
+        manifest = self.dir / 'manifest.json'
+        if manifest.exists():
+            self._walk(json.loads(manifest.read_text(encoding='utf-8')))
+
+    def _walk(self, node):
+        if isinstance(node, dict):
+            if node.get('selected') is False and isinstance(node.get('file'), str):
+                self.rejected.add(node['file'].replace('\\', '/').lstrip('./'))
+            for value in node.values():
+                self._walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                self._walk(value)
+
+    def find(self, rel):
+        """rel without version: 'locations/main_hall_night.png' → the chosen file (Path) or None."""
+        rel = rel.replace('\\', '/')
+        folder, name = rel.rsplit('/', 1)
+        stem = name[:-4] if name.endswith('.png') else name
+        best, best_v = None, -1
+        for path in (self.dir / folder).glob(f'{stem}*.png'):
+            tail = path.name[len(stem):]
+            m = re.fullmatch(r'(?:_v(\d+))?\.png(?:\.png)?', tail)
+            if not m:
+                continue
+            if f'{folder}/{path.name}' in self.rejected:
+                continue
+            version = int(m.group(1) or 1)
+            if version > best_v:
+                best, best_v = path, version
+        return best
+
+    def rel(self, path):
+        return path.relative_to(ART).as_posix() if path else None
+
+
+# ---------------------------------------------------------------- canon
+def md_table(text, heading):
+    """Rows of the first table under '## <heading>' as lists of cells."""
+    m = re.search(rf'^## {re.escape(heading)}.*?$(.*?)(?=^## |\Z)', text, re.M | re.S)
+    if not m:
+        return []
+    rows = []
+    for line in m.group(1).splitlines():
+        if not line.startswith('|') or line.startswith('| ---'):
+            continue
+        rows.append([cell.strip() for cell in line.strip().strip('|').split('|')])
+    return rows[1:] if rows else []
+
+
+def canon(world):
+    text = (CANON / world['canon']).read_text(encoding='utf-8')
+    places = [row[0].strip('`') for row in md_table(text, '2.') if row and row[0].startswith('`')]
+    heroes = []
+    for row in md_table(text, '3.'):
+        if not row or not row[0].startswith('`'):
+            continue
+        art = re.search(r'characters/([\w.-]+?)\.png', row[-1])
+        heroes.append({'id': row[0].strip('`'), 'title': row[1], 'sex': {'м': 'm', 'ж': 'f'}.get(row[2].strip()[:1], 'x'),
+                       'art': art.group(1) if art else None})
+    cases = len([row for row in md_table(text, '7.') if row and re.fullmatch(r'[0-9A-Z]{1,2}', row[0])])
+    return {'places': places, 'heroes': heroes, 'cases': cases}
+
+
+# ---------------------------------------------------------------- colour
+def hex_rgb(value):
+    value = value.lstrip('#')
+    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def rgb_hex(rgb):
+    return '#' + ''.join(f'{max(0, min(255, round(c))):02x}' for c in rgb)
+
+
+def mix(a, b, t):
+    a, b = hex_rgb(a), hex_rgb(b)
+    return rgb_hex([a[i] + (b[i] - a[i]) * t for i in range(3)])
+
+
+def lum(value):
+    def f(c):
+        c /= 255
+        return c / 12.92 if c <= .03928 else ((c + .055) / 1.055) ** 2.4
+    r, g, b = hex_rgb(value)
+    return .2126 * f(r) + .7152 * f(g) + .0722 * f(b)
+
+
+def ratio(a, b):
+    la, lb = lum(a), lum(b)
+    return (max(la, lb) + .05) / (min(la, lb) + .05)
+
+
+def lighten_to(color, bg, target):
+    """Move color towards white until it reaches the contrast target against bg."""
+    for step in range(0, 101):
+        out = mix(color, '#ffffff', step / 100)
+        if ratio(out, bg) >= target:
+            return out
+    return '#ffffff'
+
+
+def ink_for(fill):
+    """Dark ink of the fill's hue (or white when the fill is dark)."""
+    r, g, b = [c / 255 for c in hex_rgb(fill)]
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    dark = rgb_hex([c * 255 for c in colorsys.hls_to_rgb(h, .07, min(1, s))])
+    return dark if ratio(dark, fill) >= 4.5 else '#ffffff'
+
+
+def palette(base):
+    page = base['page']
+    p = dict(base)
+    p['page_rgb'] = ' '.join(str(c) for c in hex_rgb(page))
+    p['surface'] = mix(page, base['edge'], .06)
+    p['surface_2'] = mix(page, base['edge'], .11)
+    p['accent_hi'] = mix(base['accent'], '#ffffff', .28)
+    p['accent_lo'] = mix(base['accent'], '#000000', .16)
+    p['accent_ink'] = base.get('accent_ink') or ink_for(base['accent'])
+    p['accent_soft'] = 'rgb({} / .32)'.format(' '.join(str(c) for c in hex_rgb(base['edge'])))
+    p['rule'] = 'rgb({} / .24)'.format(' '.join(str(c) for c in hex_rgb(base['edge'])))
+    p['tint'] = mix(page, base['accent'], .16)
+    p['btn'] = mix(page, base['accent'], .05)
+    p['btn_text'] = mix(base['text'], base['accent_text'], .25)
+    p['field'] = mix(page, '#000000', .25)
+    p['field_line'] = mix(base['muted'], page, .35)
+    # contrast mode («Контрастный режим», UI_RULES §16): text ≥ 4.5:1 and outlines ≥ 3:1 on the surface
+    surface = p['surface']
+    p['contrast'] = {'line': lighten_to(base['line'], surface, 3.2), 'edge': lighten_to(base['edge'], surface, 3.2),
+                     'muted': lighten_to(base['muted'], surface, 7), 'accent_text': lighten_to(base['accent_text'], surface, 7),
+                     'shadow': lighten_to(base['shadow'], surface, 7), 'investigation': lighten_to(base['investigation'], surface, 7)}
+    checks = {'text/surface': ratio(base['text'], surface), 'muted/surface': ratio(base['muted'], surface),
+              'accent_text/page': ratio(base['accent_text'], page), 'accent_text/surface_2': ratio(base['accent_text'], p['surface_2']),
+              'ink/accent': ratio(p['accent_ink'], base['accent']), 'ink/accent_lo': ratio(p['accent_ink'], p['accent_lo']),
+              'shadow/surface': ratio(base['shadow'], surface), 'investigation/surface': ratio(base['investigation'], surface),
+              'edge/page (non-text)': ratio(base['edge'], page)}
+    need = {'text/surface': 7, 'edge/page (non-text)': 3}
+    failed = {k: round(v, 2) for k, v in checks.items() if v < need.get(k, 4.5)}
+    return p, {k: round(v, 2) for k, v in checks.items()}, failed
+
+
+# ---------------------------------------------------------------- encoding
+class Writer:
+    def __init__(self, out):
+        self.out = out
+        self.files = {}
+
+    def save(self, im, name, kind, quality, src):
+        path = self.out / f'{name}.webp'
+        budget = BUDGET[kind]
+        q = quality
+        while True:
+            im.save(path, 'WEBP', quality=q, method=6, exact=False)
+            size = path.stat().st_size
+            if size <= budget or q <= 40:
+                break
+            q -= 4
+        self.files[f'{name}.webp'] = {'bytes': size, 'kind': kind, 'budget': budget, 'quality': q, 'size': list(im.size), 'source': src}
+        return f'{name}.webp'
+
+
+def scene(writer, path, name, width=600, src=None):
+    im = Image.open(path).convert('RGB')
+    im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
+    return writer.save(im, name, 'scene', 66, src)
+
+
+def thumb(writer, path, src):
+    im = Image.open(path).convert('RGB')
+    im = im.resize((240, round(im.height * 240 / im.width)), Image.LANCZOS)
+    return writer.save(im, 'thumb', 'thumb', 70, src)
+
+
+def trimmed(writer, path, name, width, kind, src, quality=78):
+    im = Image.open(path).convert('RGBA')
+    im = im.crop(im.getchannel('A').getbbox())
+    im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
+    return writer.save(im, name, kind, quality, src), im
+
+
+def hole(im):
+    """Transparent region around the centre, as fractions [left, top, right, bottom] of the image."""
+    a = np.array(im)[:, :, 3] < 40
+    lab, _ = ndimage.label(a)
+    c = lab[im.height // 2, im.width // 2]
+    if not c:
+        return None
+    ys, xs = np.where(lab == c)
+    return [round(xs.min() / im.width, 4), round(ys.min() / im.height, 4),
+            round((xs.max() + 1) / im.width, 4), round((ys.max() + 1) / im.height, 4)]
+
+
+def head_box(im, tweak=None):
+    """Square head-and-shoulders box from the alpha mask: scan down from the top of the head, past the widest part of the
+    head (or hat) to the narrowest row (neck) after which the width at least doubles (shoulders). Works for full-length
+    and half-length cut-outs; tweak = [dx, dy, scale] in units of the box side for a figure the rule misreads."""
+    a = np.array(im)[:, :, 3] > 60
+    rows = np.where(a.any(axis=1))[0]
+    top, bottom = rows[0], rows[-1]
+    height = bottom - top
+    width = np.convolve(a.sum(axis=1).astype(float), np.ones(9) / 9, mode='same')
+    widest, narrow, neck_row, past_head, neck = 0, 1e9, None, False, None
+    for y in range(top, top + int(.55 * height)):
+        v = width[y]
+        if not past_head:
+            widest = max(widest, v)
+            if y > top + 15 and v < .85 * widest:
+                past_head, narrow, neck_row = True, v, y
+        else:
+            if v < narrow:
+                narrow, neck_row = v, y
+            if v > 1.8 * narrow:
+                if neck_row - top < .08 * height:
+                    # a plume or a hat brim narrowed first: that was not the neck, keep scanning
+                    past_head, widest = False, v
+                    continue
+                neck = neck_row
+                break
+    if neck is None:
+        neck = top + int(.16 * height)
+    head = neck - top
+    ys, xs = np.nonzero(a[top:neck])
+    cx = xs.mean() if len(xs) else im.width / 2
+    side = head * 2.0
+    y0 = top - .1 * head
+    if tweak:
+        dx, dy, scale = tweak
+        cx += dx * side
+        y0 += dy * side
+        cx_side = side * scale
+        y0 += (side - cx_side) / 2
+        side = cx_side
+    return tuple(int(round(v)) for v in (cx - side / 2, y0, cx + side / 2, y0 + side))
+
+
+def portrait(writer, path, name, plate, tweak, src, px=128):
+    im = Image.open(path).convert('RGBA')
+    box = head_box(im, tweak)
+    crop = im.crop(box)
+    bg = Image.new('RGBA', crop.size, hex_rgb(plate) + (255,))
+    bg.alpha_composite(crop)
+    return writer.save(bg.convert('RGB').resize((px, px), Image.LANCZOS), name, 'icon', 80, src)
+
+
+# ---------------------------------------------------------------- one world
+def plan(world, defaults):
+    """What each slot would use, and what is missing (no encoding)."""
+    src = Source(world['style'])
+    info = canon(world)
+    slot_times = {**defaults['slot_times'], **world.get('slot_times', {})}
+    scenes, missing = {}, []
+    cover = src.find(world['cover'])
+    scenes['cover'] = {'_': cover}
+    for slot, rel in {**defaults['screens'], **world.get('screens', {})}.items():
+        scenes[slot] = {'_': src.find(rel)}
+    for slot, place in world['slots'].items():
+        scenes[slot] = {time: src.find(f'locations/{place}_{time}.png') for time in slot_times.get(slot, ['evening'])}
+    for slot, variants in scenes.items():
+        for time, path in variants.items():
+            if path is None:
+                missing.append(f'scene {slot}' + ('' if time == '_' else f' · {time}'))
+    art_places = sorted({re.sub(r'_(morning|day|evening|night)(_v\d+)?$', '', p.stem) for p in (src.dir / 'locations').glob('*.png')
+                         if not p.stem.startswith('reference')})
+    place_times = {p: [t for t in TIMES if src.find(f'locations/{p}_{t}.png')] for p in art_places}
+    # portraits: canon hero ↔ art file by the art column, then by slug, then by order
+    files = sorted({re.sub(r'_v\d+$', '', p.stem) for p in (src.dir / 'characters').glob('c_*.png')})
+    by_slug = {re.sub(r'^c_\d+_', '', f): f for f in files}
+    heroes = []
+    for index, hero in enumerate(info['heroes']):
+        stem = hero['art'] if hero['art'] in files else by_slug.get(hero['id']) or by_slug.get(re.sub(r'^hero_', '', hero['id']))
+        if stem is None and index < len(files) and not any(h['art'] in files for h in info['heroes'] if h['art']):
+            stem = files[index]
+        heroes.append({**hero, 'file': stem})
+    matched = {h['file'] for h in heroes if h['file']}
+    for stem in files:
+        if stem not in matched:
+            heroes.append({'id': re.sub(r'^c_\d+_', '', stem), 'title': None, 'sex': world.get('art_sex', {}).get(stem, 'x'), 'art': stem,
+                           'file': stem, 'extra': True})
+    hint = re.compile(defaults['seat_exclude'])
+    for hero in heroes:
+        hero['seat'] = bool(hero['file']) and not hint.search(hero['file'] or '') and not hint.search(hero['id'])
+    # worlds.json `ui` maps a logical name to the style's own file name when the art queue named it differently
+    aliases = world.get('ui', {})
+    ui = {name: src.find(aliases.get(name, f'ui/{name}.png')) for name in
+          ['emblem_shadow', 'emblem_investigation', 'emblem_independent', 'card_back_role', 'card_back_case', 'card_back_event',
+           'frame_hero', 'frame_evidence', 'frame_dossier', 'frame_place', 'frame_item', 'frame_ghost', 'frame_ending']}
+    for name, path in ui.items():
+        if path is None:
+            missing.append(name)
+    canon_missing = [p for p in info['places'] if p not in art_places]
+    art_extra = [p for p in art_places if p not in info['places']]
+    case_covers = sorted({re.sub(r'_v\d+$', '', p.name.split('.')[0]) for p in (src.dir / 'covers').glob('case_*.png')})
+    seats = [h for h in heroes if h['seat']]
+    return {'src': src, 'canon': info, 'scenes': scenes, 'missing': missing, 'place_times': place_times, 'heroes': heroes,
+            'seats': seats, 'ui': ui, 'canon_places_missing': canon_missing, 'art_places_extra': art_extra,
+            'case_covers': case_covers}
+
+
+def order_seats(seats, limit):
+    """Men and women alternate so a default table looks varied; at most `limit` seats."""
+    women = [s for s in seats if s['sex'] == 'f']
+    others = [s for s in seats if s['sex'] != 'f']
+    out = []
+    while (women or others) and len(out) < limit:
+        if others:
+            out.append(others.pop(0))
+        if women and len(out) < limit:
+            out.append(women.pop(0))
+    return out
+
+
+def build(world, defaults, out_root, with_places=False):
+    p = plan(world, defaults)
+    src = p['src']
+    out = out_root / world['id']
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob('*.webp'):
+        old.unlink()
+    writer = Writer(out)
+    pal, checks, failed = palette(world['palette'])
+    focus = {**defaults['focus'], **world.get('focus', {})}
+    scenes = {}
+    for slot, variants in p['scenes'].items():
+        entry = {'focus': focus.get(slot, '50% 40%')}
+        for time, path in variants.items():
+            if path is None:
+                continue
+            name = f'scene_{slot}' if time == '_' else f'scene_{slot}_{time}'
+            file = scene(writer, path, name, src=src.rel(path))
+            if time == '_':
+                entry['file'] = file
+            else:
+                entry.setdefault('times', {})[time] = file
+        if 'file' in entry or 'times' in entry:
+            if 'times' in entry and 'file' not in entry:
+                entry['default'] = next(iter(entry['times']))
+            scenes[slot] = entry
+    if p['scenes']['cover']['_']:
+        thumb(writer, p['scenes']['cover']['_'], src.rel(p['scenes']['cover']['_']))
+    places = {}
+    for place, times in p['place_times'].items():
+        entry = {'times': {}}
+        for time in times:
+            name = f'place_{place}_{time}'
+            if with_places:
+                path = src.find(f'locations/{place}_{time}.png')
+                entry['times'][time] = scene(writer, path, name, src=src.rel(path))
+            else:
+                entry['times'][time] = None   # not built: lazy set, --places
+        places[place] = entry
+    seats = order_seats(p['seats'], defaults['seat_max'])
+    tweaks = world.get('portrait_crop', {})
+    portraits = []
+    for k, hero in enumerate(seats, 1):
+        path = src.find(f'characters/{hero["file"]}.png')
+        file = portrait(writer, path, f'portrait_{k:02d}', pal['plate'], tweaks.get(hero['file']), src.rel(path))
+        portraits.append({'n': k, 'file': file, 'hero': hero['id'], 'title': hero['title'], 'sex': hero['sex']})
+    factions = {}
+    for faction in ('shadow', 'investigation', 'independent'):
+        path = p['ui'][f'emblem_{faction}']
+        if path:
+            factions[faction] = {'emblem': trimmed(writer, path, f'emblem_{faction}', 200, 'icon', src.rel(path))[0]}
+    backs = {}
+    for kind in ('role', 'case', 'event'):
+        path = p['ui'][f'card_back_{kind}']
+        if path:
+            im = Image.open(path)
+            if im.mode in ('RGBA', 'LA', 'P'):
+                # a back drawn as a cut-out (transparent corners or middle) lies on the world's page colour
+                card = Image.new('RGBA', im.size, hex_rgb(pal['page']) + (255,))
+                card.alpha_composite(im.convert('RGBA'))
+                im = card
+            im = im.convert('RGB')
+            im = im.resize((480, round(im.height * 480 / im.width)), Image.LANCZOS)
+            backs[kind] = writer.save(im, f'back_{kind}', 'back', 72, src.rel(path))
+    frames = {}
+    for kind, width, budget in (('hero', 480, 'frame'), ('evidence', 400, 'frame_small'), ('dossier', 480, 'frame')):
+        path = p['ui'][f'frame_{kind}']
+        if path:
+            file, im = trimmed(writer, path, f'frame_{kind}', width, budget, src.rel(path), quality=80)
+            frames[kind] = {'file': file, 'aspect': [im.width, im.height], 'hole': hole(im)}
+    total = sum(f['bytes'] for f in writer.files.values())
+    over = sorted(name for name, f in writer.files.items() if f['bytes'] > f['budget'])
+    digest = hashlib.sha256(json.dumps({n: f['bytes'] for n, f in sorted(writer.files.items())}).encode()).hexdigest()[:12]
+    pack = {
+        'schema': SCHEMA, 'id': world['id'], 'title': world['title'], 'era': world.get('era'), 'style_pack': world['style'],
+        'version': digest, 'default': world['id'] == defaults['default_world'],
+        'age': world.get('age', defaults.get('age', 12)),
+        'palette': {k: v for k, v in pal.items()},
+        'font': {'display': world.get('font')},
+        'thumb': 'thumb.webp' if (out / 'thumb.webp').exists() else None,
+        'scenes': scenes, 'places': places, 'portraits': portraits, 'factions': factions, 'backs': backs, 'frames': frames,
+        'checks': {'contrast': checks, 'contrast_failed': failed, 'over_budget': over, 'missing': p['missing']},
+        'total_bytes': total, 'files': {n: {'bytes': f['bytes'], 'kind': f['kind'], 'quality': f['quality'], 'source': f['source']}
+                                        for n, f in sorted(writer.files.items())},
+    }
+    (out / 'pack.json').write_text(json.dumps(pack, ensure_ascii=False, indent=1), encoding='utf-8')
+    # preview pages open from file://, where fetch() of JSON is blocked: the same data as a script
+    (out / 'pack.js').write_text('(window.NC_PACKS = window.NC_PACKS || {})[%s] = %s;\n'
+                                 % (json.dumps(world['id']), json.dumps(pack, ensure_ascii=False)), encoding='utf-8')
+    print(f"{world['id']:15s} {len(writer.files):3d} files {total / 1024:7.0f} KB  portraits {len(portraits):2d}  "
+          f"over budget {over or '-'}  contrast {failed or 'ok'}  missing {p['missing'] or '-'}")
+    return pack
+
+
+def index(out_root, packs, defaults):
+    items = [{'id': pk['id'], 'title': pk['title'], 'era': pk['era'], 'style_pack': pk['style_pack'], 'version': pk['version'],
+              'thumb': f"{pk['id']}/{pk['thumb']}" if pk['thumb'] else None, 'accent': pk['palette']['accent'],
+              'page': pk['palette']['page'], 'age': pk.get('age'), 'default': pk['default']} for pk in packs]
+    data = {'schema': 'nc-world-index/1', 'default': defaults['default_world'], 'worlds': items}
+    (out_root / 'index.json').write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding='utf-8')
+    (out_root / 'index.js').write_text('window.NC_WORLDS = %s;\n' % json.dumps(data, ensure_ascii=False), encoding='utf-8')
+
+
+def inventory(config, out_root):
+    defaults = config['defaults']
+    rows = []
+    for world in config['worlds']:
+        p = plan(world, defaults)
+        sex = [h['sex'] for h in p['seats']]
+        rows.append({'id': world['id'], 'title': world['title'], 'style': world['style'], 'age': world.get('age', defaults.get('age', 12)),
+                     'slots': {slot: [t for t, path in v.items() if path] for slot, v in p['scenes'].items()},
+                     'missing': p['missing'], 'heroes_canon': len(p['canon']['heroes']),
+                     'heroes_with_art': sum(1 for h in p['heroes'] if h['file'] and not h.get('extra')),
+                     'heroes_without_art': [h['id'] for h in p['heroes'] if not h['file']],
+                     'seats': len(p['seats']), 'seats_f': sex.count('f'), 'seats_m': sex.count('m'), 'seats_x': sex.count('x'),
+                     'role_hint_portraits': [h['file'] for h in p['heroes'] if h['file'] and not h['seat']],
+                     'places_art': len(p['place_times']), 'places_all_times': sum(1 for t in p['place_times'].values() if len(t) == 4),
+                     'canon_places_missing': p['canon_places_missing'], 'art_places_extra': p['art_places_extra'],
+                     'cases_canon': p['canon']['cases'], 'case_covers': len(p['case_covers']),
+                     'ui': {k: bool(v) for k, v in p['ui'].items()}})
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / 'inventory.json').write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding='utf-8')
+    lines = ['| мир | стиль | слоты сцен | портреты (м/ж/?) | эмблемы · рубашки · рамки | места канона без арта | обложки дел | не хватает |',
+             '| --- | --- | --- | --- | --- | --- | --- | --- |']
+    for r in rows:
+        ui = r['ui']
+        emb = sum(ui[f'emblem_{f}'] for f in ('shadow', 'investigation', 'independent'))
+        backs = sum(ui[f'card_back_{k}'] for k in ('role', 'case', 'event'))
+        frames = sum(ui[k] for k in ui if k.startswith('frame_'))
+        gaps = list(r['missing'])
+        if r['canon_places_missing']:
+            gaps.append(f"места {', '.join(r['canon_places_missing'])}")
+        if r['case_covers'] < r['cases_canon']:
+            gaps.append(f"обложки дел {r['case_covers']}/{r['cases_canon']}")
+        if r['heroes_without_art']:
+            gaps.append(f"герои без арта {len(r['heroes_without_art'])}")
+        lines.append(f"| {r['title']} (`{r['id']}`) | `{r['style']}` | {sum(1 for v in r['slots'].values() if v)}/8 | "
+                     f"{r['seats']} ({r['seats_m']}/{r['seats_f']}/{r['seats_x']}) | {emb}/3 · {backs}/3 · {frames}/7 | "
+                     f"{len(r['canon_places_missing'])} из 8 | {r['case_covers']}/{r['cases_canon']} | {'; '.join(gaps) or '—'} |")
+    (out_root / 'inventory.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    print('\n'.join(lines))
+    return rows
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('worlds', nargs='*')
+    parser.add_argument('--all', action='store_true')
+    parser.add_argument('--inventory', action='store_true')
+    parser.add_argument('--places', action='store_true')
+    parser.add_argument('--out', default=str(ROOT / '.local/night-city-packs/worlds'))
+    args = parser.parse_args()
+    config = json.loads((HERE / 'worlds.json').read_text(encoding='utf-8'))
+    out_root = Path(args.out)
+    if args.inventory:
+        inventory(config, out_root)
+        return
+    by_id = {w['id']: w for w in config['worlds']}
+    ids = list(by_id) if args.all else (args.worlds or PREVIEW_WORLDS)
+    unknown = [i for i in ids if i not in by_id]
+    if unknown:
+        sys.exit(f'unknown worlds: {unknown}')
+    out_root.mkdir(parents=True, exist_ok=True)
+    packs = [build(by_id[i], config['defaults'], out_root, args.places) for i in ids]
+    # the index lists every pack present in the output folder, not only the ones built now
+    present = []
+    for world in config['worlds']:
+        path = out_root / world['id'] / 'pack.json'
+        if path.exists():
+            present.append(json.loads(path.read_text(encoding='utf-8')))
+    index(out_root, present, config['defaults'])
+
+
+if __name__ == '__main__':
+    main()

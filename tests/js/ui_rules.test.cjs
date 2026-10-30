@@ -11,9 +11,9 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const exists = file => fs.existsSync(path.join(root, file));
 
 const PAGES = ['web/mini_client/index.html', 'qw_farm/static/index.html', 'minigames/alchemia-1.0/shell.html'];
-const STYLES = ['web/shell/qw-tokens.css', 'web/shell/qw-shell.css', 'web/mini_client/styles.css',
+const STYLES = ['web/shell/qw-tokens.css', 'web/shell/qw-shell.css', 'web/mini_client/styles.css', 'web/mini_client/night-city.css',
     'qw_farm/static/style.css', 'qw_farm/static/dasha-game.css', 'qw_farm/static/oleg-game.css', 'minigames/alchemia-1.0/style.css'];
-const SCRIPTS = ['web/mini_client/app.js', 'web/mini_client/play-ui.js', 'qw_farm/static/app.js'];
+const SCRIPTS = ['web/mini_client/app.js', 'web/mini_client/play-ui.js', 'web/mini_client/night-city-ui.js', 'qw_farm/static/app.js'];
 
 test('every page loads the shared tokens and shell', () => {
     for (const page of PAGES) {

@@ -74,9 +74,7 @@ def test_room_leave_replay_rejoin_stale_version_and_history(pg_env):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('mode,status', [('classic', 'active'), ('photo', 'active'),
-                                        ('mafia', 'lobby'), ('mafia', 'night'),
-                                        ('mafia', 'day'), ('mafia', 'voting')])
+@pytest.mark.parametrize('mode,status', [('classic', 'active'), ('photo', 'active')])
 def test_room_leave_blocks_any_current_nonterminal_game(pg_env, mode, status):
     async def run():
         async with isolated_database(pg_env) as (db, _):
@@ -212,11 +210,7 @@ def test_room_leave_and_mafia_restart_race_both_orders(pg_env, first):
                     await session.execute(text("SET LOCAL lock_timeout = '5s'"))
                     waiting_pid.append(await session.scalar(text('SELECT pg_backend_pid()')))
                     attempting.set()
-                    if first == 'restart':
-                        with pytest.raises(RuntimeError, match='незавершённая'):
-                            await command(session, 'leave')
-                        return {'blocked': True}
-                    return await command(session, 'restart')
+                    return await command(session, 'leave' if first == 'restart' else 'restart')
 
             holder, waiter = asyncio.create_task(run_first()), asyncio.create_task(run_second())
             await attempting.wait()
@@ -237,17 +231,16 @@ def test_room_leave_and_mafia_restart_race_both_orders(pg_env, first):
             async with db.transaction() as session:
                 current = await GameRepository(session).current_in_room(room_id=room_id, mode='mafia')
                 assert current.status == 'lobby' and current.id != old_id
-                expected_roster = [str(owner)] if first == 'leave' else [str(owner), str(member)]
-                assert [p['account_id'] for p in current.state['players']] == expected_roster
-                assert (await session.get(RoomMembership, (room_id, member))).status == (
-                    'inactive' if first == 'leave' else 'active')
+                # Leave after the rematch lobby formed gives the seat up; leave first keeps the member out of it.
+                assert [p['account_id'] for p in current.state['players']] == [str(owner)]
+                assert (await session.get(RoomMembership, (room_id, member))).status == 'inactive'
                 retained = await session.get(Game, old_id)
                 assert retained.status == 'finished' and not retained.is_current
                 assert [p['account_id'] for p in retained.state['players']] == [str(owner), str(member)]
                 assert await session.scalar(select(func.count()).select_from(GamePlayer).where(
                     GamePlayer.game_id == old_id)) == 2
                 if first == 'restart':
-                    assert results[1] == {'blocked': True}
+                    assert results[1] == {'left': True, 'table': 'unseated'}
                 else:
                     assert results[0] == {'left': True}
     asyncio.run(run())
@@ -273,6 +266,10 @@ def test_room_leave_waits_for_first_start_and_observes_committed_game(pg_env, mo
                 async with db.transaction() as session:
                     await session.execute(text("SET LOCAL lock_timeout = '5s'"))
                     attempting.set()
+                    if mode == 'mafia':  # a table never blocks leaving: the seat is given up
+                        await RoomApplicationService(session).leave(account_id=member, room_id=room_id,
+                                                                    membership_version=version)
+                        return
                     with pytest.raises(RuntimeError, match='незавершённая'):
                         await RoomApplicationService(session).leave(account_id=member, room_id=room_id,
                                                                     membership_version=version)
@@ -293,7 +290,8 @@ def test_room_leave_waits_for_first_start_and_observes_committed_game(pg_env, mo
             release.set()
             await asyncio.wait_for(asyncio.gather(starter, leaver), 8)
             async with db.transaction() as session:
-                assert (await session.get(RoomMembership, (room_id, member))).status == 'active'
+                assert (await session.get(RoomMembership, (room_id, member))).status == (
+                    'inactive' if mode == 'mafia' else 'active')
     asyncio.run(run())
 
 
@@ -338,8 +336,8 @@ def test_room_leave_http_contract_and_revoked_invite(pg_env):
                 assert (await member.post(base + '/leave', headers=HEADERS, json=payload)).status_code == 409
                 assert (await member.get(base)).status_code == 200
                 async with db.transaction() as session:
-                    session.add(Game(id=str(uuid4()), room_id=room_id, mode='mafia', status='lobby',
-                                     phase='lobby', revision=0, is_current=True, state={}))
+                    session.add(Game(id=str(uuid4()), room_id=room_id, mode='classic', status='active',
+                                     phase='active', revision=0, is_current=True, state={}))
                 assert (await member.post(base + '/leave', headers=HEADERS,
                     json={'membership_version': returned['membership_version']})).status_code == 409
     asyncio.run(run())

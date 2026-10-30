@@ -1,0 +1,666 @@
+/* «Ночной город» — the client kit on the style-A art (noir_print_a), approved preview v2 (.local/night-city-design/v2).
+   Shell tokens and components only (qw-tokens.css + qw-shell.css: .qw-btn, .qw-btn-row/.qw-btn-stack, .qw-action-row, .qw-switch,
+   .qw-gear, .qw-menu). The game palette goes through --qw-game-*; --nc-* are game-local (role colours, gold rules, art).
+   Root class .nc is set by night-city-ui.js while the game is open; selectors carry :root.nc to win over the hub styles. */
+
+:root.nc.qw-mode-game{
+  color-scheme:dark;
+  --qw-game-header:#0b0c0f;--qw-game-surface:#14161b;--qw-game-surface-2:#1c1f25;--qw-game-line:#4a4030;
+  --qw-game-text:#f4ecdc;--qw-game-muted:#c9bda6;--qw-game-danger:#ffaaa3;
+  --qw-game-accent:#e9a23b;--qw-game-accent-fill:#e2a443;--qw-game-accent-ink:#1d1000;
+  --nc-page:#0b0c0f;--nc-gold:#c9963f;--nc-gold-soft:rgb(214 165 82/.32);--nc-gold-text:#f2c983;
+  --nc-field:#0e1013;--nc-field-line:#8b7c62;
+  --nc-mafia:#ff9e8e;--nc-town:#e8d3a8;--nc-ok:#b5dc98;
+  --nc-dock-h:132px;
+  background:var(--nc-page);color:var(--qw-game-text)}
+:root.nc body{background:var(--nc-page);color:var(--qw-game-text)}
+:root.nc:root:root .shell{padding:0;max-width:none}
+:root:root:root #content[data-page=night]{max-width:none;padding:0;margin:0}
+:root.nc #feedback{display:none}
+#content[data-page=night] :is(h1,h2,h3,p){margin:0}
+#content[data-page=night] img{display:block}
+.nc-main .ic,.nc-bar .ic,.nc-dock .ic,.nc-net .ic{width:var(--s,24px);height:var(--s,24px);flex:none;object-fit:contain}
+
+/* wide screens: the scene of the screen fills the margins around the 760 px column, darkened */
+@media (min-width:768px){
+  :root.nc body{background:transparent}
+  :root.nc body::before{content:"";position:fixed;inset:0;z-index:-2;background:var(--page-img) center 30%/cover no-repeat;filter:saturate(.85);opacity:.34}
+  :root.nc body::after{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 70% 90% at 50% 40%,rgb(11 12 15/.55),rgb(11 12 15/.92) 75%)}}
+
+/* ---------- header (UI_RULES §4): eyebrow + title, phase clock, ⚙ last ---------- */
+.nc-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:var(--qw-s-2);
+  min-height:calc(var(--qw-header-h) + var(--qw-safe-top));
+  padding:var(--qw-safe-top) max(calc(6px + var(--qw-safe-right)),calc((100vw - var(--qw-col-read)) / 2 + var(--qw-gutter) - 4px)) 0 max(calc(var(--qw-gutter) + var(--qw-safe-left)),calc((100vw - var(--qw-col-read)) / 2 + var(--qw-gutter)));
+  background:rgb(11 12 15/.96);border-bottom:1px solid var(--qw-game-line);box-shadow:0 1px 0 rgb(201 150 63/.18)}
+.nc-bar .qw-back:not([hidden])~.nc-title{margin-left:-4px}
+.nc-bar .qw-back{flex:none;order:-1;color:var(--qw-game-text)}
+.nc-title{flex:1;min-width:0}
+.nc-title small{display:block;font:700 var(--qw-fs-caption)/1.2 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nc-title h1{margin:0;font:750 var(--qw-fs-h3)/1.25 var(--qw-font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nc-clock-slot:empty{display:none}
+.nc-clock{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 6px;border-radius:var(--qw-r-pill);
+  background:#16130e;border:var(--qw-outline-w) solid var(--nc-gold);font:750 var(--qw-fs-control)/1 var(--qw-font);font-variant-numeric:tabular-nums;color:var(--nc-gold-text)}
+.nc-clock .ic{--s:26px}
+:root.nc .nc-bar .qw-gear{background:transparent;border:0;margin-left:0;min-height:0;padding:0}
+:root.nc .nc-bar .qw-gear svg{box-sizing:border-box;width:36px;height:36px;padding:6px;border-radius:10px;background:#16130e;border:var(--qw-outline-w) solid var(--nc-gold);color:var(--nc-gold-text)}
+
+/* ---------- column: 760 (UI_RULES §10); two sense columns from 1024 ---------- */
+.nc-main{max-width:var(--qw-col-read);margin:0 auto;padding:0 calc(var(--qw-gutter) + var(--qw-safe-right)) var(--qw-s-6) calc(var(--qw-gutter) + var(--qw-safe-left));display:flex;flex-direction:column;gap:var(--qw-s-4);font:400 var(--qw-fs-body)/1.5 var(--qw-font)}
+.nc-main.has-dock{padding-bottom:calc(var(--nc-dock-h) + var(--qw-safe-bottom) + var(--qw-s-4))}
+.nc-col{display:flex;flex-direction:column;gap:var(--qw-s-4);min-width:0}
+.nc-col:empty{display:none}
+@media (min-width:768px){.nc-main{padding-top:var(--qw-s-5)}}
+@media (min-width:1024px){
+  .nc-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;column-gap:var(--qw-s-5);row-gap:var(--qw-s-4)}
+  .nc-main>.nc-span,.nc-main>.nc-alert{grid-column:1/-1}}
+
+/* ---------- scene strip: the style-A art, copy on its own scrim (contrast holds over a white pixel) ---------- */
+.nc-hero{position:relative;isolation:isolate;overflow:hidden;margin:0 calc(-1 * var(--qw-gutter));padding:var(--hero-top,140px) 0 0;
+  display:flex;flex-direction:column;justify-content:flex-end}
+.nc-hero.tall{--hero-top:190px}
+.nc-hero::before{content:"";position:absolute;inset:0;z-index:-2;background:var(--img) var(--pos,50% 35%)/cover no-repeat}
+.nc-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgb(11 12 15/0) 0%,rgb(11 12 15/.2) 50%,rgb(11 12 15/.6) 100%)}
+.nc-hero .copy{padding:30px var(--qw-gutter) var(--qw-s-4);background:linear-gradient(180deg,rgb(11 12 15/0) 0,rgb(11 12 15/.86) 26px,rgb(11 12 15/.93) 100%)}
+.nc-hero .nc-eyebrow{color:var(--nc-gold-text);text-shadow:0 1px 2px #000}
+.nc-hero h2{margin-top:4px;font:800 var(--qw-fs-h1)/1.15 var(--qw-font);letter-spacing:-.01em;text-shadow:0 2px 6px #000}
+.nc-hero p{margin-top:6px;color:#efe4d0;font-size:var(--qw-fs-small);line-height:1.5;max-width:48ch;text-shadow:0 1px 3px #000}
+.nc-hero .qw-btn-stack{margin-top:var(--qw-s-4)}
+@media (max-width:767px){.nc-hero.short{--hero-top:76px}}
+@media (min-width:768px){
+  .nc-hero{--hero-top:120px;margin:0;border-radius:var(--qw-r-hero);border:1px solid var(--nc-gold);box-shadow:inset 0 0 0 4px rgb(11 12 15/.65),inset 0 0 0 5px var(--nc-gold-soft)}
+  .nc-hero.tall{--hero-top:150px}
+  .nc-hero .copy{padding:30px var(--qw-s-5) var(--qw-s-5);border-radius:0 0 var(--qw-r-hero) var(--qw-r-hero)}
+  .nc-hero::after{background:linear-gradient(180deg,rgb(11 12 15/0) 0%,rgb(11 12 15/.25) 60%,rgb(11 12 15/.7) 100%)}
+  .nc-hero .qw-btn-stack{max-width:320px}}
+@media (min-width:768px) and (max-height:860px){.nc-hero{--hero-top:72px}.nc-hero.tall{--hero-top:96px}}
+
+/* phase steps + time bar */
+.nc-steps{display:flex;gap:var(--qw-s-4);margin-top:var(--qw-s-3);font:700 var(--qw-fs-caption)/1.2 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:#cfc3ad}
+.nc-steps span{display:inline-flex;align-items:center;gap:5px;padding-bottom:6px;border-bottom:2px solid transparent}
+.nc-steps .ic{--s:20px;opacity:.55}
+.nc-steps .on{color:#fff4df;border-color:var(--qw-game-accent)}
+.nc-steps .on .ic{opacity:1}
+.nc-time{height:4px;border-radius:2px;background:rgb(255 255 255/.16);margin-top:var(--qw-s-2);overflow:hidden}
+.nc-time i{display:block;height:100%;width:0;background:var(--qw-game-accent);border-radius:2px;transition:width .9s linear}
+
+/* ---------- panels: dark paper with a double gold rule ---------- */
+.nc-card{position:relative;background:linear-gradient(180deg,#17191e,#121317);border:1px solid var(--qw-game-line);border-radius:var(--qw-r-card);padding:var(--qw-s-4);
+  box-shadow:inset 0 0 0 3px #121317,inset 0 0 0 4px rgb(214 165 82/.14)}
+.nc-card>*+*{margin-top:var(--qw-s-3)}
+.nc-eyebrow{display:block;font:700 var(--qw-fs-caption)/1.25 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-accent)}
+.nc-h3{font:700 var(--qw-fs-h3)/1.25 var(--qw-font)}
+.nc-head{display:flex;align-items:center;gap:var(--qw-s-2)}
+.nc-head .ic{--s:34px}
+.nc-head h2{flex:1;min-width:0}
+.nc-head .nc-count{font-size:var(--qw-fs-small);color:var(--qw-game-muted);white-space:nowrap}
+.nc-note,.nc-muted{font-size:var(--qw-fs-small);line-height:1.45;color:var(--qw-game-muted)}
+.nc-note b,.nc-muted b{color:var(--qw-game-text);font-weight:650}
+.nc-note.error{color:var(--qw-game-danger)}
+.nc-lead{font-size:var(--qw-fs-body);line-height:1.5}
+.nc-loading{padding:var(--qw-s-6) 0;text-align:center}
+.nc-empty{font-size:var(--qw-fs-small);color:var(--qw-game-muted)}
+
+/* ---------- my role (collapsed) ---------- */
+.nc-mine{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;gap:var(--qw-s-3);padding:var(--qw-s-2) var(--qw-s-2) var(--qw-s-2) var(--qw-s-3);
+  border-radius:var(--qw-r-card);border:1px solid var(--nc-gold);background:linear-gradient(135deg,#231b10,#14151a);box-shadow:inset 0 0 0 3px #17140f,inset 0 0 0 4px var(--nc-gold-soft)}
+.nc-mine .emb{box-sizing:border-box;width:52px;height:52px;object-fit:contain;padding:5px}
+.nc-mine strong{display:block;font:750 var(--qw-fs-h3)/1.2 var(--qw-font)}
+.nc-mine>div>span{display:block;font-size:var(--qw-fs-small);color:var(--qw-game-muted);line-height:1.35}
+.nc-mine>div>span b{color:var(--qw-game-text)}
+.nc-role-mafia{color:var(--nc-mafia)}.nc-role-town{color:var(--nc-town)}
+.nc-mine .nc-role-mafia,.nc-mine b.nc-role-mafia{color:var(--nc-mafia)}
+/* dark emblems (Тень) need a lit plate to read on ink */
+.nc-mine .emb,.nc-role-chip .ic{border-radius:50%;background:radial-gradient(circle,#4a3a20 0%,#2a2014 55%,#15130f 72%);box-shadow:0 0 0 1px rgb(214 165 82/.45)}
+
+.nc-team{display:flex;align-items:center;gap:var(--qw-s-2);padding:var(--qw-s-2) var(--qw-s-3);border-radius:var(--qw-r-control);background:#22151a;border:1px solid #6a3530}
+.nc-team>span{font-size:var(--qw-fs-small);color:#f6dcd6}
+.nc-team b{color:#fff}
+
+/* ---------- seats: portraits inside the avatar ring ---------- */
+.nc-ava{--size:56px;position:relative;flex:none;width:var(--size);height:var(--size)}
+.nc-ava::before{content:"";position:absolute;left:22.2%;top:25.1%;width:53.4%;height:53.4%;border-radius:50%;background:#15181e var(--p) center/cover}
+.nc-ava::after{content:"";position:absolute;inset:0}
+.nc-ava.sm{--size:32px}
+.nc-ava.sm::before{inset:0;width:auto;height:auto;border:1.5px solid var(--nc-gold)}
+.nc-ava.sm::after{display:none}
+.nc-ava.me::after{filter:drop-shadow(0 0 4px rgb(233 162 59/.9))}
+.out .nc-ava::before{filter:grayscale(1) brightness(.7)}
+.nc-ava .gh{position:absolute;right:-4px;bottom:-2px;z-index:1;width:24px;height:24px}
+.nc-seats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.nc-seat{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;column-gap:var(--qw-s-3);min-height:64px;padding:4px 0;border-top:1px solid rgb(201 150 63/.22)}
+.nc-seat:first-child{border-top:0}
+.nc-seat .nm{display:block;font:650 var(--qw-fs-body)/1.3 var(--qw-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-seat .sub{display:block;font-size:var(--qw-fs-small);color:var(--qw-game-muted);line-height:1.3}
+.nc-seat .end{display:flex;align-items:center;gap:6px}
+.nc-seat .end:empty{display:none}
+.nc-seat .qw-btn.compact{padding-inline:8px}
+.nc-seat.out .nm{text-decoration:line-through;text-decoration-thickness:1px;color:var(--qw-game-muted)}
+.nc-tag{display:inline-flex;align-items:center;gap:4px;min-height:26px;padding:2px 8px 2px 6px;border-radius:var(--qw-r-pill);font:700 var(--qw-fs-caption)/1.2 var(--qw-font);white-space:nowrap;
+  border:var(--qw-outline-w) solid var(--qw-game-line);color:var(--qw-game-muted);background:#121317}
+.nc-tag:not(:has(.ic)){padding-left:10px;padding-right:10px}
+.nc-tag .ic{--s:18px}
+.nc-tag.ok{color:var(--nc-ok);border-color:#4c6a3a}
+.nc-tag.amber{color:var(--nc-gold-text);border-color:#7a5826}
+.nc-role-chip{display:inline-flex;align-items:center;gap:6px;font:700 var(--qw-fs-small)/1.2 var(--qw-font)}
+.nc-role-chip .ic{box-sizing:border-box;--s:30px;padding:3px}
+
+/* seat track */
+.nc-track{display:flex;gap:6px;margin-top:var(--qw-s-3)}
+.nc-track i{flex:1;height:8px;border-radius:4px;background:rgb(255 255 255/.16)}
+.nc-track i.in{background:#8f7a58}.nc-track i.ready{background:var(--qw-game-accent)}
+
+/* ---------- picker: choose here, confirm in the dock ---------- */
+.nc-picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--qw-btn-gap)}
+:root.nc .nc-pick{position:relative;display:flex;align-items:center;gap:8px;min-height:68px;padding:6px 10px 6px 6px;text-align:left;cursor:pointer;font-weight:400;color:var(--qw-game-text);
+  border-radius:14px;border:1px solid var(--qw-game-line);background:#15171c}
+.nc-pick .nc-ava{--size:52px}
+.nc-pick .nm{display:block;font:650 var(--qw-fs-body)/1.25 var(--qw-font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-pick .sub{display:block;font-size:var(--qw-fs-caption);line-height:1.3;color:var(--qw-game-muted)}
+.nc-pick>span:last-child{min-width:0}
+:root.nc .nc-pick[aria-pressed="true"]{border-color:var(--qw-game-accent);box-shadow:inset 0 0 0 1px var(--qw-game-accent),0 0 18px rgb(233 162 59/.18);background:#2a2012}
+.nc-pick .tick{position:absolute;left:38px;bottom:4px;z-index:2;width:24px;height:24px}
+.nc-pick .mark-team{color:var(--nc-mafia)}
+.nc-pick .mark-check{color:#a6dde2}
+:root.nc .nc-pick:disabled{opacity:.5;cursor:default}
+:root.nc .nc-pick[aria-pressed="true"]:disabled{opacity:.85}
+
+/* portrait choice: 4 in a row on a phone, 6 from 768 */
+.nc-portraits{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--qw-btn-gap)}
+@media (min-width:768px){.nc-portraits{grid-template-columns:repeat(6,minmax(0,1fr))}}
+:root.nc .nc-portrait{position:relative;display:grid;place-items:center;min-height:76px;padding:4px;border-radius:14px;border:1px solid var(--qw-game-line);background:#15171c}
+.nc-portrait .nc-ava{--size:64px}
+:root.nc .nc-portrait[aria-pressed="true"]{border-color:var(--qw-game-accent);box-shadow:inset 0 0 0 1px var(--qw-game-accent);background:#2a2012}
+.nc-portrait .tick{position:absolute;right:6px;bottom:6px;width:24px;height:24px}
+:root.nc .nc-portrait:disabled{opacity:.35;cursor:not-allowed}
+:root.nc[data-qw-contrast="1"] .nc-portrait{border-width:2px;background:#15171c}
+:root.nc[data-qw-contrast="1"] .nc-portrait[aria-pressed="true"]{border-width:3px}
+
+/* ---------- buttons in the style: gold leaf on ink; sizes, gaps and classes stay the shell's ---------- */
+:root.nc .qw-btn{border-color:var(--nc-gold);background:#15140f;color:#f6e7c8;box-shadow:inset 0 0 0 2px #15140f,inset 0 0 0 3px rgb(214 165 82/.22);border-radius:var(--qw-r-control)}
+:root.nc .qw-btn .ic{--s:24px;margin-left:-4px}
+:root.nc .qw-btn.primary{border-color:#5a3c10;color:var(--qw-game-accent-ink);text-shadow:0 1px 0 rgb(255 236 190/.45);
+  background:linear-gradient(180deg,#f3c873 0%,#e2a443 48%,#c98a2c 100%);box-shadow:inset 0 0 0 2px rgb(255 228 160/.35),0 2px 0 #3b2708}
+:root.nc .qw-btn.text{border-color:transparent;background:transparent;box-shadow:none;color:var(--nc-gold-text)}
+:root.nc .qw-btn.danger{border-color:transparent;background:transparent;box-shadow:none;color:var(--qw-game-danger)}
+:root.nc .qw-btn:disabled{opacity:1;color:#b5a88f;border-style:dashed;border-color:#6a5a3e;background:#141412;box-shadow:none;text-shadow:none;cursor:not-allowed}
+:root.nc .qw-btn.primary:disabled{color:#b5a88f}
+
+/* ---------- bottom dock ---------- */
+.nc-dock{position:fixed;z-index:25;left:0;right:0;bottom:0;padding:var(--qw-s-3) calc(var(--qw-gutter) + var(--qw-safe-right)) calc(var(--qw-s-3) + var(--qw-safe-bottom)) calc(var(--qw-gutter) + var(--qw-safe-left));
+  background:linear-gradient(180deg,rgb(11 12 15/.9),#0b0c0f 30%);border-top:1px solid var(--nc-gold);box-shadow:0 -1px 0 rgb(11 12 15),0 -2px 0 rgb(214 165 82/.18),0 -14px 28px rgb(0 0 0/.4);font-family:var(--qw-font)}
+.nc-dock>div{max-width:calc(var(--qw-col-read) - 2 * var(--qw-gutter));margin:0 auto}
+.nc-dock .nc-dock-hint{margin:0 0 var(--qw-s-2);font-size:var(--qw-fs-small);line-height:1.4;color:var(--qw-game-muted);text-align:center}
+.nc-dock .qw-btn-row>.qw-btn{flex:1}
+.nc-dock .qw-btn-row>.qw-btn.primary{flex:2}
+
+/* ---------- lists ---------- */
+.nc-list{list-style:none;margin:0;padding:0}
+.nc-list>li{padding:var(--qw-s-3) 0;border-top:1px solid rgb(201 150 63/.22)}
+.nc-list>li:first-child{border-top:0;padding-top:var(--qw-s-1)}
+.nc-list>li:last-child{padding-bottom:0}
+.nc-list .ttl{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.nc-list .meta{display:block;margin-top:2px;font-size:var(--qw-fs-small);color:var(--qw-game-muted);line-height:1.35}
+.nc-list .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.nc-list .qw-btn{white-space:nowrap}
+.nc-list .end-note{font-size:var(--qw-fs-small);color:var(--qw-game-muted);text-align:right;line-height:1.3}
+
+/* ---------- fields ---------- */
+:root.nc .nc-field{box-sizing:border-box;width:100%;min-height:48px;margin:0;padding:10px 14px;border-radius:var(--qw-r-control);border:var(--qw-outline-w) solid var(--nc-field-line);background:var(--nc-field);color:var(--qw-game-text);font:400 16px/1.4 var(--qw-font)}
+.nc-field::placeholder{color:#a39a8a}
+.nc-join{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--qw-btn-gap)}
+:root.nc .nc-join .qw-btn{min-height:48px}
+
+/* invitation code: a sealed ticket */
+.nc-code{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:var(--qw-s-2);padding:0 var(--qw-s-2);min-height:68px;text-align:center;border-radius:var(--qw-r-control);
+  border:1px dashed var(--nc-gold);background:#16120b;font:800 24px/1 ui-monospace,"Cascadia Mono",Consolas,monospace;letter-spacing:.08em;white-space:nowrap;color:#ffe2b0}
+.nc-code.long{font-size:15px;letter-spacing:.02em;white-space:normal;word-break:break-all;line-height:1.3;padding-block:var(--qw-s-2)}
+.nc-code>.ic{--s:40px}
+:root.nc .nc-code .qw-icon-btn{display:grid;place-items:center;width:44px;height:44px;min-height:44px;padding:0;border-radius:10px;color:#f6e7c8;border:1px solid var(--nc-gold);background:#15140f}
+.nc-code .qw-icon-btn .ic{--s:28px}
+.nc-toggle{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--qw-s-3);min-height:56px;padding-top:var(--qw-s-3);border-top:1px solid rgb(201 150 63/.22)}
+.nc-toggle strong{display:block;font:650 var(--qw-fs-body)/1.3 var(--qw-font)}
+.nc-toggle span{display:block;font-size:var(--qw-fs-small);color:var(--qw-game-muted);line-height:1.4}
+:root.nc .nc-toggle button{display:grid;place-items:center;width:56px;height:var(--qw-tap);min-height:var(--qw-tap);padding:0;border:0;background:transparent}
+
+/* ---------- discussion ---------- */
+.nc-chat{display:flex;flex-direction:column;gap:var(--qw-s-3)}
+.nc-msg{display:grid;grid-template-columns:32px minmax(0,1fr);gap:var(--qw-s-2);align-items:start;max-width:92%}
+.nc-msg .bub{padding:8px 12px;border-radius:4px 14px 14px 14px;background:#1b1d22;border:1px solid #3a3326}
+.nc-msg .who{display:block;font:700 var(--qw-fs-caption)/1.3 var(--qw-font);color:var(--nc-gold-text)}
+.nc-msg p{font-size:var(--qw-fs-body);line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
+.nc-msg.mine{grid-template-columns:minmax(0,1fr);align-self:flex-end}
+.nc-msg.mine .bub{border-radius:14px 4px 14px 14px;background:#2a2115;border-color:#7a5826}
+.nc-sys{align-self:center;display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 6px;border-radius:var(--qw-r-pill);background:#101114;border:1px solid #3a3326;font-size:var(--qw-fs-caption);color:var(--qw-game-muted)}
+.nc-sys .ic{--s:20px}
+.nc-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--qw-btn-gap);align-items:end}
+:root.nc .nc-compose .nc-field{min-height:48px;resize:none}
+:root.nc .nc-compose .qw-btn{min-height:48px}
+.nc-closed{display:flex;align-items:center;gap:var(--qw-s-2);padding:8px 12px;border-radius:var(--qw-r-control);border:1px dashed #5d5040;font-size:var(--qw-fs-small);color:var(--qw-game-muted)}
+.nc-closed .ic{--s:28px}
+
+/* ---------- «Ход дела» ---------- */
+.nc-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.nc-log li{display:grid;grid-template-columns:36px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;padding:8px 0;border-top:1px solid rgb(201 150 63/.22)}
+.nc-log li:first-child{border-top:0;padding-top:0}
+.nc-log .ic{--s:36px}
+.nc-log .when{display:block;font:700 var(--qw-fs-caption)/1.3 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-muted)}
+.nc-log .what{font-size:var(--qw-fs-body);line-height:1.4}
+
+/* ---------- role card: back (card_back_role) and face (frame_hero + faction emblem) ---------- */
+.nc-reveal{align-items:center;padding-top:var(--qw-s-4);text-align:center}
+.nc-cardwrap{display:flex;justify-content:center}
+.nc-rolecard{position:relative;width:min(78vw,300px);aspect-ratio:480/725;isolation:isolate}
+.nc-rolecard .face{position:absolute;inset:12.5% 14% 9% 14%;z-index:-1;border-radius:6px;
+  background:radial-gradient(160px 140px at 50% 30%,rgb(233 162 59/.22),transparent 70%),linear-gradient(180deg,#1d1810,#0f0f12)}
+.nc-rolecard .frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.nc-rolecard .body{position:absolute;inset:15% 17% 12% 17%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px}
+.nc-rolecard .emb{width:62%;aspect-ratio:1;object-fit:contain;filter:drop-shadow(0 4px 10px rgb(0 0 0/.6))}
+.nc-rolecard h2{font:850 clamp(26px,8vw,32px)/1.05 var(--qw-font);letter-spacing:.01em}
+.nc-rolecard .side{padding:3px 10px;border-radius:var(--qw-r-pill);border:1px solid var(--nc-gold);background:#121014;font:700 var(--qw-fs-caption)/1.3 var(--qw-font);color:#f6e7c8}
+.nc-rolecard .eyebrow{font:700 var(--qw-fs-caption)/1.25 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--nc-gold-text)}
+.nc-rolecard.back{border-radius:16px;overflow:hidden;box-shadow:0 16px 40px rgb(0 0 0/.55),0 0 0 1px var(--nc-gold)}
+.nc-rolecard.back img{width:100%;height:100%;object-fit:cover}
+.nc-role-pair{display:flex;flex-direction:column;gap:var(--qw-s-4);padding-top:var(--qw-s-4)}
+@media (min-width:1024px){.nc-role-pair{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--qw-s-5);align-items:center}}
+.nc-abil{display:grid;gap:var(--qw-s-2)}
+.nc-abil div{display:grid;grid-template-columns:36px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
+.nc-abil .ic{--s:36px}
+.nc-abil .dt{display:block;font:700 var(--qw-fs-caption)/1.3 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-accent)}
+.nc-abil .dd{display:block;font-size:var(--qw-fs-small);line-height:1.45}
+.nc-secret{display:flex;align-items:center;justify-content:center;gap:6px;font-size:var(--qw-fs-small);color:var(--qw-game-muted)}
+.nc-secret .ic{--s:26px}
+
+/* ---------- case records: evidence (frame_evidence) and dossier (frame_dossier) ---------- */
+.nc-evidence{margin:0;display:grid;grid-template-columns:112px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
+.nc-evidence-art{position:relative;aspect-ratio:400/393;isolation:isolate}
+.nc-evidence-plate{position:absolute;inset:11.2% 12.25% 11.45% 12.25%;z-index:-1;display:grid;place-items:center;background:#1d1810}
+.nc-evidence-plate .pic{width:82%;height:82%;object-fit:contain}
+.nc-evidence-art .frame{position:absolute;inset:0;width:100%;height:100%}
+.nc-evidence figcaption strong{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.nc-evidence .meta{display:block;font-size:var(--qw-fs-small);color:var(--qw-game-muted)}
+.nc-evidence figcaption p{margin-top:4px;font-size:var(--qw-fs-small);line-height:1.45}
+.nc-evidence-kind{display:inline-block;margin-bottom:4px;padding:1px 8px;border-radius:var(--qw-r-pill);font:700 var(--qw-fs-caption)/1.4 var(--qw-font);letter-spacing:.04em;text-transform:uppercase}
+.nc-evidence-kind.proof{color:#1d1000;background:var(--qw-game-accent)}
+.nc-evidence-kind.claim{color:var(--nc-gold-text);border:1px dashed var(--nc-gold)}
+.nc-dossier{position:relative;width:min(100%,340px);aspect-ratio:480/705;margin:0 auto;isolation:isolate}
+.nc-dossier .frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.nc-dossier-body{position:absolute;inset:11.91% 18.54% 13.48% 18.75%;z-index:-1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:var(--qw-s-3) var(--qw-s-2);overflow:auto;
+  text-align:center;background:linear-gradient(180deg,#201a10,#111013)}
+.nc-dossier dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;text-align:left;font-size:var(--qw-fs-small)}
+.nc-dossier dt{color:var(--qw-game-muted)}.nc-dossier dd{margin:0}
+
+/* ---------- alerts ---------- */
+.nc-alert{display:grid;grid-template-columns:40px minmax(0,1fr);gap:var(--qw-s-3);padding:var(--qw-s-3) var(--qw-s-4) var(--qw-s-3) var(--qw-s-3);border-radius:var(--qw-r-card);border:1px solid #7a3a34;background:#231417;font-family:var(--qw-font)}
+.nc-alert>.ic{--s:40px}
+.nc-alert strong{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.nc-alert p{margin-top:2px;font-size:var(--qw-fs-small);color:#f3dcd6;line-height:1.45}
+.nc-alert .qw-btn-row{justify-content:flex-start;margin-top:var(--qw-s-3)}
+.nc-alert.warn{border-color:#7a5826;background:#201a10}
+.nc-alert.warn p{color:#eedfc4}
+.nc-net{position:sticky;top:calc(var(--qw-header-h) + var(--qw-safe-top));z-index:20;display:flex;align-items:center;gap:var(--qw-s-2);padding:6px calc(var(--qw-gutter) + var(--qw-safe-right)) 6px calc(var(--qw-gutter) + var(--qw-safe-left));
+  background:#3a1c1c;border-bottom:1px solid #7a3a34;font:400 var(--qw-fs-small)/1.4 var(--qw-font);color:#ffe0dc}
+.nc-net .ic{--s:28px}
+.nc-net>span{flex:1;min-width:0}
+
+/* ⚙ menu: shell component; game items carry vector glyphs from the shell sprite (see the end of the file) */
+
+/* Telegram group path */
+.nc-steps-list{margin:0;padding:0;list-style:none;display:grid;gap:var(--qw-s-2);counter-reset:s}
+.nc-steps-list li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:var(--qw-s-2);align-items:start;font-size:var(--qw-fs-small);line-height:1.45;color:var(--qw-game-muted)}
+.nc-steps-list li::before{counter-increment:s;content:counter(s);display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1px solid var(--nc-gold);color:var(--nc-gold-text);font:700 var(--qw-fs-caption)/1 var(--qw-font)}
+.nc-steps-list code{font:650 var(--qw-fs-small) ui-monospace,Consolas,monospace;color:var(--qw-game-text);background:#0e1013;padding:1px 6px;border-radius:6px;border:1px solid #3a3326}
+.nc-card .qw-btn-row{justify-content:flex-start}
+
+/* ===== Контрастный режим (UI_RULES §16): solid plates under text on art, text ≥ 4.5:1, outlines 2 px ≥ 3:1 ===== */
+:root.nc.qw-mode-game[data-qw-contrast="1"]{
+  --qw-game-header:#0b0c0f;--qw-game-surface:#15171c;--qw-game-surface-2:#1d2026;--qw-game-line:#c4ab7e;
+  --qw-game-text:#fff;--qw-game-muted:#ece2cf;--qw-game-danger:#ffc2bc;
+  --qw-game-accent:#f2b45a;--qw-game-accent-fill:#f2b45a;--qw-game-accent-ink:#1d1000;
+  --nc-gold:#e0b468;--nc-gold-text:#ffd99a;--nc-field-line:#d8c7a6;--nc-mafia:#ffb8ac;--nc-town:#fff;--nc-ok:#c8eeb0}
+:root.nc[data-qw-contrast="1"] body::before{opacity:.18}
+:root.nc[data-qw-contrast="1"] .nc-bar{background:#0b0c0f;border-bottom-width:2px}
+:root.nc[data-qw-contrast="1"] .nc-hero{border:2px solid var(--qw-game-line)}
+:root.nc[data-qw-contrast="1"] .nc-hero .copy{background:#0b0c0f;border-top:2px solid var(--qw-game-line)}
+:root.nc[data-qw-contrast="1"] :is(.nc-hero p,.nc-steps){color:#fff}
+:root.nc[data-qw-contrast="1"] .nc-steps .on{border-bottom-width:3px;color:var(--qw-game-accent)}
+:root.nc[data-qw-contrast="1"] .nc-steps .on::after{content:"\00a0◂"}
+:root.nc[data-qw-contrast="1"] .nc-time{background:#2a2f37;outline:1px solid #c4ab7e}
+:root.nc[data-qw-contrast="1"] :is(.nc-card,.nc-pick,.nc-mine,.nc-msg .bub,.nc-alert,.nc-team,.nc-code,.nc-tag){border-width:2px}
+:root.nc[data-qw-contrast="1"] :is(.nc-card,.nc-mine,.nc-pick){background:#15171c;box-shadow:none}
+:root.nc[data-qw-contrast="1"] .nc-pick[aria-pressed="true"]{border-width:3px;background:#2a2012;box-shadow:none}
+:root.nc[data-qw-contrast="1"] :is(.nc-seat,.nc-list>li,.nc-log li){border-top-color:#6d6150}
+:root.nc[data-qw-contrast="1"] .nc-track i{background:#2a2f37;outline:1px solid #8a8f98}
+:root.nc[data-qw-contrast="1"] .nc-track i.in{background:#d6bf98}
+:root.nc[data-qw-contrast="1"] .nc-track i.ready{background:var(--qw-game-accent);outline-color:#fff}
+:root.nc[data-qw-contrast="1"] .nc-dock{background:#0b0c0f;border-top-width:2px}
+:root.nc[data-qw-contrast="1"] .qw-btn{border-width:2px;box-shadow:none;background:#15140f}
+:root.nc[data-qw-contrast="1"] .qw-btn.primary{background:#f2b45a;border-color:#1d1000;text-shadow:none}
+:root.nc[data-qw-contrast="1"] :is(.qw-btn.text,.qw-btn.danger){background:transparent;text-decoration:underline;text-underline-offset:3px}
+:root.nc[data-qw-contrast="1"] .qw-btn:disabled{color:#e6dcc8;border-color:#c4ab7e;background:#15140f}
+:root.nc[data-qw-contrast="1"] .nc-field::placeholder{color:#d8cfbf}
+:root.nc[data-qw-contrast="1"] .nc-rolecard .face{background:#121014}
+:root.nc[data-qw-contrast="1"] .nc-net{background:#2a1214;border-bottom:2px solid #ffc2bc;color:#fff}
+:root.nc[data-qw-contrast="1"] :is(.nc-alert p,.nc-team>span){color:#fff}
+:root.nc[data-qw-contrast="1"] .nc-seat.out .nm{text-decoration-thickness:2px}
+:root.nc[data-qw-contrast="1"] :is(.nc-mine .emb,.nc-role-chip .ic){background:#3a2e1c;box-shadow:0 0 0 2px var(--nc-gold)}
+:root.nc[data-qw-contrast="1"] .nc-evidence-kind.claim{border-style:solid;border-width:2px}
+
+/* =====================================================================================================================
+   Shell and world packs (docs/tasks/NIGHT_CITY_OPEN_ROOMS.md, scripts/art/night_city/README.md).
+   Everything above was written for one world; from here the colours are tokens. Defaults = the neutral SHELL (ink, ivory, one red
+   «stamp», WeLizard Noir for titles); a world pack overrides the --nc-* tokens on <html> (night-city-ui.js, from pack.json palette),
+   and --qw-game-* are derived from them, so the shared shell components follow the world too. Sizes, gaps, radii, safe areas stay.
+   ===================================================================================================================== */
+/* «Ночной город»: the neutral shell + world pack tokens, layered over the real web/mini_client/night-city.css.
+   Proposed for stage 2 (after approval). Every gold literal of night-city.css becomes a token:
+   - defaults below = the SHELL (no world): ink, ivory, one red «stamp», display face WeLizard Noir;
+   - a world pack overrides the --nc-* tokens on <html> (nc-packs.js, from pack.json palette);
+   - --qw-game-* (the core contract, UI_RULES §3) are derived from --nc-*, so qw-shell components follow the world too.
+   Sizes, gaps, radii and safe-area stay the core's. */
+
+@font-face{font-family:"WeLizard Noir";src:url(/app/night/shell/WeLizardNoir-Regular.woff2) format("woff2");font-display:swap}
+
+:root.nc.qw-mode-game{
+  /* shell palette (neutral brand) */
+  --nc-page:#0c0d10;--nc-page-rgb:12 13 16;--nc-surface:#15171b;--nc-surface-2:#1c1f24;--nc-line:#3a3c42;
+  --nc-edge:#8f897d;--nc-edge-soft:rgb(143 137 125/.32);--nc-rule:rgb(143 137 125/.22);
+  --nc-text:#f1ede4;--nc-muted:#bfbab0;
+  --nc-accent:#ece4d2;--nc-accent-hi:#fbf7ec;--nc-accent-lo:#d4c9b1;--nc-accent-ink:#121212;--nc-accent-text:#ff7a6b;
+  --nc-tint:#24221f;--nc-btn:#131417;--nc-btn-text:#f1ede4;--nc-field:#08090b;--nc-field-line:#8d887f;--nc-plate:#16181d;
+  --nc-shadow:#ff9e8e;--nc-invest:#e3dccd;--nc-indep:#b9d3c9;
+  --nc-line-hc:#a9a49a;--nc-edge-hc:#cfc9bc;--nc-muted-hc:#ece7dc;--nc-accent-text-hc:#ffb0a6;--nc-shadow-hc:#ffbcb1;--nc-invest-hc:#fff;
+  --nc-display:"WeLizard Noir",Georgia,"Times New Roman",serif;
+  /* the core contract, derived */
+  --qw-game-header:var(--nc-page);--qw-game-surface:var(--nc-surface);--qw-game-surface-2:var(--nc-surface-2);--qw-game-line:var(--nc-line);
+  --qw-game-text:var(--nc-text);--qw-game-muted:var(--nc-muted);
+  --qw-game-accent:var(--nc-accent-text);--qw-game-accent-fill:var(--nc-accent);--qw-game-accent-ink:var(--nc-accent-ink);
+  /* night-city.css names */
+  --nc-gold:var(--nc-edge);--nc-gold-soft:var(--nc-edge-soft);--nc-gold-text:var(--nc-accent-text);
+  --nc-mafia:var(--nc-shadow);--nc-town:var(--nc-invest);
+  background:var(--nc-page);color:var(--nc-text)}
+:root.nc body{background:var(--nc-page);color:var(--nc-text)}
+:root.nc.qw-mode-game[data-qw-contrast="1"]{
+  --qw-game-line:var(--nc-line-hc);--qw-game-text:#fff;--qw-game-muted:var(--nc-muted-hc);
+  --qw-game-accent:var(--nc-accent-text-hc);--qw-game-accent-fill:var(--nc-accent);--qw-game-accent-ink:var(--nc-accent-ink);
+  --nc-gold:var(--nc-edge-hc);--nc-gold-text:var(--nc-accent-text-hc);--nc-field-line:var(--nc-muted-hc);
+  --nc-mafia:var(--nc-shadow-hc);--nc-town:var(--nc-invest-hc)}
+
+/* icons: one vector sprite for all worlds (currentColor); faction emblems stay pack art */
+.ic{display:inline-block;width:var(--s,24px);height:var(--s,24px);flex:none;color:var(--nc-accent-text)}
+.ic svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+img.ic{object-fit:contain}
+.nc-head .ic:not(.emb-art){box-sizing:border-box;--s:34px;padding:6px;border-radius:50%;border:1px solid var(--nc-edge-soft);background:var(--nc-tint)}
+.nc-steps .ic{color:inherit;opacity:.7}
+.nc-steps .on .ic{opacity:1;color:var(--nc-accent-text)}
+.qw-btn .ic{color:inherit}
+:root.nc .qw-btn .ic{--s:22px}
+.nc-tag .ic{color:inherit}
+.nc-log .ic,.nc-abil .ic{box-sizing:border-box;--s:36px;padding:7px;border-radius:50%;border:1px solid var(--nc-edge-soft);background:var(--nc-tint)}
+.nc-alert>.ic{box-sizing:border-box;--s:40px;padding:8px;border-radius:50%;border:1px solid currentColor;color:var(--nc-accent-text)}
+.nc-net .ic{color:#ffe0dc}
+.nc-secret .ic,.nc-closed .ic{--s:22px;color:var(--nc-muted)}
+.nc-sys .ic{--s:18px;color:var(--nc-muted)}
+.nc-clock .ic{--s:20px;color:var(--nc-accent-text)}
+.nc-code>.ic{--s:30px}
+.nc-pick .tick,.nc-portrait .tick{box-sizing:border-box;padding:4px;border-radius:50%;background:var(--nc-accent);color:var(--nc-accent-ink);box-shadow:0 0 0 2px var(--nc-page)}
+.nc-pick .tick svg,.nc-portrait .tick svg{stroke-width:3}
+.nc-ava .gh{box-sizing:border-box;padding:3px;border-radius:50%;background:var(--nc-surface-2);color:var(--nc-muted);border:1px solid var(--nc-line)}
+.nc-ava .gh svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2}
+
+/* ---------- header, clock, ⚙ ---------- */
+.nc-bar{background:rgb(var(--nc-page-rgb)/.96);border-bottom-color:var(--nc-line);box-shadow:0 1px 0 var(--nc-rule)}
+.nc-title small{color:var(--nc-accent-text)}
+.nc-clock{background:var(--nc-btn);border-color:var(--nc-edge);color:var(--nc-accent-text)}
+:root.nc .nc-bar .qw-gear svg{background:var(--nc-btn);border-color:var(--nc-edge);color:var(--nc-btn-text)}
+.nc-bar .qw-back svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- wide screens: page art behind the column ---------- */
+@media (min-width:768px){
+  :root.nc body::after{background:radial-gradient(ellipse 70% 90% at 50% 40%,rgb(var(--nc-page-rgb)/.55),rgb(var(--nc-page-rgb)/.92) 75%)}}
+
+/* ---------- scene strip ---------- */
+.nc-hero::after{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/0) 0%,rgb(var(--nc-page-rgb)/.2) 50%,rgb(var(--nc-page-rgb)/.6) 100%)}
+.nc-hero .copy{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/0) 0,rgb(var(--nc-page-rgb)/.86) 26px,rgb(var(--nc-page-rgb)/.93) 100%)}
+.nc-hero .nc-eyebrow{color:var(--nc-accent-text)}
+/* display face in capitals only: its lowercase «ы» and «ъ» are drawn as «ь» (font defect, see the report) */
+.nc-hero h2{font-family:var(--nc-display);font-weight:400;font-size:calc(var(--qw-fs-h1) + 6px);line-height:1.08;letter-spacing:.04em;text-transform:uppercase}
+.nc-hero p{color:var(--nc-text)}
+.nc-steps{color:var(--nc-muted)}
+.nc-steps .on{color:var(--nc-text);border-color:var(--nc-accent-text)}
+.nc-time i{background:var(--nc-accent-text)}
+@media (min-width:768px){
+  .nc-hero{border-color:var(--nc-edge);box-shadow:inset 0 0 0 4px rgb(var(--nc-page-rgb)/.65),inset 0 0 0 5px var(--nc-edge-soft)}
+  .nc-hero::after{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/0) 0%,rgb(var(--nc-page-rgb)/.25) 60%,rgb(var(--nc-page-rgb)/.7) 100%)}}
+/* shell brand: the logotype rule under the display title */
+.nc-shell-scene h2::after{content:"";display:block;width:56px;height:3px;margin-top:8px;background:var(--nc-accent-text)}
+
+/* ---------- panels ---------- */
+.nc-card{background:linear-gradient(180deg,var(--nc-surface-2),var(--nc-surface));border-color:var(--nc-line);
+  box-shadow:inset 0 0 0 3px var(--nc-surface),inset 0 0 0 4px var(--nc-rule)}
+.nc-eyebrow{color:var(--nc-accent-text)}
+.nc-seat,.nc-list>li,.nc-log li,.nc-toggle{border-top-color:var(--nc-rule)}
+.nc-mine{border-color:var(--nc-edge);background:linear-gradient(135deg,var(--nc-tint),var(--nc-surface));box-shadow:inset 0 0 0 3px var(--nc-surface),inset 0 0 0 4px var(--nc-edge-soft)}
+.nc-mine .emb,.nc-role-chip .ic{background:radial-gradient(circle,var(--nc-tint) 0%,var(--nc-surface-2) 60%,var(--nc-page) 74%);box-shadow:0 0 0 1px var(--nc-edge-soft)}
+span.emb{box-sizing:border-box;padding:12px!important;color:var(--nc-invest)}
+.nc-team{background:var(--nc-tint);border-color:var(--nc-edge-soft)}
+.nc-team>span{color:var(--nc-text)}
+.nc-tag{background:var(--nc-surface);border-color:var(--nc-line);color:var(--nc-muted)}
+.nc-tag.amber{color:var(--nc-accent-text);border-color:var(--nc-edge-soft)}
+.nc-track i.in{background:var(--nc-edge)}
+.nc-track i.ready{background:var(--nc-accent-text)}
+
+/* ---------- avatars: vector ring in the world's edge colour (no raster ring per world) ---------- */
+.nc-ava::before{left:0;top:0;width:100%;height:100%;background:var(--nc-plate) var(--p) center/cover}
+.nc-ava::after{background:none;border-radius:50%;box-shadow:inset 0 0 0 2px var(--nc-edge),inset 0 0 0 4px rgb(var(--nc-page-rgb)/.85)}
+.nc-ava.me::after{filter:none;box-shadow:inset 0 0 0 2px var(--nc-accent-text),inset 0 0 0 4px rgb(var(--nc-page-rgb)/.85),0 0 0 2px var(--nc-edge-soft)}
+.nc-ava.sm::before{border-color:var(--nc-edge)}
+
+/* ---------- picker, portraits ---------- */
+:root.nc .nc-pick,:root.nc .nc-portrait{background:var(--nc-surface);border-color:var(--nc-line)}
+:root.nc .nc-pick[aria-pressed="true"],:root.nc .nc-portrait[aria-pressed="true"]{border-color:var(--nc-accent-text);box-shadow:inset 0 0 0 1px var(--nc-accent-text);background:var(--nc-tint)}
+
+/* ---------- buttons: the world's accent on ink; sizes stay the core's ---------- */
+:root.nc .qw-btn{border-color:var(--nc-edge);background:var(--nc-btn);color:var(--nc-btn-text);box-shadow:inset 0 0 0 2px var(--nc-btn),inset 0 0 0 3px var(--nc-rule)}
+:root.nc .qw-btn.primary{border-color:var(--nc-accent-lo);color:var(--nc-accent-ink);text-shadow:none;
+  background:linear-gradient(180deg,var(--nc-accent-hi) 0%,var(--nc-accent) 48%,var(--nc-accent-lo) 100%);box-shadow:inset 0 0 0 2px rgb(255 255 255/.22),0 2px 0 rgb(0 0 0/.45)}
+:root.nc .qw-btn.text{color:var(--nc-accent-text)}
+:root.nc .qw-btn:disabled{color:var(--nc-muted);border-color:var(--nc-line);background:var(--nc-surface)}
+:root.nc .qw-btn.primary:disabled{color:var(--nc-muted)}
+
+/* ---------- dock, fields, ticket ---------- */
+.nc-dock{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/.9),var(--nc-page) 30%);border-top-color:var(--nc-edge);box-shadow:0 -1px 0 var(--nc-page),0 -2px 0 var(--nc-rule),0 -14px 28px rgb(0 0 0/.4)}
+:root.nc .nc-field{background:var(--nc-field);border-color:var(--nc-field-line);color:var(--nc-text)}
+.nc-field::placeholder{color:var(--nc-muted);opacity:.8}
+.nc-code{border-color:var(--nc-edge);background:var(--nc-tint);color:var(--nc-accent-hi)}
+:root.nc .nc-code .qw-icon-btn{border-color:var(--nc-edge);background:var(--nc-btn);color:var(--nc-btn-text)}
+
+/* ---------- chat, log ---------- */
+.nc-msg .bub{background:var(--nc-surface-2);border-color:var(--nc-line)}
+.nc-msg .who{color:var(--nc-accent-text)}
+.nc-msg.mine .bub{background:var(--nc-tint);border-color:var(--nc-edge-soft)}
+.nc-sys{background:var(--nc-surface);border-color:var(--nc-line)}
+.nc-closed{border-color:var(--nc-line)}
+
+/* ---------- role card: geometry from the pack's frame hole (--fa, --fl…) ---------- */
+.nc-rolecard{aspect-ratio:var(--fa,480/725)}
+.nc-rolecard .face{inset:calc(var(--ft,12.5%) + 2%) calc(var(--fr,14%) + 2%) calc(var(--fb,9%) + 2%) calc(var(--fl,14%) + 2%);
+  background:radial-gradient(70% 50% at 50% 32%,var(--nc-tint),transparent 70%),linear-gradient(180deg,var(--nc-surface-2),var(--nc-page))}
+.nc-rolecard .body{inset:calc(var(--ft,12.5%) + 5%) calc(var(--fr,14%) + 4%) calc(var(--fb,9%) + 5%) calc(var(--fl,14%) + 4%)}
+.nc-rolecard h2{font-family:var(--nc-display);font-weight:400;font-size:clamp(28px,8.5vw,36px);letter-spacing:.05em;text-transform:uppercase}
+.nc-rolecard .side{border-color:var(--nc-edge);background:var(--nc-page);color:var(--nc-text)}
+.nc-rolecard .eyebrow{color:var(--nc-accent-text)}
+.nc-rolecard.back{box-shadow:0 16px 40px rgb(0 0 0/.55),0 0 0 1px var(--nc-edge)}
+.nc-abil .dt{color:var(--nc-accent-text)}
+
+/* ---------- alerts ---------- */
+.nc-alert.warn{border-color:var(--nc-edge-soft);background:var(--nc-tint)}
+.nc-alert.warn p{color:var(--nc-text)}
+
+/* ---------- NEW shell components: story (world) chip, world picker, invitation card ---------- */
+.nc-world-chip{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 10px 0 0;border-radius:var(--qw-r-pill);border:1px solid var(--nc-line);background:var(--nc-surface);
+  font:700 var(--qw-fs-caption)/1.2 var(--qw-font);color:var(--nc-text);white-space:nowrap;overflow:hidden}
+.nc-world-chip{max-width:100%}
+.nc-world-chip span{overflow:hidden;text-overflow:ellipsis}
+.nc-world-chip img{flex:none;width:26px;height:26px;border-radius:50%;object-fit:cover;object-position:50% 35%;box-shadow:0 0 0 2px var(--w-accent,var(--nc-edge))}
+.nc-worlds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--qw-btn-gap)}
+@media (min-width:600px){.nc-worlds{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1024px){.nc-worlds{grid-template-columns:repeat(4,minmax(0,1fr))}}
+:root.nc .nc-world{position:relative;display:flex;flex-direction:column;min-height:44px;margin:0;padding:0;overflow:hidden;cursor:pointer;text-align:left;color:var(--nc-text);
+  border-radius:14px;border:1px solid var(--nc-line);background:var(--nc-surface);font:inherit}
+.nc-world img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:50% 40%}
+.nc-world .w-copy{display:block;padding:8px 10px 10px;border-top:3px solid var(--w-accent)}
+.nc-world .w-name{display:block;font:700 var(--qw-fs-body)/1.25 var(--qw-font)}
+.nc-world .w-era{display:block;font-size:var(--qw-fs-caption);color:var(--nc-muted);line-height:1.3}
+.nc-world .w-tag{position:absolute;left:6px;top:6px;padding:2px 8px;border-radius:var(--qw-r-pill);background:rgb(var(--nc-page-rgb)/.88);font:700 var(--qw-fs-caption)/1.4 var(--qw-font);color:var(--nc-text)}
+:root.nc .nc-world[aria-pressed="true"]{border-color:var(--nc-accent);box-shadow:0 0 0 2px var(--nc-accent)}
+.nc-world .tick{position:absolute;right:6px;top:6px;width:28px;height:28px}
+.nc-story{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:var(--qw-s-3);align-items:center}
+.nc-story img{width:64px;height:84px;border-radius:8px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge)}
+.nc-story strong{display:block;font:700 var(--qw-fs-h3)/1.2 var(--qw-font)}
+.nc-story span{display:block;font-size:var(--qw-fs-small);color:var(--nc-muted);line-height:1.35}
+.nc-invite-card{display:grid;grid-template-columns:96px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
+.nc-invite-card>img{width:96px;height:132px;border-radius:10px;object-fit:cover;box-shadow:0 0 0 1px var(--w-accent),0 10px 24px rgb(0 0 0/.5)}
+.nc-invite-card strong{display:block;font:400 24px/1.1 var(--nc-display);letter-spacing:.05em;text-transform:uppercase}
+.nc-invite-card span{display:block;margin-top:4px;font-size:var(--qw-fs-small);color:var(--nc-muted);line-height:1.4}
+.nc-invite-card .nc-world-chip{margin-top:8px}
+
+/* ⚙ menu: shell component, vector icons */
+.qw-menu .qw-menu-item>.ic{--s:24px;color:var(--nc-accent-text)}
+.qw-menu .qw-menu-item.qw-danger>.ic{color:var(--qw-game-danger)}
+
+/* ===== Контрастный режим (UI_RULES §16) — token versions of night-city.css's contrast block ===== */
+:root.nc[data-qw-contrast="1"] .nc-bar{background:var(--nc-page)}
+:root.nc[data-qw-contrast="1"] .nc-hero .copy{background:var(--nc-page);border-top:2px solid var(--qw-game-line)}
+:root.nc[data-qw-contrast="1"] :is(.nc-card,.nc-mine,.nc-pick,.nc-portrait,.nc-world){background:var(--nc-surface);box-shadow:none}
+:root.nc[data-qw-contrast="1"] :is(.nc-pick,.nc-portrait,.nc-world)[aria-pressed="true"]{border-width:3px;background:var(--nc-tint);box-shadow:none}
+:root.nc[data-qw-contrast="1"] :is(.nc-seat,.nc-list>li,.nc-log li){border-top-color:var(--qw-game-line)}
+:root.nc[data-qw-contrast="1"] .nc-dock{background:var(--nc-page)}
+:root.nc[data-qw-contrast="1"] .qw-btn{background:var(--nc-btn)}
+:root.nc[data-qw-contrast="1"] .qw-btn.primary{background:var(--nc-accent);border-color:var(--nc-accent-ink)}
+:root.nc[data-qw-contrast="1"] .qw-btn:disabled{color:#fff;border-color:var(--qw-game-line);background:var(--nc-btn)}
+:root.nc[data-qw-contrast="1"] .nc-rolecard .face{background:var(--nc-page)}
+:root.nc[data-qw-contrast="1"] :is(.nc-mine .emb,.nc-role-chip .ic){background:var(--nc-surface-2);box-shadow:0 0 0 2px var(--nc-gold)}
+:root.nc[data-qw-contrast="1"] .nc-track i.in{background:var(--nc-edge-hc)}
+:root.nc[data-qw-contrast="1"] .nc-world .w-copy{border-top-width:4px}
+:root.nc[data-qw-contrast="1"] :is(.nc-head,.nc-log,.nc-abil) .ic:not(.emb-art){border-color:var(--qw-game-line)}
+:root.nc[data-qw-contrast="1"] .nc-world-chip{border-width:2px;border-color:var(--qw-game-line)}
+
+/* contrast mode on a narrow phone: the ◂ marker of the current step must not push «Голосование» out of the strip */
+@media (max-width:400px){:root.nc[data-qw-contrast="1"] .nc-steps{gap:10px;letter-spacing:.01em}
+  :root.nc[data-qw-contrast="1"] .nc-head .nc-count{white-space:normal;text-align:right;max-width:40%}}
+.nc-invite-card .nc-world-chip{display:inline-flex}
+.nc-invite-card .nc-world-chip span{display:inline;margin:0;font-size:var(--qw-fs-caption);color:var(--nc-text)}
+
+/* ---------- no pack (failed to load, or a Telegram group table before the pack arrives): drawn by CSS ---------- */
+.nc-ava .ph{position:absolute;inset:18%;width:auto;height:auto;color:var(--nc-muted)}
+.nc-ava.sm .ph{inset:20%}
+.nc-hero::before{background:var(--img) var(--pos,50% 35%)/cover no-repeat,var(--img-fb,none) 50% 40%/cover no-repeat,var(--nc-surface)}
+.nc-list>li.nc-empty{display:grid;gap:var(--qw-s-2);justify-items:start}
+.nc-empty-pic{width:100%;height:72px;object-fit:cover;object-position:50% 70%;border-radius:var(--qw-r-control);border:1px solid var(--nc-line);opacity:.85}
+.nc-rolecard.plain .face{inset:0;border-radius:14px;border:1px solid var(--nc-edge)}
+.nc-rolecard.plain .body{inset:6% 8%}
+.nc-rolecard.back.plain{display:grid;place-items:center;aspect-ratio:480/725;background:linear-gradient(160deg,var(--nc-tint),var(--nc-page))}
+.nc-rolecard .plain-back{position:absolute;inset:10px;border:1px solid var(--nc-edge-soft);border-radius:10px}
+.nc-rolecard.back.plain .ic{--s:72px;color:var(--nc-accent-text)}
+.nc-evidence-art.plain,.nc-dossier.plain{border:1px solid var(--nc-edge);border-radius:12px}
+.nc-evidence-art.plain .nc-evidence-plate,.nc-dossier.plain .nc-dossier-body{inset:0;border-radius:11px}
+.nc-story.nothumb{grid-template-columns:minmax(0,1fr) auto}
+/* frames of evidence and dossier: geometry from the pack (--fa, --fl…); the defaults are the pilot frames */
+.nc-evidence-art{aspect-ratio:var(--fa,400/393)}
+.nc-evidence-plate{inset:var(--ft,11.2%) var(--fr,12.25%) var(--fb,11.45%) var(--fl,12.25%)}
+.nc-dossier{aspect-ratio:var(--fa,480/705)}
+.nc-dossier-body{inset:var(--ft,11.91%) var(--fr,18.54%) var(--fb,13.48%) var(--fl,18.75%)}
+.nc-evidence-plate{background:var(--nc-plate)}
+.nc-dossier-body{background:linear-gradient(180deg,var(--nc-surface-2),var(--nc-page))}
+.nc-evidence-kind.proof{color:var(--nc-accent-ink);background:var(--nc-accent)}
+.nc-evidence-kind.claim{color:var(--nc-accent-text);border-color:var(--nc-edge)}
+.nc-steps-list li::before{border-color:var(--nc-edge);color:var(--nc-accent-text)}
+.nc-steps-list code{background:var(--nc-field);border-color:var(--nc-line)}
+.nc-team{border-color:var(--nc-shadow)}
+.nc-alert{border-color:var(--nc-shadow);background:var(--nc-surface)}
+.nc-alert p{color:var(--nc-text)}
+.nc-pick .mark-team{color:var(--nc-mafia)}
+.nc-pick .mark-check{color:var(--nc-indep)}
+.nc-ava.sm::before{border-color:var(--nc-edge)}
+/* panel rhythm: the list resets above (margin:0) beat .nc-card>*+*, so the first row touched the header; one gap token for everything in a panel */
+:root.nc .nc-card>*+*{margin-top:var(--qw-s-3)}
+
+/* the card back is one big button; the face turns up with a short flip, none under prefers-reduced-motion */
+.nc-rolecard.tappable,.nc-rolecard.swipe{touch-action:pan-y}
+.nc-rolecard.tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .15s ease}
+.nc-rolecard.tappable:active{transform:scale(.985)}
+.nc-rolecard.tappable:focus-visible{outline:3px solid var(--nc-accent-text);outline-offset:4px}
+.nc-rolecard:not(.back){animation:nc-turn .45s ease-out}
+@keyframes nc-turn{from{transform:perspective(900px) rotateY(calc(var(--dir,1) * 90deg));opacity:.2}to{transform:perspective(900px) rotateY(0);opacity:1}}
+@media (prefers-reduced-motion:reduce){.nc-rolecard,.nc-rolecard.tappable{animation:none;transition:none}.nc-rolecard.tappable:active{transform:none}}
+/* age mark of the darker worlds: a mark only, no gate */
+.nc-age{display:inline-block;margin-left:6px;padding:0 6px;min-height:20px;border-radius:var(--qw-r-pill);border:1.5px solid var(--nc-shadow);color:var(--nc-shadow);font:800 var(--qw-fs-caption)/18px var(--qw-font);letter-spacing:.02em;vertical-align:middle;white-space:nowrap}
+.nc-world-chip .nc-age{margin-left:0;flex:none}
+:root.nc[data-qw-contrast="1"] .nc-age{border-color:var(--nc-shadow-hc);color:var(--nc-shadow-hc);border-width:2px}
+.nc-age.a18{background:var(--nc-shadow);color:var(--nc-page)}
+
+/* =====================================================================================================================
+   Design review 2026-10-30: world picker, role card, 18+ question, shell backgrounds (nc-shell/2), loading.
+   ===================================================================================================================== */
+/* world picker: the choice reads without colour — a thick rim in the world's accent text colour, a filled tick, a word */
+.nc-world .w-pic{position:relative;display:block}
+.nc-world .w-copy{display:flex;flex-direction:column;gap:2px;flex:1}
+:root.nc .nc-world[aria-pressed="true"]{border-color:var(--nc-accent-text);box-shadow:0 0 0 2px var(--nc-accent-text),0 8px 22px rgb(0 0 0/.45);background:var(--nc-tint)}
+:root.nc .nc-world[aria-pressed="true"] .w-copy{border-top-color:var(--nc-accent-text)}
+.nc-world .tick{box-sizing:border-box;position:absolute;left:auto;right:8px;top:auto;bottom:8px;width:32px;height:32px;padding:5px;border-radius:50%;
+  background:var(--nc-accent-text);color:var(--nc-page);box-shadow:0 0 0 2px var(--nc-page),0 2px 8px rgb(0 0 0/.5)}
+.nc-world .tick svg{stroke-width:3}
+.nc-world .w-state{display:inline-flex;align-self:flex-start;margin-top:4px;padding:1px 9px;border-radius:var(--qw-r-pill);font:700 var(--qw-fs-caption)/1.4 var(--qw-font);
+  white-space:nowrap;color:var(--nc-page);background:var(--nc-accent-text)}
+.nc-world .w-state.now{color:var(--nc-muted);background:transparent;border:1px solid var(--nc-line);padding:0 7px}
+.nc-world .w-tag{left:8px;top:8px}
+:root.nc[data-qw-contrast="1"] .nc-world[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 2px var(--nc-accent-text-hc)}
+:root.nc[data-qw-contrast="1"] .nc-world .w-state{background:#fff;color:#000}
+:root.nc[data-qw-contrast="1"] .nc-world .w-state.now{background:transparent;color:#fff;border:2px solid var(--qw-game-line)}
+
+/* role card face: the faction emblem is the card's centre, not a 24 px icon (.nc-main .ic used to set its height) */
+:root.nc .nc-rolecard .body{gap:10px}
+:root.nc .nc-rolecard .emb{width:min(64%,190px);height:auto;aspect-ratio:1;object-fit:contain}
+:root.nc .nc-rolecard span.emb{width:44%;padding:0!important}
+:root.nc .nc-rolecard.plain span.emb{color:var(--nc-accent-text)}
+
+/* 18+ question: the plaque is the eyebrow, the story in question sits under it */
+.nc-age-plate .nc-age{margin:0;min-height:30px;padding:0 12px;font-size:16px;line-height:28px;border-width:2px}
+.nc-story strong .nc-age{margin-left:8px}
+
+/* shell backgrounds (nc-shell/2): pictures painted for the UI, calm dark top ~15% and bottom ~40%. The art sits in the upper
+   part of the strip, the copy on the dark lower part. Focus per slot and orientation. */
+.nc-hero[data-shell]::before{background-position:var(--pos-shell,50% 30%)}
+.nc-hero[data-shell][data-orient="portrait"]{--pos-shell:50% 62%}
+.nc-hero[data-shell="entry"][data-orient="portrait"]{--pos-shell:50% 100%}
+.nc-hero[data-shell="invite"][data-orient="portrait"]{--pos-shell:50% 76%}
+.nc-hero[data-shell="loading"][data-orient="portrait"]{--pos-shell:50% 62%}
+.nc-hero[data-shell][data-orient="landscape"]{--pos-shell:50% 55%}
+.nc-hero[data-shell="invite"][data-orient="landscape"]{--pos-shell:50% 60%}
+.nc-hero[data-shell="entry"][data-orient="landscape"]{--pos-shell:50% 75%}
+/* the art is already dark below: a lighter scrim keeps it visible, the copy keeps its own plate */
+.nc-hero[data-shell]::after{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/.35) 0%,rgb(var(--nc-page-rgb)/0) 22%,rgb(var(--nc-page-rgb)/0) 50%,rgb(var(--nc-page-rgb)/.55) 100%)}
+@media (max-width:767px){.nc-hero.tall[data-shell]{--hero-top:210px}}
+/* wide screens: the copy is a column on the left, so its plate fades to the right and the art stays visible beside it */
+@media (min-width:768px){
+  .nc-hero .copy{background:linear-gradient(90deg,rgb(var(--nc-page-rgb)/.9) 0,rgb(var(--nc-page-rgb)/.78) 46%,rgb(var(--nc-page-rgb)/.15) 80%,rgb(var(--nc-page-rgb)/0) 100%);
+    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 30px);mask-image:linear-gradient(180deg,transparent 0,#000 30px)}
+  :root.nc[data-qw-contrast="1"] .nc-hero .copy{-webkit-mask-image:none;mask-image:none}
+  .nc-hero::after{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/0) 0%,rgb(var(--nc-page-rgb)/.1) 55%,rgb(var(--nc-page-rgb)/.5) 100%)}}
+.nc-loading-scene .copy h2{font-size:calc(var(--qw-fs-h1) + 2px)}
+/* page backdrop on wide screens: the landscape picture when the viewport is landscape */
+@media (min-width:768px) and (orientation:landscape){:root.nc body::before{background-image:var(--page-img-l,var(--page-img))}}
+@media (min-width:768px){:root.nc body::before{opacity:.42}}
+/* empty state: the empty-table picture, wide enough to read */
+.nc-empty-pic{height:120px;object-position:50% 56%;opacity:1}
+/* phase steps: «.nc-steps span» also caught the icon's own span (padding and the underline squeezed the glyph to 12 px, raised) */
+.nc-steps>span>.ic{display:inline-block;padding:0;border:0;--s:18px}
+.nc-steps>span{gap:6px}
+/* header on a narrow phone with the phase clock: the phase («Ночь 1») stays, the brand gives way */
+@media (max-width:459px){.nc-bar.has-clock .nc-title small .nc-brand{display:none}}
+/* the «only you» line under the card back: one balanced block with its lock, not a lone icon beside two ragged lines */
+:root.nc .nc-secret{max-width:36ch;margin-inline:auto;text-wrap:balance}
+/* header: an opaque plate (the 4 % see-through let the scrolled art ghost under the title and the Telegram inset) */
+.nc-bar{background:var(--nc-page)}
+/* role card face: a soft halo of the world's edge colour under the emblem, so a dark emblem (Усадьба: the moth) still reads on the dark face */
+:root.nc .nc-rolecard img.emb{border-radius:50%;background:radial-gradient(closest-side,var(--nc-edge-soft),transparent 78%)}

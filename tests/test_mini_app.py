@@ -1107,12 +1107,12 @@ def test_mafia_full_cycle_uses_private_actions_and_public_results(pg_env, monkey
             action = await env.client.post(base + '/action', headers=headers[mafia],
                 json={'target': roles[victim]['seat'], 'expected_revision': lobby['phase_revision']})
             assert action.status_code == 200
+            # The mafia was the only night role, yet the night runs to its deadline (no early close).
+            assert action.json()['lobby']['status'] == 'night'
+            from tests.phase_helpers import end_phase
+            assert (await end_phase(env.db, chat_id=CHAT))['status'] == 'day'
             lobby = (await env.client.get(base + '/lobby', headers=headers[USER])).json()['lobby']
-            assert lobby['can_advance'] is True and 'role' not in str(lobby)
-            night = await env.client.post(base + '/advance', headers=headers[USER],
-                json={'expected_revision': lobby['revision']})
-            assert night.status_code == 200 and night.json()['lobby']['status'] == 'day'
-            lobby = night.json()['lobby']
+            assert 'role' not in str(lobby)
             opened = await env.client.post(base + '/advance', headers=headers[USER],
                 json={'expected_revision': lobby['revision']})
             assert opened.status_code == 200 and opened.json()['lobby']['status'] == 'voting'
@@ -1125,9 +1125,8 @@ def test_mafia_full_cycle_uses_private_actions_and_public_results(pg_env, monkey
                     json={'target': target, 'expected_revision': phase_revision})
                 assert result.status_code == 200, result.text
                 revision = result.json()['lobby']['revision']
-            finished = await env.client.post(base + '/advance', headers=headers[USER],
-                json={'expected_revision': revision})
-            assert finished.status_code == 200
+            # The last living player voted: the vote closes early.
+            finished = result
             assert finished.json()['lobby']['status'] == 'finished'
             assert finished.json()['lobby']['winner'] == 'citizens'
             assert 'assignments' not in finished.text and 'user_id' not in finished.text

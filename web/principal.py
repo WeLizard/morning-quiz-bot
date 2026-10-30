@@ -33,7 +33,7 @@ class Principal:
 
 @asynccontextmanager
 async def resolve_principal(request, *, database, guest_store, mini_store, lock=False,
-                            identity=None, gate=None):
+                            identity=None, gate=None, write=False):
     """Yield ``(session, Principal)`` inside one transaction.
 
     ``identity`` ('guest' | 'telegram' | None) picks the channel when a request carries both
@@ -41,6 +41,9 @@ async def resolve_principal(request, *, database, guest_store, mini_store, lock=
     ``lock`` takes the row locks used by account-owned write commands. ``gate(session, user_id)``
     is awaited after the session is verified and before the account rows are locked
     (maintenance checks); ``user_id`` is None for the guest channel.
+    ``write`` opens a read-write transaction without taking the User/Account row locks: for commands
+    whose application service takes its own game/room locks (and for reads that lock rows). The guest
+    channel is always read-write; the Telegram channel is READ ONLY unless ``lock`` or ``write``.
     """
     if identity not in {None, 'guest', 'telegram'}:
         raise PrincipalError('identity', 'Неизвестный способ входа.', 422)
@@ -66,7 +69,7 @@ async def resolve_principal(request, *, database, guest_store, mini_store, lock=
         return
     if not telegram:
         raise PrincipalError('authentication', 'Сначала войди через QuizzyWizzy.')
-    async with mini_store.authorized(telegram, write=lock) as (session, user):
+    async with mini_store.authorized(telegram, write=lock or write) as (session, user):
         if gate is not None:
             await gate(session, user.id)
         if lock:

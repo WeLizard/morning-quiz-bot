@@ -67,3 +67,38 @@ def deep_link(bot_username, target, chat_id=None):
     if target not in LAUNCH_PAGES:
         raise ValueError('Неизвестная страница Mini App')
     return f'https://t.me/{username}?startapp={target}'
+
+
+STARTAPP_PARAM = re.compile(r'[A-Za-z0-9_-]{1,64}')
+DEFAULT_SHORT_NAME = 'play'
+
+
+def short_name_from_env():
+    """Registered Main Mini App short name ('' selects the bot-level link form)."""
+    return os.getenv('MINI_APP_SHORT_NAME', DEFAULT_SHORT_NAME).strip()
+
+
+def startapp_url(bot_username, param, short_name=DEFAULT_SHORT_NAME):
+    """``https://t.me/<bot>/<short>?startapp=<param>``; None without a bot username.
+
+    Telegram limits the parameter to 64 characters of ``A-Za-z0-9_-``. Room links use the
+    ``room_<invite code>`` (48 chars) and ``roomid_<room id>`` (43 chars) forms.
+    """
+    bot = (bot_username or '').lstrip('@')
+    if not bot:
+        return None
+    username = _bot_username(bot)
+    if not isinstance(param, str) or not STARTAPP_PARAM.fullmatch(param):
+        raise ValueError('Некорректный параметр запуска Mini App')
+    if short_name and not re.fullmatch(r'[A-Za-z0-9_]{3,30}', short_name):
+        raise ValueError('Некорректное имя Mini App')
+    path = f'{username}/{short_name}' if short_name else username
+    return f'https://t.me/{path}?startapp={param}'
+
+
+def room_invite_param(invite_code):
+    return f'room_{invite_code}'
+
+
+def room_open_param(room_id):
+    return f'roomid_{room_id}'

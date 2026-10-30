@@ -184,6 +184,13 @@ class Room(TimestampMixin, Base):
         Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), index=True
     )
     state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    # «Открытая комната»: listed for strangers while open_activity_at is fresh (see application/rooms.py).
+    is_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false', nullable=False)
+    open_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # «Ночной город»: the story (world pack) of the room; ids are checked on the server (domain/night_worlds.py).
+    world: Mapped[str] = mapped_column(String(32), default="manor_lake", server_default="manor_lake", nullable=False)
+
+    __table_args__ = (Index("ix_rooms_open_activity", "is_open", "open_activity_at"),)
 
 
 class RoomMembership(TimestampMixin, Base):
@@ -211,6 +218,8 @@ class RoomInvite(Base):
         Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
     )
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Hash of the short typed code (K7Q4-MD2X); NULL for invites created before the short code existed.
+    short_hash: Mapped[Optional[str]] = mapped_column(String(64))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_uses: Mapped[int] = mapped_column(Integer, nullable=False)
     uses: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
@@ -223,7 +232,27 @@ class RoomInvite(Base):
         CheckConstraint("max_uses BETWEEN 1 AND 100", name="ck_room_invites_max_uses"),
         CheckConstraint("uses BETWEEN 0 AND max_uses", name="ck_room_invites_uses"),
         UniqueConstraint("token_hash", name="uq_room_invites_token_hash"),
+        UniqueConstraint("short_hash", name="uq_room_invites_short_hash"),
         Index("ix_room_invites_room_created", "room_id", "created_at"),
+    )
+
+
+class RoomJoinAttempt(Base):
+    """Rate-limit ledger: room membership changes and failed short-code entries per account."""
+    __tablename__ = "room_join_attempts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Keyed hash of the client network address (failed short-code entries only; never the raw address).
+    client_hash: Mapped[Optional[str]] = mapped_column(String(64))
+
+    __table_args__ = (
+        Index("ix_room_join_attempts_account", "account_id", "kind", "created_at"),
+        Index("ix_room_join_attempts_client", "kind", "client_hash", "created_at"),
     )
 
 

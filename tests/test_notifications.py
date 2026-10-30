@@ -162,7 +162,8 @@ def test_farm_request_delivery_flag_filters_before_claim(monkeypatch, flag, enab
     claim.assert_awaited_once()
     expected = {'mafia.phase', 'classic.question', 'classic.finished',
                 'photo.question', 'photo.hint', 'photo.feedback', 'photo.result',
-                'photo.finished', 'problem_report.text', 'problem_report.images'}
+                'photo.finished', 'problem_report.text', 'problem_report.images',
+                'mafia.room_phase'}
     if enabled:
         expected.add('farm.request')
     assert claim.await_args.kwargs['kinds'] == expected

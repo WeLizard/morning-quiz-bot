@@ -15,11 +15,45 @@
         }
         // Ссылки вида ?startapp=chat_n100123 и mafia_n100123 несут id группы (со знаком минус).
         const scoped = /^(mafia|chat)_n([1-9][0-9]{0,15})$/.exec(raw);
-        if (scoped) return {page: scoped[1], chatId: '-' + scoped[2]};
+        if (scoped) return scoped[1] === 'mafia' ? {page: 'mafia', night: {chatId: '-' + scoped[2]}} : {page: scoped[1], chatId: '-' + scoped[2]};
+        const night = nightLaunch(raw);
+        if (night) return {page: 'mafia', night};
         return Object.prototype.hasOwnProperty.call(LAUNCH_PAGES, raw) ? {page: LAUNCH_PAGES[raw]} : null;
     }
+    // «Ночной город»: startapp roomid_<uuid> opens a room by id (checked before room_), room_<code> is an invitation;
+    // in a browser the invitation is /app#room=<code> (a fragment never reaches server logs or Referer; the old /app?room=<code> still works).
+    // Telegram keeps start_param on every reload, so it is used once.
+    function roomFromLocation() {
+        if (typeof location === 'undefined' || typeof URLSearchParams === 'undefined') return '';
+        const fromHash = new URLSearchParams(String(location.hash || '').replace(/^#/, '')).get('room');
+        return fromHash || new URLSearchParams(location.search).get('room') || '';
+    }
+    function nightLaunch(raw) {
+        let target = null;
+        const roomQuery = roomFromLocation();
+        if (/^roomid_[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(raw)) target = {roomId: raw.slice(7).toLowerCase()};
+        else if (/^room_[A-Za-z0-9_-]{4,64}$/.test(raw)) target = {code: raw.slice(5)};
+        else if (/^[A-Za-z0-9_-]{4,64}$/.test(roomQuery)) target = {code: roomQuery, fromQuery: true};
+        if (!target) return null;
+        try {
+            if (!target.fromQuery && sessionStorage.getItem('qw-night.launch-consumed') === (target.roomId || target.code)) return null;
+        } catch {}
+        return target;
+    }
+    function consumeNightLaunch(target) {
+        if (!target) return;
+        try { sessionStorage.setItem('qw-night.launch-consumed', target.roomId || target.code || ''); } catch {}
+        if (target.fromQuery) {
+            try {
+                const url = new URL(location.href); url.searchParams.delete('room');
+                const hash = new URLSearchParams(url.hash.replace(/^#/, '')); hash.delete('room');
+                const rest = hash.toString();
+                history.replaceState(history.state, '', url.pathname + url.search + (rest ? '#' + rest : ''));
+            } catch {}
+        }
+    }
     const launch = launchTarget();
-    const state = {authenticated: false, guest: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: '', gameModes: []};
+    const state = {authenticated: false, guest: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', nightTarget: launch?.night || null, launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: '', gameModes: []};
     let generation = 0, playCommand = null, runtimeEnabled = false, guestAllowed = true, roomClassicEnabled = false, roomPhotoEnabled = false;
     let roomPhotoDispose = null, roomPhotoPending = null;
     const stopRoomPhoto = () => { const dispose = roomPhotoDispose; roomPhotoDispose = null; dispose?.(); };
@@ -29,8 +63,8 @@
     window.addEventListener?.('pagehide', stopRoomClassic);
     const el = (tag, text, cls) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; };
     // Core button classes (qw-shell.css): 'primary' / 'secondary' / 'text' / 'danger'; legacy 'quiet' maps to secondary.
-    // Self-styled buttons (mafia seats, play options, cards) keep their own classes without .qw-btn.
-    const BARE_BUTTON = /mafia-person|settings-link|resume-game|play-option|answer-option/;
+    // Self-styled buttons (play options, cards) keep their own classes without .qw-btn.
+    const BARE_BUTTON = /settings-link|resume-game|play-option|answer-option/;
     const button = (label, action, cls = '') => {
         const node = el('button', label, BARE_BUTTON.test(cls) ? cls : ('qw-btn ' + cls.replace(/\bquiet\b/, 'secondary quiet')).trim());
         node.type = 'button'; node.addEventListener('click', action); return node;
@@ -64,7 +98,8 @@
         QW.nav.setRoot(back !== undefined ? back : parent ? () => navigate(parent) : null, {onScreen: !TAB_ROOTS.has(page)});
         // Same identity rule as the account API calls: the Telegram session when signed in through it, else the guest cookie; '' = unknown.
         const identity = state.authenticated ? 'telegram' : state.guest ? 'guest' : '';
-        QW.configure(game ? {mode: 'game', onHome, screen: 'mafia', identity} : {mode: 'hub', onHome: null, screen: page || 'hub', identity});
+        QW.configure(game ? {mode: 'game', onHome, screen: 'night-city', identity} : {mode: 'hub', onHome: null, screen: page || 'hub', identity});
+        if (!game) window.NightCity?.close?.();
         QW.menu.register([]);
         setHubTitle(game ? null : title ?? (page ? PAGE_TITLES[page] || null : null));
         const profile = state.authenticated ? state.me : state.guest;
@@ -77,9 +112,6 @@
             const method = String(options.method || 'GET').toUpperCase();
             const headers = {...(options.headers || {})};
             if (!['GET', 'HEAD'].includes(method)) headers['X-Mini-CSRF'] = '1';
-            if (!['GET', 'HEAD'].includes(method) && path.includes('/api/mini/mafia/chats/') && !headers['Idempotency-Key']) {
-                headers['Idempotency-Key'] = globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-            }
             const response = await fetch(path, {...options, method, credentials: 'same-origin', signal: controller.signal, headers});
             if (response.status === 204) return null;
             let data; try { data = await response.json(); } catch { throw new Error('Сервис временно недоступен. Повторите позже.'); }
@@ -117,6 +149,9 @@
         const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
         const explicit = query.get('invite') || query.get('tgWebAppStartParam') || query.get('startapp') || '';
         let raw = explicit || tg?.initDataUnsafe?.start_param || '';
+        // «Ночной город» links (room_<code>, roomid_<uuid>, ?room=<code>) are not farm invitations, even when the code looks like one.
+        const roomHash = typeof location !== 'undefined' ? new URLSearchParams(String(location.hash || '').replace(/^#/, '')) : new URLSearchParams();
+        if (/^room(id)?_/.test(raw) || query.has('room') || roomHash.has('room')) return null;
         try { raw = raw || sessionStorage.getItem('qw-farm.incoming') || ''; } catch {}
         if (raw.startsWith('farm_')) raw = raw.slice(5);
         if (!uuid.test(raw) && !shareToken.test(raw)) return null;
@@ -676,6 +711,7 @@
         }
         if (version !== generation || state.guest?.account_id !== accountId) return;
         if (pendingFarmInvite && resumeFarmInvite('guest', pendingFarmInvite)) return;
+        if (state.nightTarget) { openNightCity(state.nightTarget); return; }
         if (openSettingsOnLoad) { consumeSettingsHash(); await guestSettings(); return; }
         window.QuizPlay?.stop(); showGuestTab('home'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest'; shell(); consumeSettingsHash();
         // Same hero and game cards as the Telegram home, limited to modes a guest can play.
@@ -688,17 +724,12 @@
         const guestLayout = el('div', undefined, 'guest-layout'), guestMain = el('div', undefined, 'guest-main'), guestSide = el('div', undefined, 'guest-side');
         guestLayout.append(guestMain, guestSide); content.append(guestLayout);
         const guestCards = el('section', undefined, 'play-choices game-mode-list');
-        let guestRoomsSection = null;
         const farmLive = (state.gameModes || []).some(mode => mode.id === 'farm' && mode.status === 'development');
-        HOME_GAME_CARDS.forEach(spec => guestCards.append(homeGameCard(guestCardSpec(spec, {farmLive,
-            focusRooms: () => {
-                guestRoomsSection?.scrollIntoView?.({behavior: 'smooth', block: 'start'});
-                feedback.textContent = 'Ночной город играют компанией: создай комнату ниже и пригласи друзей по коду.';
-            }}))));
+        HOME_GAME_CARDS.forEach(spec => guestCards.append(homeGameCard(guestCardSpec(spec, {farmLive}))));
         const guestAddressPrompt = addressPrompt('guest', state.guest);
         if (guestAddressPrompt) guestMain.append(guestAddressPrompt);
         guestMain.append(guestCards);
-        const rooms = el('section', undefined, 'card guest-rooms'); guestRoomsSection = rooms;
+        const rooms = el('section', undefined, 'card guest-rooms');
         rooms.append(el('span', 'Играть вместе', 'eyebrow'), el('h2', 'Твои комнаты'));
         note(rooms, 'Создавай закрытые комнаты, приглашай друзей и играйте в Ночной город.');
         const title = el('input'); title.type = 'text'; title.maxLength = 80;
@@ -781,7 +812,7 @@
                 const item = el('article', undefined, 'guest-room-item');
                 item.append(el('strong', room.title), el('span', room.role === 'owner' ? 'Твоя комната' : 'Ты в комнате'));
                 const roomActions = el('div', undefined, 'qw-btn-stack');
-                roomActions.append(button('Открыть Ночной город', () => openGuestMafia(room), 'primary'),
+                roomActions.append(button('Открыть Ночной город', () => openNightCity({room}), 'primary'),
                     button('Открыть классический квиз', () => openGuestClassic(room), 'secondary'),
                     button('Открыть фото-загадки', () => openGuestPhoto(room), 'secondary'));
                 item.append(roomActions);
@@ -1246,7 +1277,7 @@
             id: 'night', side: 'left', palette: 'brown', image: '/app/mafia-card.webp',
             alt: 'Филиныч в капюшоне ведёт ночное дело', eyebrow: 'НОВЫЙ РЕЖИМ · DEV',
             title: 'Ночной город',
-            description: 'Собери стол, настрой роли и раскрой городскую историю.',
+            description: 'Собери компанию: роли тайные, ведущий — приложение. Играй из Telegram и из браузера.',
             label: 'Открыть дело', action: () => navigate('mafia'), position: '24% 46%'
         },
         {
@@ -1271,7 +1302,7 @@
         const soon = {...spec, label: 'Скоро', disabled: true, runtime: false, action: () => {}};
         if (spec.id === 'classic') return roomClassicEnabled ? {...spec, runtime: false, action: () => openSoloGame('classic')} : soon;
         if (spec.id === 'photo') return roomPhotoEnabled ? {...spec, runtime: false, action: () => openSoloGame('photo')} : soon;
-        if (spec.id === 'night') return {...spec, label: 'Собрать компанию', action: () => openCompanyGame()};
+        if (spec.id === 'night') return {...spec, action: () => openNightCity()};
         if (spec.id === 'atlas') return {...spec, action: () => window.location.assign('/app/alchemy?mode=guest')};
         if (spec.id === 'farm') return ctx.farmLive
             ? {...spec, image: '/app/farm-card-v2.webp', alt: 'Филиныч с урожаем на своей ферме', palette: 'green', position: '45% center',
@@ -1307,24 +1338,6 @@
         }
     }
     // Solo play for guests: reuse the personal owner room, creating it on first use.
-    // Night City needs company: open (or create) the player's own «Ночной город» room and its lobby.
-    let companyOpening = false;
-    async function openCompanyGame() {
-        if (companyOpening) return;
-        companyOpening = true; feedback.textContent = '';
-        try {
-            const data = await guestRequest('/api/guest/rooms');
-            let room = (data.items || []).find(item => item.role === 'owner' && item.title === 'Ночной город');
-            if (!room) {
-                if (typeof globalThis.crypto?.randomUUID !== 'function') throw new Error('Безопасное создание комнаты не поддерживается этим браузером.');
-                room = await guestRequest('/api/guest/rooms', 'POST', {headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({request_id: globalThis.crypto.randomUUID(), title: 'Ночной город'})});
-            }
-            companyOpening = false;
-            await openGuestMafia({...room, role: 'owner', title: room.title || 'Ночной город'});
-        } catch (error) { feedback.textContent = error.message; }
-        finally { companyOpening = false; }
-    }
     async function openSoloGame(kind) {
         if (soloOpening) return;
         soloOpening = true; feedback.textContent = '';
@@ -1672,8 +1685,8 @@
         await refresh();
     }
 
-    // Shared by the room list and the Night City lobby: expiry/uses pickers (unless compact) plus
-    // the button that issues a one-time invite code and shows it with a copy button.
+    // Room list (hub): expiry/uses pickers plus the button that issues a one-time invite code with a copy button.
+    // Night City issues its own invitations with links (night-city-ui.js).
     function inviteIssuer(room, {mount, afterIssue, compact = false}) {
         const controls = el('div', undefined, 'guest-invite-controls');
         const expiry = el('select'); expiry.setAttribute('aria-label', 'Срок действия кода');
@@ -1713,270 +1726,21 @@
         return controls;
     }
 
-    async function openGuestMafia(room) {
-        stopRoomClassic();
+    // «Ночной город» (night-city-ui.js): one entry for Telegram and browser players. The rooms API serves both channels;
+    // with both cookies the channel is explicit (?identity=). Telegram groups with /mafia stay a secondary path.
+    function openNightCity(target = null) {
+        stopRoomClassic(); window.QuizPlay?.stop();
         const version = ++generation;
-        window.QuizPlay?.stop();
-        nav.hidden = true; state.page = 'guest-mafia'; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest-mafia';
-        // Night City is a game inside /app: own header, no tab bar. Back: Telegram BackButton, ⚙ → «Главное меню».
-        shell({game: true, onHome: () => guestHome()});
-        try { await mafia(version, room); }
-        catch (error) { if (version === generation) { note(content, error.message, 'error'); content.append(button('Повторить', () => openGuestMafia(room))); } }
-    }
-    // One persistent header row for Night City (the page re-renders on every poll; ⚙ is mounted once).
-    let gameBar = null, gameBarTitle = null;
-    function mafiaBar(title) {
-        if (!gameBar) {
-            gameBar = el('header', undefined, 'game-bar'); const box = el('div', undefined, 'game-bar-title');
-            gameBarTitle = el('h1'); box.append(el('small', 'Ночной город · Дело 01'), gameBarTitle);
-            gameBar.append(box); QW.header.mountGear(gameBar);
-        }
-        gameBarTitle.textContent = title; return gameBar;
-    }
-    const telegramMafiaRequest = request;
-    const telegramMafiaNavigate = navigate;
-    const guestMafiaCommands = new Map();
-    async function mafia(version, room = null) {
-        let pendingCommand = room ? guestMafiaCommands.get(room.id) || null : null;
-        const showPending = message => {
-            if (version !== generation) return;
-            feedback.replaceChildren(el('span', message + ' '), button('Проверить / повторить', async () => {
-                const command = pendingCommand;
-                if (!command) return;
-                try {
-                    await guestRequest(command.endpoint, 'POST', {headers: {'Content-Type': 'application/json', 'Idempotency-Key': command.id}, body: command.body});
-                    pendingCommand = null; guestMafiaCommands.delete(room.id);
-                    await navigate('mafia');
-                } catch (error) {
-                    if (error.status && error.status < 500) { pendingCommand = null; guestMafiaCommands.delete(room.id); if (version === generation) { feedback.textContent = error.message; await navigate('mafia'); } }
-                    else showPending(error.message);
-                }
-            }, 'quiet'));
-        };
-        const request = room ? async (path, options = {}) => {
-            const endpoint = path;
-            if (!options.method || options.method === 'GET') return guestRequest(endpoint);
-            const body = options.body || '{}';
-            if (pendingCommand && (pendingCommand.endpoint !== endpoint || pendingCommand.body !== body)) throw new Error('Сначала повтори предыдущее действие, чтобы узнать его результат.');
-            if (!pendingCommand) { pendingCommand = {endpoint, body, id: crypto.randomUUID()}; guestMafiaCommands.set(room.id, pendingCommand); }
-            try {
-                const result = await guestRequest(endpoint, 'POST', {headers: {'Content-Type': 'application/json', 'Idempotency-Key': pendingCommand.id}, body});
-                pendingCommand = null; guestMafiaCommands.delete(room.id); return result;
-            } catch (error) {
-                if (error.status && error.status < 500) { pendingCommand = null; guestMafiaCommands.delete(room.id); }
-                else showPending(error.message);
-                throw error;
-            }
-        } : telegramMafiaRequest;
-        const navigate = page => version !== generation ? undefined : room ? (page === 'mafia' ? openGuestMafia(room) : guestHome()) : telegramMafiaNavigate(page);
-        const group = room || state.chats.find(chat => ['group', 'supergroup'].includes(chat.type));
-        const base = room ? `/api/guest/rooms/${encodeURIComponent(room.id)}/mafia` : group ? `/api/mini/mafia/chats/${group.chat_id}` : null;
-        const draft = room ? {title: 'Ночной город'} : await request('/api/mini/mafia/draft');
-        let lobbyData = null;
-        if (group) {
-            try { lobbyData = await request(`${base}/lobby`); }
-            catch (error) { if (version === generation) feedback.textContent = error.message; }
-        }
-        if (version !== generation) return;
-        if (pendingCommand) showPending('Действие могло быть принято. Проверь его результат.');
-        content.append(mafiaBar(draft.title));
-        const top = el('section', undefined, 'mafia-case');
-        const image = el('img'); image.src = '/app/mafia.webp'; image.alt = 'Филиныч в капюшоне у стола детектива';
-        const copy = el('div', undefined, 'mafia-case-copy');
-        note(copy, room ? 'Собери друзей за столом. Город засыпает, а ваше дело продолжается.' : 'Собери состав стола. Черновик сохранится и не влияет на очки квиза.');
-        top.append(image, copy); content.append(top);
-        if (!room) {
-        const setup = el('section', undefined, 'card mafia-setup');
-        setup.append(el('h2', 'Состав дела'));
-        note(setup, 'Сколько человек сядет за стол? Роли пересчитаются автоматически.');
-        const people = el('div', undefined, 'mafia-people');
-        for (let count = 4; count <= 12; count++) {
-            const choice = button(String(count), async event => {
-                event.currentTarget.disabled = true;
-                try {
-                    await request('/api/mini/mafia/draft', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({players: count, expected_revision: draft.revision})});
-                    await navigate('mafia');
-                } catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-            }, `mafia-person ${draft.players === count ? 'selected' : ''}`);
-            choice.setAttribute('aria-pressed', String(draft.players === count)); people.append(choice);
-        }
-        setup.append(people);
-        const roles = el('div', undefined, 'mafia-roles');
-        for (const role of draft.roles) {
-            const item = el('div', undefined, `mafia-role ${role.id}`);
-            item.append(el('strong', String(role.count)), el('span', role.title)); roles.append(item);
-        }
-        setup.append(roles); content.append(setup);
-        }
-        if (room && room.role === 'owner') {
-            const invite = el('section', undefined, 'card mafia-invite');
-            invite.append(el('h2', 'Позвать друзей'));
-            note(invite, 'Друзья вводят код в разделе «Войти по приглашению».', 'muted');
-            const issued = el('div', undefined, 'mafia-invite-code');
-            invite.append(inviteIssuer(room, {compact: true, mount: codeBox => issued.replaceChildren(codeBox)}), issued);
-            content.append(invite);
-        }
-        const table = el('section', undefined, 'card mafia-table');
-        table.append(el('h2', 'Стол игроков'));
-        if (!group) note(table, 'Для лобби нужен групповой чат, где бот может видеть участников. В личной игре пока доступен только черновик ролей.', 'muted');
-        else if (!lobbyData) note(table, 'Не удалось прочитать лобби этого чата.');
-        else if (!lobbyData.lobby) {
-            note(table, `Создай лобби в «${group.title}». Никого автоматически не добавляем.`);
-            if (!room || room.role === 'owner') table.append(button('Создать лобби', async event => {
-                event.currentTarget.disabled = true;
-                try { await request(`${base}/${room ? 'lobby' : 'lobby/join'}`, {method: 'POST'}); if (version === generation) await navigate('mafia'); }
-                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-            }, 'primary'));
-            else note(table, 'Владелец комнаты скоро соберёт стол.');
-        } else {
-              const lobby = lobbyData.lobby;
-              note(table, `${group.title} · ${lobby.players.length} из 12 за столом`);
-              if (lobby.ends_at && lobby.status !== 'finished') {
-                  const remaining = Math.max(0, Math.ceil(Number(lobby.ends_at) - Date.now() / 1000));
-                  note(table, `До автоматического перехода: ${remaining} сек.`, 'mafia-deadline');
-              }
-            const list = el('div', undefined, 'mafia-player-list');
-            for (const player of lobby.players) {
-                const row = el('div', undefined, `mafia-player ${player.ready ? 'ready' : ''} ${player.alive === false ? 'eliminated' : ''}`);
-                const stateLabel = lobby.status === 'lobby' ? (player.ready ? 'готов' : 'думает') : (player.alive ? 'в игре' : 'выбыл');
-                row.append(el('span', player.name + (player.is_me ? ' · ты' : '')), el('strong', stateLabel));
-                list.append(row);
-            }
-            table.append(list);
-            if (!lobby.joined) table.append(button('Сесть за стол', async event => {
-                event.currentTarget.disabled = true;
-                try { await request(`${base}/lobby/join`, {method: 'POST'}); await navigate('mafia'); }
-                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-            }, 'primary'));
-            else if (lobby.status !== 'lobby') {
-                const roleCard = el('section', undefined, 'mafia-role-card');
-                try {
-                    const role = await request(`${base}/role`);
-                    const phaseTitle = {night: `НОЧЬ ${role.round}`, day: `ДЕНЬ ${role.round}`, voting: 'ГОРОД ГОЛОСУЕТ', finished: 'ДЕЛО ЗАКРЫТО'}[role.phase] || role.phase;
-                    roleCard.append(el('span', phaseTitle, 'eyebrow'), el('strong', role.title));
-                    if (!role.alive) note(roleCard, gm('Ты выбыл из дела, но можешь наблюдать за общим ходом.', 'Ты выбыла из дела, но можешь наблюдать за общим ходом.', 'Для тебя дело закончено, но можно наблюдать за общим ходом.'), 'muted');
-                    else if (role.investigation) note(roleCard, `Проверка ${role.investigation.seat}: ${role.investigation.is_mafia ? 'это мафия' : 'не мафия'}.`, 'mafia-next');
-                    if (role.phase === 'night' && role.alive) {
-                        if (role.role === 'citizen') note(roleCard, 'Город спит. Дождись итогов ночи.');
-                        else if (role.acted) note(roleCard, 'Твой выбор принят. Ведущий продолжит, когда все роли сделают ход.', 'mafia-next');
-                        else {
-                            note(roleCard, role.role === 'mafia' ? 'Выбери ночную цель.' : role.role === 'doctor' ? 'Кого защитить этой ночью?' : 'Кого проверить?');
-                            const targets = el('div', undefined, 'mafia-targets');
-                            for (const target of role.targets || []) targets.append(button(target.name, async event => {
-                                event.currentTarget.disabled = true;
-                                try { await request(`${base}/action`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: target.seat, expected_revision: lobby.phase_revision})}); await navigate('mafia'); }
-                                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                            }));
-                            roleCard.append(targets);
-                        }
-                    } else if (role.phase === 'day') note(roleCard, 'Обсудите события ниже. Ведущий откроет голосование, когда город будет готов.');
-                    else if (role.phase === 'voting' && role.alive) {
-                        if (role.voted) note(roleCard, 'Голос принят. Ждём остальных игроков.', 'mafia-next');
-                        else {
-                            note(roleCard, 'Кого город должен вывести из игры?');
-                            const targets = el('div', undefined, 'mafia-targets');
-                            for (const target of role.targets || []) targets.append(button(target.name, async event => {
-                                event.currentTarget.disabled = true;
-                                try { await request(`${base}/vote`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: target.seat, expected_revision: lobby.phase_revision})}); await navigate('mafia'); }
-                                catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                            }));
-                            roleCard.append(targets);
-                        }
-                    } else if (role.phase === 'finished') note(roleCard, role.winner === 'citizens' ? 'Город победил. Мафия раскрыта.' : 'Мафия подчинила Ночной город.', 'mafia-next');
-                } catch (error) { roleCard.append(el('p', error.message)); }
-                if (version !== generation) return;
-                table.append(roleCard);
-                if (lobby.history?.length) {
-                    const history = el('div', undefined, 'mafia-history'); history.append(el('h3', 'Ход дела'));
-                    for (const event of lobby.history.slice(-6)) {
-                        const text = event.type === 'started' ? 'Стол собран. Наступила первая ночь.'
-                            : event.type === 'night_result' ? (event.eliminated ? `После ночи выбыл ${event.eliminated}.` : event.saved ? 'Доктор спас цель мафии.' : 'Ночь прошла без потерь.')
-                            : event.eliminated ? `Город вывел из игры ${event.eliminated}.` : 'Голоса разделились — никто не выбыл.';
-                        note(history, text);
-                    }
-                    table.append(history);
-                }
-                  if (lobby.can_advance && lobby.is_host) {
-                    const label = lobby.status === 'night' ? 'Объявить итоги ночи' : lobby.status === 'day' ? 'Открыть голосование' : 'Подвести итоги голосования';
-                    table.append(button(label, async event => {
-                        event.currentTarget.disabled = true;
-                        try { await request(`${base}/advance`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
-                        catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                      }, 'primary'));
-                  }
-                  if (lobby.status === 'finished' && lobby.is_host) table.append(button('Собрать реванш', async event => {
-                      event.currentTarget.disabled = true;
-                      try { await request(`${base}/restart`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
-                      catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                  }, 'primary'));
-            } else {
-                const mine = lobby.players.find(player => player.is_me);
-                table.append(button(mine?.ready ? gm('Я не готов', 'Я не готова', 'Снять готовность') : gm('Я готов', 'Я готова', 'Отметить готовность'), async event => {
-                    event.currentTarget.disabled = true;
-                    try { await request(`${base}/lobby/ready`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ready: !mine?.ready, expected_revision: lobby.revision})}); await navigate('mafia'); }
-                    catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                }, mine?.ready ? 'quiet' : 'primary'));
-                if (lobby.can_start) {
-                    note(table, 'Стол собран. Роли будут выданы каждому игроку приватно.', 'mafia-next');
-                    if (lobby.is_host) table.append(button('Начать ночь', async event => {
-                        event.currentTarget.disabled = true;
-                        try { await request(`${base}/lobby/start`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: lobby.revision})}); await navigate('mafia'); }
-                        catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                    }, 'primary'));
-                }
-                else note(table, `До старта нужно минимум 4 готовых игрока. Сейчас готово: ${lobby.players.filter(player => player.ready).length}.`, 'muted');
-            }
-        }
-        content.append(table);
-        if (group && lobbyData?.lobby?.joined) {
-            const discussion = el('section', undefined, 'card mafia-discussion');
-            discussion.append(el('h2', 'Обсуждение'));
-            note(discussion, 'Сообщения видны участникам стола. Писать можно во время сбора игроков и дневной фазы.');
-            try {
-                const feed = await request(`${base}/discussion`);
-                if (version !== generation) return;
-                if (!feed.items?.length) note(discussion, 'Пока тихо. Начните разговор здесь.', 'muted');
-                for (const message of feed.items || []) {
-                    const item = el('article', undefined, `mafia-message ${message.is_me ? 'mine' : ''}`);
-                    item.append(el('strong', message.author), el('p', message.message));
-                    if (message.created_at) item.append(el('time', new Date(message.created_at).toLocaleString('ru-RU')));
-                    discussion.append(item);
-                }
-                if (feed.enabled) {
-                    const input = el('textarea'); input.maxLength = 1000; input.rows = 3;
-                    input.placeholder = 'Напиши участникам стола…'; input.setAttribute('aria-label', 'Сообщение участникам стола');
-                    discussion.append(input);
-                    discussion.append(button('Отправить', async event => {
-                        const message = input.value;
-                        if (!message.trim()) { feedback.textContent = 'Напиши сообщение перед отправкой.'; return; }
-                        event.currentTarget.disabled = true;
-                        const commandId = globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-                        try {
-                            await request(`${base}/discussion`, {
-                                method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': commandId},
-                                body: JSON.stringify({message}),
-                            });
-                            await navigate('mafia');
-                        } catch (error) { if (version === generation) { if (!pendingCommand) feedback.textContent = error.message; event.currentTarget.disabled = false; } }
-                    }, 'primary'));
-                } else note(discussion, 'Новая переписка сейчас закрыта до начала следующей дневной фазы.', 'muted');
-            } catch (error) { note(discussion, error.message, 'error'); }
-            if (version !== generation) return;
-            content.append(discussion);
-        }
-        if (version !== generation) return;
-        const boundary = el('section', undefined, 'mafia-boundary');
-        boundary.append(el('h2', 'Полный ход дела'), el('p', 'Лобби, тайные роли, ночные действия, обсуждение, голосование, выбывание и победа сохраняются в общей партии.'));
-          if (!room) boundary.append(el('h2', 'Ещё предстоит'), el('p', 'Живая проверка большого стола в отдельной тестовой Telegram-группе.'));
-          content.append(boundary);
-          if (!pendingCommand && (room || (lobbyData?.lobby && !['lobby', 'finished'].includes(lobbyData.lobby.status)))) {
-              const poll = () => {
-                  if (generation !== version || state.page !== (room ? 'guest-mafia' : 'mafia')) return;
-                  if (pendingCommand || content.querySelector('textarea')?.value) { setTimeout(poll, 5000); return; }
-                  navigate('mafia');
-              };
-              setTimeout(poll, 5000);
-          }
+        if (target && target === state.nightTarget) { consumeNightLaunch(target); state.nightTarget = null; }
+        state.page = 'mafia'; nav.hidden = true; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'night';
+        const identity = state.authenticated ? 'telegram' : 'guest';
+        shell({game: true, onHome: () => { if (state.authenticated) navigate('home'); else guestHome(); }});
+        if (!window.NightCity) { note(content, 'Ночной город не загрузился. Обнови приложение.', 'error'); return; }
+        window.NightCity.open({host: content, target, identity, gm, botUsername: state.botUsername,
+            isCurrent: () => version === generation,
+            groups: state.authenticated ? state.chats.filter(chat => ['group', 'supergroup'].includes(chat.type)) : [],
+            telegram: () => (tg?.initData ? tg : null),
+            setContrast: on => saveContrast(identity, on).catch(error => { feedback.textContent = error.message; })});
     }
     // Chat page: segments «Играть · Рейтинг · Статистика · Настройки». Settings are editable for admins and read-only for others.
     function scheduleCard(details) {
@@ -2161,22 +1925,26 @@
         const message = el('p', '', 'error'); message.hidden = true;
         input.addEventListener('change', async () => {
             const on = input.checked; input.disabled = true; message.hidden = true;
-            window.QW?.prefs?.setContrast(on);
-            try {
-                const path = `/api/account/contrast-mode?identity=${channel}`, headers = {'Content-Type': 'application/json'}, body = JSON.stringify({enabled: on});
-                const result = channel === 'guest'
-                    ? await guestRequest(path, 'POST', {headers, body})
-                    : await request(path, {method: 'POST', headers: {...headers, 'X-Guest-CSRF': '1'}, body});
-                const profile = channel === 'guest' ? state.guest : state.me;
-                if (profile) profile.contrast_mode = result.contrast_mode;
-                window.QW?.prefs?.applyAccount(result);
-                input.checked = Boolean(result.contrast_mode);
-            } catch (error) {
-                window.QW?.prefs?.setContrast(!on); input.checked = !on;
-                message.textContent = error.message; message.hidden = false;
-            } finally { input.disabled = false; }
+            try { input.checked = await saveContrast(channel, on); }
+            catch (error) { input.checked = !on; message.textContent = error.message; message.hidden = false; }
+            finally { input.disabled = false; }
         });
         label.append(copy, input); wrap.append(label, message); return wrap;
+    }
+    // «Контрастный режим» is an Account setting: applied at once on this device, then stored on the server (UI_RULES §16).
+    async function saveContrast(channel, on) {
+        window.QW?.prefs?.setContrast(on);
+        try {
+            const path = `/api/account/contrast-mode?identity=${channel}`, headers = {'Content-Type': 'application/json'}, body = JSON.stringify({enabled: on});
+            const result = channel === 'guest'
+                ? await guestRequest(path, 'POST', {headers, body})
+                : await request(path, {method: 'POST', headers: {...headers, 'X-Guest-CSRF': '1'}, body});
+            const profile = channel === 'guest' ? state.guest : state.me;
+            if (profile) profile.contrast_mode = result.contrast_mode;
+            window.QW?.prefs?.applyAccount(result);
+            return Boolean(result.contrast_mode);
+        } catch (error) { window.QW?.prefs?.setContrast(!on); throw error; }
+        finally { window.QW?.menu?.refresh?.(); }
     }
     // Theme and haptics: per device, the same card for a Telegram player and a guest; the contrast mode follows the account.
     function appearanceCard(channel) {
@@ -2365,18 +2133,16 @@
     async function navigate(page) {
         stopRoomClassic();
         if (!state.authenticated) { if (state.guest) guestNavigate(page); else loginScreen(); return; }
+        if (page === 'mafia') { openNightCity(state.nightTarget); return; }
         window.QuizPlay?.stop();
         window.QuizPlay?.stop();
         window.QuizTelegram.selection();
         state.page = page; const version = ++generation; feedback.textContent = ''; content.replaceChildren(); content.dataset.page = page;
         const tab = page.startsWith('settings') || page === 'achievements' || page === 'history' || page === 'alchemy-top' ? 'profile' : page === 'play' ? 'home' : page === 'chat' ? 'chats' : page;
         nav.querySelectorAll('button').forEach(node => { if (node.dataset.page === tab) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-        if (page === 'mafia') shell({game: true, onHome: () => navigate('home')});
-        else {
-            const chatTitle = state.chats.find(chat => chat.chat_id === state.selected)?.title;
-            shell({page, title: page === 'play' ? (playCommand === '/photo_quiz' ? 'Фото-загадки' : 'Классический квиз')
-                : page === 'chat' ? chatTitle || 'Чат' : undefined});
-        }
+        const chatTitle = state.chats.find(chat => chat.chat_id === state.selected)?.title;
+        shell({page, title: page === 'play' ? (playCommand === '/photo_quiz' ? 'Фото-загадки' : 'Классический квиз')
+            : page === 'chat' ? chatTitle || 'Чат' : undefined});
         try {
             if (page === 'home') await home(version);
             else if (page === 'play') {
@@ -2399,7 +2165,6 @@
             else if (page === 'settings') await settings();
             else if (page === 'help') help();
             else if (page === 'chats') chats();
-            else if (page === 'mafia') await mafia(version);
             else await rating(version);
         } catch (error) {
             if (version !== generation) return;

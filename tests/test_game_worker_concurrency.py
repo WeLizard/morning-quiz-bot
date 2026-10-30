@@ -371,11 +371,11 @@ def test_independent_processes_finish_standalone_mafia_vote_once(pg_env):
                     expected_revision=state['phase_revision'],
                     command_id=f'mafia-action-{room_id}',
                 )
-                day = await service.room_advance(
-                    room_id=room_id, account_id=accounts[0],
-                    expected_revision=action['lobby']['revision'],
-                    command_id=f'mafia-day-{room_id}',
-                )
+                # The only night role acted, yet the night runs to its deadline; the worker path ends it.
+                assert action['lobby']['status'] == 'night'
+                await service.advance_due_game(
+                    game_id=game_id, now=datetime.now(timezone.utc) + timedelta(hours=1))
+                day = {'lobby': await service.room_lobby(room_id=room_id, account_id=accounts[0])}
                 assert day['lobby']['status'] == 'day'
                 voting = await service.room_advance(
                     room_id=room_id, account_id=accounts[0],
@@ -399,7 +399,7 @@ def test_independent_processes_finish_standalone_mafia_vote_once(pg_env):
                 command_count = await session.scalar(select(func.count()).select_from(GameCommand).where(
                     GameCommand.game_id == game_id,
                 ))
-                assert command_count == 14
+                assert command_count == 13  # the night closed early: no manual night->day advance
                 assert await session.scalar(select(func.count()).select_from(GameCommand).where(
                     GameCommand.game_id == game_id, GameCommand.status != 'completed',
                 )) == 0
@@ -443,7 +443,7 @@ def test_independent_processes_finish_standalone_mafia_vote_once(pg_env):
                 assert game.ended_at is not None
                 assert game.revision == voting_revision + 1
                 assert game.state['phase_revision'] == voting_phase_revision + 1
-                assert transitions == 1
+                assert transitions == 2  # the night (ended by the test's clock) and the vote (two workers, once)
                 assert len(vote_results) == 1
                 assert vote_results[0]['eliminated'] == seats[mafia_id]
                 revision = game.revision
@@ -473,7 +473,7 @@ def test_independent_processes_finish_standalone_mafia_vote_once(pg_env):
                             if entry['type'] == 'vote_result']) == 1
                 assert await session.scalar(select(func.count()).select_from(GameEvent).where(
                     GameEvent.game_id == game_id, GameEvent.kind == 'deadline_advanced',
-                )) == 1
+                )) == 2
                 assert await session.scalar(select(func.count()).select_from(GameDeadline).where(
                     GameDeadline.game_id == game_id, GameDeadline.status == 'pending',
                 )) == 0

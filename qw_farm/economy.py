@@ -17,7 +17,7 @@ next visit (``claim_village``): no background workers.
 from .catalog import (BUILDINGS, ITEMS, level, income_ref, FUND_LEVEL,
                       SEASON_DAYS, FUND_TIERS, FUND_MARKUP, MIN_SHARE_PCT, DEBT_SLOW, DEBT_SLOW_DEN, FEAST_DAYS, FEAST_PCT,
                       DECOR_SHOP, DECOR_EXTRA, REWARD_DECOR, TIER_DISCOUNT_PCT, MAX_CONTRIBUTION, FUND_REWARD_TEXT,
-                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET)
+                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET, PLANTATION_UPKEEP)
 from .upkeep_config import land_plot_rate, settings_for
 
 TZ_OFFSET = 10800
@@ -89,7 +89,7 @@ def tree_upkeep(farm, upkeep_config=None):
 
 
 def base_upkeep(farm, upkeep_config=None):
-    """Daily bill before discounts using the effective land, building, field, and orchard rates."""
+    """Daily bill before discounts for land, buildings, fields, orchards and plantations."""
     settings = settings_for(upkeep_config)
     size = farm['size']
     per_plot = land_plot_rate(size, settings)
@@ -107,7 +107,7 @@ def base_upkeep(farm, upkeep_config=None):
     total += settings['field_per_hectare'] * sum(
         f.get('ha', 0) for f in farm.get('fields', []) if isinstance(f, dict)
     )
-    return total
+    return total + PLANTATION_UPKEEP * len(farm.get('plantations', []))
 
 
 def perk(farm, name, at):

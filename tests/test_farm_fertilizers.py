@@ -163,9 +163,12 @@ def test_heap_unlock_cost_footprint_and_singleton_are_enforced():
     ('compost_grass', {'manure': 2, 'grass': 4}),
     ('compost_manure', {'manure': 3}),
 ))
-def test_compost_recipes_spend_exact_inputs_take_eight_hours_and_award_no_xp(recipe, inputs):
+@pytest.mark.parametrize('heap_level', (1, 2, 3))
+def test_compost_recipes_spend_exact_inputs_take_eight_hours_and_award_no_xp(recipe, inputs, heap_level):
     state = farm()
-    obj = heap(state)
+    obj = heap(state, heap_level)
+    if heap_level >= 2:
+        inputs = {**inputs, 'manure': inputs['manure'] - 1}
     state['inventory'] = {**inputs, 'hay': 20}
     xp_before = state['xp']
     cmd(state, 'queue', {'object': obj['id'], 'recipe': recipe})
@@ -201,34 +204,44 @@ def test_upgraded_heap_queue_is_sequential_and_cannot_exceed_six_compost_per_day
     assert all(job['ready_at'] > T0 + 86400 for job in obj['jobs'])
 
 
-def test_heap_is_not_upgradable_any_more_but_an_old_upgraded_heap_keeps_its_slots():
-    """E27 B3: the 8-hour batch is fixed, so an upgrade only added upkeep; the command is refused, saved levels stay valid."""
+def test_heap_can_buy_the_economic_upgrade_and_keeps_legacy_levels():
     state = farm()
     obj = heap(state)
-    assert upgrade_cost('compost_heap', 2) is None and upgrade_cost('compost_heap', 3) is None
-    rejected(state, 'upgrade', {'object': obj['id'], 'revision': obj['revision']}, 'cannot_upgrade')
+    assert upgrade_cost('compost_heap', 2) == dict(coins=200, items={'hay': 4, 'flour': 4}, level=4)
+    assert upgrade_cost('compost_heap', 3) is None
+    args = {'object': obj['id'], 'revision': obj['revision']}
+    state['inventory'] = {'hay': 4, 'flour': 3}
+    rejected(state, 'upgrade', args, 'missing_goods')
+    state['inventory']['flour'] = 4
+    coins = state['coins']
+    cmd(state, 'upgrade', args)
+    assert obj['level'] == 2 and obj['revision'] == 1
+    assert state['coins'] == coins - 200
+    assert state['inventory'] == {'hay': 0, 'flour': 0}
     for target in (2, 3):                                   # a heap upgraded before E27
         obj['level'] = target
         validate_state(state)
+        rejected(state, 'upgrade', {'object': obj['id'], 'revision': obj['revision']}, 'max_level')
         assert queue_slots(obj['level']) == target + 2
         preview = make_job(obj, RECIPES['compost_manure'], T0, 1, 'preview')
-        assert preview['seconds'] == EIGHT_HOURS
+        assert preview['seconds'] == EIGHT_HOURS and preview['inputs'] == {'manure': 2}
 
 
-@pytest.mark.parametrize('mode', ('repeat_once', 'fill_queues'))
-def test_common_bulk_commands_use_heap_recipe_memory_and_shared_stock(mode):
+@pytest.mark.parametrize('mode,expected_count', (('repeat_once', 2), ('fill_queues', 4), ('restart_all', 1)))
+def test_common_bulk_commands_use_heap_recipe_memory_and_shared_stock(mode, expected_count):
     state = farm()
-    obj = heap(state)
+    obj = heap(state, level=2)
     state['inventory'] = {'manure': 100, 'grass': 100}
     for recipe in ('compost_grass', 'compost_manure'):
         cmd(state, 'queue', {'object': obj['id'], 'recipe': recipe})
         cmd(state, 'set_recipe_repeat', {'object': obj['id'], 'recipe': recipe, 'enabled': True})
     cmd(state, 'collect_group', {'group': 'workshops', 'area': None}, T0 + 2 * EIGHT_HOURS)
+    state['inventory'].update(manure={1: 1, 2: 3, 4: 6}[expected_count], grass=8)
     before = deepcopy(state['inventory'])
     cmd(state, mode, {'area': None}, T0 + 2 * EIGHT_HOURS)
-    expected_count = 2 if mode == 'repeat_once' else queue_slots(1)
     assert len(obj['jobs']) == expected_count
-    assert {job['recipe'] for job in obj['jobs']} == {'compost_grass', 'compost_manure'}
+    assert obj['jobs'][0]['recipe'] == 'compost_grass'
+    assert state['inventory']['manure'] == 0
     for item in ('manure', 'grass'):
         used = sum(job['inputs'].get(item, 0) for job in obj['jobs'])
         assert state['inventory'][item] == before[item] - used
@@ -240,12 +253,15 @@ def test_common_bulk_commands_use_heap_recipe_memory_and_shared_stock(mode):
 def test_cancel_heap_job_uses_common_refund_and_reschedules_queue(delay, refund):
     state = farm()
     obj = heap(state)
-    state['inventory'] = {'manure': 4, 'grass': 8}
+    state['inventory'] = {'manure': 4, 'grass': 8, 'hay': 4, 'flour': 4}
     for _ in range(2):
         cmd(state, 'queue', {'object': obj['id'], 'recipe': 'compost_grass'})
+    queued = deepcopy(obj['jobs'])
+    cmd(state, 'upgrade', {'object': obj['id'], 'revision': obj['revision']})
+    assert obj['jobs'] == queued
     xp_before = state['xp']
     cmd(state, 'cancel_job', {'object': obj['id'], 'job': obj['jobs'][0]['id']}, T0 + delay)
-    assert state['inventory'] == refund
+    assert state['inventory'] == {**refund, 'hay': 0, 'flour': 0}
     assert len(obj['jobs']) == 1
     assert obj['jobs'][0]['starts_at'] == T0 + delay
     assert obj['jobs'][0]['ready_at'] == T0 + delay + EIGHT_HOURS
@@ -254,8 +270,8 @@ def test_cancel_heap_job_uses_common_refund_and_reschedules_queue(delay, refund)
 
 def test_master_collects_heap_and_repeats_only_opted_in_recipe_during_shift():
     state = farm()
-    obj = heap(state)
-    state['inventory'] = {'manure': 100, 'hay': 50}
+    obj = heap(state, level=2)
+    state['inventory'] = {'manure': 4, 'hay': 50}
     cmd(state, 'queue', {'object': obj['id'], 'recipe': 'compost_manure'})
     cmd(state, 'set_recipe_repeat', {'object': obj['id'], 'recipe': 'compost_manure', 'enabled': True})
     xp_before = state['xp']
@@ -264,6 +280,7 @@ def test_master_collects_heap_and_repeats_only_opted_in_recipe_during_shift():
     cmd(state, 'start_shift', {'worker': 'beaver_artisan', 'shift': 'night'}, at)
     settle(state, at + EIGHT_HOURS)
     assert state['inventory']['compost'] == 4
+    assert state['inventory']['manure'] == 0
     assert state['inventory']['hay'] == 50
     assert state['xp'] == xp_before
     assert state['helpers']['beaver_artisan']['shift']['status'] == 'finished'

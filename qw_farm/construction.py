@@ -17,12 +17,12 @@ from uuid import UUID, uuid4
 import math
 import sqlalchemy as sa
 
-from . import economy
+from . import economy, tavern
 from .catalog import ITEMS, FUND_LEVEL, FUND_MARKUP, VILLAGE_GOAL_FLOOR, LEVELS, income_ref, level
 from .domain import FarmError, need, inventory, unbound, event, named
 
 DAY = 86400
-COMMANDS = {'build_contribute', 'build_speedup', 'stall_list', 'stall_buy', 'stall_cancel'}
+COMMANDS = {'build_contribute', 'build_speedup', 'stall_list', 'stall_buy', 'stall_cancel'} | tavern.SCHEMAS.keys()
 ORDER = ('stalls', 'tavern', 'greenhouse', 'fairground')
 NAMES = dict(stalls='Торговые ряды', tavern='Трактир', greenhouse='Оранжерея', fairground='Ярмарочное поле')
 STAGE_NAMES = ('Котлован', 'Каркас', 'Отделка')
@@ -507,6 +507,11 @@ async def command(unit, farm, other, account_id, kind, data, now):
     need(available(unit), 'village_build_unavailable', 'Стройка временно недоступна.', 503)
     if kind != 'stall_buy':
         need(other is farm, 'not_owner', 'Это не твоя ферма.', 403)
+    if kind in tavern.SCHEMAS:
+        t = unit.t['projects']
+        status = (await unit.execute(sa.select(t.c.status).where(t.c.id == 'tavern'))).scalar_one_or_none()
+        need(status == 'done', 'tavern_closed', 'Трактир ещё строится.')
+        return tavern.command(farm, kind, data, now), kind
     if kind == 'build_contribute':
         return await contribute(unit, farm, account_id, data, now), kind
     if kind == 'build_speedup':
@@ -555,7 +560,8 @@ async def projection(unit, farm, account_id, now):
     return dict(level_ok=level(farm['xp']) >= FUND_LEVEL, level=FUND_LEVEL, active=active, projects=projects, honor=honor,
                 tier_bp=list(TIER_BP), tier_names=list(TIER_NAMES), energy=list(ENERGY),
                 rows=await rows_projection(unit, farm, account_id, now) if 'stalls' in done else dict(open=False),
-                stub=dict(effects=['tavern', 'greenhouse', 'fairground'], magpie_third_visit=True))
+                tavern=tavern.projection(farm, now) if 'tavern' in done else None,
+                stub=dict(effects=['greenhouse', 'fairground'], magpie_third_visit=True))
 
 
 async def rows_projection(unit, farm, account_id, now):

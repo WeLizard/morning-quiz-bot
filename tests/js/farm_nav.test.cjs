@@ -28,12 +28,23 @@ const rows=[{id:'apple',name:'Яблоня',sapling:'Саженец яблони
 test('the menu has five sections in the approved order with one entry per place',async()=>{
  const N=await load();
  assert.deepEqual(N.MENU.map(s=>s.title),['Хозяйство','Производство','За околицей','Деревня и соседи','Сведения']);
- assert.deepEqual(N.MENU_TABS,['orders','inventory','team','land','production','orchard','forest','lake','fields','village','neighbors','festival','secrets','journal']);
+ assert.deepEqual(N.MENU_TABS,['orders','inventory','team','land','production','orchard','forest','lake','fields','plantations','village','neighbors','festival','secrets','journal']);
  assert.equal(new Set(N.MENU_TABS).size,N.MENU_TABS.length,'no place twice');
  for(const gone of ['build','more','settings','objects'])assert.ok(!N.MENU_TABS.includes(gone),`${gone} is not a menu place`);
  const plain=N.menuSections({});assert.ok(!plain.flatMap(s=>s.items).some(i=>i.id==='festival'),'«Праздник» only while a festival runs');
  assert.ok(N.menuSections({festival:'Посиделки'}).flatMap(s=>s.items).some(i=>i.id==='festival'));
  assert.equal(N.menuSections({}).find(s=>s.id==='outside').art,true,'За околицей are picture cards');
+});
+
+test('plantations appear with the catalog feature and advance by purchased hectares',async()=>{
+ const N=await load();
+ const item=f=>N.menuSections(f).find(s=>s.id==='outside').items.find(i=>i.id==='plantations');
+ assert.equal(item({}),undefined);
+ assert.equal(item({plantations:true,plantationsLocked:32}).status,'С 32 ур.');
+ assert.equal(item({plantations:true,plantationsLocked:32}).locked,true);
+ assert.equal(item({plantations:true,plantationHectares:4}).status,'4 га');
+ const steps={1:{ha:1},2:{ha:1},3:{ha:2},4:{ha:2}};
+ assert.deepEqual([0,1,2,4,6].map(n=>N.nextPlantationStep(steps,n)?.id),[1,2,3,4,undefined]);
 });
 
 test('counters: orders ready, workshops done, saplings waiting, requests; the «Меню» button sums them',async()=>{
@@ -106,12 +117,12 @@ test('fields header and menu share the approved vector generated from the farm v
  assert.doesNotMatch(art,/<image\b|data:image|<script\b/i,'no raster patch or executable artwork');
  assert.match(art,/matrix\(0\.59 0 0 0\.59 105 55\)/,'the farm vehicle transform is preserved');
  assert.ok(app.includes("headerCardArt('fields-card',FIELDS_CARD_ART)"));
- assert.match(app,/function menuArt\(id\).*FIELDS_CARD_ART/,'the menu uses the same approved art');
+ assert.match(app,/function menuArt\(id\)\{[^}]*FIELDS_CARD_ART/,'the menu uses the same approved art');
 });
 
 test('app wiring: one menu in #rail, «Меню» on a phone, header picture cards kept, catalogue and placement',()=>{
  const app=read('app.js'),html=read('index.html'),css=read('style.css'),api=read('../api.py');
- assert.ok(api.includes("'farm_nav.js'"),'the module is served');assert.ok(app.includes("import * as NAV from './farm_nav.js'"));
+ assert.ok(api.includes("'farm_nav.js'"),'the module is served');assert.match(app,/import \* as NAV from '\.\/farm_nav\.js(?:\?[^']+)?'/);
  // The owner asked to keep the picture cards in the header (2026-10-24): «За околицей» is reachable from the menu and the header.
  for(const id of ['forest-door','fields-door'])assert.ok(html.includes(`id="${id}"`),`${id} is in the header`);
  for(const id of ['lake-door','village-card-door','farm-card-door'])assert.ok(app.includes(`'${id}'`),`${id} is built into the header`);
@@ -160,6 +171,35 @@ test('entry details: crop, building with recipes and upgrades, animal house, dec
  assert.ok(!N.entryInfo({kind:'tree',id:'apple',name:'Яблоня'},cat,me,{}).facts.some(([k])=>k==='Аренда'),'no rent line without rent data');
  assert.equal(N.entryInfo({kind:'crop',id:'nope',name:'?'},cat,me,h),null);
 });
+test('entry details skip unavailable upgrade costs, including the fixed-time compost heap',async()=>{
+ const N=await load(),cat={...catalog,
+  buildings:{...catalog.buildings,compost_heap:{id:'compost_heap',name:'Компостная куча',cost:400,level:6}},
+  recipes:{...catalog.recipes,compost:{name:'Компост',building:'compost_heap',inputs:{wheat:10},outputs:{compost:2},seconds:28800,no_level_speedup:true}},
+  upgrades:{kinds:{compost_heap:null,mill:'workshop'},costs:{compost_heap:{2:null,3:null},mill:{2:null,3:{coins:500,items:{flour:4},level:8}}}}};
+ const heap=N.entryInfo({kind:'building',id:'compost_heap',name:'Компостная куча'},cat,me);
+ assert.equal(heap.title,'Компостная куча','the info dialog still opens');
+ assert.ok(heap.sections.find(s=>s.title==='Рецепты').lines[0].includes('28800 с'),'the fixed-time recipe stays visible');
+ assert.deepEqual(heap.sections.filter(s=>s.title==='Улучшения'),[{title:'Улучшения',lines:['Уровень компостной кучи не повышается.','Время партии всегда 28800 с.']}],'the fixed cycle is explained without offering an upgrade');
+ const formatted=N.entryInfo({kind:'building',id:'compost_heap',name:'Компостная куча'},cat,me,{duration:s=>`${s/3600} ч`});
+ assert.ok(formatted.sections.find(s=>s.title==='Улучшения').lines.includes('Время партии всегда 8 ч.'));
+ assert.equal(heap.action.label,'Поставить');
+ const mill=N.entryInfo({kind:'building',id:'mill',name:'Мельница'},cat,me);
+ assert.deepEqual(mill.sections.find(s=>s.title==='Улучшения').lines,['Ур. 3: 500 мон. и Мука ×4, с 8 ур. фермы']);
+});
+
+test('compost catalog details explain one upgrade and show both sets of requirements',async()=>{
+ const N=await load(),heap={kind:'building',id:'compost_heap',name:'Компостная куча'};
+ const compost={name:'Компост из травы',building:heap.id,inputs:{manure:2,grass:4},upgrade_inputs:{manure:1,grass:4},upgrade_level:2,outputs:{compost:2},seconds:28800};
+ const compostManure={...compost,name:'Компост без травы',inputs:{manure:3},upgrade_inputs:{manure:2}};
+ const cat={...catalog,buildings:{[heap.id]:heap},recipes:{compost,compostManure},upgrades:{kinds:{[heap.id]:'compost'},costs:{[heap.id]:{2:{coins:200,items:{hay:4,flour:4},level:4},3:null}}}};
+ const {sections}=N.entryInfo(heap,cat,me,{duration:s=>`${s/3600} ч`});
+ assert.deepEqual(sections.find(s=>s.title==='Рецепты · уровень 1').lines,['Компост из травы: manure ×2, grass ×4 → compost ×2 · 8 ч','Компост без травы: manure ×3 → compost ×2 · 8 ч']);
+ assert.deepEqual(sections.find(s=>s.title==='Рецепты · Экономная закладка').lines,['Компост из травы: manure ×1, grass ×4 → compost ×2 · 8 ч','Компост без травы: manure ×2 → compost ×2 · 8 ч']);
+ assert.deepEqual(sections.find(s=>s.title==='Улучшения').lines,['Экономная закладка: 200 мон. и hay ×4, Мука ×4, с 4 ур. фермы','На 1 ед. навоза меньше на партию.']);
+ assert.equal(N.recipeInputs({...compost,upgrade_inputs:undefined},3),compost.inputs);
+ assert.equal(N.recipeInputs({...compost,upgrade_level:undefined},3),compost.inputs);
+});
+
 test('entry details wiring: (i) is a sibling of the card, a long press opens details without choosing or placing',()=>{
  const app=read('app.js'),css=read('style.css');
  assert.ok(app.includes("const cell=el('div',null,'catalog-cell');cell.append(b,infoButton(e));return cell;"),'no button inside a button');

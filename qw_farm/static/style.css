@@ -405,7 +405,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 :root[data-farm-theme=night] .village-scene{background:#2f3f5c}
 .village-scene{position:absolute;inset:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;min-width:0;background:#bdd0a2;container-type:size;cursor:grab;scrollbar-width:thin}
 .village-scene.is-dragging{cursor:grabbing;user-select:none}
-.village-world{position:relative;width:clamp(1600px,250cqw,3200px);aspect-ratio:4/3;flex:none;user-select:none;-webkit-user-select:none}
+.village-world{--village-width:clamp(1600px,250cqw,3200px);position:relative;width:var(--village-width);aspect-ratio:4/3;flex:none;user-select:none;-webkit-user-select:none}
 .village-art{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
 .village-npc,.village-townhall{position:absolute;transform:translate(-50%,-50%);width:48px;min-width:44px;height:48px;min-height:44px;display:flex;align-items:center;justify-content:center;padding:2px;background:transparent;border:0;border-radius:50%;z-index:3}
 .village-npc:hover:not(:disabled),.village-townhall:hover:not(:disabled){transform:translate(-50%,-50%) scale(1.07)}
@@ -541,12 +541,14 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 :root:not([data-farm-theme=night]) .village-build-glow{display:none}
 .village-crew{position:absolute;width:40px;height:60px;transform:translate(-50%,-92.6%);pointer-events:none}
 .village-crew .bc-art{display:block;width:100%;height:100%;overflow:visible}
-.village-crew .bc-plan,.village-crew .bc-hammer,.village-crew .bc-shovel{transform-box:view-box}
-.village-crew .bc-plan{transform-origin:7px -16px}.village-crew .bc-hammer{transform-origin:7px -17px}.village-crew .bc-shovel{transform-origin:1px -14px}
+:is(.village-crew,[data-resident-mode=working]) :is(.bc-plan,.bc-hammer,.bc-shovel){transform-box:view-box}
+:is(.village-crew,[data-resident-mode=working]) .bc-plan{transform-origin:7px -16px}
+:is(.village-crew,[data-resident-mode=working]) .bc-hammer{transform-origin:7px -17px}
+:is(.village-crew,[data-resident-mode=working]) .bc-shovel{transform-origin:1px -14px}
 @media(prefers-reduced-motion:no-preference){
- .village-crew .bc-plan{animation:bc-nod 3.2s ease-in-out infinite}
- .village-crew .bc-hammer{animation:bc-swing .9s ease-in-out infinite}
- .village-crew .bc-shovel{animation:bc-dig 1.6s ease-in-out infinite}
+ :is(.village-crew,[data-resident-mode=working]) .bc-plan{animation:bc-nod 3.2s ease-in-out infinite}
+ :is(.village-crew,[data-resident-mode=working]) .bc-hammer{animation:bc-swing .9s ease-in-out infinite}
+ :is(.village-crew,[data-resident-mode=working]) .bc-shovel{animation:bc-dig 1.6s ease-in-out infinite}
 }
 @keyframes bc-nod{0%,100%{transform:rotate(0)}50%{transform:rotate(-7deg)}}
 @keyframes bc-swing{0%,100%{transform:rotate(0)}45%{transform:rotate(-34deg)}60%{transform:rotate(6deg)}}
@@ -629,12 +631,16 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-npc:hover .village-walker svg,.village-npc:focus-visible .village-walker svg{filter:var(--farm-lit)}
 :root[data-farm-theme=night]{--farm-focus-ring:drop-shadow(2px 0 0 #f2d57a) drop-shadow(-2px 0 0 #f2d57a) drop-shadow(0 2px 0 #f2d57a) drop-shadow(0 -2px 0 #f2d57a)}
 :root[data-farm-theme=night] :is(.village-npc,.village-townhall):focus-visible{outline-color:#f2d57a}
-/* phone-friendly hit areas: the 48px resident button grows an invisible 8px ring (64px target) and the wandering figure carries it along */
-.village-npc::after,.village-visitor::after,.village-walker::after{content:'';position:absolute;inset:-8px;border-radius:50%}
+/* Visitors retain the enlarged hit area on their wandering inner figure. */
+.village-visitor::after,.village-visitor .village-walker::after{content:'';position:absolute;inset:-8px;border-radius:50%}
 .village-walker{pointer-events:auto;position:relative}
+/* A native 48×60 button carries the 40×60 figure and shares its ground anchor. */
+.village-npc[data-resident-mode],.village-npc[data-resident-mode]:hover:not(:disabled){height:60px;padding:0;transform:translate(-50%,-92.6%)}
+.village-npc[data-resident-mode] .village-walker>svg{display:block;width:40px;height:60px;flex:none;overflow:visible;filter:none;transform-origin:50% 92.6%}
+.village-npc[data-resident-mode]:is(:hover,:focus-visible) .village-walker>svg{filter:var(--farm-lit)}
 /* place signs, construction sites and daily guests: static layer, centred with margins (no transforms) */
 .village-places{position:absolute;inset:0;pointer-events:none;z-index:6}
-/* Static targets (gate, place signs) stack above wandering residents, whose 64px rings drift up to ~50px; signs also beat guests. */
+/* Static targets (gate, place signs) stack above wandering residents; signs also beat guests. */
 .village-place{z-index:2}.village-visitor{z-index:1}
 .village-places>button{pointer-events:auto}
 .village-place{position:absolute;box-sizing:border-box;width:44px;height:44px;margin:-22px 0 0 -22px;padding:0;display:grid;place-items:center;background:#fff8dcf0;border:2px solid #e0c98c;border-radius:12px;box-shadow:0 3px 8px #5a4a2a33;color:#6a5124}
@@ -642,6 +648,8 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-place:hover{background:#fffbe9;box-shadow:0 4px 12px #5a4a2a55}
 .village-place:focus-visible,.village-visitor:focus-visible{outline:3px solid #79975b;outline-offset:2px}
 .village-site{position:absolute;margin:-12px 0 0 -60px;width:120px;box-sizing:border-box;padding:3px 6px;text-align:center;border-radius:10px;background:#efe2c2e6;border:1px dashed #a88a62;font:700 12px/1.2 system-ui;color:#6f5640;white-space:nowrap;pointer-events:none}
+/* The active construction plaque stays above the crew's tap targets. */
+.village-site[data-working=true]:not([data-village-site=stalls]){margin-top:-86px}
 .village-visitor{position:absolute;box-sizing:border-box;width:48px;height:48px;margin:-24px 0 0 -24px;padding:0;background:transparent;border:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .village-visitor-face{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#fff6dc;border:2px solid #d9c58e;box-shadow:0 3px 4px #52643c35;font-size:21px;line-height:1}
 :root[data-farm-theme=night] :is(.village-place,.village-site){background:var(--float);border-color:var(--line);color:var(--ink)}
@@ -668,6 +676,18 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  .village-walker svg{animation:v-flip var(--cycle,18s) steps(1,end) infinite,v-bob 3.6s ease-in-out infinite;animation-delay:calc(var(--d,0s) - var(--e,0s)),calc(var(--d,0s) - var(--e,0s))}
  @keyframes v-flip{0%{transform:scaleX(1)}19%{transform:scaleX(var(--face,1))}53%{transform:scaleX(calc(var(--face,1) * -1))}70%{transform:scaleX(1)}}
  @keyframes v-bob{0%,100%{rotate:-3deg;translate:0 0}50%{rotate:3deg;translate:0 -2px}}
+ [data-resident-mode] .village-walker,[data-resident-mode=working] .village-walker>svg{animation:none}
+ [data-resident-mode=roaming]{animation:v-resident-walk var(--cycle) ease-in-out infinite;animation-delay:var(--d)}
+ @keyframes v-resident-walk{
+  0%,18%,70%,100%{translate:0 0}
+  34%,52%{translate:calc(var(--resident-dx) * var(--village-width)) calc(var(--resident-dy) * var(--village-width))}
+ }
+ [data-resident-mode=roaming] .village-walker>svg{animation-name:v-flip,v-resident-gait;animation-duration:var(--cycle),var(--cycle)}
+ [data-resident-mode=roaming]:focus-visible,[data-resident-mode=roaming]:focus-visible .village-walker>svg{animation-play-state:paused}
+ @keyframes v-resident-gait{
+  0%,18%,22%,26%,30%,34%,52%,56%,60%,64%,68%,70%,100%{translate:0 0}
+  20%,24%,28%,32%,54%,58%,62%,66%{translate:0 -1.5px}
+ }
  .village-thought{animation:v-think var(--cycle,18s) ease-out infinite;animation-delay:calc(var(--td,0s) - var(--e,0s))}
  @keyframes v-think{0%,5%{opacity:0;transform:scale(.4) translateY(6px)}8%,17%{opacity:1;transform:none}20%,100%{opacity:0;transform:scale(.7) translateY(-4px)}}
  .village-order.is-ready{animation:v-pulse 1.8s ease-in-out infinite}
@@ -1025,7 +1045,10 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 }
 @media(min-width:1024px){.header-destinations .forest-door[data-label]::after{font-size:13px}}
 html.qw-desktop .header-destinations .forest-door[data-label]::after{font-size:13px}
-.village-npc.is-stealing .village-walker{animation:none;transform:translate(var(--steal-x,0),var(--steal-y,0));transition:transform 1.2s ease-in-out}
+@media(prefers-reduced-motion:no-preference){
+ .village-npc.is-stealing{animation:none;translate:var(--steal-x,0) var(--steal-y,0);transition:translate 1.2s ease-in-out}
+ .village-npc.is-stealing .village-walker>svg{animation:none}
+}
 .inv-search{position:relative;margin:4px 0 10px}.inv-search input{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:10px 48px 10px 12px;border:1px solid #dce3cf;border-radius:12px;background:#fcfcf5;color:var(--ink);font-size:16px;outline-color:#91a57b}.inv-search input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 .inv-clear{position:absolute;right:0;top:0;width:44px;height:44px;min-width:44px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:22px;line-height:1}.inv-clear[hidden]{display:none}
 .inv-filters{gap:8px}.inv-filters button{min-height:44px;padding:5px 13px;font-size:13px}.inv-filters .count{font-size:13px}
@@ -1067,6 +1090,11 @@ html .topbar>.hud,html .compact .hud{margin-right:0}
 html .topbar>.header-actions{margin-left:0;gap:var(--hdr-gap)}
 html .compact .lighting-toggle{margin-right:0}
 @media(min-width:851px){html .compact .header-destinations{gap:var(--hdr-gap,12px)}}
+@media(min-width:851px){
+ .compact .header-destinations:has(>#plantations-door:not([hidden])){flex:0 1 auto;min-width:0}
+ .compact .header-destinations:has(>#plantations-door:not([hidden]))>.dest-card{flex:0 1 auto;min-width:var(--qw-tap)}
+ .compact .header-destinations:has(>#plantations-door:not([hidden]))~.hud{flex-shrink:0}
+}
 /* the ⚙ keeps its 44×44 tap box; only a 36px plate is painted inside it */
 html .topbar .header-actions .qw-gear{position:relative;isolation:isolate;background:transparent;border:0;box-shadow:none;border-radius:12px;color:#4d6b4c}
 html .topbar .header-actions .qw-gear::before{content:'';position:absolute;inset:4px;z-index:-1;border-radius:11px;background:#eef2e4;border:1px solid #d3dcc4;box-shadow:0 1px 2px #3a55301a;transition:background-color .15s ease,border-color .15s ease}
@@ -1181,6 +1209,7 @@ html .scene-area .map-controls{display:flex;flex-direction:column;border:1px sol
 .rail.farm-menu .farm-menu-item>.tab-badge,.farm-menu-button>.tab-badge{position:static;flex:none;min-width:22px;height:22px;margin-left:auto;padding:0 6px;border-radius:999px;background:var(--farm-badge);color:var(--farm-badge-ink);font-size:12px;font-weight:800;line-height:22px;text-align:center;transform:none}
 /* За околицей: three picture cards in a row */
 .farm-menu-section.is-art .farm-menu-items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.farm-menu-section.is-art.has-plantations .farm-menu-items{grid-template-columns:repeat(2,minmax(0,1fr))}
 .rail.farm-menu .farm-menu-item.farm-menu-art{flex-direction:column;align-items:stretch;gap:4px;padding:4px;border:1px solid var(--line);background:var(--surface)}
 .rail.farm-menu .farm-menu-item.farm-menu-art.active{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
 .rail.farm-menu .farm-menu-art>svg{position:static;flex:none;display:block;width:100%;height:auto;aspect-ratio:160/68;border-radius:9px;inset:auto}
@@ -1369,6 +1398,10 @@ body.catalog-open .panel-close{display:block;min-width:44px;min-height:44px}
 .inv-filters button{flex:none;padding:5px 11px}
 .card>.code+:is(button,.qw-btn){margin-top:var(--qw-btn-gap)}
 .farm-menu-section.is-art .farm-menu-items{gap:var(--qw-btn-gap)}
+.plantation-scene{display:block;width:100%;height:auto;aspect-ratio:640 / 370;border-radius:var(--qw-r-control)}
+:root[data-farm-theme=night] .plantation-scene{filter:brightness(calc(1 - .24 * var(--qw-night-dim)))}
+.plantation-actions{margin-top:var(--qw-btn-gap)}
+.plantations-panel .note{font-size:var(--qw-fs-small)}
 .invite-more summary,.invite-rules summary{min-height:var(--qw-tap)}
 /* order card (E11): goods and reward on the left, «Доставить» in its own column; ask links and «Другой заказ» share one row */
 .order-body,.quest-row{margin-top:10px}

@@ -11,6 +11,9 @@ def tick(now):
     return math.floor(now)
 
 VERSION = 'farm-2026-10-r9'
+PLANTATIONS_WIRED = True  # Controls entry and plantation commands. Stock and recipes remain readable if switched off.
+PLANTATION_UPKEEP = 1200
+TEA_LEAF_ITEM = dict(id='tea_leaf', name='Свежий чайный лист', price=28, color='#77a654', kind='product')
 CROPS = {}
 # id, title, seed cost, seconds, yield, unit NPC value, XP, level, tint
 for row in [
@@ -63,13 +66,15 @@ for i,n,b,ingredients,out,t,l in [
     RECIPES[i]=dict(id=i,name=n,building=b,inputs=ingredients,outputs=out,seconds=t,level=l,xp=max(1,t//45))
 # Compost heap recipes are service processing: the AV workshop law does not apply, as for meadow_hay.
 # Their 8-hour batch stays fixed across building upgrades to preserve the farm's daily compost cap.
+COMPOST_UPGRADE_LEVEL = 2
 BUILDINGS['compost_heap']=dict(id='compost_heap',name='Компостная куча',cost=400,level=6,w=1,h=1,decor=False)
 for i,n,inputs in [
     ('compost_grass','Компост из травы',{'manure':2,'grass':4}),
     ('compost_manure','Компост без травы',{'manure':3}),
 ]:
     RECIPES[i]=dict(id=i,name=n,building='compost_heap',inputs=inputs,outputs={'compost':2},seconds=8*60*60,
-                    level=6,xp=0,no_level_speedup=True)
+                    level=6,xp=0,no_level_speedup=True,upgrade_level=COMPOST_UPGRADE_LEVEL,
+                    upgrade_inputs={**inputs,'manure':inputs['manure']-1})
 ANIMALS={}
 for i,n,b,inputs,out,t,l,c in [('chicken','Курочки','coop',{'feed':1},{'egg':2},240,1,65),('cow','Бурёнки','cowshed',{'hay':1},{'milk':2},900,4,180),('sheep','Овечки','sheepfold',{'hay':1},{'wool':2},1200,5,200),('bees','Пчёлы','apiary',{'lavender':1},{'honey':2},1800,7,220)]:
     ANIMALS[i]=dict(id=i,name=n,building=b,inputs=inputs,outputs=out,seconds=t,level=l,cost=c)
@@ -85,6 +90,26 @@ QUESTS=[
  dict(id='q8',name='Большой урожай',text='Собери урожай пятьдесят раз. Никаких обязательных серий заходов.',stat='harvests',goal=50,coins=250,xp=70),
  dict(id='q9',name='Ферма, которая дружит',text='Помоги соседям пять раз. Благодарность остаётся в журнале.',stat='helps',goal=5,coins=0,xp=45),
  dict(id='q10',name='Мастер хозяйства',text='Выполни двадцать пять заказов и оставь себе время на отдых.',stat='orders',goal=25,coins=400,xp=100),
+]
+WORKSHOP_GOALS = [
+    dict(id='workshop_bread', name='Первая выпечка',
+         text='Сдай две буханки хлеба со склада. Для цели нужна пекарня на твоей ферме.',
+         level=2, building='bakery', needs={'bread': 2}, coins=91, xp=11),
+    dict(id='workshop_cheese', name='Первый сыр',
+         text='Сдай сыр со склада. Для цели нужна сыроварня на твоей ферме.',
+         level=4, building='dairy', needs={'cheese': 1}, coins=83, xp=10),
+    dict(id='workshop_butter', name='Первое масло',
+         text='Сдай сливочное масло со склада. Для цели нужна маслобойня на твоей ферме.',
+         level=10, building='oil_press', needs={'butter': 1}, coins=89, xp=11),
+    dict(id='workshop_juice', name='Первый сок',
+         text='Сдай виноградный сок со склада. Для цели нужна соковарня на твоей ферме.',
+         level=13, building='juicery', needs={'grape_juice': 1}, coins=138, xp=18),
+    dict(id='workshop_ajvar', name='Первая заготовка',
+         text='Сдай баклажанную икру со склада. Для цели нужен консервный цех на твоей ферме.',
+         level=14, building='cannery', needs={'ajvar': 1}, coins=231, xp=31),
+    dict(id='workshop_smoked_cheese', name='Первое копчение',
+         text='Сдай копчёный сыр со склада. Для цели нужна коптильня на твоей ферме.',
+         level=15, building='smokehouse', needs={'smoked_cheese': 1}, coins=144, xp=19),
 ]
 NPCS=[('Филиныч','Для вечернего чаепития'),('Агата','На маленький деревенский праздник'),('Почтальон Ёж','В корзинку для дальней дороги'),('Механик Крот','Обед мастерской'),('Кошка Кая','К чаю и мурлыканью'),('Кошка Соня','Для сладкой дремоты на печке'),('Суслик Игорь','В запас на долгую зиму'),('Неведома Зверушка','Угощение для загадочного гостя'),('Медведь Пух','Для бодрости перед работой')]   # Frozen legacy order pool: rng % len(NPCS) must stay stable.
 VILLAGE_QUESTS={
@@ -427,11 +452,11 @@ BARN_SELL_BONUS = {1: 0, 2: 5, 3: 10}  # percent on top of the item price
 
 
 def upgrade_kind(building_type):
-    """'workshop' | 'animals' | 'barn' | None (not upgradable)."""
+    """'workshop' | 'animals' | 'barn' | 'compost' | None (not upgradable)."""
     if building_type == 'barn':
         return 'barn'
     if building_type == 'compost_heap':
-        return None   # E27 B3: its 8-hour batch is fixed, so an upgrade only added upkeep; old upgraded heaps keep their level
+        return 'compost'
     if any(r['building'] == building_type for r in RECIPES.values()):
         return 'workshop'
     if any(a['building'] == building_type for a in ANIMALS.values()):
@@ -442,7 +467,8 @@ def upgrade_kind(building_type):
 def upgrade_cost(building_type, to_level):
     """Coins, goods and player level needed to raise a building to ``to_level`` (2..3), or None."""
     spec = UPGRADES.get(to_level)
-    if spec is None or upgrade_kind(building_type) is None:
+    kind = upgrade_kind(building_type)
+    if spec is None or kind is None or (kind == 'compost' and to_level != COMPOST_UPGRADE_LEVEL):
         return None
     base = BUILDINGS[building_type]['cost'] if building_type in BUILDINGS else UPGRADE_BASE_COST
     coins = max(spec['coin_min'], int(round(base * spec['coin_factor'] / 10.0)) * 10)
@@ -450,8 +476,7 @@ def upgrade_cost(building_type, to_level):
 
 
 def upgrade_coins(building_type, to_level):
-    """Coins of the upgrade to ``to_level`` by the formula alone, also for a building that cannot be upgraded any more
-    (compost heaps upgraded before E27 B3): used to give back a demolished building's investment."""
+    """Historical upgrade cost for demolition refunds, including level 3 compost heaps."""
     spec = UPGRADES.get(to_level)
     if spec is None or building_type not in BUILDINGS and building_type != 'barn':
         return 0
@@ -588,7 +613,11 @@ def public_catalog(upkeep_config=None):
         feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,
         reward_decor=REWARD_DECOR,
     )
-    return deepcopy(dict(home_projects=HOME_PROJECTS,version=VERSION,economy=economy_catalog,invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),orchard=orchard_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,equipment=EQUIPMENT,fields=field_catalog(configured['field_per_hectare']),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
+    extensions = {}
+    if PLANTATIONS_WIRED:
+        from . import plantations
+        extensions['plantations'] = plantations.public_catalog()
+    return deepcopy(dict(**extensions,home_projects=HOME_PROJECTS,version=VERSION,economy=economy_catalog,invite=INVITE,market=MARKET,lessons=LESSONS,merchant=merchant_catalog(),orchard=orchard_catalog(),crops={**CROPS,**{c['id']:dict(id=c['id'],name=c['name'],cost=0,seconds=c['seconds'],yield_qty=c['yield_qty'],price=ITEMS[c['id']]['price'],xp=c['xp'],level=c['level'],color=c['color'],exotic=True,seed=c['seed']) for c in EXOTIC_CROPS.values()}},crop_classes=dict(slow=CROP_CLASS_SLOW,long=CROP_CLASS_LONG),items=ITEMS,buildings=BUILDINGS,recipes=RECIPES,animals=ANIMALS,levels=LEVELS,quests=QUESTS,workshop_goals=WORKSHOP_GOALS,equipment=EQUIPMENT,fields=field_catalog(configured['field_per_hectare']),helpers=HELPERS,shifts=SHIFTS,automation=dict(roles=ROLE_LABELS,groups=list(GROUPS),interval=SHIFT_INTERVAL,plot_limits=PLOT_LIMITS,object_limits=OBJECT_LIMITS),routes=ROUTES,secrets=SECRETS,land=dict(start=LAND_START,max=LAND_MAX,steps=LAND_STEPS),upgrades=dict(max=MAX_BUILDING_LEVEL,levels=UPGRADES,recipe_speed=RECIPE_SPEED,animal=ANIMAL_CAPACITY,barn_bonus=BARN_SELL_BONUS,base_cost=UPGRADE_BASE_COST,costs={t:{str(n):upgrade_cost(t,n) for n in UPGRADES} for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}},kinds={t:upgrade_kind(t) for t in {*(r['building'] for r in RECIPES.values()),*(a['building'] for a in ANIMALS.values()),'barn'}})))
 
 def validate():
     for r in RECIPES.values():
@@ -1414,8 +1443,8 @@ for _i, _rn, _b, _inp, _q, _min, _l, _col, _name in _ORCHARD_RECIPES:
     _vin = sum(ITEMS[k]['price'] * q for k, q in _inp.items())
     # Only the sandbox-era orchard rows use the new law; older recipes retain their prices and XP.
     _value_minutes = 60 * math.sqrt(_min / 60) if _min > 60 else _min
-    _av = math.ceil(round(_value_minutes * (2.5 + 0.1 * _l), 6))
-    ITEMS[_i] = dict(id=_i, name=_name, price=math.ceil((_vin + _av) / _q), color=_col, kind='product')
+    _value_added = math.ceil(round(_value_minutes * (2.5 + 0.1 * _l), 6))
+    ITEMS[_i] = dict(id=_i, name=_name, price=math.ceil((_vin + _value_added) / _q), color=_col, kind='product')
     RECIPES[_i] = dict(id=_i, name=_rn, building=_b, inputs=_inp, outputs={_i: _q}, seconds=_t, level=_l, xp=_xp_r9(_b, _t))
 # Shop-window texts (the drinks of the cellar: «0%» is always in the name or in this line; no drunkenness mechanics anywhere).
 ORCHARD_TEXT = dict(
@@ -1453,3 +1482,24 @@ def orchard_catalog():
                          rules=dict(cycle=TREE_CYCLE, young=TREE_YOUNG_HARVESTS, adult=TREE_ADULT_HARVESTS, century=TREE_CENTURY_HARVESTS,
                                     prune_every=TREE_PRUNE_EVERY, birdhouse_radius=TREE_BIRDHOUSE_RADIUS, help_pct=TREE_HELP_PCT,
                                     discount_pct=TREE_VOUCHER_DISCOUNT_PCT, gold_permille=list(TREE_GOLD_PERMILLE))))
+
+
+def _register_plantation_processing():
+    lv = 32
+    ITEMS['tea_leaf'] = TEA_LEAF_ITEM
+    BUILDINGS['tea_factory'] = dict(id='tea_factory', name='Чайная фабрика', cost=12_000, level=lv, w=2, h=2, decor=False)
+    for item, name, recipe_name, building, inputs, qty, minutes, color in (
+        ('wine_zero', 'Вино 0%', 'Выдержать безалкогольное вино', 'cellar', {'grape': 4}, 2, 45, '#873e60'),
+        ('raisin', 'Изюм', 'Высушить виноград', 'dryer', {'grape': 4}, 2, 30, '#79535f'),
+        ('green_tea', 'Зелёный чай', 'Свернуть и высушить зелёный чай', 'tea_factory', {'tea_leaf': 5}, 2, 20, '#729549'),
+        ('black_tea', 'Чёрный чай', 'Завялить и высушить чёрный чай', 'tea_factory', {'tea_leaf': 8}, 3, 35, '#82533d'),
+    ):
+        seconds = minutes * 60
+        value_in = sum(ITEMS[k]['price'] * n for k, n in inputs.items())
+        price = math.ceil((value_in + _av(seconds, lv)) / qty)
+        ITEMS[item] = dict(id=item, name=name, price=price, color=color, kind='product')
+        RECIPES[item] = dict(id=item, name=recipe_name, building=building, inputs=inputs, outputs={item: qty},
+                             seconds=seconds, level=lv, xp=_xp_r9(building, seconds))
+
+
+_register_plantation_processing()

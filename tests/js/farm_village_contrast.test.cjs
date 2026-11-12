@@ -44,5 +44,5 @@ test('served as an asset, fetched only in the mode, placed under the night tint 
  assert.match(app,/getAttribute\?\.\('data-qw-contrast'\)==='1'[^;]*;\n if\(!on\|\|!layer\|\|layer\.firstChild\)return;/,'nothing is fetched while the mode is off');
  assert.match(app,/villageFestLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,/,'under the night tint');
  assert.match(app,/addEventListener\?\.\('qw:contrast',\(\)=>syncVillageContrast\(\)\)/);
- assert.match(app,/syncVillageBuild\(\);syncVillageContrast\(\);/);
+ assert.match(app,/syncVillageBuild\(workingNames\);syncVillageContrast\(\);/);
 });

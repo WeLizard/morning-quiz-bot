@@ -367,6 +367,31 @@ function tea(s,o){
   return 92}
 function post2(s,cx,cy,r,a){const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a);L(s,x,y,5,x,y,36,'#b9916b',3.2)}
 
+// Approved plantation artwork: the whole 3×2.8 design fits a catalogue 2×2 footprint.
+function teaFactory(s,o){
+  const c=s.c;c.save();c.translate(px(o.x,o.y),py(o.x,o.y,0));c.scale(2/3,2/3);
+  const x=0,y=0;
+  const g={x0:x+.18,y0:y+.18,x1:x+2.55,y1:y+1.85,H:39,col:'#e8d9ae',roof:'#7c9d83',axis:'y',prof:GABLE,R:25,ov:.12,base:'#bdb398',corner:'#f6eed6',trim:'#d9e6d8',courses:4};
+  ground(s,x,y,x+3,y+2.8,'#d4c69f');
+  body(s,g);
+  doorY(s,g.y1,x+1.55,.47,26,'#82936e');winY(s,g.y1,x+.65,14,.45,15);
+  winX(s,g.x1,y+.65,15,.55,14);winX(s,g.x1,y+1.4,15,.4,14);
+  boards(s,'x',g.x1,g.y0,g.y1,27,37,4,'#c5b791');
+  roofOf(s,g);chimney(s,x+1.75,y+.55,54,76,'#b18c6c',.12);
+  // A sealed drying annex shares the main wall; its roof meets that wall at z=29.
+  shedBox(s,'#c4b78e',x+.15,y+1.9,x+1.05,y+2.55,0,19,29);
+  for(let z=6;z<18;z+=4)L(s,x+.2,y+2.55,z,x+1,y+2.55,z,'#8d9369',1.5);
+  shedRoof(s,x+.1,y+1.86,x+1.1,y+2.6,21,30,'#8fa58a',.05);
+  // Leaf plaque sits on the front gable, in its wall plane.
+  Q(s,'#f4e9c9',[x+.96,g.y1+.01,40,x+1.76,g.y1+.01,40,x+1.76,g.y1+.01,52,x+.96,g.y1+.01,52],'#9a9e74',1);
+  const p={x:px(x+1.36,g.y1+.02),y:py(x+1.36,g.y1+.02,45)};s.leaf(p.x-3,p.y+3,-1.9,11,3.3,'#608750');s.leaf(p.x,p.y,-.5,9,2.9,'#79a85f');
+  // Two trays of tea on a low, supported work table; no detached props.
+  fullBox(s,'#ad8e64',x+1.5,y+2.1,x+2.6,y+2.55,0,9,'#c9ac78');
+  for(const tx of [x+1.56,x+2.08]){top(s,'#677c50',tx,y+2.15,tx+.42,y+2.48,10);for(let j=0;j<3;j++)L(s,tx+.06,y+2.2+j*.08,11,tx+.33,y+2.2+j*.08,11,'#a6be7e',1)}
+  sack(s,x+2.75,y+1.8,'#d6c797');
+  c.restore();return 76*2/3;
+}
+
 function garage(s,o){
   const g={x0:o.x+.14,y0:o.y+.14,x1:o.x+o.w-.14,y1:o.y+o.h-.5,H:27,col:'#c4c7bb'};
   ground(s,o.x+.02,o.y+.02,o.x+o.w-.02,o.y+o.h-.02,'rgba(190,195,175,.5)');
@@ -1191,7 +1216,7 @@ export function drawBirdhouse(s,o){
     s.ellipse(X+2.8,Z-5-bob*.4,2.1,2,'#454a5a');s.poly([{x:X+4.4,y:Z-5.6-bob*.4},{x:X+7.2,y:Z-4.8-bob*.2},{x:X+4.4,y:Z-4.3-bob*.4}],'#e2b84a');
     for(const [dx,dy] of [[-1,-3],[1,-2],[-.4,-1.8]])s.ellipse(X+dx,Z+dy,.4,.4,'#cfd3dc');s.ellipse(X+3.3,Z-5.4-bob*.4,.45,.45,'#f3f1e8')}
 }
-const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop,dryer,cellar,compost_heap:compostHeap};
+const TYPES={house,barn,mill,coop,cowshed,sheepfold,apiary,goatshed,rabbit_hutch:rabbit,alpaca_pen:alpaca,goose_house:goose,pigsty,turkey_yard:turkeyYard,quail_house:quailHouse,peacock_aviary:peacockAviary,angora_pen:angoraPen,swan_lake:swanLake,teahouse:tea,tea_factory:teaFactory,garage,bakery,feedmill,kitchen,dairy,loom,spinnery,weavery,oil_press:oilPress,juicery,cannery,smokehouse,tailor,confectionery,creamery,sausage_shop:sausageShop,cattle_barn:cattleBarn,syrupery:lateWorkshop,soapery:lateWorkshop,noodle_shop:lateWorkshop,ostrich_farm:lateAnimalHouse,silk_house:lateAnimalHouse,yak_pen:lateAnimalHouse,pheasantry:lateAnimalHouse,energy_shop:energyShop,dryer,cellar,compost_heap:compostHeap};
 /* ---------- r6 building upgrades (view only; the level comes from the server object) ----------
    level 2: flower boxes, a lantern post with a hanging sign. level 3: adds a lean-to annex with its own chimney and a
    waving flag on the roof. Both levels get a small gold badge. Buildings without a level (older saves) are level 1. */

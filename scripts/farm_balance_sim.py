@@ -74,6 +74,7 @@ import os
 import sys
 import time
 from collections import Counter, defaultdict
+from datetime import date, datetime, time as day_time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -1473,6 +1474,55 @@ def run_craft_capacity():
               'collected={batches_collected} restarted={batches_restarted} jobs_left={jobs_left}'.format(**result))
 
 
+def plantation_payback_report(days, crew_only=False):
+    """One new hectare per case, at stock prices and with no processing markup."""
+    from qw_farm import plantations as PT
+
+    starts = (date(2027, 3, 1), date(2027, 7, 1), date(2027, 11, 1))
+    prices = {'grape': C.ITEMS['grape']['price'], 'tea_leaf': C.TEA_LEAF_ITEM['price']}
+    candidate_land = 30_000
+    candidate_planting = {'vineyard': 10_000, 'tea_garden': 8_000}
+    policy = ('All profiles use the 90% crew from wave 1.' if crew_only else
+              'Active and online use a 110% manual model for wave 2; casual uses the 90% crew from wave 1.')
+    output = ['First plantation hectare: raw harvest at stock price, daily farm upkeep, no workshop or order markup.',
+              policy,
+              'Candidate: 30000 land plus 10000 for vineyard or 8000 for tea.',
+              'Payback is first calendar day with cumulative value above land and planting costs.',
+              'start       profile crop         net day42  draft payback  candidate payback']
+    for start in starts:
+        midnight = int(datetime.combine(start, day_time(), PT.MOSCOW).timestamp())
+        for profile in ('active', 'casual', 'online'):
+            sessions = PROFILES[profile]['sessions']
+            quality = 90 if crew_only or profile == 'casual' else 110
+            for crop, planting in candidate_planting.items():
+                spec = PT.CULTURES[crop]
+                harvests, net, net42 = 0, 0, None
+                initial_at = midnight + sessions[0]
+                cycle = PT.new_cycle(spec, initial_at, harvests)
+                draft = PT.STEPS[1]['cost'] + spec['cost']
+                candidate = candidate_land + planting
+                payback = {cost: None for cost in (draft, candidate)}
+                for i in range(days):
+                    net -= PT.PLANTATION_UPKEEP
+                    for session in sessions:
+                        now = midnight + i * DAY + session
+                        if now < cycle['ready_at']:
+                            continue
+                        qty, _ = PT.cycle_reward(cycle, quality)
+                        net += qty * prices[spec['item']]
+                        harvests += 1
+                        cycle = PT.new_cycle(spec, now, harvests)
+                    for cost, paid in payback.items():
+                        if paid is None and net >= cost:
+                            payback[cost] = i + 1
+                    if i == 41:
+                        net42 = net
+                old = payback[draft] or f'>{days}'
+                new = payback[candidate] or f'>{days}'
+                output.append(f'{start}  {profile:7} {crop:12} {net42:>9}  {old:>13}  {new:>17}')
+    return '\n'.join(output)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\r\n')[0])
     ap.add_argument('--days', type=int, default=25)
@@ -1491,6 +1541,8 @@ def main():
     ap.add_argument('--field-elapsed-k', type=int, help='manual/max model: run time as percent of the autopilot time A (default 200 / 100; 250 keeps the bonus, 600 melts it)')
     ap.add_argument('--field-manual-share', type=int, help='manual/max model: percent of the operations done by hand, the rest by autopilot (default 100)')
     ap.add_argument('--field-payback', action='store_true', help='measure the payback of every field step in isolation (profiles active/casual/online, manual and auto)')
+    ap.add_argument('--plantation-payback', action='store_true', help='model the first vineyard and tea hectare from three seasonal starts')
+    ap.add_argument('--plantation-crew-only', action='store_true', help='use the 90%% crew for all profiles in --plantation-payback')
     ap.add_argument('--sim-field-upkeep', type=int, help='SIMULATION ONLY: coins per hectare per day')
     ap.add_argument('--sim-field-fuel', type=int, help='SIMULATION ONLY: coins per hectare per operation')
     ap.add_argument('--sim-field-steps', type=lambda x: parse_ints(x, len(C.FIELD_STEPS)), help='SIMULATION ONLY: prices of the five field steps')
@@ -1501,6 +1553,9 @@ def main():
     args = ap.parse_args()
     if args.craft_capacity:
         run_craft_capacity()
+        return
+    if args.plantation_payback:
+        print(plantation_payback_report(max(args.days, 42), args.plantation_crew_only))
         return
     patch = overrides(args.sim_field_upkeep, args.sim_field_steps, args.sim_field_machines, args.sim_field_widths, args.sim_field_fuel, args.sim_land)
     if args.field_payback:

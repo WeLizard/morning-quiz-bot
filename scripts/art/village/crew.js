@@ -29,7 +29,7 @@ function krot(s, c) {
   c.end();
 }
 
-function pooh(s, c) {
+function pooh(s, c, roaming = false) {
   s.ellipse(1.5, .6, 10, 3, SH);
   s.ellipse(-3.4, -1.4, 3.6, 2.2, '#8a5f3a'); s.ellipse(3.4, -1.4, 3.6, 2.2, '#8a5f3a');
   s.ellipse(0, -12, 9, 10.4, '#b5814f');                                                           // body
@@ -41,6 +41,12 @@ function pooh(s, c) {
   s.ellipse(1.8, -23.6, 3.4, 2.6, '#e3c08a'); s.ellipse(2.4, -24.6, 1.2, .9, '#3d2f26');           // muzzle, nose
   s.ellipse(-1.6, -27.4, .8, .9, '#2f3338'); s.ellipse(3.6, -27.6, .8, .9, '#2f3338');
   s.line(-7, -17, -9.4, -10, '#b5814f', 3.4);                                                      // back arm
+  if (roaming) {                                                                                 // empty, relaxed paw away from work
+    c.group('roaming-arm');
+    s.line(6.6, -17, 9, -10.5, '#b5814f', 3.4);
+    c.end();
+    return;
+  }
   c.group('bc-hammer');                                                                            // the arm with the hammer
   s.line(6.6, -17, 10.6, -22, '#b5814f', 3.4);
   s.line(10.6, -22, 12, -30, '#8a6c4c', 1.6); s.poly([{x: 9, y: -31.6}, {x: 15.4, y: -29.4}, {x: 15, y: -27}, {x: 8.6, y: -29.2}], '#7f8a86');
@@ -73,4 +79,13 @@ export function crewSvgs() {
     out[name] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-18 -50 36 54" class="bc-art" aria-hidden="true" focusable="false">${c.svg()}</svg>`;
   }
   return out;
+}
+
+// Approved everyday pose: identical body, palette and foot anchor to the building crew.
+// Render at 40x60 CSS px, feet at 0,0 (translate(-50%,-92.59259259%)).
+export function poohRoamingSvg() {
+  const c = new SvgCtx('bcp'), s = Object.create(FarmScene.prototype);
+  s.c = c; s.time = 0; s.motion = false; s.inStatic = true; s.shadowLevel = 0;
+  pooh(s, c, true);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-18 -50 36 54" class="bc-art" aria-hidden="true" focusable="false">${c.svg()}</svg>`;
 }

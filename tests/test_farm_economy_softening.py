@@ -10,7 +10,7 @@ import pytest
 
 from qw_farm import catalog, economy, fields, merchant, undo
 from qw_farm.catalog import (ANIMALS, BUILDINGS, CROPS, FIELD_FUEL, FIELD_MACHINES, FIELD_SEED_MULT, FIELD_STEPS, FIELD_UPKEEP, LAND_STEPS,
-                             LEVELS, UPGRADES, income_ref, upgrade_cost, upgrade_kind)
+                             LEVELS, UPGRADES, income_ref, upgrade_cost)
 from qw_farm.domain import FarmError, apply, new_farm, project, validate_state
 from qw_farm.expansion import settle, upgrade_state
 
@@ -115,14 +115,14 @@ def test_late_buildings_have_the_softened_prices():
     catalog.validate_economy()
 
 
-def test_compost_heap_cannot_be_upgraded_any_more():
-    assert upgrade_kind('compost_heap') is None and upgrade_cost('compost_heap', 2) is None
-    pub = catalog.public_catalog()['upgrades']
-    assert pub['kinds']['compost_heap'] is None and pub['costs']['compost_heap'] == {'2': None, '3': None}
-    f = farm(30)
-    heap = put(f, 'compost_heap', w=1, h=1)
-    f['inventory'].update({'hay': 9, 'flour': 9})
-    fail(f, 'upgrade', dict(object=heap['id'], revision=heap['revision']), code='cannot_upgrade')
+def test_compost_heap_catalog_offers_only_the_economic_upgrade():
+    pub = catalog.public_catalog()
+    assert pub['upgrades']['kinds']['compost_heap'] == 'compost'
+    assert pub['upgrades']['costs']['compost_heap'] == {'2': upgrade_cost('compost_heap', 2), '3': None}
+    for rid, inputs in (('compost_grass', {'manure': 1, 'grass': 4}), ('compost_manure', {'manure': 2})):
+        recipe = pub['recipes'][rid]
+        assert recipe['upgrade_level'] == 2
+        assert recipe['upgrade_inputs'] == inputs
 
 
 # ------------------------------------------------------------------------------------------------------------------ L1

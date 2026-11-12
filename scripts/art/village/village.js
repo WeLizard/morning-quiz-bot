@@ -13,7 +13,8 @@ import {maslenitsa} from './fest_maslenitsa.js';
 import {springFlowers} from './fest_flowers.js';
 import {pumpkinNight} from './fest_pumpkin.js';
 import {buildArt} from './build.js';
-import {crewSvgs} from './crew.js';
+import {crewSvgs,poohRoamingSvg} from './crew.js';
+import {residentSvgs} from './residents.js';
 import {merchantCart,magpieSvg} from './merchant.js';
 import {contrastPaths} from './contrast_paths.js';
 
@@ -428,6 +429,8 @@ meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windo
 // construction (build.js): stages of the sites and the stalls of the rows, anchored to this render
 meta.build=buildArt({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],sites:SITES,slots:STALL_SLOTS});
 meta.build.figures=crewSvgs();
+meta.residents=residentSvgs();
+meta.pooh_roaming=poohRoamingSvg();  // everyday live layer, separate from construction workers
 meta.player=playerSvg();   // the player's figure (player.js), a live layer like the gate board
 return {world:cv.toDataURL('image/png'),meta,size:[W,H]};
 }

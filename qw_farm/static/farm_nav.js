@@ -8,7 +8,7 @@ import {categoryOf} from './scene_map.js';
 export const MENU=[
  {id:'farm',title:'Хозяйство',items:[['orders','orders','Заказы'],['inventory','shop','Склад'],['team','tractor','Команда'],['land','home','Участок']]},
  {id:'production',title:'Производство',items:[['production','workshop','Мастерские'],['orchard','orchard','Сад']]},
- {id:'outside',title:'За околицей',art:true,items:[['forest','forest','Лес'],['lake','lake','Озеро'],['fields','tractor','Поля']]},
+ {id:'outside',title:'За околицей',art:true,items:[['forest','forest','Лес'],['lake','lake','Озеро'],['fields','tractor','Поля'],['plantations','grape','Плантации','plantations']]},
  {id:'village',title:'Деревня и соседи',items:[['village','coin','Деревня'],['neighbors','friends','Соседи'],['festival','coin','Праздник','festival']]},
  {id:'info',title:'Сведения',items:[['secrets','discovery','Находки'],['journal','journal','Журнал']]}
 ];
@@ -29,6 +29,7 @@ export function menuSections(f={}){
   forest:f.forestReady?'готово':f.forestBusy?'в пути':'',
   lake:f.lakeReady?'улов':f.lakeBusy?'клюёт':'',
   fields:f.fieldsLocked?`С ${f.fieldsLocked} ур.`:'',
+  plantations:f.plantationsLocked?`С ${f.plantationsLocked} ур.`:f.plantationHectares?`${f.plantationHectares} га`:'',
   village:'',
   neighbors:f.requests?`ждут ответа: ${f.requests}`:'',
   festival:f.festival||'',
@@ -36,10 +37,20 @@ export function menuSections(f={}){
   journal:'что было на ферме'
  };
  const badge={orders:f.ordersReady||0,production:f.workshopsReady||0,orchard:f.saplings||0,neighbors:f.requests||0};
- return MENU.map(s=>({...s,items:s.items.filter(([, , ,when])=>!when||f[when]).map(([id,icon,label])=>({id,icon,label,status:status[id]||'',badge:badge[id]||0,locked:id==='fields'&&!!f.fieldsLocked}))}));
+ const locked={fields:!!f.fieldsLocked,plantations:!!f.plantationsLocked};
+ return MENU.map(s=>({...s,items:s.items.filter(([, , ,when])=>!when||f[when]).map(([id,icon,label])=>({id,icon,label,status:status[id]||'',badge:badge[id]||0,locked:!!locked[id]}))}));
 }
 /** The number on the phone «Меню» button: things that wait for the player. */
 export const menuTotal=f=>(f.ordersReady||0)+(f.workshopsReady||0)+(f.saplings||0)+(f.requests||0);
+
+// Steps are keyed by purchase order. Each can add more than one independently managed hectare.
+export function nextPlantationStep(steps,hectares){
+ for(const [id,step] of Object.entries(steps)){
+  if(hectares<step.ha)return {...step,id:Number(id)};
+  hectares-=step.ha;
+ }
+ return null;
+}
 
 // Catalogue sections (E1 variant B). Crops are picked here as in the seed bar; everything else goes to placement.
 export const CATALOG_SECTIONS=[['plots','Грядки'],['trees','Деревья'],['workshops','Мастерские'],['animals','Животные'],['decor','Декор'],['roads','Дорожки']];
@@ -116,6 +127,13 @@ export function saveRecent(store,farmId,list){try{store?.setItem('qw-farm.recent
 /** The best way to plant a tree right now: a free sapling, then a talon, then coins. */
 export const bestOption=row=>row?.options?.find(o=>o.voucher==='free'&&o.qty)||row?.options?.find(o=>o.voucher&&o.qty)||row?.options?.[row.options.length-1]||null;
 
+export const COMPOST_UPGRADE_NAME='Экономная закладка';
+export const COMPOST_UPGRADE_EFFECT='На 1 ед. навоза меньше на партию';
+export function recipeInputs(recipe,level){
+ return recipe.upgrade_inputs&&Number.isInteger(recipe.upgrade_level)&&Number.isInteger(level)&&level>=recipe.upgrade_level
+  ?recipe.upgrade_inputs:recipe.inputs;
+}
+
 /* «(i)» — details of a catalogue entry without choosing it (FARM_FEEDBACK E13). Only numbers from the server catalogue:
    a line whose field is missing is left out, nothing is guessed. `h` gives the formatting the app already uses:
    duration(seconds), cropSeconds(crop) — growth time at the server speed, purpose(type) — buildingPurpose() lines,
@@ -124,7 +142,7 @@ export function entryInfo(e,catalog,me,h={}){
  if(!e||!catalog)return null;
  const items=catalog.items||{},nm=id=>items[id]?.name||id,dur=s=>h.duration?h.duration(s):`${s} с`;
  const list=m=>Object.entries(m||{}).map(([id,q])=>`${nm(id)} ×${q}`).join(', ');
- const recipeLine=r=>`${r.name}: ${list(r.inputs)} → ${list(r.outputs)} · ${dur(r.seconds)}`;
+ const recipeLine=(r,level)=>`${r.name}: ${list(recipeInputs(r,level))} → ${list(r.outputs)} · ${dur(r.seconds)}`;
  const usedIn=id=>{
   const out=[];
   for(const r of Object.values(catalog.recipes||{}))if(r.inputs&&id in r.inputs)out.push(`${r.name} (${catalog.buildings?.[r.building]?.name||r.building})`);
@@ -173,9 +191,19 @@ export function entryInfo(e,catalog,me,h={}){
  if(b.decor)fact('Содержание','не стоит ничего');
  if(b.source)fact('Откуда',b.source);
  section('Животные',animals.map(a=>`${a.name||a.id}: корм ${list(a.inputs)} → ${list(a.outputs)} · ${dur(a.seconds)}${a.cost!=null?` · поселить за ${a.cost} мон.`:''}`));
- section('Рецепты',recipes.map(recipeLine));
  const up=catalog.upgrades,costs=up?.costs?.[b.id],kind=up?.kinds?.[b.id];
- if(costs)section('Улучшения',Object.entries(costs).sort((x,y)=>x[0]-y[0]).map(([lv,c])=>`Ур. ${lv}: ${c.coins} мон.${Object.keys(c.items||{}).length?` и ${list(c.items)}`:''}, с ${c.level} ур. фермы${h.levelEffect&&kind?` — ${h.levelEffect(kind,Number(lv),b.id)}`:''}`));
+ const efficient=kind==='compost'?recipes.filter(r=>r.upgrade_inputs&&r.upgrade_level===2):[];
+ section(efficient.length?'Рецепты · уровень 1':'Рецепты',recipes.map(r=>recipeLine(r,1)));
+ section(`Рецепты · ${COMPOST_UPGRADE_NAME}`,efficient.map(r=>recipeLine(r,2)));
+ if(kind==='compost'&&costs?.[2]){
+  const c=costs[2];
+  section('Улучшения',[`${COMPOST_UPGRADE_NAME}: ${c.coins} мон.${Object.keys(c.items||{}).length?` и ${list(c.items)}`:''}, с ${c.level} ур. фермы`,`${COMPOST_UPGRADE_EFFECT}.`]);
+ }
+ if(b.id==='compost_heap'&&kind===null){
+  const times=[...new Set(recipes.filter(r=>r.no_level_speedup).map(r=>dur(r.seconds)))];
+  section('Улучшения',['Уровень компостной кучи не повышается.',...(times.length===1?[`Время партии всегда ${times[0]}.`]:[])]);
+ }
+ if(kind!=='compost'&&costs)section('Улучшения',Object.entries(costs).filter(([,c])=>c!=null).sort((x,y)=>x[0]-y[0]).map(([lv,c])=>`Ур. ${lv}: ${c.coins} мон.${Object.keys(c.items||{}).length?` и ${list(c.items)}`:''}, с ${c.level} ур. фермы${h.levelEffect&&kind?` — ${h.levelEffect(kind,Number(lv),b.id)}`:''}`));
  info.action={label:'Поставить',kind:'place'};
  return info;
 }

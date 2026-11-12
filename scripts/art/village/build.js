@@ -226,6 +226,9 @@ export function buildArt(V) {
     night(`site-${id}-done`, id === 'fairground' ? [[x1 - .7, y0 + .75, 30, 24], [x0 + .9, y1 - .6, 26, 22]] : [], id === 'greenhouse' ? gh() : []);
     // the crew: Krot by the sign with the blueprint, two residents at the work (foot points, world units)
     crew[id] = [toWorld(x1 + .55, (y0 + y1) / 2 + .3), toWorld(x0 + .5, y1 + .3), toWorld(x1 + .1, y0 + .35)].map(p => p.map(Math.round));
+    // Keep Kaya's 48x60 interaction target clear of Krot; preserve stage art and every other foot anchor.
+    if (['tavern', 'greenhouse', 'fairground'].includes(id)) crew[id][2][0] += 60;
+    if (id === 'greenhouse') { crew[id][0][0] -= 5; crew[id][2][1] -= 28; }
   }
 
   // the market rows as a site: marking, post holes, frames of the six stalls; when built, the arch and the flags
@@ -252,6 +255,10 @@ export function buildArt(V) {
   piece('site-stalls-done', rowsOut, 56, s => rowsDone(s, slots));
   pieces['site-stalls-done-night'] = {box: pieces['site-stalls-done'].box, body: ''};
   crew.stalls = [toWorld(rx0 - .5, ry1 + .1), toWorld(slots[2][0] + .7, ry1 + .45), toWorld(slots[4][0] + .7, ry1 + .45)].map(p => p.map(Math.round));
+  // Mobile-reviewed foot anchors: clear of the plaque, market props and nearby interaction targets.
+  crew.stalls[0] = [895, 1003];
+  crew.stalls[1][1] += 24;
+  crew.stalls[2] = [1091, 963];
 
   // ---------------- the stalls of the rows: one per place, closed and open ----------------
   const stalls = {};

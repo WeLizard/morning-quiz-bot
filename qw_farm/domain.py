@@ -8,7 +8,7 @@ from copy import deepcopy
 from hashlib import sha256
 import math
 import re
-from .catalog import (tick, CROPS, ITEMS, BUILDINGS, RECIPES, ANIMALS, QUESTS, LEVELS, NPCS, VERSION, level, is_land_size, land_step,
+from .catalog import (tick, CROPS, ITEMS, BUILDINGS, RECIPES, ANIMALS, QUESTS, WORKSHOP_GOALS, LEVELS, NPCS, VERSION, level, is_land_size, land_step,
                       MAX_BUILDING_LEVEL, RECIPE_SPEED, EXOTIC_BY_FRUIT, BARN_SELL_BONUS, upgrade_kind, upgrade_cost, effective_level,
                       queue_slots, animal_batch, animal_xp, ANIMAL_XP_LEGACY, land_bound, plot_limit, object_limit, WEARABLE_ITEM_IDS)
 from . import progression, economy, projects
@@ -132,8 +132,10 @@ def daily(farm, key, now, limit):
 def reachable(farm):
     from .textile import recipe_level
     lv=level(farm['xp'])
-    from . import orchard
+    from . import catalog, orchard, plantations
     result={k for k,v in CROPS.items() if v['level']<=lv and not v.get('orchard')}|orchard.fruits_in_reach(farm)   # fruit: only from a bearing tree or an old bed planting
+    if catalog.PLANTATIONS_WIRED:
+        result.update(plantations.products_in_reach(farm))
     from .catalog import ROUTES, route_level
     types={b['type'] for b in farm['objects']}
     for _ in range(20):
@@ -281,8 +283,9 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
     from . import expansion
     expansion.upgrade_state(me,now)
     if other is not me: expansion.upgrade_state(other,now)
-    if kind in expansion.SCHEMAS:
-        need(isinstance(data,dict) and set(data)==expansion.SCHEMAS[kind], 'invalid_command', 'Некорректные параметры действия.',422)
+    schema=expansion.command_schema(kind)
+    if schema is not None:
+        need(isinstance(data,dict) and set(data)==schema, 'invalid_command', 'Некорректные параметры действия.',422)
         need(me['id']==other['id'], 'not_owner', 'Это не твоя ферма.',403)
         text=expansion.apply_extension(me,kind,data,now,command_id,speed,form,upkeep_config)
         progression.touch(me,now)  # r9: a successful command of the actor is activity (M2 pool, Moscow-day roll)
@@ -331,8 +334,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         r=named(RECIPES,data['recipe'])
         need(obj['type']==r['building'] and expansion.textile.recipe_level(me,r)<=lv,'wrong_building','Этот рецепт здесь пока недоступен.')
         need(len(obj['jobs']) < queue_slots(obj.get('level')),'queue_full','Очередь заполнена. Забери готовые товары.')
-        inventory(me,r['inputs'],-1)
         job=expansion.make_job(obj,r,now,speed,command_id,me);job['manual']=True
+        inventory(me,job['inputs'],-1)
         obj['jobs'].append(job)
         obj['revision']+=1;text='Производство поставлено в очередь.'
     elif kind=='set_recipe_repeat':
@@ -471,10 +474,12 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         from . import undo
         text=undo.demolish(me,obj,now)
     elif kind=='upgrade':
-        need(upgrade_kind(obj['type']) is not None,'cannot_upgrade','Эту постройку улучшать не нужно.')
+        effect=upgrade_kind(obj['type'])
+        need(effect is not None,'cannot_upgrade','Эту постройку улучшать не нужно.')
         cur=obj.get('level',1)
         need(type(cur) is int and cur<MAX_BUILDING_LEVEL,'max_level','Уже максимальный уровень постройки.')
         target=cur+1;cost=upgrade_cost(obj['type'],target)
+        need(cost is not None,'max_level','Уже максимальный уровень постройки.')
         need(lv>=cost['level'],'locked',f'Улучшение до {target} уровня открывается с {cost["level"]} уровня фермы.')
         need(me['coins']>=cost['coins'],'insufficient_coins','Недостаточно монет для улучшения.')
         inventory(me,cost['items'],-1)  # validates every good before anything is spent
@@ -482,7 +487,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         if paid_gift:obj['gift']=obj.get('gift',0)+paid_gift   # E27 D1: the starter gift part comes back with a refund
         text={'workshop':f'Мастерская улучшена до {target} уровня: очередь длиннее, работа быстрее.',
               'animals':f'Домик улучшен до {target} уровня: животные помещаются в большем количестве.',
-              'barn':f'Склад улучшен до {target} уровня: торговля идёт выгоднее.'}[upgrade_kind(obj['type'])]
+              'barn':f'Склад улучшен до {target} уровня: торговля идёт выгоднее.',
+              'compost':'Компостная куча улучшена: на каждую новую партию нужно на 1 навоз меньше.'}[effect]
     elif kind=='expand':
         step=land_step(me['size'])
         need(step,'max_land','Весь участок уже открыт.')
@@ -520,10 +526,20 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         from . import village_quests
         text=village_quests.act(me,data['npc'],data['action'],now)
     elif kind=='quest':
-        q=find(QUESTS,data['quest'])
-        need(q['id'] not in me['claimed_quests'],'already_claimed','Награда уже получена.')
-        need(me['stats'][q['stat']]>=q['goal'],'quest_incomplete','Задание ещё не выполнено.')
-        me['claimed_quests'].append(q['id']);me['coins']+=q['coins'];progression.grant_xp(me,q['xp'],'quest',now,True);text=f'«{q["name"]}»: награда получена!'
+        quest = find(QUESTS + WORKSHOP_GOALS, data['quest'])
+        need(quest['id'] not in me['claimed_quests'], 'already_claimed', 'Награда уже получена.')
+        if 'building' in quest:
+            need(lv >= quest['level'], 'locked', f'Цель откроется с {quest["level"]} уровня.')
+            building = quest['building']
+            need(any(obj['type'] == building for obj in me['objects']),
+                 'building_required', f'Нужна постройка на твоей ферме: {BUILDINGS[building]["name"]}.')
+            inventory(me, quest['needs'], -1)
+        else:
+            need(me['stats'][quest['stat']] >= quest['goal'], 'quest_incomplete', 'Задание ещё не выполнено.')
+        me['claimed_quests'].append(quest['id'])
+        me['coins'] += quest['coins']
+        progression.grant_xp(me, quest['xp'], 'quest', now, True)
+        text = f'«{quest["name"]}»: награда получена!'
     elif kind=='settings':
         name=data['name'];need(isinstance(name,str) and 2<=len(name.strip())<=28 and not any(ord(c)<32 for c in name),'invalid_name','Название: от 2 до 28 символов.',422)
         need(isinstance(data['visibility'],str) and data['visibility'] in {'private','friends','public'},'invalid_privacy','Недопустимая приватность.',422)
@@ -667,6 +683,7 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
     need(can_visit(visitor,farm),'private_farm','Ферма недоступна.',404)
     if own:
         result=deepcopy(farm)
+        result.pop('tavern',None)  # exposed only as the current-day village_build projection
         from . import village_quests
         result['village_errands']=village_quests.public(farm,now)
         from . import minigames, oleg, expansion as _ex
@@ -684,6 +701,11 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
         result['merchant_view']=merchant.owner_view(farm,now)
         from . import orchard
         result['orchard_view']=orchard.owner_view(farm,now)
+        from . import catalog, plantations
+        if catalog.PLANTATIONS_WIRED:
+            result['plantations']=plantations.owner_view(farm,now)
+        else:
+            result.pop('plantations',None)
         from . import meadow
         result['meadow_view']=meadow.view(farm,now)
         result['home_projects']=projects.owner_state(farm)

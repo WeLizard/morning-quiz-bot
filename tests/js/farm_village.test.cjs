@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
+const figures=JSON.parse(source.match(/const VILLAGE_RESIDENT_FIGURES=(.*);/)[1]);
 const block=source.slice(source.indexOf('// Living village uses existing personal orders'),source.indexOf('/* ---- r9 stage 15B:'));
 const declarations=source.slice(source.indexOf('const VILLAGE_VOICES='),source.indexOf('const fmt='));
 class Node{
@@ -13,7 +14,7 @@ class Node{
  setAttribute(k,v){this.attrs[k]=v;}
  focus(){this.focused=true;}
  querySelector(){return null;}
- querySelectorAll(selector){const all=this.children.flatMap(n=>n instanceof Node?[n,...n.querySelectorAll('*')]:[]);return selector==='*'?all:all.filter(n=>selector.includes('data-village-npc')?n.dataset.villageNpc||n.dataset.villageTownhall||selector.includes('data-village-place')&&n.dataset.villagePlace:selector.includes('data-village-focus')?n.dataset.villageFocus:selector==='.village-services'?n.className==='village-services':false);}
+ querySelectorAll(selector){const all=this.children.flatMap(n=>n instanceof Node?[n,...n.querySelectorAll('*')]:[]);return selector==='*'?all:all.filter(n=>selector.includes('data-village-npc')?n.dataset.villageNpc||n.dataset.villageTownhall||selector.includes('data-village-place')&&n.dataset.villagePlace:selector.includes('data-village-focus')?n.dataset.villageFocus:selector==='[data-village-site]'?n.dataset.villageSite:selector==='.village-services'?n.className==='village-services':false);}
 }
 const AC=h=>h.nodes.get('village-scene').children[0].children.find(n=>n.className==='village-actors');
 function setup(){
@@ -38,6 +39,62 @@ function setup(){
 }
 test('entering village from guest routes to own farm and invalidates older requests',()=>{
  const h=setup();h.ctx.selectTab('village');assert.equal(h.S.farm,h.S.me);assert.equal(h.S.tab,'village');assert.equal(h.ctx.farmViewEpoch,5);assert.ok(h.calls.includes('scene'));assert.equal(h.bodyClasses.has('panel-open'),false);assert.equal(h.bodyClasses.has('panel-collapsed'),true);const world=AC(h);assert.equal(world.children.filter(n=>n.dataset.villageNpc&&n.attrs['aria-pressed']==='true').length,0);
+});
+
+test('construction moves the three residents to their tools and Pukh keeps access to the ballista',()=>{
+ const h=setup(),name='Медведь Пух',walking=[];
+ h.S.catalog.market.tastes[name]=['honey'];
+ h.S.me.village_games={pukh_ballista:{attempts_left:3}};
+ h.ctx.openBallistaGame=()=>h.calls.push('open-ballista');
+ h.ctx.villageWalk=(target,open,instant,key)=>{walking.push({target,instant,key});open();};
+ h.ctx.selectTab('village');
+ const scene=h.nodes.get('village-scene'),world=scene.children[0];
+ const crew=world.children.find(n=>n.className==='village-crew-layer');
+ scene.querySelector=selector=>world.children.find(n=>n.className?.split(' ').includes(selector.slice(1)));
+ h.ctx.document.createElementNS=(_ns,tag)=>new Node(tag);
+ crew.append=node=>{node.remove=()=>{crew.children=crew.children.filter(n=>n!==node);};crew.children.push(node);};
+ const pooh=()=>{
+  const buttons=AC(h).children.filter(n=>n.dataset.villageNpc===name);
+  assert.equal(buttons.length,1);return buttons[0];
+ };
+ const play=b=>{
+  assert.equal(b.attrs['aria-label'],name);assert.equal(b.attrs['aria-controls'],'panel-content');
+  b.onclick({detail:0,currentTarget:b});assert.equal(pooh().attrs['aria-pressed'],'true');
+  const panel=new Node('div');h.ctx.renderVillageResident(panel);
+  panel.querySelectorAll('*').find(n=>n.dataset.openBallista==='true').onclick();
+  assert.equal(h.calls.at(-1),'open-ballista');
+ };
+ const idle=pooh();assert.equal(idle.dataset.pooh,'roaming');
+ assert.match(idle.children[0].innerHTML,/class="roaming-arm"/);
+ assert.doesNotMatch(idle.children[0].innerHTML,/bc-hammer/);
+ play(idle);assert.equal(walking.at(-1).key,name);
+ const sites=new Set(['stalls','tavern']);
+ h.ctx.CONSTR={art:id=>({stage:sites.has(id)?'pit':'soon',crew:sites.has(id)}),siteLabel:(_id,name)=>name,rowsOpen:()=>false};
+ h.ctx.syncVillageScene();
+ const plaques=()=>scene.querySelectorAll('[data-village-site]');
+ assert.deepEqual(plaques().filter(n=>n.dataset.working==='true').map(n=>n.dataset.villageSite),['stalls','tavern']);
+ const worker=pooh();assert.equal(worker.dataset.pooh,'working');assert.match(worker.children[0].innerHTML,/class="bc-hammer"/);
+ assert.equal(worker.style.left,`${1005/24}%`);assert.equal(worker.style.top,`${985/18}%`);
+ const minimap=h.nodes.get('village-hud').children.find(n=>n.dataset.villageMinimap);
+ assert.equal(minimap.children.find(n=>n.title===name).style.left,worker.style.left);
+ assert.deepEqual(crew.children.map(n=>n.className),['village-crew vc-krot','village-crew vc-kaya','village-crew vc-krot','village-crew vc-kaya']);
+ const priorWalks=walking.length;
+ play(worker);assert.equal(walking.length,priorWalks,'worksite selection opens without walking away from the site');
+ h.S.catalog.market.tastes['Механик Крот']=['wood'];h.S.catalog.market.tastes['Кошка Кая']=['fish'];
+ h.ctx.syncVillageScene();assert.equal(crew.children.length,0,'every interactive worker replaces its stand-in');
+ const workers=AC(h).children.filter(n=>n.dataset.residentMode==='working');
+ assert.equal(workers.length,3);
+ const build=vm.runInContext('VILLAGE_BUILD',h.ctx);
+ for(const [i,[npc,tool]] of [['Механик Крот','plan'],[name,'hammer'],['Кошка Кая','shovel']].entries()){
+  const button=workers.find(n=>n.dataset.villageNpc===npc),[x,y]=build.crew.stalls[i];
+  assert.match(button.children[0].innerHTML,new RegExp(`class="bc-${tool}"`));
+  assert.equal(button.style.left,`${x/24}%`);assert.equal(button.style.top,`${y/18}%`);
+  button.onclick({detail:0,currentTarget:button});assert.equal(vm.runInContext('villageResident',h.ctx),npc);
+ }
+ sites.clear();h.ctx.syncVillageScene();
+ assert.equal(pooh().dataset.pooh,'roaming');assert.equal(pooh().style.left,idle.style.left);assert.equal(crew.children.length,0);
+ assert.equal(AC(h).children.filter(n=>n.dataset.residentMode==='working').length,0);
+ assert.ok(plaques().every(n=>n.dataset.working==='false'));
 });
 
 test('Hedgehog and the existing post sign open the read-only bulletin without leaving village',()=>{
@@ -169,9 +226,20 @@ test('scene does not rebuild on identical refresh; pause remains owned by villag
  h.ctx.chooseVillageResident('Агата');assert.equal(root.replaces,1,'world image and effects are never rebuilt');assert.equal(act.replaces,2);h.ctx.syncVillageScene();assert.equal(act.replaces,2);
  h.S.tab='fields';h.S.fieldGame={};h.ctx.syncVillageScene();assert.equal(root.hidden,true);assert.equal(h.pause.at(-1),true);h.S.fieldGame=null;h.ctx.syncScenePause();assert.equal(h.pause.at(-1),false);
 });
-test('resident buttons are native accessible controls and data changes preserve selection',()=>{
- const h=setup();h.S.tab='village';h.ctx.syncVillageScene();h.ctx.chooseVillageResident('Агата');h.S.me.orders.push({id:'two',npc:'Агата'});h.ctx.syncVillageScene();
- const residents=AC(h).children.filter(n=>n.dataset.villageNpc);assert.equal(residents[1].attrs['aria-pressed'],'true');assert.match(residents[1].attrs['aria-label'],/есть просьба/);assert.equal(residents[1].tagName,'button');assert.equal(residents[0].attrs['aria-controls'],'panel-content');assert.equal(residents[1].style.left,`${vm.runInContext('VILLAGE_SPOTS',h.ctx)['Агата'][0]}%`);
+test('all eleven residents are native buttons with full-body art and preserve selection on refresh',()=>{
+ const h=setup();h.S.tab='village';
+ for(const name of Object.keys(figures))h.S.catalog.market.tastes[name]=[];
+ h.ctx.syncVillageScene();h.ctx.chooseVillageResident('Агата');h.S.me.orders.push({id:'two',npc:'Агата'});h.ctx.syncVillageScene();
+ const residents=AC(h).children.filter(n=>n.dataset.villageNpc);assert.equal(residents.length,11);
+ for(const button of residents){
+  const name=button.dataset.villageNpc,[[x,y],art]=figures[name];
+  assert.equal(button.tagName,'button');assert.equal(button.attrs['aria-controls'],'panel-content');
+  assert.equal(button.dataset.residentMode,'roaming');assert.equal(button.children[0].innerHTML,art);
+  assert.equal(button.style.left,`${x/24}%`);assert.equal(button.style.top,`${y/18}%`);
+  assert.ok(Number.isFinite(button.style['--resident-dx']));assert.ok(Number.isFinite(button.style['--resident-dy']));
+ }
+ const agata=residents.find(n=>n.dataset.villageNpc==='Агата');
+ assert.equal(agata.attrs['aria-pressed'],'true');assert.match(agata.attrs['aria-label'],/есть просьба/);
 });
 
 test('panel refresh retains focused service, open section and scroll position',()=>{
@@ -209,7 +277,7 @@ test('town hall opens services without implicitly selecting a resident',()=>{
 test('village artwork is a large external SVG world served by allowlist and scrolls inside the scene',()=>{
  const svg=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/village.svg'),'utf8');assert.match(svg,/viewBox="0 0 2400 1800"/);assert.match(svg,/preserveAspectRatio="xMidYMid meet"/);
  const api=fs.readFileSync(path.join(__dirname,'../../qw_farm/api.py'),'utf8');assert.match(api,/ASSETS=.*'village.svg'/);
- const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');assert.match(css,/\.village-scene\{[^}]*overflow:auto/);assert.match(css,/\.village-world\{[^}]*width:clamp\(1600px,250cqw,3200px\);aspect-ratio:4\/3/);assert.match(css,/object-fit:contain/);
+ const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');assert.match(css,/\.village-scene\{[^}]*overflow:auto/);assert.match(css,/\.village-world\{--village-width:clamp\(1600px,250cqw,3200px\);[^}]*width:var\(--village-width\);aspect-ratio:4\/3/);assert.match(css,/object-fit:contain/);
  assert.doesNotMatch(css,/\.village-scene\{[^}]*overflow-x:hidden/);
 });
 
@@ -233,10 +301,10 @@ test('debt shortcut opens town hall services and all eleven resident positions e
 });
 
 test('world keeps 44px targets without overlap at phone and desktop widths; walking and HUD exist',()=>{
- const h=setup();const positions=Object.values(vm.runInContext('VILLAGE_SPOTS',h.ctx)),hallPos=vm.runInContext('VILLAGE_HALL',h.ctx),board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
+ const h=setup();const positions=Object.values(figures).map(([[x,y]])=>[x/24,y/18]),hallPos=vm.runInContext('VILLAGE_HALL',h.ctx),board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
  for(const availableWidth of [320,360,390,430,1280,1920]){
   const width=Math.min(3200,Math.max(1600,availableWidth*2.5)),height=width*.75;
-  const targets=positions.map(([x,y])=>({x:x*width/100,y:y*height/100,w:48,h:48}));targets.push({x:hallPos[0]/100*width,y:hallPos[1]/100*height,w:62,h:44});targets.push({x:board[0]/100*width,y:board[1]/100*height,w:board[2]/100*width,h:board[3]/100*height});
+  const targets=positions.map(([x,y])=>({x:x*width/100,y:y*height/100-25.56,w:48,h:60}));targets.push({x:hallPos[0]/100*width,y:hallPos[1]/100*height,w:62,h:44});targets.push({x:board[0]/100*width,y:board[1]/100*height,w:board[2]/100*width,h:board[3]/100*height});
   for(const t of targets){assert.ok(t.x-t.w/2>=0&&t.x+t.w/2<=width);assert.ok(t.y-t.h/2>=0&&t.y+t.h/2<=height);assert.ok(t.w>=44&&t.h>=44);}
   for(let i=0;i<targets.length;i++)for(let j=i+1;j<targets.length;j++){const a=targets[i],b=targets[j];assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2||Math.abs(a.y-b.y)>=(a.h+b.h)/2,`targets ${i}/${j} overlap at ${availableWidth}`);}
  }
@@ -267,9 +335,9 @@ test('keyboard activation opens a resident at once, mouse click walks first and 
 test('daily guests follow the date only, differ from each other, and place signs never cover residents',()=>{
  const h=setup();const today=vm.runInContext('villageVisitorsToday',h.ctx);
  for(let d=0;d<30;d++){const t=Date.UTC(2026,9,1+d,9),a=today(t),b=today(t+5*3600e3);assert.deepEqual(a.map(x=>x.v[0]),b.map(x=>x.v[0]),'same Moscow day, same guests');assert.notEqual(a[0].v[0],a[1].v[0]);assert.notDeepEqual(a[0].spot,a[1].spot);}
- const spots=Object.values(vm.runInContext('VILLAGE_SPOTS',h.ctx)).map(([x,y])=>({x,y,w:48,h:48}));const places=vm.runInContext('VILLAGE_PLACES',h.ctx).map(p=>({x:p[3],y:p[4],w:44,h:44}));const guests=vm.runInContext('VILLAGE_VISITOR_SPOTS',h.ctx).map(([x,y])=>({x,y,w:48,h:48}));const hall=vm.runInContext('VILLAGE_HALL',h.ctx),board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
+ const spots=Object.values(figures).map(([[x,y]])=>({x:x/24,y:y/18,w:48,h:60,footOffset:25.56}));const places=vm.runInContext('VILLAGE_PLACES',h.ctx).map(p=>({x:p[3],y:p[4],w:44,h:44}));const guests=vm.runInContext('VILLAGE_VISITOR_SPOTS',h.ctx).map(([x,y])=>({x,y,w:48,h:48}));const hall=vm.runInContext('VILLAGE_HALL',h.ctx),board=vm.runInContext('VILLAGE_GATE_BOARD',h.ctx);
  const all=[...spots,...places,...guests,{x:hall[0],y:hall[1],w:62,h:44}];
- for(const width of [1600,3200]){const height=width*.75,T=all.map(t=>({x:t.x*width/100,y:t.y*height/100,w:t.w,h:t.h}));T.push({x:board[0]*width/100,y:board[1]*height/100,w:board[2]*width/100,h:board[3]*height/100});
+ for(const width of [1600,3200]){const height=width*.75,T=all.map(t=>({x:t.x*width/100,y:t.y*height/100-(t.footOffset||0),w:t.w,h:t.h}));T.push({x:board[0]*width/100,y:board[1]*height/100,w:board[2]*width/100,h:board[3]*height/100});
   for(let i=0;i<T.length;i++)for(let j=i+1;j<T.length;j++){const a=T[i],b=T[j];assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2||Math.abs(a.y-b.y)>=(a.h+b.h)/2,`targets ${i}/${j} overlap at ${width}`);}}
 });
 test('easter-egg guests are extra, rare, deterministic and complete',()=>{
@@ -323,18 +391,51 @@ test('a disabled errand delivery says what is missing',()=>{
  const all=p.querySelectorAll('*'),deliver=all.find(n=>n.textContent==='Сдать задание');
  assert.equal(deliver.disabled,true);assert.ok(all.some(n=>/Не хватает: Морковь ×2/.test(n.textContent||n.tagName)),all.map(n=>n.textContent).join('|'));
 });
-test('static targets (exit gate, place signs) stack above wandering residents across their whole drift',()=>{
+test('static targets stack above wandering residents and their approach routes remain clear',()=>{
  const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');
  const z=re=>Number((css.match(re)||[])[1]);
  const zNpc=z(/\.village-npc,\.village-townhall\{[^}]*?z-index:(\d+)/),zNpcSel=z(/\.village-npc\[aria-pressed=true\]\{z-index:(\d+)/),zPlaces=z(/\.village-places\{[^}]*?z-index:(\d+)/),zGate=z(/\.village-gate\{[^}]*?z-index:(\d+)/),zSign=z(/\.village-place\{z-index:(\d+)/),zGuest=z(/\.village-visitor\{z-index:(\d+)/);
  for(const v of [zNpc,zNpcSel,zPlaces,zGate,zSign,zGuest])assert.ok(Number.isFinite(v),'z-index parsed');
  assert.ok(zPlaces>Math.max(zNpc,zNpcSel),'place layer above every resident');assert.ok(zGate>Math.max(zNpc,zNpcSel),'gate above every resident');assert.ok(zSign>zGuest,'signs above wandering guests inside their layer');
- const W=1600,H=1200,ring=32; // smallest world; resident button 48px + inset:-8px ring => 32px half-size around the walking figure
- const spots=JSON.parse(source.match(/const VILLAGE_SPOTS=(\{[^}]*\})/)[1].replace(/'/g,'"')),life=eval('('+source.match(/const VILLAGE_LIFE=(\{[^}]*\})/)[1]+')');
- const board=eval(source.match(/const VILLAGE_GATE_BOARD=(\[[^\]]*\])/)[1]),places=eval(source.match(/const VILLAGE_PLACES=(\[.*\]);\n/)[1]);
+ const {ctx}=setup(),W=1600,H=1200,scale=W/2400;
+ const board=vm.runInContext('VILLAGE_GATE_BOARD',ctx),places=vm.runInContext('VILLAGE_PLACES',ctx);
  const targets=[{id:'gate',x:board[0]*W/100,y:board[1]*H/100,hw:Math.max(22,board[2]*W/200),hh:Math.max(22,board[3]*H/200)}].concat(places.map(p=>({id:p[0],x:p[3]*W/100,y:p[4]*H/100,hw:22,hh:22})));
- let overlaps=0;
- for(const [npc,[sx,sy]] of Object.entries(spots)){const [,wx,wy]=life[npc];for(let k=0;k<=20;k++){const cx=sx*W/100+wx*k/20,cy=sy*H/100+wy*k/20;
-  for(const t of targets)if(Math.abs(t.x-cx)<=ring+t.hw&&Math.abs(t.y-cy)<=ring+t.hh){overlaps++;assert.ok(zGate>zNpcSel&&zPlaces>zNpcSel,`${npc} ring reaches ${t.id}: static target must win`);}}}
- assert.ok(overlaps>0,'the drift range really reaches a static target, so the stacking assertion is not vacuous');
+ const graph=vm.runInContext('VILLAGE_WALK',ctx);
+ for(const [npc,[[sx,sy]]] of Object.entries(figures)){
+  const [dx,dy]=ctx.villageResidentDrift(npc,[sx,sy]);
+  for(let k=0;k<=20;k++){
+   const x=sx+dx*k/20,y=sy+dy*k/20,cx=x*scale,cy=y*scale-25.56;
+   assert.ok(ctx.villageSnap(graph,x,y).d<4,`${npc} stays near the walk graph`);
+   for(const t of targets)assert.ok(Math.abs(t.x-cx)>=24+t.hw+8||Math.abs(t.y-cy)>=30+t.hh+8,`${npc} crowds ${t.id}`);
+  }
+ }
+});
+
+test('construction leaves a gap between its workers and nearby buttons at phone scale',()=>{
+ const {ctx}=setup(),scale=2/3;
+ const resident=(name,[x,y])=>({name,x:x*scale,y:y*scale-25.56,hw:24,hh:30});
+ const markers=(name,[x,y],hw,hh)=>({name,x:x*16,y:y*12,hw,hh});
+ const oleg='Петух Олег',olegFoot=figures[oleg][0],olegDrift=ctx.villageResidentDrift(oleg,olegFoot);
+ const targets=[
+  markers('market',vm.runInContext("VILLAGE_PLACES.find(p=>p[0]==='market').slice(3,5)",ctx),22,22),
+  markers('hall',vm.runInContext('VILLAGE_HALL',ctx),31,22),
+  markers('guest',vm.runInContext('VILLAGE_VISITOR_SPOTS[1]',ctx),24,24),
+  ...Array.from({length:11},(_,i)=>resident(oleg,olegFoot.map((x,j)=>x+olegDrift[j]*i/10))),
+ ];
+ const build=vm.runInContext('VILLAGE_BUILD',ctx);
+ const sites=vm.runInContext('VILLAGE_SITES',ctx);
+ const css=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/style.css'),'utf8');
+ assert.match(css,/\.village-site\[data-working=true\]:not\(\[data-village-site=stalls\]\)\{margin-top:-86px\}/);
+ for(const [site,feet] of Object.entries(build.crew)){
+  const crew=feet.map((foot,i)=>resident(`worker ${i}`,foot));
+  const plaques=sites.map(([id,,x,y])=>{
+   const plate=markers(id,[x,id==='greenhouse'?23.8:y],70,29);
+   plate.y+=7-(id===site&&id!=='stalls'?64:0);
+   return plate;
+  });
+  for(const a of crew)for(const b of [...targets,...crew,...plaques]){
+   if(a===b)continue;
+   assert.ok(Math.abs(a.x-b.x)>=a.hw+b.hw+8||Math.abs(a.y-b.y)>=a.hh+b.hh+8,`${site}: ${a.name} crowds ${b.name}`);
+  }
+ }
 });

@@ -135,7 +135,7 @@ def test_recipe_batches_do_not_exceed_an_adult_tree_harvest():
 
 def test_cellar_has_the_motto_and_no_drunkenness_in_the_rules():
     assert catalog.CELLAR_MOTTO == 'Безалкогольно. Градус — только в названии'
-    cellar = [r for r in RECIPES.values() if r['building'] == 'cellar']
+    cellar = [r for r in RECIPES.values() if r['building'] == 'cellar' and r['id'] in ORCHARD_RECIPE_IDS]
     assert len(cellar) == 11
     words = ' '.join([catalog.ORCHARD_TEXT[k] for k in catalog.ORCHARD_TEXT] + [ITEMS[r]['name'] for r in ORCHARD_RECIPE_IDS]).lower()
     assert 'похмель' not in words and 'пьян' not in words, 'no drunkenness, no hangover: the degree lives in the name only'

@@ -13,3 +13,11 @@
 .stall-form{display:grid;gap:12px}
 .stall-own{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-top:1px solid var(--line)}
 .stall-own small{flex:1 1 auto}
+.tavern-rules{padding-inline-start:var(--qw-s-4)}
+.tavern-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr}
+.tavern-tray{margin-block-start:var(--qw-btn-gap)}
+.tavern-dish.qw-btn{flex-direction:column;min-width:0;padding:var(--qw-s-1);color:var(--qw-game-text);background:var(--qw-game-surface-2);font-size:var(--qw-fs-small)}
+.tavern-dish svg{width:24px;height:24px}
+.tavern-dish[aria-pressed="true"]{background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink);border-color:var(--qw-game-accent)}
+.tavern-tray .tavern-dish{min-height:64px}
+.tavern-hint{min-height:3.1em}

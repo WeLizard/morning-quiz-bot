@@ -32,14 +32,14 @@ test('mill tap box follows the drawn silhouette and no longer steals from neighb
  assert.notEqual(at(0,-125),'m');assert.notEqual(at(0,-110),'m');
  assert.notEqual(at(42,-60),'m','beside the tower is not the mill');
 });
-test('village residents get a 64px touch target that follows the wandering figure',()=>{
- assert.match(css,/\.village-npc::after[^{]*\{[^}]*inset:-8px/);
- assert.match(css,/\.village-walker\{pointer-events:auto/);
- const m=css.match(/\.village-npc,\.village-townhall\{[^}]*?;width:(\d+)px/);assert.ok(Number(m[1])+16>=64);
- // neighbouring residents' 64px rings do not overlap at the smallest world size (1600x1200)
- const spots=JSON.parse(app.match(/const VILLAGE_SPOTS=(\{[^}]*\})/)[1].replace(/'/g,'"'));
- const pts=Object.entries(spots).map(([n,[x,y]])=>({n,x:x*16,y:y*12}));
- for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const a=pts[i],b=pts[j];assert.ok(Math.abs(a.x-b.x)>=64||Math.abs(a.y-b.y)>=64,`${a.n}/${b.n} hit rings overlap`);}
+test('village residents move the native 48×60 touch target together with the figure',()=>{
+ assert.match(css,/\.village-npc,\.village-townhall\{[^}]*;width:48px/);
+ assert.match(css,/\.village-npc\[data-resident-mode\][^\n]*\{height:60px/);
+ assert.match(css,/\[data-resident-mode=roaming\]\{animation:v-resident-walk/);
+ // Native buttons retain at least 8px of space at their resting positions.
+ const figures=JSON.parse(app.match(/const VILLAGE_RESIDENT_FIGURES=(.*);/)[1]);
+ const pts=Object.entries(figures).map(([n,[[x,y]]])=>({n,x:x*2/3,y:y*2/3}));
+ for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const a=pts[i],b=pts[j];assert.ok(Math.abs(a.x-b.x)>=56||Math.abs(a.y-b.y)>=68,`${a.n}/${b.n} targets too close`);}
 });
 test('exit sign is a real button: one board on the posts, farm-style highlight, no hover jump, 44px target',()=>{
  assert.match(app,/gate\.innerHTML=VILLAGE_GATE_SIGN/);

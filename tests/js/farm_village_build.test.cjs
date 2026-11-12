@@ -46,10 +46,13 @@ test('construction.js: Сорока opens on her visit, Sonya shutters 23–7 Mo
 test('app.js: layers under and above the night tint, the crew, synced with the village scene; CSS keeps the motion optional',()=>{
  assert.match(app,/villageFestLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageBuildLayer\('glow'\),/);
  assert.match(app,/villageWaterWheel\(\),villageCrewLayer\(\),actors,/);
- assert.match(app,/syncVillageSites\(\);syncVillageBuild\(\);/);
+ assert.match(app,/syncVillageBuild\(workingNames\);syncVillageContrast\(\);/);
  assert.match(app,/u\.setAttribute\('href',`\/app\/farm\/assets\/\$\{VILLAGE_BUILD\.asset\}#\$\{id\}`\)/);
  assert.match(css,/:root:not\(\[data-farm-theme=night\]\) \.village-build-glow\{display:none\}/);
- assert.match(css,/@media\(prefers-reduced-motion:no-preference\)\{\n \.village-crew \.bc-plan\{animation/);
+ for(const tool of ['plan','hammer','shovel']){
+  const motion=css.match(/@media\(prefers-reduced-motion:no-preference\)\{\n :is\(\.village-crew,\[data-resident-mode=working\]\) \.bc-plan\{animation:[^\n]*\n[^\n]*\n[^\n]*/)?.[0];
+  assert.ok(motion?.includes(` .bc-${tool}{animation:`));
+ }
 });
 test('api.py serves village-build.svg',()=>{
  assert.match(api,/'village-build\.svg'/);

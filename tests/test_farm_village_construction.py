@@ -5,14 +5,15 @@ Logic tests run on the local SQLite harness (``DemoDatabase``); the shared-SQL r
 """
 import asyncio
 from copy import deepcopy
+from math import ceil
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
 
-from qw_farm import construction as cn, economy, merchant, progression
-from qw_farm.catalog import ITEMS, LEVELS, income_ref
+from qw_farm import construction as cn, economy, market, merchant, progression
+from qw_farm.catalog import ITEMS, LEVELS, RECIPES, income_ref
 from qw_farm.domain import FarmError, new_farm, validate_state
 from qw_farm.expansion import upgrade_state
 from qw_farm.persistence import DemoDatabase
@@ -523,9 +524,88 @@ def test_metadata_is_idempotent_and_merge_policy_has_no_gaps():
     assert ('farm_village_contribs', 'account_id') not in extra and ('farm_village_stall_lots', 'seller_account') not in extra
 
 
+TRAY = ['tea', 'pie', None, 'pancake', None, None]
+
+
+def test_tavern_opens_to_an_old_farm_and_cosmetics_follow_moscow_days():
+    async def scenario():
+        w = World()
+        await w.player('a', lv=1)
+        day = market.moscow_day(w.now[0])
+        assert (await w.build('a'))['tavern'] is None
+        with pytest.raises(FarmError, match='ещё строится'):
+            await w.cmd('a', 'tavern_serve', {'day': day, 'cells': TRAY})
+        await w.force('stalls', status='done', stage=2, opened_at=T0)
+        await w.force('tavern', status='done', stage=2, opened_at=T0)
+        initial = await w.farm('a')
+        assert 'tavern' not in initial
+        assert (await w.build('a'))['tavern'] == {
+            'day': day, 'order': None, 'puzzle': {'done': False, 'stamps': 0, 'variant': 0}, 'toast': None,
+        }
+        with pytest.raises(FarmError, match='Олег'):
+            await w.cmd('a', 'tavern_serve', {'day': day, 'cells': ['tea', 'pie', 'pancake', None, None, None]})
+        assert 'tavern' not in await w.farm('a')
+        data = {'day': day, 'cells': TRAY}
+        cmd_id = key()
+        result = await w.cmd('a', 'tavern_serve', data, command_id=cmd_id)
+        assert await w.cmd('a', 'tavern_serve', data, command_id=cmd_id) == result
+        with pytest.raises(FarmError, match='уже получена'):
+            await w.cmd('a', 'tavern_serve', data)
+        await w.cmd('a', 'tavern_toast', {'day': day, 'toast': 'dill'})
+        with pytest.raises(FarmError, match='уже выбран'):
+            await w.cmd('a', 'tavern_toast', {'day': day, 'toast': 'foam'})
+        owner = (await w.view('a'))['farm']
+        assert 'tavern' not in owner
+        assert owner['village_build']['tavern']['toast'] == 'dill'
+        after = await w.farm('a')
+        assert {k: after[k] for k in ('coins', 'xp', 'inventory')} == {k: initial[k] for k in ('coins', 'xp', 'inventory')}
+
+        w.now[0] = (day + 1) * DAY - market.TZ_OFFSET
+        fresh = (await w.build('a'))['tavern']
+        assert fresh['day'] == day + 1 and fresh['toast'] is None
+        assert fresh['puzzle'] == {'done': False, 'stamps': 1, 'variant': 0}
+        with pytest.raises(FarmError, match='новый день'):
+            await w.cmd('a', 'tavern_serve', data)
+        await w.cmd('a', 'tavern_serve', {'day': day + 1, 'cells': [None, None, 'pancake', 'tea', 'pie', None]})
+        assert (await w.build('a'))['tavern']['puzzle'] == {'done': True, 'stamps': 2, 'variant': 0}
+
+    run(scenario())
+
+
+def test_tavern_rejects_changed_or_unavailable_orders_without_spending_stock():
+    async def scenario():
+        w = World()
+        await w.player('a', lv=2)
+        await w.build('a')
+        await w.force('stalls', status='done', stage=2, opened_at=T0)
+        await w.force('tavern', status='done', stage=2, opened_at=T0)
+        await w.cmd('a', 'build', {'type': 'bakery', 'x': 6, 'y': 3})
+        current = (await w.build('a'))['tavern']
+        order = current['order']
+        assert any(order['item'] in recipe['outputs'] for recipe in RECIPES.values()
+                   if recipe['building'] == 'bakery' and recipe['level'] <= 2)
+        assert order['qty'] == 1 and not order['done']
+        assert order['coins'] == (ceil(ITEMS[order['item']]['price'] * 1.45) + 6) * 4 // 5
+        payload = {'day': current['day'], 'item': order['item']}
+        before = await w.farm('a')
+        with pytest.raises(FarmError, match='Заказ изменился'):
+            await w.cmd('a', 'tavern_order', {**payload, 'item': 'pie'})
+        with pytest.raises(FarmError, match='Не хватает'):
+            await w.cmd('a', 'tavern_order', payload)
+        assert await w.farm('a') == before
+        await w.grant('a', {order['item']: 2})
+        await w.cmd('a', 'tavern_order', payload)
+        after = await w.farm('a')
+        assert after['inventory'][order['item']] == 1
+        assert after['coins'] - before['coins'] == order['coins'] and after['xp'] == before['xp']
+        assert (await w.build('a'))['tavern']['order'] == {**order, 'done': True}
+
+    run(scenario())
+
+
 # ----------------------------------------------------------------------------------------------------------- PostgreSQL
 from tests.test_farm_platform import (  # noqa: E402
-    FARM_HEADERS, accepted, command, environment, farm_pg_url, player, raw_farm, view)
+    FARM_HEADERS, accepted, command, environment, farm_pg_url, ledger, player, raw_farm, receipts, view)
 from qw_farm.persistence import Unit  # noqa: E402
 
 
@@ -547,6 +627,67 @@ async def pg_project(env, pid):
         unit = Unit(session, env.schema)
         t = unit.t['projects']
         return dict((await unit.execute(sa.select(t).where(t.c.id == pid))).mappings().first())
+
+
+def test_postgres_tavern_replays_and_two_tabs_grant_each_daily_action_once(farm_pg_url):
+    async def scenario():
+        async with environment(farm_pg_url) as env, player(env) as actor, player(env, 'telegram') as neighbor:
+            await pg_ready(env, actor, lv=2)
+            await accepted(actor, 'build', {'type': 'bakery', 'x': 6, 'y': 3})
+            async with env.db.transaction() as session:
+                unit = Unit(session, env.schema)
+                projects = unit.t['projects']
+                await unit.execute(projects.update().where(projects.c.id.in_(['stalls', 'tavern'])).values(
+                    status='done', stage=2, opened_at=env.now[0]))
+                farm = await unit.by_account(actor.account_id)
+                farm['settings']['visibility'] = 'public'
+                await unit.save(farm)
+
+            current = (await view(actor))['village_build']['tavern']
+            day, order = current['day'], current['order']
+            async with env.db.transaction() as session:
+                unit = Unit(session, env.schema)
+                farm = await unit.by_account(actor.account_id)
+                farm['inventory'][order['item']] = 2
+                await unit.save(farm)
+            before = await raw_farm(env, actor)
+            neighbor_view = await view(neighbor, actor.farm_id)
+            assert 'village_build' not in neighbor_view and 'tavern' not in neighbor_view
+            denied = await command(neighbor, 'tavern_serve', {'day': day, 'cells': TRAY}, target=actor.farm_id)
+            assert denied.status_code == 403 and denied.json()['code'] == 'not_owner'
+
+            for kind, extra, expected_error in (
+                ('tavern_order', {'item': order['item']}, 'tavern_order_done'),
+                ('tavern_serve', {'cells': TRAY}, 'tavern_puzzle_done'),
+                ('tavern_toast', {'toast': 'harvest'}, 'tavern_toast_done'),
+            ):
+                data = {'day': day, **extra}
+                keys = (f'{kind}:tab-a', f'{kind}:tab-b')
+                responses = await asyncio.gather(*(command(actor, kind, data, key=k) for k in keys))
+                assert sorted(r.status_code for r in responses) == [200, 409]
+                winner = next(i for i, r in enumerate(responses) if r.status_code == 200)
+                assert responses[1 - winner].json()['code'] == expected_error
+                assert await accepted(actor, kind, data, key=keys[winner]) == responses[winner].json()
+                assert len(await receipts(env, actor.account_id, keys[winner])) == 1
+                assert not await receipts(env, actor.account_id, keys[1 - winner])
+                entries = await ledger(env, key=keys[winner])
+                assert len(entries) == 1 and entries[0]['kind'] == kind
+                assert entries[0]['coins_delta'] == (order['coins'] if kind == 'tavern_order' else 0)
+                assert entries[0]['xp_delta'] == 0
+
+            after = await raw_farm(env, actor)
+            assert after['inventory'][order['item']] == before['inventory'][order['item']] - 1
+            persisted = (await view(actor))['village_build']['tavern']
+            assert persisted == dict(day=day, order={**order, 'done': True},
+                                     puzzle=dict(done=True, stamps=1, variant=0), toast='harvest')
+            env.now[0] = (day + 1) * DAY - market.TZ_OFFSET
+            stale = await command(actor, 'tavern_order', {'day': day, 'item': order['item']})
+            assert stale.status_code == 409 and stale.json()['code'] == 'tavern_stale_day'
+            next_day = (await view(actor))['village_build']['tavern']
+            assert next_day['day'] == day + 1 and next_day['toast'] is None and not next_day['order']['done']
+            assert next_day['puzzle'] == dict(done=False, stamps=1, variant=0)
+
+    run(scenario())
 
 
 def test_postgres_two_players_close_the_same_stage_at_once(farm_pg_url):

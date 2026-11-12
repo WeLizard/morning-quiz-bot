@@ -105,7 +105,7 @@ test('app.js wiring: the field card button, the confirm texts, the upkeep wordin
  assert.ok(/\.field-cancel\{min-height:44px\}/.test(css)&&css.indexOf('.field-cancel{')<css.indexOf('«Контрастный режим» (UI_RULES'));
 });
 
-test('the compost heap upgrade button is hidden when the catalog says kind null (the real upgradeCard function)',()=>{
+test('the compost heap offers one upgrade with its catalog cost and handles old catalogs',()=>{
  const app=read('qw_farm/static/app.js');
  const src=app.slice(app.indexOf('function upgradeCard'),app.indexOf('const barnBonus'));
  const made=[];
@@ -124,4 +124,30 @@ test('the compost heap upgrade button is hidden when the catalog says kind null 
  made.length=0;p.kids.length=0;
  fn({type:'dairy',level:1},p);
  assert.ok(JSON.stringify(made[0].kids).includes('Улучшить'),'other buildings still upgrade');
+
+ const upgrade={coins:200,items:{hay:4,flour:4},level:4},calls=[];
+ env.NAV=require('../../qw_farm/static/farm_nav.js');
+ env.UP=()=>({kinds:{compost_heap:'compost'},max:3,costs:{compost_heap:{2:upgrade,3:null}}});
+ env.goods=items=>({items});
+ env.button=(button,click,cls,dis)=>({button,click,dis});
+ env.command=(...args)=>calls.push(args);
+ const upgraded=new Function(...Object.keys(env),`${src}\nreturn upgradeCard;`)(...Object.values(env));
+ const heap={id:'heap',revision:17,type:'compost_heap',level:1};
+ upgraded(heap,p);
+ assert.equal(p.kids.at(-1).kids.find(x=>x.button).dis,true);
+ env.S.me={level:4,coins:200};
+ upgraded(heap,p);
+ const offered=p.kids.at(-1);
+ assert.equal(offered.text,'Экономная закладка');
+ assert.deepEqual(offered.kids.find(x=>x.items).items,{hay:4,flour:4});
+ const action=offered.kids.find(x=>x.button);
+ assert.equal(action.button,'Улучшить · 200 мон.');
+ assert.equal(action.dis,false);
+ action.click();
+ assert.deepEqual(calls,[['upgrade',{object:'heap',revision:17}]]);
+ for(const level of [2,3]){
+  upgraded({...heap,level},p);
+  assert.equal(p.kids.at(-1).text,'Экономная закладка');
+  assert.ok(!p.kids.at(-1).kids.some(x=>x.button));
+ }
 });

@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import market, progression, economy, fields, projects, trip_games, swans, festivals, horseman, textile, merchant, orchard, meadow, fertilizer
+from . import catalog, market, progression, economy, fields, projects, trip_games, swans, festivals, horseman, textile, merchant, orchard, meadow, fertilizer, plantations
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -47,6 +47,12 @@ SCHEMAS.update(horseman.SCHEMAS)
 SCHEMAS.update(textile.SCHEMAS)  # lessons of Кошка Соня: lesson_deliver
 SCHEMAS.update(merchant.SCHEMAS)  # Сорока-коробейница: merchant_buy, merchant_sell
 SCHEMAS.update(orchard.SCHEMAS)  # fruit orchard: plant_tree, tree_care
+
+
+def command_schema(kind):
+    if catalog.PLANTATIONS_WIRED and kind in plantations.SCHEMAS:
+        return plantations.SCHEMAS[kind]
+    return SCHEMAS.get(kind)
 
 
 def upgrade_state(farm, now=None):
@@ -169,13 +175,20 @@ def ordered_objects(farm):
     return sorted(farm['objects'], key=lambda x: x['id'])
 
 
+def recipe_inputs(obj, recipe):
+    upgrade_level = recipe.get('upgrade_level')
+    if upgrade_level is not None and effective_level(obj.get('level')) >= upgrade_level:
+        return recipe['upgrade_inputs']
+    return recipe['inputs']
+
+
 def make_job(obj, recipe, at, speed, job_id, farm=None):
     """The one place that builds a queued recipe, used by the manual command and by the artisans."""
     start = max([at] + [j['ready_at'] for j in obj['jobs']])
     level_speed = 1 if recipe.get('no_level_speedup') else RECIPE_SPEED[effective_level(obj.get('level'))]
     seconds = duration(recipe['seconds'] * level_speed, speed, farm)
     return dict(id=job_id, recipe=recipe['id'], starts_at=start, ready_at=start + seconds, seconds=seconds,
-                inputs=deepcopy(recipe['inputs']), outputs=deepcopy(recipe['outputs']), xp=recipe['xp'], version=VERSION)
+                inputs=deepcopy(recipe_inputs(obj, recipe)), outputs=deepcopy(recipe['outputs']), xp=recipe['xp'], version=VERSION)
 
 
 def memory_cap(obj):
@@ -269,7 +282,7 @@ def restartable(farm, obj, lv):
     for step in range(len(mem)):
         recipe = RECIPES.get(mem[(obj.get('recipe_cursor', 0) + step) % len(mem)])
         if (recipe and recipe['building'] == obj['type'] and textile.recipe_level(farm, recipe) <= lv
-                and all(farm['inventory'].get(k, 0) >= q for k, q in recipe['inputs'].items())):
+                and all(farm['inventory'].get(k, 0) >= q for k, q in recipe_inputs(obj, recipe).items())):
             return recipe
     return None
 
@@ -302,11 +315,13 @@ def plan_repeats(farm, area, mode):
                 if mode == 'repeat_once' and recipe_id in item['used']:
                     continue
                 recipe = RECIPES.get(recipe_id)
-                if (recipe is None or recipe['building'] != obj['type'] or textile.recipe_level(farm, recipe) > lv
-                        or any(stock.get(key, 0) < qty for key, qty in recipe['inputs'].items())):
+                if recipe is None or recipe['building'] != obj['type'] or textile.recipe_level(farm, recipe) > lv:
+                    continue
+                inputs = recipe_inputs(obj, recipe)
+                if any(stock.get(key, 0) < qty for key, qty in inputs.items()):
                     continue
                 starts.append(dict(object=obj['id'], recipe=recipe_id))
-                for key, qty in recipe['inputs'].items():
+                for key, qty in inputs.items():
                     stock[key] = stock.get(key, 0) - qty
                 item['slots'] -= 1
                 item['used'].add(recipe_id)
@@ -333,7 +348,7 @@ def plan_repeats(farm, area, mode):
                 recipe = RECIPES.get(rid)
                 if recipe is None or recipe['building'] != obj['type'] or textile.recipe_level(farm, recipe) > lv:
                     reasons.add('locked_recipe')
-                elif any(stock.get(key, 0) < qty for key, qty in recipe['inputs'].items()):
+                elif any(stock.get(key, 0) < qty for key, qty in recipe_inputs(obj, recipe).items()):
                     reasons.add('ingredients')
     return dict(starts=starts, reasons=sorted(reasons))
 
@@ -494,8 +509,9 @@ def _craft_collects_fit(farm, ordered, box, shift, at, action_units, candidate):
 
 
 def _start_craft(farm, obj, recipe, at, speed, job_id, log, worker):
-    inventory(farm, recipe['inputs'], -1)
-    obj['jobs'].append(make_job(obj, recipe, at, speed, job_id))
+    job = make_job(obj, recipe, at, speed, job_id)
+    inventory(farm, job['inputs'], -1)
+    obj['jobs'].append(job)
     mark_started(obj, recipe['id'])
     obj['revision'] += 1
     if log is not None:
@@ -577,7 +593,7 @@ GENITIVE = dict(
     juicery='соковарни', noodle_shop='макаронной мастерской', oil_press='маслобойни', sausage_shop='колбасного цеха',
     smokehouse='коптильни', soapery='мыловарни', syrupery='сироповарни', tailor='швейной мастерской',
     teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой', dryer='сушильни', cellar='погребка',
-    compost_heap='компостной кучи')
+    compost_heap='компостной кучи', tea_factory='чайной фабрики')
 
 
 def craft_text(rows):
@@ -695,8 +711,8 @@ def _bulk(farm, kind, data, now, speed, command_id):
         for index, entry in enumerate(starts):
             obj = by_id[entry['object']]
             recipe = RECIPES[entry['recipe']]
-            inventory(farm, recipe['inputs'], -1)
             job = make_job(obj, recipe, now, speed, f'bulk-{command_id}-{index}', farm)
+            inventory(farm, job['inputs'], -1)
             job['manual'] = True
             obj['jobs'].append(job)
             mark_started(obj, recipe['id'])
@@ -750,8 +766,9 @@ def _bulk(farm, kind, data, now, speed, command_id):
             if obj['type'] in WORKSHOP_TYPES and in_zone(obj, box):
                 recipe = restartable(farm, obj, lv)
                 if recipe:
-                    inventory(farm, recipe['inputs'], -1)
-                    obj['jobs'].append(make_job(obj, recipe, now, speed, f'bulk-{command_id}-{done}', farm))
+                    job = make_job(obj, recipe, now, speed, f'bulk-{command_id}-{done}', farm)
+                    inventory(farm, job['inputs'], -1)
+                    obj['jobs'].append(job)
                     mark_started(obj, recipe['id'])
                     obj['revision'] += 1
                     done += 1
@@ -792,6 +809,10 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_c
         return text
     if kind in orchard.SCHEMAS:
         text = orchard.apply(farm, kind, data, now, command_id, speed)
+        event(farm, now, text, kind)
+        return text
+    if kind in plantations.SCHEMAS:
+        text = plantations.apply(farm, kind, data, now, speed)
         event(farm, now, text, kind)
         return text
     if kind == 'fert_toggle':
@@ -991,6 +1012,7 @@ def validate_expansion(farm):
     textile.validate(farm)
     merchant.validate(farm)
     orchard.validate(farm)
+    plantations.validate(farm)
     fertilizer.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),

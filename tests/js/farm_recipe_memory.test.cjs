@@ -1,14 +1,15 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const NAV=require('../../qw_farm/static/farm_nav.js');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../../qw_farm/static/app.js'),'utf8');
 const fn=name=>{const a=source.indexOf(`function ${name}(`);let d=0,k=source.indexOf('{',a);for(;;k++){if(source[k]==='{')d++;else if(source[k]==='}'&&--d===0)break;}return source.slice(a,k+1)+';\n';};
 const code=source.slice(source.indexOf('function renderObject(p)'),source.indexOf('async function visit(id)'))+['recipeMemory','repeatToggle','bulkCounts','bulkRepeatPlan','jobRefund','confirmCancelJob'].map(fn).join('');
 class Node{constructor(text,cls){this.textContent=text;this.className=cls;this.children=[];this.dataset={};this.attributes={};this.classList={add:c=>{this.className=[this.className,c].filter(Boolean).join(' ');}};}append(...n){this.children.push(...n);}setAttribute(k,v){this.attributes[k]=String(v);}getAttribute(k){return this.attributes[k]??null;}all(){return this.children.flatMap(c=>c instanceof Node?[c,...c.all()]:[]);}}
 const recipes={bread:{id:'bread',building:'bakery',name:'Хлеб',inputs:{wheat:1},outputs:{bread:1},seconds:20,level:1},pie:{id:'pie',building:'bakery',name:'Пирог',inputs:{wheat:2},outputs:{pie:1},seconds:30,level:1},cake:{id:'cake',building:'bakery',name:'Торт',inputs:{wheat:9},outputs:{cake:1},seconds:30,level:5},rye_flour:{id:'rye_flour',building:'mill',name:'Ржаная мука',inputs:{rye:1},outputs:{rye_flour:1},seconds:20,level:1},linen:{id:'linen',building:'loom',name:'Лён',inputs:{flax:1},outputs:{linen:1},seconds:20,level:1}};
-function setup(o,{helpers={},helperCatalog={},animals={},canAfford=()=>true}={}){
+function setup(o,{helpers={},helperCatalog={},animals={},canAfford=()=>true,recipeCatalog=recipes}={}){
  const p=new Node(),calls=[],notes=[],modals=[];
- const ctx={S:{selected:o.id,farm:{objects:[o]},me:{level:10,coins:100,inventory:{wheat:3},objects:[o],helpers},catalog:{animals:{},recipes,buildings:{},helpers:helperCatalog}},
+ const ctx={NAV,S:{selected:o.id,farm:{objects:[o]},me:{level:10,coins:100,inventory:{wheat:3},objects:[o],helpers},catalog:{animals:{},recipes:recipeCatalog,buildings:{},helpers:helperCatalog}},
   own:()=>true,heading:()=>{},objName:()=>'bakery',buildingPurpose:()=>[],lvlOf:()=>1,slotsOf:()=>5,now:()=>100,note:t=>notes.push(t),upgradeCard:()=>{},renderVisitActions:()=>{},speedOf:()=>1,
-  el:(tag,text,cls)=>new Node(text,cls),card:()=>new Node(),goods:()=>new Node(),timer:()=>new Node(),itemName:x=>x,duration:x=>x,stock:()=>0,batchOf:()=>({inputs:{feed:1},outputs:{egg:1},seconds:20}),
+  el:(tag,text,cls)=>new Node(text,cls),card:()=>new Node(),goods:items=>new Node(JSON.stringify(items),'goods'),timer:()=>new Node(),itemName:x=>x,duration:x=>x,stock:()=>0,batchOf:()=>({inputs:{feed:1},outputs:{egg:1},seconds:20}),
   document:{createElementNS:()=>new Node()},checkbox:()=>[new Node(),new Node()],
   button:(text,fn,cls,disabled=false)=>{const n=new Node(text,cls);n.disabled=disabled;n.onclick=fn;return n;},command:(...a)=>calls.push(a),safe:fn=>fn,modal:(title,text,buttons)=>modals.push({title,text,buttons}),
   $:()=>({close(){}}),undoFull:()=>true,undoLeft:()=>0,undoRules:()=>({late_refund_pct:50}),inArea:()=>true,enough:canAfford};
@@ -16,6 +17,19 @@ function setup(o,{helpers={},helperCatalog={},animals={},canAfford=()=>true}={})
  vm.createContext(ctx);vm.runInContext(code,ctx);return {ctx,p,calls,notes,modals};
 }
 const workshop=extra=>({id:'w1',type:'bakery',jobs:[],level:1,...extra});
+test('compost recipe and helper use the same per-heap inputs and fixed duration',()=>{
+ const compost={id:'compost',name:'Компост',building:'compost_heap',inputs:{manure:2,grass:1},upgrade_inputs:{manure:1,grass:1},upgrade_level:2,outputs:{compost:2},seconds:28800,no_level_speedup:true,level:1};
+ for(const level of [1,2,3]){
+  const h=setup(workshop({type:'compost_heap',level,recipes_memory:['compost']}),{recipeCatalog:{compost},canAfford:items=>items.manure<=1,helpers:{master:{shift:{status:'working',until:101,remaining:1}}},helperCatalog:{master:{role:'craft'}}});
+  h.ctx.speedOf=()=>0.7;
+  h.ctx.renderObject(h.p);
+  const row=h.p.all().find(n=>n.className==='qw-action-row recipe-row');
+  assert.deepEqual(JSON.parse(row.all().find(n=>n.className==='goods').textContent),{manure:level===1?2:1,grass:1});
+  assert.equal(row.all().find(n=>n.className==='recipe-time').textContent,'→ compost ×2 · 28800');
+  assert.equal(row.all().find(n=>n.className==='secondary recipe-go').disabled,level===1);
+  assert.equal(h.notes.includes('Повтор ждёт сырьё.'),level===1);
+ }
+});
 test('each workshop batch exposes the same accessible repeat control before its action',()=>{
  const h=setup(workshop({recipes_memory:['bread','pie'],last_recipe:'pie'}));h.ctx.renderObject(h.p);
  assert.ok(h.notes.some(t=>t==='Автоповтор включён: Хлеб, Пирог.'),h.notes.join('|'));

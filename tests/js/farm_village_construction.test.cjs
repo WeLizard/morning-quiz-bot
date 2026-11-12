@@ -9,6 +9,7 @@ const load=()=>import(pathToFileURL(path.join(stat,'construction.js')).href);
 class Node{
  constructor(tag,text,cls){this.tag=tag;this.textContent=text||'';this.className=cls||'';this.children=[];this.dataset={};this.attrs={};this.value='';this.classList={add:c=>this.className+=' '+c};}
  append(...nodes){this.children.push(...nodes);if(this.tag==='select'&&!this.value)this.value=nodes[0]?.value||'';}
+ replaceChildren(...nodes){this.children=nodes;}
  setAttribute(k,v){this.attrs[k]=v;}
 }
 const walk=n=>[n,...n.children.flatMap(walk)];
@@ -32,7 +33,8 @@ function harness(v,meOver={}){
   itemName:id=>({wood:'Древесина',bread:'Хлеб'}[id]||id),fmt:n=>String(n),now:()=>1000,timer:t=>{const s=el('span',String(t));return s;},
   command:async(kind,data,target)=>{calls.push([kind,data,target]);return true;},modal:(...a)=>dialogs.push(a),close(){h.closed=true;},toast:t=>toasts.push(t),
   isBound:id=>id==='bound_seed',open:s=>log.push(['open',s]),resident:n=>log.push(['resident',n]),merchant:()=>log.push(['merchant']),
-  festival:()=>log.push(['festival']),post:()=>log.push(['post']),warehouse:()=>log.push(['warehouse'])};
+  festival:()=>log.push(['festival']),post:()=>log.push(['post']),warehouse:()=>log.push(['warehouse']),
+  icon:id=>el('svg',id),goods:needs=>el('div',JSON.stringify(needs)),bulletin:source=>log.push(['bulletin',source])};
  h.panel=el('div');
  return {h,me,calls,dialogs,toasts,log};
 }
@@ -54,6 +56,51 @@ test('pure helpers: need rows, percent, time, site captions and the tier gap',as
  assert.deepEqual(C.lotPriceRange(29),[29,43]);
  assert.deepEqual(C.energyChoice({berry_charge:20},['berry_charge'],86400),{item:'berry_charge',qty:12});
  assert.equal(C.energyChoice({},['berry_charge'],86400),null);assert.equal(C.energyChoice({berry_charge:2},['berry_charge'],3600),null);
+});
+
+test('tavern keeps tray placements through reload and resets them on the next day',async t=>{
+ const {createConstruction}=await load();
+ const values=new Map(),descriptor=Object.getOwnPropertyDescriptor(globalThis,'sessionStorage');
+ Object.defineProperty(globalThis,'sessionStorage',{configurable:true,value:{
+  getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),
+ }});
+ t.after(()=>{
+  if(descriptor)Object.defineProperty(globalThis,'sessionStorage',descriptor);
+  else delete globalThis.sessionStorage;
+ });
+ const tavern={day:5,order:{item:'bread',qty:2,coins:40,done:false},puzzle:{done:false,stamps:0},toast:null};
+ const v=build({projects:[project({id:'tavern',name:'Трактир',status:'done'})],tavern});
+ const {h,calls,log}=harness(v);
+ const render=()=>{h.panel.replaceChildren();createConstruction(h).render(h.panel,'site:tavern');};
+ const by=(key,value)=>buttons(h.panel).find(b=>b.dataset[key]===value);
+ render();
+ assert.deepEqual(log[0],['heading','Игривая кобыла']);
+ await by('tavernOrder','').onclick();
+ await by('villageFocus','bulletin').onclick();
+ assert.deepEqual(log.at(-1),['bulletin','site:tavern']);
+ by('tavernPiece','pie').onclick();
+ by('tavernCell','0').onclick();
+ by('tavernPiece','tea').onclick();
+ by('tavernCell','1').onclick();
+ by('tavernCell','0').onclick();
+ by('tavernCell','1').onclick();
+ render();
+ assert.match(by('tavernCell','0').attrs['aria-label'],/Чай/);
+ assert.match(by('tavernCell','1').attrs['aria-label'],/Пирог/);
+ assert.equal(by('tavernServe','').disabled,true);
+ by('tavernPiece','pancake').onclick();
+ by('tavernCell','3').onclick();
+ await by('tavernServe','').onclick();
+ await by('tavernToast','dill').onclick();
+ assert.deepEqual(calls.map(([kind,data])=>[kind,data]),[
+  ['tavern_order',{day:5,item:'bread'}],
+  ['tavern_serve',{day:5,cells:['tea','pie',null,'pancake',null,null]}],
+  ['tavern_toast',{day:5,toast:'dill'}],
+ ]);
+ tavern.day++;
+ render();
+ assert.match(by('tavernCell','0').attrs['aria-label'],/Пусто/);
+ assert.equal(by('tavernServe','').disabled,true);
 });
 
 test('site sheet in the collecting stage: needs, one primary button, contribute sends exactly the inputs',async()=>{
@@ -137,7 +184,7 @@ test('rows: closed before the building is done; open shows stalls, lots and own 
 test('wiring: assets, stylesheet, map sites are buttons, the market sign leads to the rows once built',()=>{
  const app=fs.readFileSync(path.join(stat,'app.js'),'utf8'),api=fs.readFileSync(path.join(stat,'../api.py'),'utf8'),index=fs.readFileSync(path.join(stat,'index.html'),'utf8');
  assert.match(api,/'construction\.js'/);assert.match(api,/'construction\.css'/);assert.match(index,/assets\/construction\.css/);
- assert.match(app,/from '\.\/construction\.js'/);
+ assert.match(app,/from '\.\/construction\.js(?:\?[^']+)?'/);
  assert.match(app,/const VILLAGE_SITES=\[\['stalls','Торговые ряды'/);
  assert.match(app,/'village-site village-site-btn'/);
  assert.match(app,/id==='market'&&typeof CONSTR!=='undefined'&&CONSTR\.rowsOpen\(\)\?villageGo\(\[x,y\+2\.4\],\(\)=>openVillageConstruction\('rows'\),e\)/);

@@ -12,7 +12,7 @@ from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, oleg, progression, trip_games, festivals
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
-from . import wagers, friend_requests, construction
+from . import wagers, friend_requests, construction, tavern
 from application import farm_village_games
 from .upkeep_config import effective_values as effective_upkeep_config
 
@@ -452,7 +452,7 @@ class FarmService:
             target_id=str(UUID(str(target_id or me['id'])))
         except (ValueError,TypeError,AttributeError):
             raise FarmError('not_found','Ферма не найдена.',404)
-        if kind in {'wager_start','wager_choose','oleg_start','oleg_answer'} | farm_village_games.COMMANDS:
+        if kind in {'wager_start','wager_choose','oleg_start','oleg_answer'} | farm_village_games.COMMANDS | tavern.SCHEMAS.keys():
             need(target_id==me['id'],'not_owner','Это не твоя ферма.',403)
         # UUID spelling must not create two different advisory locks for the
         # same row (uppercase/lowercase or alternate UUID notation).
@@ -548,8 +548,9 @@ class FarmService:
         elif kind in construction.COMMANDS:
             notice,ledger_kind=await construction.command(self.u,me,other,self.p.account_id,kind,data,now)
             event(me,now,notice,kind)
-            progression.touch(me,now)
-            economy.bill(me,now,upkeep_config)
+            if kind not in {'tavern_serve','tavern_toast'}:
+                progression.touch(me,now)
+                economy.bill(me,now,upkeep_config)
         else:
             notice=apply(me,other,kind,data,now,key,self.speed,self.p.address_form,upkeep_config)
         if kind in {'remove_neighbor','block'}:

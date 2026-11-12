@@ -1,8 +1,15 @@
 // Village construction and the market rows (docs/tasks/FARM_VILLAGE_CONSTRUCTION.md). The server owns every number
 // (qw_farm/construction.py, S.me.village_build); this module only shows them and sends build_contribute / build_speedup /
-// stall_list / stall_buy / stall_cancel. Existing components only (card, qw-btn, meter); no art of its own.
+// stall_list / stall_buy / stall_cancel and tavern commands. Existing components only, no art of its own.
 const STAGE_LOWER=['котлован','каркас','отделка'];
 const TIER_ICON=['','①','②','③'];
+const TAVERN_NAME='Игривая кобыла';
+const TRAY_DISHES={pie:'Пирог',tea:'Чай',pancake:'Оладьи'};
+const TAVERN_TOASTS={
+ harvest:'За урожай!',
+ dill:'За тех, кто посадил укроп и нашёл его весной!',
+ foam:'Чтоб пенка выше забора!',
+};
 
 export const view=me=>me?.village_build||null;
 export const project=(v,id)=>(v?.projects||[]).find(p=>p.id===id)||null;
@@ -82,7 +89,159 @@ export function createConstruction(h){
  const v=()=>view(h.me());
  const earned=()=>Math.max(0,(h.me()?.coins||0)-(h.me()?.starter_credit||0));
  const bands=()=>h.catalog()?.economy?.income_ref||[];
- const label=(id,fallback)=>siteLabel(project(v(),id),fallback,h.now());
+ const label=(id,fallback)=>id==='tavern'&&project(v(),id)?.status==='done'&&v()?.tavern
+  ?TAVERN_NAME:siteLabel(project(v(),id),fallback,h.now());
+ let trayDraft=null;
+
+ function draftFor(day){
+  const key=`qw-farm.tavern-tray.${h.me().id}`;
+  if(trayDraft?.key===key&&trayDraft.day===day)return trayDraft;
+  let cells=Array(6).fill(null);
+  try{
+   const saved=JSON.parse(sessionStorage.getItem(key));
+   const candidate=saved?.cells;
+   if(saved?.day===day&&Array.isArray(candidate)&&candidate.length===6){
+    const dishes=candidate.filter(id=>id!==null);
+    if(dishes.every(id=>Object.hasOwn(TRAY_DISHES,id))&&new Set(dishes).size===dishes.length)cells=candidate;
+   }
+  }catch{}
+  trayDraft={key,day,cells,selected:null};
+  return trayDraft;
+ }
+
+ function tavernControl(button,key){
+  button.dataset.villageFocus=key;
+  return button;
+ }
+
+ function tavernStatus(text,key){
+  const status=tavernControl(h.el('p',text,'note'),key);
+  status.tabIndex=-1;
+  return status;
+ }
+
+ function renderTavernOrder(parent,day,order){
+  const card=h.card('Заказ дня',order?`${h.itemName(order.item)} ×${order.qty}`:null,order?.item||'orders');
+  if(!order){
+   h.note('Заказ появится, когда на ферме откроется подходящий рецепт.',card);
+  }else if(order.done){
+   card.append(tavernStatus(`Заказ сдан · +${h.fmt(order.coins)} мон.`,'tavern-order'));
+  }else{
+   const stock=h.me().inventory?.[order.item]||0;
+   card.append(h.goods({[order.item]:order.qty}));
+   const send=tavernControl(h.button(`Сдать заказ · +${h.fmt(order.coins)} мон.`,
+    ()=>h.command('tavern_order',{day,item:order.item}),'qw-btn secondary wide',stock<order.qty),'tavern-order');
+   send.dataset.tavernOrder='';
+   card.append(send);
+   if(stock<order.qty)h.note('На складе пока не хватает блюда.',card);
+  }
+  parent.append(card);
+ }
+
+ function renderTray(parent,day,puzzle){
+  const card=h.card('Поднос с характером','Бесплатно · без таймера','pie');
+  const stamps=h.el('p',`Печатей собрано: ${h.fmt(puzzle.stamps)}`,'note');
+  stamps.dataset.tavernStamps='';
+  if(puzzle.done){
+   const success=tavernStatus('✓ Поднос пережил смену','tavern-serve');
+   success.dataset.tavernStamp='';
+   card.append(success,stamps);
+   parent.append(card);
+   return;
+  }
+
+  const rules=h.el('ul',null,'note tavern-rules');
+  for(const rule of [
+   'Пух просит пирог в середину ряда.',
+   'Соня хочет чай на соседней клетке слева от пирога.',
+   'Олег просит оладьи в другой ряд, подальше от крошек.',
+  ])rules.append(h.el('li',rule));
+  card.append(rules);
+
+  const draft=draftFor(day);
+  const palette=h.el('div',null,'qw-btn-row tavern-grid');
+  palette.setAttribute('role','group');
+  palette.setAttribute('aria-label','Блюда для подноса');
+  const pieces=Object.entries(TRAY_DISHES).map(([id,name])=>{
+   const button=tavernControl(h.button(null,()=>{
+    draft.selected=draft.selected===id?null:id;
+    syncBoard();
+   },'qw-btn tavern-dish'),`tavern-piece-${id}`);
+   button.dataset.tavernPiece=id;
+   button.append(h.icon(id),h.el('span',name));
+   palette.append(button);
+   return button;
+  });
+
+  const tray=h.el('div',null,'qw-btn-row tavern-grid tavern-tray');
+  tray.setAttribute('role','group');
+  tray.setAttribute('aria-label','Поднос, два ряда по три клетки');
+  const slots=draft.cells.map((_,index)=>{
+   const button=tavernControl(h.button(null,()=>{
+    const at=draft.cells[index];
+    if(draft.selected&&at!==draft.selected){
+     const previous=draft.cells.indexOf(draft.selected);
+     if(previous>=0)draft.cells[previous]=at;
+     draft.cells[index]=draft.selected;
+     try{sessionStorage.setItem(draft.key,JSON.stringify({day,cells:draft.cells}));}catch{}
+     draft.selected=null;
+    }else{
+     draft.selected=at===draft.selected?null:at;
+    }
+    syncBoard();
+   },'qw-btn tavern-dish'),`tavern-cell-${index}`);
+   button.dataset.tavernCell=String(index);
+   tray.append(button);
+   return button;
+  });
+  const hint=h.el('p',null,'note tavern-hint');
+  hint.setAttribute('role','status');
+  const send=tavernControl(h.button('Подать',()=>h.command('tavern_serve',{day,cells:[...draft.cells]}),
+   'qw-btn primary wide'),'tavern-serve');
+  send.dataset.tavernServe='';
+
+  function syncBoard(){
+   for(const button of pieces)button.setAttribute('aria-pressed',String(button.dataset.tavernPiece===draft.selected));
+   slots.forEach((button,index)=>{
+    const id=draft.cells[index];
+    const name=id?TRAY_DISHES[id]:'Пусто';
+    button.replaceChildren(...(id?[h.icon(id)]:[]),h.el('span',name));
+    button.setAttribute('aria-label',`Ряд ${Math.floor(index/3)+1}, место ${index%3+1}. ${name}`);
+    button.setAttribute('aria-pressed',String(!!id&&id===draft.selected));
+   });
+   send.disabled=draft.cells.filter(Boolean).length!==3;
+   hint.textContent=draft.selected
+    ?`Выбрано: ${TRAY_DISHES[draft.selected]}. Нажми на клетку.`
+    :send.disabled?'Выбери блюдо, затем клетку. Блюда можно переставлять.':'Можно подать поднос или переставить блюда.';
+  }
+  syncBoard();
+  card.append(palette,tray,hint,send,stamps);
+  parent.append(card);
+ }
+
+ function renderTavern(parent,tavern){
+  h.heading(TAVERN_NAME,'Овёс не подаём. Сами едим');
+  renderTavernOrder(parent,tavern.day,tavern.order);
+  renderTray(parent,tavern.day,tavern.puzzle);
+  const mug=h.card('Кобыла в пене','Бесплатная кружка дня','fest_mas_tea');
+  if(tavern.toast){
+   mug.append(tavernStatus(TAVERN_TOASTS[tavern.toast],`tavern-toast-${tavern.toast}`));
+  }else{
+   h.note('Подними кружку и выбери тост.',mug);
+   const toasts=h.el('div',null,'qw-btn-stack');
+   for(const [toast,label] of Object.entries(TAVERN_TOASTS)){
+    const button=tavernControl(h.button(label,()=>h.command('tavern_toast',{day:tavern.day,toast}),'qw-btn secondary'),
+     `tavern-toast-${toast}`);
+    button.dataset.tavernToast=toast;
+    toasts.append(button);
+   }
+   mug.append(toasts);
+  }
+  parent.append(mug);
+  const reader=h.card('Почтальон Ёж','Читает «Вестник» за столиком');
+  reader.append(tavernControl(h.button('Деревенский вестник',()=>h.bulletin('site:tavern'),'qw-btn secondary wide'),'bulletin'));
+  parent.append(reader);
+ }
 
  function timeline(p,parent){
   const list=h.el('ol',null,'build-timeline');
@@ -140,8 +299,9 @@ export function createConstruction(h){
 
  function renderSite(p,id){
   const b=v();
-  h.heading(project(b,id)?.name||'Стройка','КРОТ С ЧЕРТЕЖОМ');
   const proj=project(b,id);
+  if(id==='tavern'&&proj?.status==='done'&&b.tavern)return renderTavern(p,b.tavern);
+  h.heading(proj?.name||'Стройка','КРОТ С ЧЕРТЕЖОМ');
   if(!b||!proj){h.note('Данные стройки пока недоступны. Обнови ферму.',p);return;}
   const c=h.card('Механик Крот',siteLabel(proj,proj.name,h.now()));
   p.append(c);
@@ -201,7 +361,7 @@ export function createConstruction(h){
   const post=h.card('Почтальон Ёж','Почтовое окно');post.classList.add('stall-card');
   h.note('Просьбы к соседям и «Вестник» на стене.',post);
   const postActions=h.el('div',null,'qw-btn-stack');
-  const news=h.button('Деревенский вестник',h.bulletin,'qw-btn secondary');news.dataset.villageFocus='bulletin';
+  const news=h.button('Деревенский вестник',()=>h.bulletin(),'qw-btn secondary');news.dataset.villageFocus='bulletin';
   postActions.append(news,h.button('Записка для Ежа',h.post,'qw-btn secondary'));post.append(postActions);p.append(post);
   p.append(h.button('Продать со склада',h.warehouse,'qw-btn secondary'));
   p.append(h.el('h3','Лавки игроков','subheading'));

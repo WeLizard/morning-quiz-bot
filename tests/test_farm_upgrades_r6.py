@@ -49,7 +49,7 @@ def test_catalog_validates_and_version_bumped():
 def test_every_workshop_and_animal_house_is_upgradable_decor_and_house_are_not():
     for b in {r['building'] for r in RECIPES.values()} - {'compost_heap'}:
         assert upgrade_kind(b) == 'workshop'
-    assert upgrade_kind('compost_heap') is None      # E27 B3: its batch is fixed, an upgrade only raised the upkeep
+    assert upgrade_kind('compost_heap') == 'compost'
     for b in {a['building'] for a in ANIMALS.values()}:
         assert upgrade_kind(b) in {'workshop', 'animals'}
     assert upgrade_kind('barn') == 'barn'

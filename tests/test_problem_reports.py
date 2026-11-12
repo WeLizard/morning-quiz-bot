@@ -62,6 +62,28 @@ def jpeg_with_exif(size=(40, 20), orientation=6):
 
 # ---------------------------------------------------------------- pure checks
 
+@pytest.fixture(autouse=True)
+def no_build_stamp(tmp_path, monkeypatch):
+    # A real build_info.json in the checkout must not leak into these tests.
+    monkeypatch.setattr(reports, 'BUILD_INFO_PATH', tmp_path / 'build_info.json')
+    monkeypatch.setattr(reports, '_build_cache', None)
+
+
+def test_build_stamp_file_wins_over_env(tmp_path, monkeypatch):
+    monkeypatch.setenv('MQB_BUILD_COMMIT', 'b37bfb2')
+    stamp = tmp_path / 'build_info.json'
+    stamp.write_text(json.dumps({'build': 'ce19da0-dirty;x', 'commit': 'ce19da0'}), encoding='utf-8')
+    assert reports.build_commit() == 'ce19da0-dirtyx'
+    assert reports.meta()['build'] == 'ce19da0-dirtyx'
+    stamp.write_text(json.dumps({'build': 'd00d123', 'stamped_at': 'later'}), encoding='utf-8')
+    os.utime(stamp, ns=(stamp.stat().st_atime_ns, stamp.stat().st_mtime_ns + 10**9))
+    assert reports.build_commit() == 'd00d123'
+    stamp.write_text('{broken', encoding='utf-8')
+    assert reports.build_commit() == 'b37bfb2'
+    stamp.unlink()
+    assert reports.build_commit() == 'b37bfb2'
+
+
 def test_meta_and_build_commit_are_sanitised(monkeypatch):
     monkeypatch.delenv('MQB_BUILD_COMMIT', raising=False)
     assert reports.meta() == {'build': 'unknown', 'text_max': 2000, 'images_max': 3,

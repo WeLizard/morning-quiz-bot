@@ -16,6 +16,7 @@ import ipaddress
 import json
 import math
 import os
+from pathlib import Path
 import re
 import weakref
 from uuid import UUID
@@ -48,9 +49,37 @@ _CONTROL = re.compile('[\x00-\x08\x0b-\x1f\x7f\u200e\u200f\u202a-\u202e\u2066-\u
 _BUILD = re.compile(r'[^0-9A-Za-z._-]')
 
 
+# Written by the deploy step (scripts/stamp_build.py) next to the deployed code, so the
+# version always matches the files actually running. The env var is only a fallback for
+# setups without the file (Docker build args, ad-hoc runs).
+BUILD_INFO_PATH = Path(__file__).resolve().parents[1] / 'build_info.json'
+_build_cache: tuple[tuple[int, int], str] | None = None
+
+
+def _clean_build(value) -> str:
+    return _BUILD.sub('', str(value or '').strip())[:40]
+
+
+def _build_from_file() -> str:
+    global _build_cache
+    try:
+        st = BUILD_INFO_PATH.stat()
+    except OSError:
+        return ''
+    key = (st.st_mtime_ns, st.st_size)
+    if _build_cache and _build_cache[0] == key:
+        return _build_cache[1]
+    try:
+        data = json.loads(BUILD_INFO_PATH.read_text(encoding='utf-8'))
+        value = _clean_build(data.get('build')) if isinstance(data, dict) else ''
+    except (OSError, ValueError):
+        value = ''
+    _build_cache = (key, value)
+    return value
+
+
 def build_commit() -> str:
-    value = _BUILD.sub('', (os.getenv('MQB_BUILD_COMMIT') or '').strip())[:40]
-    return value or 'unknown'
+    return _build_from_file() or _clean_build(os.getenv('MQB_BUILD_COMMIT')) or 'unknown'
 
 
 def meta() -> dict:

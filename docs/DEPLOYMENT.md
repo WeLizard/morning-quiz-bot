@@ -174,7 +174,13 @@ MINI_APP_DATABASE_URL=postgresql+asyncpg://... \
 `problem_reports` / `problem_report_images` (миграция 0033, скриншоты — JPEG в БД) и видны в
 админке в разделе «Отчёты». Шаг выкатки должен выставлять для `mqb-mini-app`:
 
-- `MQB_BUILD_COMMIT=$(git rev-parse --short HEAD)` — версия, которую клиент показывает в отчёте;
+- версия сборки, которую клиент показывает в отчёте, — **штамп выкладки**: последним шагом каждой
+  выкладки запусти `python scripts/stamp_build.py --remote <host>:<каталог приложения> --files <выложенные файлы>`.
+  Скрипт пишет `build_info.json` в корень приложения (`{build, commit, dirty, stamped_at, changed_files}`);
+  `build` = короткий HEAD, с суффиксом `-dirty`, если выложенные файлы отличаются от коммита.
+  Сервис читает файл при каждом запросе (кэш по mtime), перезапуск не нужен. Переменная
+  `MQB_BUILD_COMMIT` — только запасной вариант, когда файла нет (например, Docker); при наличии
+  файла она не действует;
 - `MQB_PROBLEM_REPORT_CHAT_ID=621817842` — чат владельца для уведомления (бот доставляет его
   через outbox, kinds `problem_report.text` и `problem_report.images`). Без переменной отчёты
   сохраняются, но уведомление не ставится.

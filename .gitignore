@@ -137,3 +137,6 @@ bot.pid
 
 # Web template backups
 web/templates/backup_*/
+
+# Deploy stamp, written by scripts/stamp_build.py
+/build_info.json

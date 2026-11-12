@@ -9,11 +9,13 @@ The mini app reads the version shown in problem reports from this file
     # local preview / inspect what would be written
     python scripts/stamp_build.py --print
 
-`build` is the short HEAD commit. With --remote the script compares every runtime
-file that exists on the server with that commit (line endings ignored) and appends
-`-dirty` when any differs, listing them in `changed_files`: deploys copy files from
-the working tree, so the server may hold changes no commit has. Locally the same
-check runs against the worktree.
+`build` is the short HEAD commit. With --remote the script lists the runtime files on
+the server (code, static files, migrations, minigames, requirements.txt) and compares
+them with that commit, ignoring line endings. `-dirty` is appended when the server
+differs: a file changed (`changed_files`), a file the commit lacks that git does not
+ignore (`extra_files`) or a committed file absent on the server (`missing_files`).
+Git-ignored files there (generated art, build outputs, local secrets) are only
+counted in `ignored_files`. Without --remote the same check runs on the worktree.
 """
 
 from __future__ import annotations
@@ -31,46 +33,63 @@ FILE_NAME = 'build_info.json'
 # Code the deployed services load; data, tests, docs and dev scripts are not compared.
 RUNTIME_DIRS = ('alembic', 'application', 'config', 'domain', 'handlers', 'minigames',
                 'modules', 'qw_farm', 'storage', 'web')
-RUNTIME_ROOT_FILES = (':(glob)*.py', 'alembic.ini', 'requirements.txt')
+RUNTIME_ROOT_FILES = ('alembic.ini', 'requirements.txt')  # plus top-level *.py
 
 REMOTE_HASH = (
-    "set -e; cd \"$1\"; while IFS= read -r f; do "
-    "[ -f \"$f\" ] && printf '%s\\t%s\\n' \"$(tr -d '\\r' < \"$f\" | md5sum | cut -c1-32)\" \"$f\"; "
-    "done; true"
+    'set -e; cd "$1"; shift; '
+    '{ find "$@" -type f ! -path "*/__pycache__/*" ! -name "*.pyc" 2>/dev/null; '
+    "find . -maxdepth 1 -type f \\( -name '*.py' -o -name alembic.ini -o -name requirements.txt \\) "
+    "| sed 's|^\\./||'; } | while IFS= read -r f; do "
+    "printf '%s\\t%s\\n' \"$(tr -d '\\r' < \"$f\" | md5sum | cut -c1-32)\" \"$f\"; done"
 )
 
 
-def git(*args: str) -> str:
-    return subprocess.run(['git', *args], cwd=ROOT, check=True, capture_output=True,
-                          text=True, encoding='utf-8').stdout.rstrip('\n')
+def run(*args: str, data: bytes | None = None, check: bool = True) -> bytes:
+    return subprocess.run(list(args), cwd=ROOT, input=data, check=check, capture_output=True).stdout
+
+
+def git_lines(*args: str, data: bytes | None = None, check: bool = True) -> list[str]:
+    out = run('git', args[0], '-z', *args[1:], data=data, check=check)
+    return [p.decode('utf-8') for p in out.split(b'\0') if p]
 
 
 def digest(data: bytes) -> str:
     return hashlib.md5(data.replace(b'\r', b'')).hexdigest()
 
 
-def runtime_files() -> list[str]:
-    out = subprocess.run(['git', 'ls-files', '-z', '--', *RUNTIME_DIRS, *RUNTIME_ROOT_FILES],
-                         cwd=ROOT, check=True, capture_output=True).stdout
-    files = [p.decode('utf-8') for p in out.split(b'\0') if p]
-    return [f for f in files if '/' in f or not f.startswith('.')]
+def is_runtime(path: str) -> bool:
+    if '/' not in path:
+        return path.endswith('.py') or path in RUNTIME_ROOT_FILES
+    return path.split('/', 1)[0] in RUNTIME_DIRS and '/__pycache__/' not in path \
+        and not path.endswith('.pyc')
+
+
+def head_files() -> list[str]:
+    return [f for f in git_lines('ls-tree', '-r', '--name-only', 'HEAD') if is_runtime(f)]
 
 
 def head_hashes(files: list[str]) -> dict[str, str]:
-    request = ''.join(f'HEAD:{f}\n' for f in files).encode('utf-8')
-    out = subprocess.run(['git', 'cat-file', '--batch'], cwd=ROOT, input=request,
-                         check=True, capture_output=True).stdout
+    out = run('git', 'cat-file', '--batch', data=''.join(f'HEAD:{f}\n' for f in files).encode('utf-8'))
     hashes, pos = {}, 0
     for f in files:
         end = out.index(b'\n', pos)
-        header = out[pos:end].split()
-        size = int(header[2])
+        size = int(out[pos:end].split()[2])
         hashes[f] = digest(out[end + 1:end + 1 + size])
         pos = end + 1 + size + 1
     return hashes
 
 
-def worktree_hashes(files: list[str]) -> dict[str, str]:
+def ignored(paths: list[str]) -> set[str]:
+    if not paths:
+        return set()
+    # Exit code 1 only means "nothing ignored".
+    return set(git_lines('check-ignore', '--no-index', '--stdin',
+                         data=b'\0'.join(p.encode('utf-8') for p in paths), check=False))
+
+
+def worktree_hashes() -> dict[str, str]:
+    files = [f for f in git_lines('ls-files', '--cached', '--others', '--', *RUNTIME_DIRS, '.')
+             if is_runtime(f)]
     hashes = {}
     for f in files:
         try:
@@ -87,41 +106,47 @@ def split_remote(target: str) -> tuple[str, str]:
     return host, directory.rstrip('/')
 
 
-def remote_hashes(host: str, directory: str, files: list[str]) -> dict[str, str]:
-    # Bytes, not text mode: on Windows text mode turns '\n' into '\r\n' in the file list.
-    out = subprocess.run(['ssh', host, f'bash -c {quote(REMOTE_HASH)} _ {quote(directory)}'],
-                         input=''.join(f + '\n' for f in files).encode('utf-8'), check=True,
-                         capture_output=True).stdout
-    hashes = {}
-    for line in out.decode('utf-8').splitlines():
-        value, _, path = line.partition('\t')
-        if path:
-            hashes[path] = value
-    return hashes
-
-
 def quote(value: str) -> str:
     return "'" + value.replace("'", "'\"'\"'") + "'"
 
 
+def remote_hashes(host: str, directory: str) -> dict[str, str]:
+    command = f'bash -c {quote(REMOTE_HASH)} _ {quote(directory)} ' + ' '.join(RUNTIME_DIRS)
+    out = run('ssh', host, command)
+    hashes = {}
+    for line in out.decode('utf-8').splitlines():
+        value, _, path = line.partition('\t')
+        if path and is_runtime(path):
+            hashes[path] = value
+    return hashes
+
+
 def build_info(deployed: dict[str, str]) -> dict:
-    commit = git('rev-parse', '--short', 'HEAD').strip()
-    head = head_hashes(sorted(deployed))
-    changed = sorted(f for f, value in deployed.items() if head.get(f) != value)
+    commit = run('git', 'rev-parse', '--short', 'HEAD').decode().strip()
+    committed = head_files()
+    head = head_hashes(committed)
+    outside = sorted(set(deployed) - set(head))
+    skipped = ignored(outside)
+    changed = sorted(f for f in deployed if f in head and head[f] != deployed[f])
+    extra = [f for f in outside if f not in skipped]
+    missing = sorted(set(head) - set(deployed))
+    dirty = bool(changed or extra or missing)
     return {
-        'build': f'{commit}-dirty' if changed else commit,
+        'build': f'{commit}-dirty' if dirty else commit,
         'commit': commit,
-        'dirty': bool(changed),
+        'dirty': dirty,
         'stamped_at': datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         'changed_files': changed,
+        'extra_files': extra,
+        'missing_files': missing,
+        'ignored_files': len(skipped),
     }
 
 
 def push_remote(host: str, directory: str, payload: str) -> None:
     path = quote(f'{directory}/{FILE_NAME}')
     tmp = quote(f'{directory}/{FILE_NAME}.tmp')
-    subprocess.run(['ssh', host, f'cat > {tmp} && mv {tmp} {path}'],
-                   input=payload.encode('utf-8'), check=True)
+    run('ssh', host, f'cat > {tmp} && mv {tmp} {path}', data=payload.encode('utf-8'))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -132,14 +157,10 @@ def main(argv: list[str] | None = None) -> int:
     target.add_argument('--print', action='store_true', help='only print the stamp of the worktree')
     args = parser.parse_args(argv)
 
-    files = runtime_files()
     remote = split_remote(args.remote) if args.remote else None
-    if remote:
-        deployed = remote_hashes(*remote, files)
-        if not deployed:
-            raise SystemExit(f'no runtime files found in {args.remote}')
-    else:
-        deployed = worktree_hashes(files)
+    deployed = remote_hashes(*remote) if remote else worktree_hashes()
+    if not deployed:
+        raise SystemExit(f'no runtime files found in {args.remote or ROOT}')
     payload = json.dumps(build_info(deployed), ensure_ascii=False, indent=2) + '\n'
     if remote:
         push_remote(*remote, payload)

@@ -13,14 +13,22 @@
     <div class="mq-brand"><span class="mq-mark" aria-hidden="true"><span></span></span><span class="mq-brand-copy"><small>MORNING QUIZ</small><strong>За кулисами</strong></span></div>
     <p class="login-eyebrow">ПУЛЬТ ВЕДУЩЕГО</p>
     <h1>Только для своих</h1>
-    <p class="login-description">Панель управления ботом. Войдите с отдельным ключом администратора — токен Telegram сюда вводить не нужно.</p>
+    <p class="login-description" id="loginDescription">Вход в панель управления.</p>
     <form id="loginForm">
-      <label for="accessToken">Ключ доступа</label>
-      <input id="accessToken" name="token" type="password" autocomplete="current-password" required maxlength="512" autofocus>
+      <div id="passwordFields" hidden>
+        <label for="username">Логин</label>
+        <input id="username" name="username" type="text" autocomplete="username" maxlength="64">
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256">
+      </div>
+      <div id="tokenFields" hidden>
+        <label for="accessToken">Первичный ключ доступа</label>
+        <input id="accessToken" name="token" type="password" autocomplete="off" maxlength="512">
+      </div>
       <p id="loginError" role="alert" aria-live="polite"></p>
       <button type="submit">Войти в панель <span aria-hidden="true">→</span></button>
     </form>
-    <p class="login-note">Локальная админка · не Telegram Mini App<br>После перезапуска панели потребуется войти снова.</p>
+    <p class="login-note">Админка песочницы · только домашняя сеть</p>
   </main>
 </body>
 </html>

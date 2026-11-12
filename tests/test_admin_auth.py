@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 import httpx
 import pytest
@@ -127,4 +128,35 @@ def test_remote_http_is_rejected_and_request_size_and_content_type_are_bounded()
             assert (await client.post("/auth/login", data={"token": TOKEN})).status_code == 415
             assert (await client.post("/auth/login", content="{", headers={"Content-Type": "application/json"})).status_code == 401
             assert (await client.post("/auth/login", json={"token": "x" * 2100})).status_code == 413
+    asyncio.run(run())
+
+
+def test_admin_password_setup_disables_bootstrap_token_and_survives_restart(tmp_path):
+    async def run():
+        path = tmp_path / 'credentials.json'
+        app = application(AdminAuth(TOKEN, credentials_file=path))
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://127.0.0.1') as client:
+            assert (await client.get('/auth/method')).json()['method'] == 'token'
+            csrf = await login(client)
+            assert (await client.post('/auth/credentials', json={
+                'username': 'owner', 'password': 'elevenchars',
+            })).status_code == 403
+            response = await client.post('/auth/credentials', headers={'X-CSRF-Token': csrf}, json={
+                'username': 'owner', 'password': 'elevenchars',
+            })
+            assert response.status_code == 200, response.text
+            assert (await client.get('/auth/method')).json()['method'] == 'password'
+            assert (await client.post('/auth/login', json={'token': TOKEN})).status_code == 401
+            assert (await client.post('/auth/login', json={
+                'username': 'owner', 'password': 'elevenchars',
+            })).status_code == 200
+        if os.name != 'nt':
+            assert path.stat().st_mode & 0o077 == 0
+        assert 'elevenchars' not in path.read_text()
+        restarted = application(AdminAuth(TOKEN, credentials_file=path))
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(restarted), base_url='http://127.0.0.1') as client:
+            assert (await client.post('/auth/login', json={'token': TOKEN})).status_code == 401
+            assert (await client.post('/auth/login', json={
+                'username': 'owner', 'password': 'elevenchars',
+            })).status_code == 200
     asyncio.run(run())

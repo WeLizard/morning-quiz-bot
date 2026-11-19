@@ -71,3 +71,38 @@ test('layer renderer pauses and resumes without leaving an animation frame behin
   for(const [key,value] of Object.entries(previous))if(value===undefined)delete global[key];else global[key]=value;
  }
 });
+
+test('object sprites: still art is painted once and blitted, marks replay live, animated art stays live at rest',async()=>{
+ const {FarmScene}=await import('../../qw_farm/static/scene.js');
+ const previousDocument=global.document;
+ const ctx=()=>{const g={blits:0,setTransform(){},save(){},restore(){},clearRect(){},drawImage(){g.blits++}};return g};
+ global.document={createElement(){const g=ctx();return {width:0,height:0,getContext(){return g}}}};
+ try{
+  const painted=[],marks=[],scene=Object.create(FarmScene.prototype),main=ctx();
+  const barn={id:'barn',type:'barn',x:2,y:2,w:2,h:2},mill={id:'mill',type:'mill',x:5,y:5,w:2,h:2};
+  Object.assign(scene,{
+   c:main,farm:{objects:[barn,mill]},catalog:{},pan:{x:0,y:0},scale:1,dpr:1,motion:true,time:5,frameInterval:32,
+   stats:{frames:0},lanternLights:[],lightMarkers:null,frameOrigin:{x:0,y:0},
+   ready(x,y){marks.push(['ready',x,y])},
+   drawObject(o){painted.push(o.id);this.ready(1,2);this.lanternLights?.push({x:3,y:4});if(o.id==='mill')void this.time}
+  });
+  const frame=()=>{scene.stats.frames++;scene.lanternLights=[];scene.drawObjectSprite(barn);scene.drawObjectSprite(mill)};
+  scene.cameraKey='0|0|1';scene.cameraAt=-1e9;   // the camera rests
+  frame();frame();frame();
+  assert.deepEqual(painted.filter(id=>id==='barn'),['barn'],'still art is painted once');
+  assert.equal(painted.filter(id=>id==='mill').length,4,'animated art: one sprite paint, then live while cheap');
+  assert.equal(marks.length,6,'the ready mark of both objects is drawn every frame');
+  assert.equal(scene.lanternLights.length,2,'lantern glows are replayed from the sprite');
+  assert.equal(main.blits,3,'the barn is blitted');
+  scene.pan.x=10;painted.length=0;frame();          // the camera starts moving: the mill's sprite is refreshed once
+  assert.deepEqual(painted,['mill']);assert.equal(main.blits,5);
+  scene.pan.x=20;painted.length=0;frame();          // and borrowed while the camera keeps moving
+  assert.deepEqual(painted,[]);assert.equal(main.blits,7);
+  scene.selected='barn';painted.length=0;frame();   // a selected object is drawn live
+  assert.deepEqual(painted,['barn']);
+  assert.equal(scene.time,5,'the clock is restored after a sprite paint');
+  assert.equal(Object.hasOwn(scene,'now'),false);
+ }finally{
+  if(previousDocument===undefined)delete global.document;else global.document=previousDocument;
+ }
+});

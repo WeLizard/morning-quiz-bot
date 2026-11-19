@@ -25,6 +25,12 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const PLANT_LOD_SCALE=0;
 const PLANT_BOX={x:-18,y:-42,w:36,h:54},PLANT_SPRITE_MAX=240;   // world px around a plant's foot (scene.plantSprite)
 const MIN_SCALE=.25,MAX_SCALE=2,CACHE_MARGIN=.18,MAIN_MAX_PIXELS=4e6,CACHE_MAX_PIXELS=6e6;
+// Field layer (paintFields): from this many beds the soil and crops are one cached picture. Sway repaints it at most every
+// FIELD_SWAY_MS (longer on slow devices), growth alone every FIELD_GROW_MS; a zoom keeps live drawing until it settles.
+const FIELD_LAYER_MIN=12,FIELD_SWAY_MS=250,FIELD_GROW_MS=4000,FIELD_ZOOM_SETTLE=250;
+// Object sprites (drawObjectSprite): all bitmaps together stay under SPRITE_MAX_PIXELS device pixels (least recently drawn go
+// first); art that read the server clock is repainted every SPRITE_CLOCK_MS; the camera counts as moving for CAMERA_SETTLE ms.
+const SPRITE_MAX_PIXELS=8e6,SPRITE_ONE_MAX=2e6,SPRITE_CLOCK_MS=2000,CAMERA_SETTLE=250,SPRITE_KEEP=['ready','clockBubble','cropBadge','label'];
 const KEY_PAN={ArrowLeft:[1,0],KeyA:[1,0],ArrowRight:[-1,0],KeyD:[-1,0],ArrowUp:[0,1],KeyW:[0,1],ArrowDown:[0,-1],KeyS:[0,-1]};
 const KEY_SPEED=560;
 export const SWAN_FEED_SECONDS=7;
@@ -316,6 +322,82 @@ export class FarmScene {
   }else this.stats.staticBlits++;
   const d=this.dpr;this.c.setTransform(1,0,0,1,0,0);this.c.drawImage(C.canvas,Math.round((origin.x-C.ox-C.mx)*d),Math.round((origin.y-C.oy-C.my)*d));
  }
+ // Soil and crops of a big farm: one cached picture instead of ~6 plant sprites per bed every frame (a 120-bed field was ~800
+ // draws a frame). Repainted when the beds, zoom, selection, contrast or light step change, when the pan leaves the margin, and
+ // on a slow clock for sway and growth. Plot markers, hover and everything that moves stay live; small farms draw directly.
+ paintFields(plots,crops,view){
+  const paint=v=>{for(const p of plots)if(overlaps(p.bounds,v))this.plotGround(p.object);for(const e of crops)if(overlaps(e.bounds,v))e.draw()};
+  if(plots.length<FIELD_LAYER_MIN||typeof document==='undefined'||typeof document.createElement!=='function'){paint(view);return}
+  const now=performance.now();
+  if(this.fieldScale!==this.scale){this.fieldScale=this.scale;this.fieldScaleAt=now}
+  if(this.anim||this.pinch||now-this.fieldScaleAt<FIELD_ZOOM_SETTLE){paint(view);return}   // every zoom frame has a new scale
+  const origin=this.origin(),selected=plots.some(p=>p.object.id===this.selected)?this.selected:'';
+  const key=`${this.renderOrder?.serial}|${this.scale}|${this.dpr}|${this.w}|${this.h}|${this.contrast?1:0}|${selected}|${Math.round((this.lighting?.darkness||0)*12)}|${this.motion?1:0}`;
+  let C=this.fieldCache;
+  const refresh=this.motion?clamp((C?.cost||0)*12,FIELD_SWAY_MS,2000):FIELD_GROW_MS;
+  if(!C||C.key!==key||now-C.at>=refresh||Math.abs(origin.x-C.ox)>C.mx||Math.abs(origin.y-C.oy)>C.my){
+   if(!C)C=this.fieldCache={canvas:document.createElement('canvas')};
+   this.paintLayer(C,origin,(g,v)=>paint(v));
+   C.key=key;C.at=now;C.cost=performance.now()-now;this.stats.fieldPaints=(this.stats.fieldPaints||0)+1;
+  }
+  const c=this.c,d=this.dpr;c.save();c.setTransform(1,0,0,1,0,0);c.drawImage(C.canvas,Math.round((origin.x-C.ox-C.mx)*d),Math.round((origin.y-C.oy-C.my)*d));c.restore();
+ }
+ // Buildings, trees and decor as cached bitmaps: one drawImage instead of hundreds of paths per object and frame. The object
+ // is painted by drawObject into its world box at the current zoom; ready marks, clocks, labels, lantern glows and night
+ // markers are recorded and replayed live every frame. Art that read the animation clock (sway, smoke, sails, bees) is animated:
+ // it is drawn live while the camera rests and only borrows its sprite while the camera moves (a slow device paces idle
+ // frames ~300 ms apart, so a sprite repainted for each animation step would only add work). During a zoom the sprite is
+ // stretched and repainted once the zoom settles. A selected object, beds and roads are always drawn live.
+ drawObjectSprite(o){
+  if(o.type==='plot'||o.type==='road'||o.id===this.selected||typeof document==='undefined'||typeof document.createElement!=='function'){this.drawObject(o);return}
+  const now=performance.now(),cam=`${this.pan.x}|${this.pan.y}|${this.scale}`;
+  if(this.cameraKey!==cam){this.cameraKey=cam;this.cameraAt=now}
+  const moving=!!this.anim||!!this.pinch||now-(this.cameraAt||0)<CAMERA_SETTLE,dk=this.lighting?.darkness||0,warm=this.lighting?.warmth||0;
+  const key=`${this.dpr}|${this.contrast?1:0}|${Math.round(dk*12)}|${Math.round(warm*12)}|${this.motion?1:0}`;
+  let S=this.sprites;
+  if(!S||S.farm!==this.farm||S.catalog!==this.catalog||S.key!==key){this.dropSprites();S=this.sprites={farm:this.farm,catalog:this.catalog,key,map:new Map(),pixels:0}}
+  if(this.moveFrame!==this.stats.frames){this.moveFrame=this.stats.frames;if(moving&&!this.wasMoving)this.moveStart=now;this.wasMoving=moving}
+  let e=S.map.get(o.id);
+  if(e?.animated&&!moving){this.drawObject(o);return}
+  // An animated sprite is refreshed once as the camera starts moving, so smoke and sails do not jump back to an old frame.
+  const stale=e&&(e.scale!==this.scale||e.clock&&now-e.at>=SPRITE_CLOCK_MS),restart=e?.animated&&moving&&e.at<this.moveStart;
+  if(!e||restart||stale&&!moving){e=this.rasterObject(o,e,S);if(!e){this.drawObject(o);return}this.stats.spritePaints=(this.stats.spritePaints||0)+1}
+  S.map.delete(o.id);S.map.set(o.id,e);e.frame=this.stats.frames;
+  if(e.animated&&!moving){this.drawObject(o);return}
+  const c=this.c;
+  if(e.scale===this.scale&&this.frameOrigin){   // same zoom: snap to device pixels, the bitmap stays as crisp as live paths
+   const d=this.dpr,o0=this.frameOrigin;c.save();c.setTransform(1,0,0,1,0,0);
+   c.drawImage(e.canvas,Math.round((o0.x+e.x0*this.scale)*d),Math.round((o0.y+e.y0*this.scale)*d));c.restore();
+  }else c.drawImage(e.canvas,e.x0,e.y0,e.canvas.width/e.k,e.canvas.height/e.k);
+  for(const [name,args] of e.calls)this[name](...args);
+  if(e.lights.length)this.lanternLights?.push(...e.lights);
+  for(const m of e.markers){if(this.lightMarkers)this.lightMarkers.push(m);else m.fn()}
+  this.stats.spriteBlits=(this.stats.spriteBlits||0)+1;
+ }
+ rasterObject(o,old,S){
+  const b=objectBounds(o),x0=b.x0-40,y0=b.y0-80,x1=b.x1+40,y1=b.y1+30,k=this.dpr*this.scale;
+  const w=Math.ceil((x1-x0)*k),h=Math.ceil((y1-y0)*k);
+  if(old){S.pixels-=old.canvas.width*old.canvas.height;S.map.delete(o.id)}
+  if(w<1||h<1||w*h>SPRITE_ONE_MAX)return null;
+  // Room for the new bitmap: least recently drawn sprites go first, never one already drawn in this frame.
+  for(const [id,s] of S.map){if(S.pixels+w*h<=SPRITE_MAX_PIXELS)break;if(s.frame===this.stats.frames)continue;S.pixels-=s.canvas.width*s.canvas.height;s.canvas.width=s.canvas.height=0;S.map.delete(id)}
+  if(S.pixels+w*h>SPRITE_MAX_PIXELS)return null;
+  const cv=old?.canvas||document.createElement('canvas');cv.width=w;cv.height=h;
+  const g=cv.getContext('2d');g.setTransform(k,0,0,k,-x0*k,-y0*k);
+  const at=performance.now(),e={canvas:cv,x0,y0,k,scale:this.scale,at,ms:0,calls:[],lights:[],markers:[],animated:false,clock:false};
+  const keep={c:this.c,lanternLights:this.lanternLights,lightMarkers:this.lightMarkers},t=this.time,serverNow=this.now;
+  // Instrument the clocks for this one paint: reading `time` makes the art animated, reading now() makes it expire.
+  Object.defineProperty(this,'time',{configurable:true,enumerable:true,get(){if(t)e.animated=true;return t},set(){}});
+  this.now=()=>{e.clock=true;return serverNow.call(this)};
+  const own=SPRITE_KEEP.filter(name=>Object.hasOwn(this,name)).map(name=>[name,this[name]]);   // a scene with patched marks keeps them
+  for(const name of SPRITE_KEEP)this[name]=(...args)=>{e.calls.push([name,args])};
+  this.c=g;this.lanternLights=e.lights;this.lightMarkers=e.markers;
+  try{this.drawObject(o)}
+  finally{delete this.time;this.time=t;delete this.now;for(const name of SPRITE_KEEP)delete this[name];Object.assign(this,keep,Object.fromEntries(own))}
+  e.ms=performance.now()-at;S.pixels+=w*h;
+  return e;
+ }
+ dropSprites(){const S=this.sprites;if(!S)return;for(const s of S.map.values())s.canvas.width=s.canvas.height=0;this.sprites=null}
  background(){
   const darkness=Math.round((this.lighting?.darkness||0)*255)/255,warmth=Math.round((this.lighting?.warmth||0)*255)/255,key=`${this.h}|${darkness}|${warmth}`;
   if(!this.bg||this.bg.key!==key){const g=this.c.createLinearGradient(0,0,0,this.h);g.addColorStop(0,lightingColor([237,243,226],[24,37,48],darkness,warmth));g.addColorStop(1,lightingColor([227,236,211],[35,49,51],darkness,warmth));this.bg={key,g}}
@@ -394,11 +476,11 @@ export class FarmScene {
   point(signCell.x,signCell.y,()=>this.welcomeSign(area),{x0:sign.x-signWidth/2-10,x1:sign.x+signWidth/2+24,y0:sign.y-72,y1:sign.y+12});
   const list=sortByDepth(buildings),slots=spriteSlots(list,sprites),entries=[];
   for(let i=0;i<=list.length;i++){entries.push(...slots[i]);if(i<list.length)entries.push(list[i])}
-  crops.sort(compareDepth);return this.renderOrder={src,key,plots,roads,crops,entries};
+  crops.sort(compareDepth);this.orderSerial=(this.orderSerial||0)+1;return this.renderOrder={serial:this.orderSerial,src,key,plots,roads,crops,entries};
  }
  draw(t){this.stepLighting(performance.now());let c=this.c;c.setTransform(this.dpr,0,0,this.dpr,0,0);c.clearRect(0,0,this.w,this.h);
   if(!this.w||!this.h)return;this.background();this.stats.frames++;
-  if(!this.farm)return;const origin=this.origin();this.time=this.motion?t:0;
+  if(!this.farm)return;const origin=this.origin();this.frameOrigin=origin;this.time=this.motion?t:0;
   if(!this.layout||this.layout.key!==this.layoutKey())this.buildLayout();
   const now=performance.now(),area=this.farm.size;
   // Keep objects live while panning and zooming; only the ground is cached.
@@ -427,9 +509,9 @@ export class FarmScene {
   const {plots,roads=[],crops,entries}=this.standingOrder(),visible=b=>overlaps(b,view),lit=this.placement?null:this.hoverId,drawnObjects=new Set();
   for(const r of roads)if(visible(r.bounds)){this.drawObject(r.object);if(r.object.id===lit)this.footprint(r.object,'#fffbe130','#fff6b8');drawnObjects.add(r.object.id)}
   // Soil is a ground surface: no later bed can paint over a vehicle, animal or fence.
-  for(const p of plots)if(visible(p.bounds)){this.plotGround(p.object);drawnObjects.add(p.object.id)}
+  for(const p of plots)if(visible(p.bounds))drawnObjects.add(p.object.id);
   // Vegetation is a separate layer below all solid sprites: no per-plant scratch canvases or masks.
-  for(const e of crops)if(visible(e.bounds))e.draw();
+  this.paintFields(plots,crops,view);
   for(const patch of this.farm.meadow_view?.patches||[])this.drawMeadow(patch);
   const list=entries.filter(e=>visible(e.bounds)),moving=teamSprites(this),slots=spriteSlots(list,moving);
   // Buildings, animals, fence and moving sprites keep their existing depth/parent constraints.
@@ -437,7 +519,7 @@ export class FarmScene {
    for(const sp of slots[i])this.drawSprite(sp);
    if(i===list.length)break;
    const e=list[i];
-   if(e.object){if(lit&&e.object.id===lit)this.drawLit(e.object);else this.drawObject(e.object);drawnObjects.add(e.object.id)}
+   if(e.object){if(lit&&e.object.id===lit)this.drawLit(e.object);else this.drawObjectSprite(e.object);drawnObjects.add(e.object.id)}
    else e.draw();
   }
   for(const p of plots)if(visible(p.bounds))this.plotMarkers(p.object);

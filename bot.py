@@ -607,10 +607,12 @@ async def main() -> None:
         application_instance.bot_data['wisdom_scheduler'] = wisdom_scheduler
         logger.info("Планировщик мудрости дня добавлен в bot_data")
 
-        # Устанавливаем команды бота ДО запуска (правильный порядок для python-telegram-bot 21.7 и Telegram Bot API 9.2)
+        from modules.telegram_api_ext import allowed_updates as telegram_allowed_updates, api_support
+        logger.info("python-telegram-bot %(ptb)s: нативно Bot API %(ptb_bot_api)s, адаптер до %(target_bot_api)s", api_support())
+        # Устанавливаем команды бота ДО запуска
         await setup_bot_commands(application_instance, app_config)
 
-        # Инициализируем Application перед запуском (требуется для python-telegram-bot 21.7)
+        # Инициализируем Application перед запуском
         await application_instance.initialize()
         if data_manager.postgres_storage:
             from telegram.ext import CallbackContext
@@ -636,7 +638,7 @@ async def main() -> None:
         if application_instance.updater:
             logger.info(f"Запуск бота (polling) с уровнем логирования: {logging.getLevelName(logger.getEffectiveLevel())}")
             await application_instance.updater.start_polling(
-                allowed_updates=Update.ALL_TYPES,
+                allowed_updates=telegram_allowed_updates(),  # PTB 10.0 types + Bot API 10.4 widget queries
                 poll_interval=1.0,  # 1 секунда между запросами (снижает нагрузку на CPU)
                 timeout=30,  # Long polling таймаут (30 секунд)
                 drop_pending_updates=False  # Не пропускаем накопленные обновления

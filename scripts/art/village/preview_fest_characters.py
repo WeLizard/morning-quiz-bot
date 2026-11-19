@@ -26,12 +26,20 @@ PLACES = {
     'resident-hedgehog-new_year': ((797, 1012), 'Почтальон Ёж'),
     'mascot-fest_posid_snowman': ((1290, 1120), None),     # beside the player, as a follower
     'mascot-fest_ny_bullfinch': ((830, 1030), None),
+    'guest-ded_moroz': ((1180, 960), None),          # the square by the town hall
+    'guest-snegurochka': ((1220, 975), None),
+    'guest-santa': ((1180, 960), None),
+    'guest-krampus': ((1220, 975), None),
 }
 TITLES = {
     'resident-sonya-posidelki': 'Посиделки · Соня дремлет на крыльце в шарфе',
     'mascot-fest_posid_snowman': 'Посиделки · маскот «Снеговик в шарфе» (стоит / шаг)',
     'mascot-fest_ny_bullfinch': 'Новый год · маскот «Снегирь» (стоит / прыжок)',
     'resident-hedgehog-new_year': 'Новый год · Ёж разносит открытки',
+    'guest-ded_moroz': 'Новый год · Дед Мороз',
+    'guest-snegurochka': 'Новый год · Снегурочка',
+    'guest-santa': 'Битва с Сантой · Санта',
+    'guest-krampus': 'Битва с Сантой · Крампус',
 }
 
 
@@ -73,8 +81,24 @@ def main() -> None:
         groups = re.findall(r'<g class="[^"]+">.*?</g>(?=<g class=|</svg>)', svg, re.S)
         return [root_open + g + '</svg>' for g in groups] or [svg]
 
-    rows = []
+    rows, guests, winter = [], [], []
+    winter_names = {'filinych': 'Филиныч', 'agata': 'Агата', 'hedgehog': 'Почтальон Ёж', 'mole': 'Механик Крот',
+                    'kaya': 'Кошка Кая', 'sonya': 'Кошка Соня', 'igor': 'Суслик Игорь', 'zverushka': 'Неведома Зверушка',
+                    'pukh': 'Медведь Пух', 'dasha': 'Лиса Даша', 'oleg': 'Петух Олег'}
+
+    def dressed(base_svg: str, overlay: str) -> str:
+        """The resident with the winter overlay laid on top, as the game would stack them."""
+        inner = overlay[overlay.index('>') + 1:overlay.rindex('</svg>')]
+        return base_svg[:base_svg.rindex('</svg>')] + inner + '</svg>'
+
     for name, svg in svgs.items():
+        if name.startswith('winter-'):
+            base = winter_names[name[len('winter-'):]]
+            winter.append((base, dressed(figures[base][1], svg)))
+            continue
+        if name.startswith('guest-'):            # the New Year guests side by side, at the same scale, for heights
+            guests.append(f'<figure>{figure_html(svg, 7)}<figcaption>{TITLES[name].split(" · ")[-1]}</figcaption></figure>')
+            continue
         base = PLACES[name][1]
         cells = []
         if base and base in figures:
@@ -82,14 +106,23 @@ def main() -> None:
         for i, f in enumerate(frames(svg, '')):
             cells.append(f'<figure>{figure_html(f, 8)}<figcaption>{"новое" if not i else "кадр 2"}</figcaption></figure>')
         rows.append(f'<section><h2>{TITLES[name]}</h2><div class="row">{"".join(cells)}</div></section>')
+    if winter:
+        big = ''.join(f'<figure>{figure_html(svg, 5)}<figcaption>{base}</figcaption></figure>' for base, svg in winter)
+        game = ''.join(f'<figure>{figure_html(svg, UNIT * 2)}</figure>' for base, svg in winter)
+        rows.append(f'<section><h2>Новый год · жители в зимнем</h2><div class="row wrap">{big}</div>'
+                    f'<h2>то же в игровом масштабе ×2</h2><div class="row wrap">{game}</div></section>')
+    if guests:
+        rows.append(f'<section><h2>Новый год · гости</h2><div class="row">{"".join(guests)}</div></section>')
     sheet = ('<html><head><meta charset="utf-8"><style>body{margin:0;padding:16px;background:#e8eedc;font:15px system-ui;color:#1b2319}'
-             'h2{font-size:17px;margin:14px 0 6px}.row{display:flex;gap:28px;align-items:flex-end}figure{margin:0;text-align:center}'
+             'h2{font-size:17px;margin:14px 0 6px}.row{display:flex;gap:28px;align-items:flex-end}.wrap{flex-wrap:wrap;gap:14px}figure{margin:0;text-align:center}'
              'figcaption{margin-top:4px}</style></head><body>' + ''.join(rows) + '</body></html>')
     (out / 'sheet.html').write_text(sheet, encoding='utf-8')
 
     village = (STATIC / 'village.svg').as_uri()
     crops = []
     for name, svg in svgs.items():
+        if name not in PLACES:
+            continue
         (fx, fy), _ = PLACES[name]
         x, y, w, h = view_box(svg)
         first = frames(svg, '')[0]

@@ -11,6 +11,8 @@
 import {FarmScene} from '/static/scene.js';
 import {SvgCtx} from './svg_ctx.js';
 import {hedgehog} from './host-residents.js';
+import {dedMoroz, snegurochka, santa, krampus} from './new_year_guests.js';
+import {WINTER, hedgehogScarf} from './winter_residents.js';
 
 const SH = '#41623530';
 const P = (s, pts, fill) => s.poly(pts.map(([x, y]) => ({x, y})), fill);
@@ -130,10 +132,7 @@ function sonyaDozing(s) {
 // The approved postman (host-residents.js) with a striped scarf, a satchel full of cards and one card held out.
 function hedgehogNewYear(s, c) {
   hedgehog(s, c);
-  P(s, [[-4.4, -19.4], [5.8, -19.4], [6.4, -16.8], [-4.8, -16.8]], '#c9473f');                  // scarf over the collar
-  s.line(-3.6, -18.1, 5.4, -18.1, '#f6efe2', .9);
-  P(s, [[3.6, -17.4], [6, -17.4], [6.9, -11.6], [4.4, -11.8]], '#c9473f');
-  s.line(4, -15.2, 6.3, -15.1, '#f6efe2', .9); s.line(4.3, -13.1, 6.6, -13, '#f6efe2', .9);
+  hedgehogScarf(s);                                                                              // scarf over the collar
   // two cards standing up out of the satchel (red, green, each with a white snowflake) and one held out
   const card = (pts, col) => {
     P(s, pts, col);
@@ -167,6 +166,13 @@ export function festCharacterSvgs() {
     // festive poses of residents: same viewBox as the residents, the bench pose is wider
     'resident-sonya-posidelki': svgOf('fcso', '-18 -50 36 54', 'bc-art', [['', sonyaDozing]]),
     'resident-hedgehog-new_year': svgOf('fche', '-18 -50 36 54', 'bc-art', [['', hedgehogNewYear]]),
+    // New Year guests (new_year_guests.js): people are taller than the residents, same units
+    'guest-ded_moroz': svgOf('fcdm', '-20 -56 40 60', 'bc-art', [['', dedMoroz]]),
+    'guest-snegurochka': svgOf('fcsg', '-20 -56 40 60', 'bc-art', [['', snegurochka]]),
+    'guest-santa': svgOf('fcsa', '-20 -56 40 60', 'bc-art', [['', santa]]),
+    'guest-krampus': svgOf('fckr', '-20 -56 40 60', 'bc-art', [['', krampus]]),
+    // New Year winter clothes: overlays laid over the everyday resident figure (winter_residents.js)
+    ...Object.fromEntries(Object.entries(WINTER).map(([key, draw]) => [`winter-${key}`, svgOf(`fcw${key}`, '-18 -50 36 54', 'bc-winter', [['', draw]])])),
   };
 }
 

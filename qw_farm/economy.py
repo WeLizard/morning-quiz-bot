@@ -17,7 +17,7 @@ next visit (``claim_village``): no background workers.
 from .catalog import (BUILDINGS, ITEMS, level, income_ref, FUND_LEVEL,
                       SEASON_DAYS, FUND_TIERS, FUND_MARKUP, MIN_SHARE_PCT, DEBT_SLOW, DEBT_SLOW_DEN, FEAST_DAYS, FEAST_PCT,
                       DECOR_SHOP, DECOR_EXTRA, REWARD_DECOR, TIER_DISCOUNT_PCT, MAX_CONTRIBUTION, FUND_REWARD_TEXT,
-                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET, PLANTATION_UPKEEP)
+                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET, PLANTATION_UPKEEP, RUSH_DAYS, RUSH_PCT)
 from .upkeep_config import land_plot_rate, settings_for
 
 TZ_OFFSET = 10800
@@ -250,6 +250,19 @@ def contribute(farm, coins, items, at):
     if got:
         text += ' Награда: ' + '; '.join(got) + '.'
     return value, text, first
+
+
+def rush_pct(at, total, goal):
+    """«Рывок деревни» (owner's decision 2026-11-19, «не успели к празднику»): in the last RUSH_DAYS of a season, while the
+    village counter is below its goal, a contribution counts RUSH_PCT % toward the COMMON goal only. The personal scale, the
+    tiers and the minimal share stay nominal (``contribute``), so holding a contribution back never pays the player."""
+    left = season_end(season_of(at)) - at
+    return RUSH_PCT if 0 < left <= RUSH_DAYS * DAY and total < goal else 100
+
+
+def village_value(sent, at, total, goal):
+    """What a booked contribution adds to the shared counter."""
+    return sent * rush_pct(at, total, goal) // 100
 
 
 def goal_share(ref):

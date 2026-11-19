@@ -212,7 +212,7 @@ def test_task_level_gate_closed_fair_and_unknown_ids():
     assert code(low, 'festival_task', task('yarn')) == 'locked'
     cmd(low, 'festival_task', task('tea'))                                  # level 3 is enough for the pie task
     f = farm(inv={'yarn': 9})
-    assert code(f, 'festival_task', task('yarn'), ts(2026, 11, 22)) == 'fair_closed'        # decoration only, fair not open yet
+    assert code(f, 'festival_task', task('yarn'), ts(2026, 11, 22)) == 'tasks_not_open'     # decoration only, fair not open yet
     assert code(f, 'festival_task', task('yarn'), ts(2026, 12, 2)) == 'fair_closed'
     assert code(f, 'festival_task', task('yarn', fest='new_year'), FAIR) == 'fair_closed'
     assert code(f, 'festival_task', task('yarn', fest='nope')) == 'unknown_festival'
@@ -624,3 +624,66 @@ def test_new_year_fair_window_and_name_of_the_toy():
     assert F.current(ts(2027, 1, 8))['phase'] == 'fair' and F.current(ts(2027, 1, 9))['phase'] == 'decor'
     assert F.current(ts(2027, 1, 14))['id'] == 'new_year' and F.current(ts(2027, 1, 15)) is None
     assert F.owner_view(farm(), ts(2026, 12, 30))['fair']['todo'] is False
+
+
+# ---- «не успели к празднику» (owner's decision 2026-11-19): the list before the fair, the same price after it -------------------
+def _inv_for(fid):
+    need_inv = {}
+    for t in F.CONTENT[fid]['tasks']:
+        for k, q in t['options'][0].items():
+            need_inv[k] = need_inv.get(k, 0) + q
+    return need_inv
+
+
+def test_tasks_are_shown_before_the_fair_and_taken_only_from_its_first_day():
+    before = ts(2027, 3, 31)                                   # «День смеха»: decoration 31.03, the fair 01.04
+    f = farm(inv=_inv_for('april_fools'), at=before)
+    view = F.owner_view(f, before)
+    assert view['fair'] is None and view['prep']['mode'] == 'preview' and view['prep']['id'] == 'april_fools'
+    assert view['prep']['opens_at'] == F._ts(F._first_fair_day('april_fools-2027'))
+    assert all(t['locked'] and t['preview'] and not t['done'] for t in view['prep']['tasks'])
+    assert [t['id'] for t in view['prep']['tasks']] == [t['id'] for t in F.CONTENT['april_fools']['tasks']]
+    assert code(f, 'festival_task', task('hidden', 0, 'april_fools'), before) == 'tasks_not_open'
+    assert f['inventory'] == _inv_for('april_fools')          # nothing was taken
+    fair = ts(2027, 4, 1)
+    assert F.owner_view(f, fair)['prep'] is None and F.owner_view(f, fair)['fair']['tasks']
+
+
+def test_unfinished_tasks_are_taken_after_the_fair_at_the_same_price_and_still_give_the_keepsake():
+    fair, late = ts(2027, 4, 1), ts(2027, 4, 2)               # «День смеха»: the decoration lasts one more day
+    f = farm(inv=_inv_for('april_fools'), at=fair)
+    tasks = F.CONTENT['april_fools']['tasks']
+    cmd(f, 'festival_task', task(tasks[0]['id'], 0, 'april_fools'), fair)
+    view = F.owner_view(f, late)
+    assert view['fair'] is None and view['prep']['mode'] == 'late'
+    assert [t['done'] for t in view['prep']['tasks']] == [True] + [False] * (len(tasks) - 1)
+    assert not any(t['locked'] for t in view['prep']['tasks'])
+    coins = f['coins']
+    for n, t in enumerate(tasks[1:]):
+        text = cmd(f, 'festival_task', task(t['id'], 0, 'april_fools'), late)
+        assert (n == len(tasks) - 2) == ('навсегда в коллекции' in text)
+    assert f['coins'] == coins and not any(f['inventory'].values())      # exactly the listed goods, no discount, no coins
+    assert f['festivals']['april_fools-2027']['keepsake'] is True
+    assert F.owner_view(f, late)['prep']['keepsake']['got'] is True
+    # the fair lots are not sold at the fair price after the fair: only the past shop (x1.5)
+    g = next(g for g in F.CONTENT['april_fools']['goods'] if g['source'] == 'fair')
+    c0 = f['coins']
+    cmd(f, 'festival_buy', buy(g['id'], 'april_fools'), late)
+    assert c0 - f['coins'] == F.past_price(g)
+    # the decoration is over: nothing more is taken
+    assert code(farm(inv=_inv_for('april_fools'), at=ts(2027, 4, 3)), 'festival_task', task(tasks[1]['id'], 0, 'april_fools'),
+                ts(2027, 4, 3)) == 'fair_closed'
+
+
+def test_task_modes_follow_the_calendar():
+    modes = {}
+    for fid in F.FESTIVALS:
+        occ = next(o for o in F.occurrences(2027) if o['id'] == fid)
+        days = range(occ['deco'][0], occ['deco'][1] + 1)
+        modes[fid] = {F.task_mode(F.current(F._ts(d) + 3600), F._ts(d) + 3600) for d in days
+                      if (F.current(F._ts(d) + 3600) or {}).get('key') == occ['key']}
+    assert modes['april_fools'] == {'preview', 'fair', 'late'}
+    assert modes['new_year'] == {'preview', 'fair', 'late'}                # 09.01-14.01 after the fair
+    assert 'late' not in modes['fisher_day'] and 'late' not in modes['posidelki']  # the fair is the last day
+    assert modes['maslenitsa'] == {'fair'}                                 # the whole week is the fair
+    assert F.task_mode(None, ts(2027, 5, 20)) is None

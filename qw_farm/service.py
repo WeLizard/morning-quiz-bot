@@ -247,7 +247,8 @@ class FarmService:
         now=self.clock();season=economy.season_of(now)
         row=await self.u.village_peek(season)
         if row is None:row=dict(season=season,total=0,goal=await self.u.village_goal(now))
-        return dict(season=season,total=row['total'],goal=row['goal'],ends_at=economy.season_end(season))
+        return dict(season=season,total=row['total'],goal=row['goal'],ends_at=economy.season_end(season),
+                    rush_pct=economy.rush_pct(now,row['total'],row['goal']))
 
     async def _tower_goal(self, cfg, now):
         """The fair starts with the content goal; a completed previous fund season cuts it by 25% (BOOST)."""
@@ -562,7 +563,11 @@ class FarmService:
         # Fund contributions: the farm booked the value; the shared counter is a separate atomic row in the same transaction.
         sent=me['economy']['stats']['fund_village']-before['economy']['stats']['fund_village']
         if sent>0 and hasattr(self.u,'village_add'):
-            await self.u.village_add(economy.season_of(now),sent,now)
+            season=economy.season_of(now);row=await self.u.village_peek(season)
+            goal=row['goal'] if row else await self.u.village_goal(now)
+            counted=economy.village_value(sent,now,row['total'] if row else 0,goal)
+            await self.u.village_add(season,counted,now)
+            if counted>sent:notice+=f' Рывок деревни: в общую цель засчитано {counted}.'
         me['revision']+=1
         validate_state(me);await self.u.save(me)
         ledger_key=key

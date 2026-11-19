@@ -736,10 +736,37 @@ def validate(farm):
 # ----------------------------------------------------------------------------------------------------------------------
 # Commands
 # ----------------------------------------------------------------------------------------------------------------------
-def _open_fair(festival, now):
-    cur = current(now)
+def task_mode(cur, now):
+    """When the tasks of the acting festival are shown and taken (owner's decision 2026-11-19, «не успели к празднику»):
+    'fair' on a fair day; 'preview' in the decoration days before the first fair day (the list is shown so the goods can be
+    gathered in time, nothing is taken yet); 'late' in the decoration days after it (an unfinished task is taken at the SAME
+    price and still counts for the keepsake). No discount anywhere: waiting never pays, it only stops costing the keepsake."""
+    if cur is None or not content(cur['id'])['tasks']:
+        return None
+    if cur['phase'] == 'fair':
+        return 'fair'
+    first = _first_fair_day(cur['key'])
+    if first is None:
+        return None
+    return 'preview' if economy.moscow_day(tick(now)) < first else 'late'
+
+
+def _day_text(day):
+    d = date.fromordinal(day + EPOCH)
+    return f'{d.day} {MONTHS_GEN[d.month - 1]}'
+
+
+MONTHS_GEN = ('января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря')
+
+
+def _open_tasks(festival, now):
     need(isinstance(festival, str) and festival in FESTIVALS, 'unknown_festival', 'Такого праздника нет.', 422)
-    need(cur is not None and cur['id'] == festival and cur['phase'] == 'fair', 'fair_closed', 'Ярмарка сейчас не работает.')
+    cur = current(now)
+    mode = task_mode(cur, now) if cur is not None and cur['id'] == festival else None
+    if mode == 'preview':
+        need(False, 'tasks_not_open', f'Задания примут с первого дня ярмарки — {_day_text(_first_fair_day(cur["key"]))}. '
+                                      'Пока можно собрать товары.')
+    need(mode in ('fair', 'late'), 'fair_closed', 'Ярмарка сейчас не работает.')
     return cur
 
 
@@ -753,7 +780,7 @@ def last_completed(fid, now):
 
 def hand_in(farm, data, now):
     now = tick(now)
-    cur = _open_fair(data['festival'], now)
+    cur = _open_tasks(data['festival'], now)
     fid = cur['id']
     task = next((t for t in content(fid)['tasks'] if t['id'] == data['task']), None)
     need(task is not None, 'unknown_task', 'Такого задания нет.', 422)
@@ -826,13 +853,27 @@ def _good_view(g, e, lvl, cost, extra=None):
     return row
 
 
+def prep_view(farm, cur, mode, lvl):
+    """The task list outside the fair days: 'preview' (shown, locked until the first fair day) or 'late' (taken, same price)."""
+    c = content(cur['id'])
+    e = {**blank(), **(farm.get('festivals') or {}).get(cur['key'], {})}
+    first = _first_fair_day(cur['key'])
+    tasks = [dict(id=t['id'], title=t['title'], host=t['host'], level=t['level'], options=t['options'], done=t['id'] in e['tasks'],
+                  locked=mode == 'preview' or lvl < t['level'], preview=mode == 'preview',
+                  reward=dict(id=t['reward'], name=good_of(cur['id'], t['reward'])['name']))
+             for t in c['tasks']]
+    keep = next((g for g in c['goods'] if g['source'] == 'keepsake'), None)
+    return dict(id=cur['id'], name=cur['name'], key=cur['key'], host=cur['host'], mode=mode, opens_at=_ts(first),
+                ends_at=cur['ends_at'], tasks=tasks, keepsake=keep and dict(id=keep['id'], name=keep['name'], got=e['keepsake']))
+
+
 def owner_view(farm, now, tower=None):
     """Owner-only projection: calendar, the open fair (tasks, stall), the past-festivals shop and the collection."""
     now = tick(now)
     lvl = level(farm['xp'])
     s = farm.get('festivals') or {}
     cur = current(now)
-    view = dict(public_calendar(farm, now), past_markup_pct=PAST_MARKUP_PCT, fair=None, past=[], collection=collection(farm))
+    view = dict(public_calendar(farm, now), past_markup_pct=PAST_MARKUP_PCT, fair=None, prep=None, past=[], collection=collection(farm))
     if cur is not None and cur['phase'] == 'fair':
         c = content(cur['id'])
         e = {**blank(), **s.get(cur['key'], {})}
@@ -846,6 +887,10 @@ def owner_view(farm, now, tower=None):
                             ends_at=cur['fair_ends_at'], tasks=tasks, goods=goods, todo=not c['tasks'] and not c['goods'],
                             keepsake=keep and dict(id=keep['id'], name=keep['name'], got=e['keepsake']),
                             tower=tower)
+    acting = current(now)
+    mode = task_mode(acting, now) if view['fair'] is None else None
+    if mode in ('preview', 'late'):
+        view['prep'] = prep_view(farm, acting, mode, lvl)
     for fid in FESTIVALS:
         if cur is not None and cur['id'] == fid and cur['phase'] == 'fair':
             continue    # this fair is open: the stall sells at the fair price, so last year's lots (x1.5) are not listed next to it

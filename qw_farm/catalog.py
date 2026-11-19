@@ -610,7 +610,7 @@ def public_catalog(upkeep_config=None):
         debt_slow=[DEBT_SLOW,DEBT_SLOW_DEN], fund_level=FUND_LEVEL, season_days=SEASON_DAYS,
         fund_tiers=FUND_TIERS,tier_text=FUND_REWARD_TEXT,markup=FUND_MARKUP,
         min_share_pct=MIN_SHARE_PCT,discount_pct=TIER_DISCOUNT_PCT,
-        feast=[FEAST_DAYS,FEAST_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,
+        feast=[FEAST_DAYS,FEAST_PCT],rush=[RUSH_DAYS,RUSH_PCT],decor_tiers=DECOR_TIERS,decor_shop=DECOR_SHOP,
         reward_decor=REWARD_DECOR,
     )
     extensions = {}
@@ -737,6 +737,7 @@ MIN_SHARE_PCT=10                # minimal personal contribution (percent of INCO
 MAX_CONTRIBUTION=10**9
 TIER_DISCOUNT_PCT=25            # personal tier 3: upkeep discount until the season ends
 FEAST_DAYS,FEAST_PCT=3,10       # "Праздник": +10% XP for 3 days
+RUSH_DAYS,RUSH_PCT=3,125        # «Рывок деревни»: the last 3 days of a season a lagging village goal counts contributions x1.25
 FUND_REWARD_TEXT={
  1:'Праздничная гирлянда (декор)',
  2:'«Покупатель Сороки»: +1 к лимиту в её визите',

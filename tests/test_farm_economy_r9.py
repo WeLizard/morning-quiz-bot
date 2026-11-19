@@ -555,3 +555,34 @@ def test_postgres_migration_creates_the_village_table_and_refuses_to_drop_data(f
                     assert inspect(sync).has_table('farm_village', schema=schema)
                 await connection.run_sync(roundtrip)
     asyncio.run(run())
+
+
+def test_village_rush_counts_the_last_days_x125_for_the_common_goal_only():
+    """«Рывок деревни»: the last 3 days of a season a lagging goal counts contributions x1.25; the personal scale stays nominal."""
+    from qw_farm.catalog import RUSH_DAYS, RUSH_PCT
+    assert (RUSH_DAYS, RUSH_PCT) == (3, 125)
+    season = economy.season_of(D1 + 3600)
+    end = economy.season_end(season)
+    assert economy.rush_pct(end - 4 * DAY, 0, 10) == 100                 # before the last three days: nominal
+    assert economy.rush_pct(end - 3 * DAY, 0, 10) == 125 and economy.rush_pct(end - 1, 9, 10) == 125
+    assert economy.rush_pct(end - DAY, 10, 10) == 100                     # the goal is reached: nothing extra
+    assert economy.rush_pct(end, 0, 10) == 100                            # the next season starts plain
+
+    async def run():
+        village = SharedVillage(goal=30_000)
+        clock = [end - 2 * DAY]
+        state = farm(lv=12, coins=200_000)
+        unit = SharedUnit('r', state, village)
+        service = FarmService(unit, Principal('r', 'r'), clock=lambda: clock[0])
+        view = await service.view()
+        assert view['village']['rush_pct'] == 125
+        result = await service.command('rush-r-000001', 'fund_contribute', {'coins': 20_000, 'items': {}})
+        assert village.rows[season]['total'] == 25_000 and 'Рывок деревни: в общую цель засчитано 25000.' in result['notice']
+        mine = unit.farms[state['id']]['economy']
+        assert mine['seasons'][str(season)]['personal'] == 20_000 and mine['stats']['fund_village'] == 20_000
+        await service.command('rush-r-000002', 'fund_contribute', {'coins': 8_000, 'items': {}})
+        assert village.rows[season]['total'] == 35_000                    # 25 000 < goal: this one is still x1.25
+        await service.command('rush-r-000003', 'fund_contribute', {'coins': 1_000, 'items': {}})
+        assert village.rows[season]['total'] == 36_000                    # the goal is reached: nominal again
+        assert (await service.view())['village']['rush_pct'] == 100
+    asyncio.run(run())

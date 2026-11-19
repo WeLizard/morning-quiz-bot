@@ -80,11 +80,40 @@ export function groupBySeller(goods){
 }
 export function bannerText(view,format=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',timeZone:'Europe/Moscow'})){
  const cur=view?.current,date=at=>format.format(new Date(at*1000));
- if(cur)return cur.phase==='fair'?`${cur.name}: ярмарка на площади. Шатёр и задания открыты.`:`${cur.name}: деревня наряжается. Ярмарка ещё впереди.`;
+ if(cur)return cur.phase==='fair'?`${cur.name}: ярмарка на площади. Шатёр и задания открыты.`:view?.prep?.mode==='late'?`${cur.name}: ярмарка прошла, деревня ещё нарядная. Несданные задания примут до конца праздника.`:`${cur.name}: деревня наряжается. Ярмарка ещё впереди.`;
  const up=view?.upcoming;
  return up?.soon?`Скоро: ${up.name}, с ${date(up.starts_at)}.`:'';
 }
 
+// Tasks outside the fair days (qw_farm/festivals.py task_mode): 'preview' shows what to gather before the first fair day,
+// 'late' takes what was not handed in at the fair — the same goods, no discount, the keepsake still counts.
+export function prepText(prep,format=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',timeZone:'Europe/Moscow'})){
+ const date=at=>format.format(new Date(at*1000));
+ return prep.mode==='preview'?`Задания примут с ${date(prep.opens_at)}, с первого дня ярмарки. Товары можно собрать заранее.`
+  :`Ярмарка прошла, но не сданное можно сдать до ${date(prep.ends_at-1)} включительно: те же товары, памятный предмет засчитывается.`;
+}
+function prepCard(p,prep,h){
+ const {el,button,card,goods,stock,command}=h;
+ const c=card('Праздничные задания',prep.mode==='preview'?'Подготовка к ярмарке':'Ярмарка прошла — ещё не поздно','journal');c.classList.add('fest-tasks','fest-prep');
+ c.dataset.prep=prep.mode;c.append(el('p',prepText(prep),'note'));
+ for(const t of prep.tasks){
+  const row=el('div',null,`fest-task${t.done?' done':''}`);
+  const reward=el('small',null);reward.append(itemMark(h,t.reward.id),el('span',`${t.host} · награда: ${t.reward.name}${!t.preview&&t.locked?` · с ${t.level} уровня`:''}`));
+  row.append(el('strong',t.done?`${t.title} · готово`:t.title),reward);
+  if(!t.done){
+   const stack=el('div',null,'qw-btn-stack');
+   t.options.forEach((needs,i)=>{
+    const line=el('div',null,'fest-option');line.append(goods(needs));
+    if(!t.preview)line.append(button('Сдать',()=>command('festival_task',{festival:prep.id,task:t.id,option:i}),'qw-btn secondary',!canHandIn(t,i,stock)||h.busy?.()));
+    stack.append(line);
+   });
+   row.append(stack);
+  }
+  c.append(row);
+ }
+ if(prep.keepsake){const k=el('p',null,'note');k.append(itemMark(h,prep.keepsake.id),el('span',prep.keepsake.got?`${prep.keepsake.name}: в коллекции навсегда.`:`Все задания — и «${prep.keepsake.name}» твои. Только в этом году.`));c.append(k);}
+ p.append(c);
+}
 function santaCard(p,h){
  const game=h.santa?.();if(!game)return;
  const {el,button,card}=h,wins=(game.battles||[]).filter(b=>b.stars>0).length;
@@ -111,6 +140,7 @@ export function renderFestival(p,view,h){
  if(cur?.id==='pumpkin_night')h.horsemanCard?.(p);
  // «Битва с Сантой» (FARM_SANTA_BATTLE.md): Дед Мороз calls to the square while the New Year lasts.
  if(cur?.id==='new_year')santaCard(p,h);
+ if(view.prep)prepCard(p,view.prep,h);
  if(fair){
   if(fair.tower){
    const t=fair.tower,pie=h.pie?.(),label=pie?.active?'Продолжить':!pie?'Играть':pie.attempts_left>0?(pie.last_result?'Ещё раз':'Играть'):'Тренировка';

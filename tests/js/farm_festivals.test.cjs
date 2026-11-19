@@ -195,3 +195,25 @@ test('a host stall wears the host sign; every festival that sells through its ho
  assert.ok(hosted.size>=8,[...hosted].join());
  assert.deepEqual([...hosted].filter(fid=>!F.HOST_SHOP[fid]),[]);
 });
+
+test('outside the fair: the task list is shown in advance and the unfinished tasks are taken after the fair',async()=>{
+ const F=await load(),tasks=preview=>[
+  {id:'yarn',title:'Пряжа для общего клубка',host:'Соня',level:5,options:[{yarn:4},{wool:6}],done:false,locked:preview,preview,reward:{id:'fest_posid_basket',name:'Корзинка'}},
+  {id:'tea',title:'Пироги к чаю',host:'Агата',level:3,options:[{pie:3}],done:true,locked:preview,preview,reward:{id:'fest_posid_smoke',name:'Дымок'}}];
+ const view=mode=>({current:{id:'posidelki',name:'Посиделки',phase:'decor',host:'Соня',starts_at:100,ends_at:9e9},fair:null,past:[],collection:{},
+  prep:{id:'posidelki',name:'Посиделки',key:'posidelki-2026',host:'Соня',mode,opens_at:1795640400,ends_at:1796072400,tasks:tasks(mode==='preview'),
+   keepsake:{id:'fest_posid_socks',name:'Носки года',got:false}}});
+ const fmt=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',timeZone:'Europe/Moscow'});
+ assert.match(F.prepText(view('preview').prep,fmt),/^Задания примут с 26 ноября/);
+ assert.match(F.prepText(view('late').prep,fmt),/до 30 ноября включительно: те же товары/);
+ let h=helpers(),p=new Node('div');F.renderFestival(p,view('preview'),h);
+ let all=walk(p);
+ assert.equal(all.filter(n=>n.tag==='button'&&n.text==='Сдать').length,0,'nothing is taken before the fair');
+ assert.ok(all.some(n=>n.tag==='div'&&n.cls==='goods'&&n.text==='{"yarn":4}'),'the goods to gather are listed');
+ assert.match(all.map(n=>n.text).join('|'),/деревня наряжается/);
+ h=helpers();p=new Node('div');F.renderFestival(p,view('late'),h);all=walk(p);
+ const handIns=all.filter(n=>n.tag==='button'&&n.text==='Сдать');
+ assert.equal(handIns.length,2);handIns[0].onclick();
+ assert.deepEqual(h.calls[0],['festival_task',{festival:'posidelki',task:'yarn',option:0}],'the same intent, no price');
+ assert.match(all.map(n=>n.text).join('|'),/ярмарка прошла/);
+});

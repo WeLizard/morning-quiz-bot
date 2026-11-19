@@ -2184,10 +2184,13 @@ function fundGoodsDialog(){
  for(const id of ids){const [fw,fi]=field(`${itemName(id)}: есть ${S.me.inventory[id]}, ≈${fmt(Math.floor(S.catalog.items[id].price*e.markup/100))} мон. за штуку`,'number',0);fi.min=0;fi.max=S.me.inventory[id];inputs[id]=fi;w.append(fw);}
  modal('Товары в фонд деревни',w,[button('Внести',safe(async()=>{const items={};for(const [id,i] of Object.entries(inputs)){const q=Math.floor(Number(i.value));if(q>0)items[id]=Math.min(q,stock(id));}if(!Object.keys(items).length){toast('Выбери хотя бы один товар.',true);return;}if(await command('fund_contribute',{coins:0,items}))$('dialog').close();}),'primary',!ids.length)]);
 }
+// «Рывок деревни» (qw_farm/economy.py rush_pct): the last days of a lagging season count contributions more for the common goal only.
+function rushNote(){const r=S.village?.rush_pct;return r>100?`Рывок деревни: цель сезона ещё не набрана, поэтому до конца сезона каждый вклад идёт в общую цель ×${String(r/100).replace('.',',')}. Личная шкала и награды считают вклад как есть.`:'';}
 function fundCard(p,e){
  const eC=ECON(),left=Math.max(0,Math.ceil((e.season_ends_at-now())/86400));
  const c=card('Фонд деревни',`СЕЗОН: ЕЩЁ ${left} ${dayWord(left)}`,'friends');
  if(!e.fund_open){note(`Фонд откроется с ${eC.fund_level} уровня: вклады копят личные награды и помогают всей деревне.`,c);p.append(c);return;}
+ if(rushNote())note(rushNote(),c);
  if(e.feast_until>now()){const f=el('div',null,'callout feast-note'),left=timer(e.feast_until);left.dataset.untilPrefix=`+${eC.feast[1]}% опыта ещё `;updateTime(left);f.append(el('strong','«Праздник»'),left);c.append(f);}
  c.append(el('h3','Твоя шкала','subheading'),meter(e.personal,e.thresholds[e.thresholds.length-1]));
  c.append(el('p',`Внесено за сезон: ${fmt(e.personal)} из ${fmt(e.thresholds[e.thresholds.length-1])} мон.`,'note'));
@@ -2575,7 +2578,7 @@ function renderVillage(p){
  if(villageSheet==='resident'&&villageResident){heading(villageResident,'НА ДЕРЕВЕНСКОЙ ПЛОЩАДИ');renderVillageResident(p);return;}if(villageSheet!=='townhall'){heading('Деревня','ЖИТЕЛИ И ОБЩАЯ ПЛОЩАДЬ');return;}heading('Ратуша','СЕЗОННЫЙ ПРАЗДНИК И ДЕЛА ФЕРМЫ');
  const e=eco();if(!e){note('Данные фонда пока недоступны. Обнови ферму.',p);return;}
  const seasonal=el('section',null,'card village-season');seasonal.append(el('strong','Сезонная подготовка праздника'));note('Помогаем вместе: флажки, цветы и угощения появляются по мере наполнения общего фонда. В новом сезоне подготовка начинается заново.',seasonal);
- const stage=villageStage();if(stage===null)note(e.fund_open?'Данные общего фонда пока недоступны. Обнови ферму.':`Фонд и этапы подготовки откроются с ${ECON().fund_level} уровня.`,seasonal);else{seasonal.append(meter(S.village.total,S.village.goal));note(`${fmt(S.village.total)} / ${fmt(S.village.goal)} мон. · этап ${stage+1} из 4`,seasonal);}p.append(seasonal);
+ const stage=villageStage();if(stage===null)note(e.fund_open?'Данные общего фонда пока недоступны. Обнови ферму.':`Фонд и этапы подготовки откроются с ${ECON().fund_level} уровня.`,seasonal);else{seasonal.append(meter(S.village.total,S.village.goal));note(`${fmt(S.village.total)} / ${fmt(S.village.goal)} мон. · этап ${stage+1} из 4`,seasonal);if(rushNote())note(rushNote(),seasonal);}p.append(seasonal);
  for(const [name,draw] of [['Фонд и праздник',fundCard],['Содержание фермы',upkeepCard],['Украшения фермы',decorShop]]){const details=el('details',null,'village-services');details.dataset.villageService=name;const summary=el('summary',name);summary.dataset.villageFocus=`service:${name}`;details.append(summary);draw(details,e);p.append(details);}
 }
 

@@ -8,11 +8,12 @@ No Telegram I/O is performed under these locks.
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
+from uuid import UUID
 import json
 
-from sqlalchemy import and_, select, text, or_
+from sqlalchemy import and_, select, text, or_, update
 
-from .models import AdminAction, Chat, ChatMember, Game, QuizSession, User, SystemState
+from .models import Account, AdminAction, Chat, ChatMember, Game, GuestSession, QuizSession, User, SystemState
 from .games import GameRepository
 from .score_ledger import RewardLedger, ensure_account_for_user
 
@@ -97,9 +98,11 @@ def digest(value):
 
 
 def receipt(row):
-    return {'id': row.id, 'scope': row.scope, 'target_id': str(row.target_id), 'kind': row.kind,
+    target = row.target_account_id if row.scope == 'accounts' else row.target_id
+    return {'id': row.id, 'scope': row.scope, 'target_id': str(target), 'kind': row.kind,
             'created_at': row.created_at.isoformat(), 'request': row.request,
-            'before': row.before, 'after': row.after, 'actor': 'local-admin-session'}
+            'before': row.before, 'after': row.after,
+            'actor': 'operator:' + row.request['operator_id'] if row.scope == 'accounts' else 'local-admin-session'}
 
 
 class AdminActions:
@@ -158,16 +161,70 @@ class AdminActions:
     async def _retry(self, session, action_id, scope, target_id, kind, request):
         row = await session.get(AdminAction, action_id)
         if row:
-            if (row.scope, row.target_id, row.kind, row.request) != (scope, target_id, kind, request):
+            stored_target = row.target_account_id if row.scope == 'accounts' else row.target_id
+            requested_target = UUID(str(target_id)) if scope == 'accounts' else target_id
+            if (row.scope, stored_target, row.kind, row.request) != (scope, requested_target, kind, request):
                 raise AdminConflict('Идентификатор операции уже использован для другого действия.')
             return receipt(row)
 
     async def _record(self, session, action_id, scope, target_id, kind, request, before, after):
-        row = AdminAction(id=action_id, scope=scope, target_id=target_id, kind=kind,
+        row = AdminAction(id=action_id, scope=scope,
+                          target_id=None if scope == 'accounts' else target_id,
+                          target_account_id=UUID(str(target_id)) if scope == 'accounts' else None, kind=kind,
                           request=request, before=before, after=after)
         session.add(row)
         await session.flush()
         return receipt(row)
+
+    async def moderate_account(self, account_id, *, operator_id, action_id, expected_revision,
+                               reason, blocked=None, archived=None):
+        """Trusted admin adapter only: typed UUID audit, no Telegram fallback.
+
+        The adapter must already have authenticated/authorized its admin and CSRF.
+        Blocking one UUID revokes sessions; it never interrupts its whole table.
+        """
+        account_id = UUID(str(account_id))
+        if (not isinstance(operator_id, str) or not 1 <= len(operator_id) <= 128
+                or not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 500
+                or (blocked is None) == (archived is None)
+                or (blocked is not None and type(blocked) is not bool)
+                or (archived is not None and type(archived) is not bool)
+                or type(expected_revision) is not int):
+            raise ValueError('invalid_account_moderation')
+        kind = 'moderation' if blocked is not None else 'archive'
+        request = {'operator_id': operator_id, 'reason': reason.strip(),
+                   'expected_revision': expected_revision,
+                   ('blocked' if blocked is not None else 'archived'): blocked if blocked is not None else archived}
+        async with self.database.transaction() as session:
+            await operation_fence(session, exclusive=True)
+            previous = await self._retry(session, action_id, 'accounts', account_id, kind, request)
+            if previous:
+                return previous
+            if blocked is True or archived is True:
+                # Canonical UUID only, after exact replay and BEFORE Account
+                # row lock. Invalid revision/order below rolls this back too.
+                from .night_ai_dispatch import revoke_account_night_ai_in
+                await revoke_account_night_ai_in(session,account_id,now=datetime.now(timezone.utc))
+            row = await session.scalar(select(Account).where(Account.id == account_id).with_for_update())
+            if row is None:
+                raise LookupError('account_unavailable')
+            if row.moderation_revision != expected_revision:
+                raise AdminConflict('account_revision_conflict')
+            if row.merged_into_id is not None:
+                raise AdminConflict('account_merged')
+            if (blocked is False and row.archived) or (archived is True and not row.bot_blocked):
+                raise AdminConflict('account_moderation_order')
+            before = moderation(row)
+            if blocked is not None:
+                row.bot_blocked = blocked
+            else:
+                row.archived = archived
+            row.moderation_reason = reason.strip()
+            row.moderation_revision += 1
+            if row.bot_blocked or row.archived:
+                await session.execute(update(GuestSession).where(GuestSession.account_id == account_id).values(revoked=True))
+            return await self._record(session, action_id, 'accounts', account_id, kind,
+                                      request, before, moderation(row))
 
     async def block(self, scope, target_id, *, blocked, reason, expected_revision, action_id):
         reason = reason.strip()

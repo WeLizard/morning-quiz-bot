@@ -1,6 +1,6 @@
 """Merge two platform accounts into one (secondary -> main).
 
-Runs inside the caller's transaction; the caller already holds ``operation_fence``
+Runs inside the caller's transaction; the caller already holds exclusive ``operation_fence``
 (and, for Telegram flows, the ``mini-login:<uid>`` advisory lock). Lock order, continuing the
 platform order: User FOR UPDATE -> AccountIdentity FOR UPDATE -> GuestSession FOR UPDATE ->
 Account(s) FOR NO KEY UPDATE (ascending id) -> AlchemyProgress (ascending account id) -> Farm
@@ -31,7 +31,7 @@ from storage.mini_app import MiniAppError
 from storage.models import (
     Account, AccountCredential, AccountIdentity, AccountMerge, AlchemyClaimCommand,
     AlchemyCraftCommand, AlchemyProgress, AlchemyStageClaim, Base, ClassicAccountAnswer,
-    GamePlayer, GuestSession, Room, RoomInvite, RoomMembership, ScoreEvent, User,
+    Game, GamePlayer, GuestSession, Room, RoomInvite, RoomMembership, ScoreEvent, User,
 )
 from storage.score_ledger import RewardLedger
 
@@ -75,6 +75,16 @@ MERGE_POLICY = {
     ('farm_village_contribs', 'account_id'): 'special',
     ('farm_village_stall_lots', 'seller_account'): 'special',
     ('problem_reports', 'account_id'): 'history',
+    ('night_cases', 'registered_by'): 'history',
+    ('night_lobby_commands', 'original_actor_account_id'): 'history',
+    ('night_messages', 'sender_account_id'): 'history',
+    ('night_intent_proposals', 'original_actor_account_id'): 'history',
+    ('night_episode_drafts', 'reviewed_by'): 'history',
+    ('night_reward_claims', 'original_account_id'): 'history',
+    ('admin_actions', 'target_account_id'): 'history',
+    ('night_ai_game_control', 'starter_account_id'): 'history',
+    ('night_ai_requests', 'requester_account_id'): 'history',
+    ('night_ai_intent_requests', 'requester_account_id'): 'history',
 }
 
 _UNION_LISTS = ('discovered', 'crafted', 'verified_discovered', 'verified_crafted',
@@ -271,6 +281,9 @@ class AccountMergeService:
         if main is None or secondary is None or main.id == secondary.id:
             raise MiniAppError(409, 'Слияние невозможно.', code='merge_unavailable')
         ids = sorted([main.id, secondary.id], key=lambda value: value.bytes)
+        # Entry points hold the exclusive operational fence from their first SQL.
+        from application.night_case import assert_merge_available
+        await assert_merge_available(session, ids)
         # Users, identities and guest sessions were locked by the caller (``lock_owned_rows_in``)
         # before any Account row; accounts come next, ascending id, NO KEY UPDATE (compatible
         # with the FK checks of games/farm).
@@ -441,7 +454,8 @@ class AccountMergeService:
     async def _merge_games(self, session, main, secondary, summary):
         gp = select(GamePlayer.game_id).where(GamePlayer.account_id == main.id)
         summary['moved']['game_players'] = (await session.execute(
-            update(GamePlayer).where(GamePlayer.account_id == secondary.id, GamePlayer.game_id.not_in(gp))
+            update(GamePlayer).where(GamePlayer.account_id == secondary.id, GamePlayer.game_id.not_in(gp),
+                GamePlayer.game_id.not_in(select(Game.id).where(Game.mode == 'night_case')))
             .values(account_id=main.id))).rowcount
         summary['left_on_secondary']['game_players'] = await self._count(
             session, GamePlayer.account_id, secondary.id)
@@ -478,6 +492,13 @@ class AccountMergeService:
         from qw_farm import friend_requests
         await friend_requests.merge_close(unit,main.id,secondary.id,self.clock())
         from qw_farm import construction
+        from qw_farm import daily_bonus
+        farm_now = self.clock()
+        for account in (main,secondary):
+            state = await unit.by_account(account.id)
+            if state is not None:
+                await daily_bonus.bootstrap(unit,state,farm_now)
+                await unit.save(state)
         await construction.merge_prepare(unit, main.id, secondary.id, self.clock())
         theirs = await unit.by_account(secondary.id)
         mine = await unit.by_account(main.id)
@@ -516,6 +537,7 @@ class AccountMergeService:
                 total = MAX_QTY
             inventory[key] = total
         farm['inventory'] = {k: v for k, v in inventory.items() if v}
+        construction.merge_effect_state(farm, theirs, farm_now)
         farm['revision'] = int(farm['revision']) + 1
         try:
             from qw_farm.domain import validate_state

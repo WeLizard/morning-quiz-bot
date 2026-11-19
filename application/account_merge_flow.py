@@ -6,7 +6,7 @@ Telegram ownership is proven either by a bot-approved browser login request (coo
 transaction and then delegates to ``AccountMergeService.merge_in``.
 
 Lock order inside ``confirm`` (platform order, rows before Accounts, accounts ascending):
-operation_fence -> advisory ``mini-login:<uid>`` -> login request FOR UPDATE -> User(uid) ->
+exclusive operation_fence -> advisory ``mini-login:<uid>`` -> login request FOR UPDATE -> User(uid) ->
 AccountIdentity(telegram uid) -> Users / AccountIdentities / GuestSessions of BOTH accounts
 (``lock_owned_rows_in``) -> Account rows FOR NO KEY UPDATE ascending id -> (merge_in) AlchemyProgress
 -> farm advisory locks. The browser account id is learned from the cookie without locking, then
@@ -67,7 +67,7 @@ class AccountMergeFlow:
         if main not in CHOICES or (browser_secret is None) == (identity is None):
             raise MiniAppError(400, 'Некорректные параметры')
         async with self.database.transaction() as session:
-            await operation_fence(session)
+            await operation_fence(session, exclusive=True)
             request = None
             if browser_secret is not None:
                 peek = await self.logins.peek_in(session, browser_secret)

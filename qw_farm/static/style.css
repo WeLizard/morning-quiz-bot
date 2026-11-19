@@ -1620,7 +1620,7 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"] :is(.rail button,.note,.empty,.text-button,.subheading,.recipe-time,.lock-text,.event small,.card .tag,.login-card details,.login-card .eyebrow,.scene-heading .eyebrow,.scene-heading p,.reward small,.scene-status,.seedcard-class,.seedcard-hint,.resident-note,.invite-more summary,.invite-rules summary,.catalog-card small,.catalog-section small,.catalog-group,.placement-copy small){color:var(--muted)}
 :root[data-qw-contrast="1"] :is(.catalog-card small,.catalog-section small,.placement-copy small,.panel-content small,.note){font-size:var(--qw-fs-small,14px)}
 :root[data-qw-contrast="1"] .catalog-card strong{font-size:var(--qw-fs-control,15px)}
-:root[data-qw-contrast="1"] .catalog-section strong{font-size:var(--qw-fs-caption,14px)}
+:root[data-qw-contrast="1"] .catalog-section strong{font-size:var(--qw-fs-caption,14px);hyphens:auto;overflow-wrap:break-word}
 :root[data-qw-contrast="1"] .catalog-card.is-locked strong{color:var(--ink)}
 :root[data-qw-contrast="1"] .catalog-card.is-locked .catalog-pic>canvas,:root[data-qw-contrast="1"] .catalog-card.is-locked .catalog-pic>.is-icon{opacity:.75}
 :root[data-qw-contrast="1"] .catalog-chip{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 var(--qw-outline-w) var(--ink)}

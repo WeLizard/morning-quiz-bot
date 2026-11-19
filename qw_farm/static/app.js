@@ -993,7 +993,7 @@ function drawCatalogBody(body,entries){
   const b=button(null,()=>{catState.section=id;drawCatalogBody(body,entries);body.querySelector('.catalog-sections [aria-pressed=true]')?.focus({preventScroll:true});},'catalog-section');
   b.setAttribute('aria-pressed',String(id===catState.section));b.dataset.section=id;
   const pic=el('span',null,'catalog-section-pic');if(SECTION_PIC[id])pic.append(thumbCanvas(SECTION_PIC[id],'catalog-section-thumb',96,72));else pic.append(icon('wheat'));
-  b.append(pic,el('strong',title),el('small',String(counts[id])));b.setAttribute('aria-label',`${title}: ${counts[id]}`);nav.append(b);
+  b.append(pic,el('strong',title.length>8?title.slice(0,6)+'\u00ad'+title.slice(6):title),el('small',String(counts[id])));b.setAttribute('aria-label',`${title}: ${counts[id]}`);nav.append(b);
  }
  for(const e of entries.filter(e=>e.section===catState.section))grid.append(catalogCard(e));
  body.append(nav,grid);

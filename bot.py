@@ -534,6 +534,11 @@ async def main() -> None:
         application_instance.add_handlers(photo_quiz_handlers.get_handlers())
         if mafia_handlers:
             application_instance.add_handlers(mafia_handlers.get_handlers())
+        from handlers.farm_widget_handlers import FarmWidgetHandlers, farm_enabled
+        if data_manager.postgres_storage and farm_enabled():
+            # /farm в личке: живая карточка фермы (виджет Bot API 10.4) поверх того же FarmService.
+            application_instance.add_handlers(
+                FarmWidgetHandlers(data_manager.postgres_storage.database).get_handlers())
         if data_manager.postgres_storage:
             # Group -1: служебные события чата не должны зависеть от остальных обработчиков.
             availability_handlers = ChatAvailabilityHandlers(data_manager.postgres_storage.database)

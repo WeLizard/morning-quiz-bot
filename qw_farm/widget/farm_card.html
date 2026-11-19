@@ -1,0 +1,49 @@
+<style>
+body{margin:0;padding:10px 12px max(10px,env(safe-area-inset-bottom));font:1em system-ui,sans-serif}
+h3{margin:0;font-size:1.1em}
+.m{color:var(--tg-theme-hint-color);font-size:.9em}
+.big{font-size:1.6em;font-weight:700;margin:10px 0 0}
+button{display:block;width:100%;margin-top:10px;min-height:44px;font-weight:600}
+.o{display:flex;gap:10px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--tg-theme-section-separator-color)}
+.o div{flex:1;min-width:0}
+.o button{width:auto;margin:0;padding:0 14px;flex:none}
+.sec{margin-top:14px;font-weight:600}
+.err{color:var(--tg-theme-destructive-text-color)}
+#q{margin-top:8px;min-height:1.3em}
+</style>
+<div id="a"></div>
+<script>
+const W=window.TelegramWidget,OPEN="__OPEN_URL__",A=document.getElementById('a');
+const ERR={NOT_ALLOWED:'Здесь это действие недоступно.',BUSY:'Подожди, прошлое действие ещё идёт.',RATE_LIMITED:'Слишком часто. Подожди пару секунд.',TIMEOUT:'Бот не ответил вовремя. Загляни в карточку чуть позже.',FAILED:'Нет связи с ботом.'};
+let S=null,busy=false,msg='',bad=false;
+function load(t){try{const n=JSON.parse(t);if(n&&(!S||n.r>=S.r))S=n}catch(e){}}
+load(W.chatData);
+const now=()=>Date.now()/1000;
+const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
+function ready(){return S?S.k+S.t.filter(x=>x<=now()).length:0}
+function wait(){const f=S.t.find(x=>x>now());return f?f-now():0}
+function dur(s){s=Math.ceil(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+' ч '+m+' мин':m?m+' мин '+s%60+' с':s+' с'}
+function el(tag,cls,text,parent){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;(parent||A).appendChild(e);return e}
+function btn(text,off,fn,parent){const b=el('button','',text,parent);b.disabled=off||busy;b.onclick=fn;return b}
+function ask(data){if(busy)return;busy=true;msg='Отправляю…';bad=false;render();
+W.request(data).then(a=>{let r=null;try{r=JSON.parse(a.result)}catch(e){}busy=false;if(r&&r.st)load(JSON.stringify(r.st));msg=r?(r.err||r.m||''):'';bad=!!(r&&r.err);
+if(r&&r.m&&!bad&&W.HapticFeedback)W.HapticFeedback.notificationOccurred('success');render()},
+e=>{busy=false;msg=ERR[e&&e.code]||'Не получилось. Попробуй ещё раз.';bad=true;render()})}
+function sync(){if(busy)return;busy=true;W.request('farm:sync:'+(S?S.r:0)).then(a=>{busy=false;let r=null;try{r=JSON.parse(a.result)}catch(e){}if(r&&r.st)load(JSON.stringify(r.st));if(r&&r.err){msg=r.err;bad=true}render()},()=>{busy=false;render()})}
+function render(){A.textContent='';
+if(!S){el('h3','','🌾 Ферма');el('p','m',msg||'Загружаю…')}
+else{el('h3','','🌾 '+S.n);el('div','m','💰 '+fmt(S.c)+' монет');
+const n=ready(),w=wait();
+el('div','big',n?'Готово: '+n:'Урожай растёт');
+el('div','m',n?'Грядки и деревья можно собрать':w?'Следующий урожай через '+dur(w):'Посади что-нибудь на ферме');
+btn(n?'Собрать урожай · '+n:'Собирать пока нечего',!n,()=>ask('farm:all:'+S.r));
+if(S.o.length){el('div','sec','Заказы на доске');
+for(const o of S.o){const row=el('div','o'),d=el('div','',null,row);el('b','',o[1],d);el('div','m',o[2]+' · +'+fmt(o[4])+' монет',d);
+btn(o[3]?'Сдать':'Не хватает',!o[3],()=>ask('farm:ord:'+o[0]+':'+S.r),row)}}}
+el('div',bad?'err':'m',msg).id='q';
+if(OPEN)btn('Открыть ферму',false,()=>W.openTelegramLink(OPEN))}
+W.onEvent('chatDataChanged',()=>{load(W.chatData);render()});
+W.onEvent('activated',sync);
+setInterval(()=>{if(S&&!busy&&S.t.length)render()},1000);
+render();sync();W.ready();
+</script>

@@ -18,6 +18,7 @@
         if (scoped) return scoped[1] === 'mafia' ? {page: 'mafia', night: {chatId: '-' + scoped[2]}} : {page: scoped[1], chatId: '-' + scoped[2]};
         const night = nightLaunch(raw);
         if (night) return {page: 'mafia', night};
+        if (raw === 'farm') return {page: 'home', farm: true}; // the farm card in the chat with the bot
         return Object.prototype.hasOwnProperty.call(LAUNCH_PAGES, raw) ? {page: LAUNCH_PAGES[raw]} : null;
     }
     // «Ночной город»: startapp roomid_<uuid> opens a room by id (checked before room_), room_<code> is an invitation;
@@ -163,6 +164,17 @@
             sessionStorage.setItem('qw-farm.incoming', id);
         } catch {}
         return id;
+    }
+    // ?startapp=farm opens the farm once per Mini App session: Telegram keeps start_param on reload,
+    // so coming back to the hub from the farm must not bounce the player into the farm again.
+    function openFarmLaunch() {
+        if (!launch?.farm || !(state.gameModes || []).some(mode => mode.id === 'farm')) return false;
+        try {
+            if (sessionStorage.getItem('qw-farm.card-launch') === 'used') return false;
+            sessionStorage.setItem('qw-farm.card-launch', 'used');
+        } catch { return false; }
+        window.location.assign('/app/farm?identity=telegram');
+        return true;
     }
     function resumeFarmInvite(identity, pendingInvite = null) {
         if (!(state.gameModes || []).some(mode => mode.id === 'farm' && mode.status === 'development')) return false;
@@ -1196,6 +1208,7 @@
             Object.assign(state, {me, progress, chats: chats.items, moreChats: chats.has_more, chatOffset: chats.items.length, achievements});
             window.QW?.prefs?.applyAccount(me); // the Account's «Контрастный режим» wins over this device's cache
             if (resumeFarmInvite('telegram')) return;
+            if (openFarmLaunch()) return;
             if (state.selected && !state.chats.some(c => c.chat_id === state.selected)) {
                 state.launchLost = true;      // чат из ссылки недоступен: не подменяем молча
                 state.selected = '';

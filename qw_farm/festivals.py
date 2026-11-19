@@ -209,7 +209,8 @@ def birthday(farm, now):
 # Content.  price = ceil(k * income_ref(level) / 100)   (FARM_VILLAGE_MINIGAMES 2.4 value law; k = percent of a day's income).
 # ----------------------------------------------------------------------------------------------------------------------
 PLACES = ('farm1', 'farm2', 'fence', 'roof', 'path', 'village', 'mascot', 'tree', 'orchard', 'none')
-KINDS = ('decor', 'decor_big', 'wall', 'roof', 'path', 'village', 'mascot', 'tree_decor', 'voucher', 'graft', 'scroll', 'curio', 'keepsake')
+KINDS = ('decor', 'decor_big', 'wall', 'roof', 'path', 'village', 'mascot', 'tree_decor', 'voucher', 'graft', 'scroll', 'curio', 'keepsake',
+         'joke')
 
 
 def _g(gid, name, kind, place, lvl, k, seller='agata', source='fair', limit=1, note='', wired=False, ref=''):
@@ -343,8 +344,259 @@ CONTENT['spring_flowers'] = dict(
         _g('fest_flw_tulip', 'Первый тюльпан', 'keepsake', 'farm1', 7, 0, source='keepsake'),
     ])
 
-# Every other festival is defined in the calendar (windows, host, theme) and handled by the engine;
-# its tasks/goods are a TODO stub until its content turn (design 9.8).
+# ---- The rest of the year (design 9.2 items 4-11, 13-17), filled 2026-11-19 in calendar order. -------------------------------
+# Every festival: 3-4 tasks from ordinary goods (a cheaper fallback option each), small decor of every form it names, a Magpie curio
+# and the keepsake of the year. ``seller='host'`` is the stall of the festival's host (Даша, Крот, Игорь, Кая, Лягух Шарик, Пух,
+# Филиныч, Зверушка). Mechanics the design gives to other systems stay there: the hidden things of Даша, the rocket launch, the
+# fishing tournament, the quiz marathon, the fern riddle of Зверушка and the Jack's gifts are not hand-ins.
+# The grafts the design names (Звёздная груша, Вишня в лентах, Вишня-двойняшка, Наливная яблоня, Ночная груша) come with their
+# warehouse icons and tree looks in the art turn of each festival; the yearly voucher budget (9.7: 3-4 saplings a year) holds
+# one more voucher only, at the saplings festival «Весенний сев».
+
+# «День смеха» (9.2 item 4): one day; Даша's «Честная лавка» sells jokes for a symbolic price (kind 'joke', k 1-3).
+CONTENT['april_fools'] = dict(
+    tasks=[
+        _t('hidden', 'Найди, что я спрятала', 'Даша', 2, [{'bun': 4}, {'bread': 5}], 'fest_fool_cap'),
+        _t('signs', 'Перепутанные таблички', 'Крот', 2, [{'wood': 8}, {'wood': 4, 'hay': 4}], 'fest_fool_signs'),
+        _t('joke', 'Оладьи с сюрпризом для Филиныча', 'Пух', 4, [{'pancake': 3}, {'jam': 2, 'bread': 3}], 'fest_fool_geese'),
+    ],
+    goods=[
+        _g('fest_fool_jar', 'Пустая банка из-под тишины', 'joke', 'farm1', 3, 1, seller='host', note='шутка Даши, ни на что не влияет'),
+        _g('fest_fool_sock', 'Носок-невидимка', 'joke', 'fence', 3, 2, seller='host', note='шутка Даши'),
+        _g('fest_fool_horseshoe', 'Подкова наоборот', 'joke', 'fence', 3, 3, seller='host', note='шутка Даши: счастье вытекает'),
+        _g('fest_fool_cake', 'Торт-обманка', 'decor', 'farm1', 5, 60),
+        _g('fest_fool_mirror', 'Кривое зеркало на площади', 'village', 'village', 5, 50, note='ячейка площади'),
+        _g('fest_fool_stripes', 'Полосатые носки на забор', 'wall', 'fence', 5, 40, seller='sonya'),
+        _g('fest_fool_whistle', 'Заморская свистулька-пищалка', 'curio', 'farm1', 10, 150, seller='magpie', note='диковинка Сороки'),
+        _g('fest_fool_cap', 'Колпак на флюгере', 'roof', 'roof', 2, 60, source='task:hidden'),
+        _g('fest_fool_signs', 'Табличка «Почта» на мельнице', 'village', 'village', 2, 60, source='task:signs', note='ячейка площади'),
+        _g('fest_fool_geese', 'Гуси в колпаках', 'decor', 'farm1', 4, 60, source='task:joke'),
+        _g('fest_fool_scarecrow', 'Пугало-шутник', 'keepsake', 'farm1', 4, 0, source='keepsake'),
+    ])
+
+# «День космонавтики» (9.2 item 13): the rocket of Крот flies when the village counter is full (a show, another system).
+CONTENT['cosmonautics'] = dict(
+    tasks=[
+        _t('barrel', 'Бочка и заклёпки для ракеты', 'Крот', 2, [{'wood': 10}, {'wood': 5, 'hay': 5}], 'fest_cosm_flags'),
+        _t('fuel', 'Энергетос для космонавта', 'Пух', 5, [{'berry_milk': 2}, {'jam': 3, 'milk': 4}], 'fest_cosm_birdhouse'),
+        _t('ration', 'Бортовой паёк', 'Агата', 5, [{'rye_rusks': 6}, {'bagels': 6, 'oat_cookie': 2}], 'fest_cosm_stars'),
+    ],
+    goods=[
+        _g('fest_cosm_rocket', 'Ракета из бочки', 'decor_big', 'farm2', 20, 600, seller='host', note='2×2, верхние уровни'),
+        _g('fest_cosm_parts', 'Запчасти для ракеты', 'decor', 'farm1', 5, 60, seller='host'),
+        _g('fest_cosm_path', 'Звёздочки вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_cosm_scroll', 'Свиток «Космический энергетос»', 'scroll', 'none', 11, 25,
+           note='рецепт Пуха для бодрильни; откроется, когда его подключат'),
+        _g('fest_cosm_meteor', 'Заморский метеорит', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_cosm_flags', 'Звёздные флажки на забор', 'wall', 'fence', 2, 60, source='task:barrel'),
+        _g('fest_cosm_birdhouse', 'Ракета-скворечник у сарая', 'decor', 'farm1', 5, 60, source='task:fuel'),
+        _g('fest_cosm_stars', 'Карта созвездий над площадью', 'village', 'village', 5, 60, source='task:ration', note='ячейка площади'),
+        _g('fest_cosm_badge', 'Значок космонавта года', 'keepsake', 'fence', 5, 0, source='keepsake'),
+    ])
+
+# «Весенний сев и субботник» (9.2 item 5): the saplings festival; Игорь's seed stall, the bridge of Крот.
+CONTENT['spring_sowing'] = dict(
+    tasks=[
+        _t('seeds', 'Семенной обмен', 'Игорь', 2, [{'wheat': 20, 'carrot': 10}, {'oat': 20, 'beet': 8}], 'fest_sow_rakes'),
+        _t('bridge', 'Древесина на мосток', 'Крот', 2, [{'wood': 12}, {'wood': 6, 'hay': 6}], 'fest_sow_bridge'),
+        _t('ties', 'Подвязки для саженцев', 'Соня', 6, [{'linen_thread': 6}, {'linen': 2}], 'fest_sow_ties'),
+    ],
+    goods=[
+        _g('fest_sow_birch', 'Берёзка', 'tree_decor', 'farm1', 8, 120, note='декор, вне лимита сада'),
+        _g('fest_sow_birdhouse', 'Скворечник на столбике', 'decor', 'farm1', 5, 60, seller='host'),
+        _g('fest_sow_sprouts', 'Первые всходы вдоль дорожки', 'path', 'path', 8, 90, seller='host'),
+        _g('fest_sow_voucher', 'Талон сада со скидкой 25%', 'voucher', 'orchard', 16, 2, seller='host', note='ждёт сад', wired=ORCHARD_WIRED,
+           ref='voucher_orchard'),
+        _g('fest_sow_seeds', 'Заморская «Весенняя смесь» семян', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_sow_rakes', 'Грабли и тачка у сарая', 'decor', 'farm1', 2, 60, source='task:seeds'),
+        _g('fest_sow_bridge', 'Починенный мосток с перилами', 'village', 'village', 2, 60, source='task:bridge', note='ячейка площади'),
+        _g('fest_sow_ties', 'Льняные подвязки на заборе', 'wall', 'fence', 6, 60, source='task:ties'),
+        _g('fest_sow_sprout', 'Первый росток года', 'keepsake', 'farm1', 2, 0, source='keepsake'),
+    ])
+
+# «День молока» (9.2 item 14): Кая's tasting, one day.
+CONTENT['milk_day'] = dict(
+    tasks=[
+        _t('tasting', 'Молочная дегустация', 'Кая', 4, [{'milk': 8, 'cheese': 2}, {'goat_milk': 6, 'goat_cheese': 1}], 'fest_milk_garland'),
+        _t('cheese', 'Лучший сыр', 'Кая', 6, [{'cheese': 4, 'goat_cheese': 2}, {'curd': 3, 'cheese': 2}], 'fest_milk_churn'),
+        _t('kefir', 'Кефир к завтраку', 'Агата', 6, [{'kefir': 4}, {'milk': 6, 'whey': 4}], 'fest_milk_daisies'),
+    ],
+    goods=[
+        _g('fest_milk_can', 'Бидон с ромашками', 'decor', 'farm1', 5, 80, seller='host'),
+        _g('fest_milk_stall', 'Молочный прилавок на площади', 'village', 'village', 5, 60, seller='host', note='ячейка площади'),
+        _g('fest_milk_path', 'Ромашки вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_milk_calf', 'Телёнок', 'mascot', 'mascot', 12, 200, seller='host', note='ходит за игроком по деревне'),
+        _g('fest_milk_scroll', 'Свиток «Ягодное молоко с мятой»', 'scroll', 'none', 12, 25, seller='host',
+           note='рецепт; откроется, когда его подключат'),
+        _g('fest_milk_holes', 'Заморский сыр с дырками', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_milk_garland', 'Сырная гирлянда', 'village', 'village', 4, 60, source='task:tasting', note='ячейка площади'),
+        _g('fest_milk_churn', 'Маслобойка у коровника', 'decor', 'farm1', 6, 60, source='task:cheese'),
+        _g('fest_milk_daisies', 'Ромашки у забора', 'wall', 'fence', 6, 60, source='task:kefir'),
+        _g('fest_milk_cow', 'Коровка года', 'keepsake', 'fence', 4, 0, source='keepsake'),
+    ])
+
+# «Ягодный праздник» (9.2 item 6).
+CONTENT['berry_fest'] = dict(
+    tasks=[
+        _t('sweet', 'Самая сладкая ягода', 'Кая', 3, [{'strawberry': 12}, {'wildberry': 12}], 'fest_berry_garland'),
+        _t('jam', 'Варенье на веранду', 'Агата', 3, [{'jam': 4}, {'berry_jam': 4}], 'fest_berry_jars'),
+        _t('charge', 'Ягодный энергетос к лету', 'Пух', 11, [{'berry_charge': 2}, {'berry_milk': 3}], 'fest_berry_butterflies'),
+    ],
+    goods=[
+        _g('fest_berry_kettle', 'Варенница на треноге', 'decor_big', 'farm2', 20, 600, note='2×2, верхние уровни'),
+        _g('fest_berry_baskets', 'Корзинки у ягодных грядок', 'decor', 'farm1', 5, 60),
+        _g('fest_berry_path', 'Ягодные кустики вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_berry_stall', 'Лавка варенья у рынка', 'village', 'village', 5, 60, seller='host', note='ячейка площади'),
+        _g('fest_berry_blue', 'Заморская «Голубая клубника»', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_berry_garland', 'Ягодная гирлянда', 'village', 'village', 3, 60, source='task:sweet', note='ячейка площади'),
+        _g('fest_berry_jars', 'Банки варенья на веранде', 'decor', 'farm1', 3, 60, source='task:jam'),
+        _g('fest_berry_butterflies', 'Бабочки над крышей', 'roof', 'roof', 11, 60, source='task:charge'),
+        _g('fest_berry_berry', 'Ягодка года', 'keepsake', 'farm1', 3, 0, source='keepsake'),
+    ])
+
+# «Иван Купала» (9.2 item 7): a night festival. The fern flower is found through the riddle of Зверушка (her game).
+CONTENT['kupala'] = dict(
+    tasks=[
+        _t('wreath', 'Сплести венок', 'Соня', 6, [{'lavender': 8, 'linen_thread': 2}, {'herbs': 10, 'linen_thread': 3}], 'fest_kup_gate'),
+        _t('fern', 'Травы для Зверушки', 'Зверушка', 3, [{'herbs': 12, 'mushroom': 4}, {'chanterelle': 6, 'wildberry': 6}], 'fest_kup_fern'),
+        _t('fire', 'Дрова для костра у пруда', 'Крот', 2, [{'wood': 12}, {'wood': 6, 'hay': 6}], 'fest_kup_fire'),
+    ],
+    goods=[
+        _g('fest_kup_flies', 'Светлячки над прудом', 'decor', 'farm1', 8, 120, note='ярче ночью'),
+        _g('fest_kup_path', 'Гирлянда светлячков вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_kup_lavender', 'Венок из лаванды и льна', 'wall', 'fence', 6, 50, seller='sonya'),
+        _g('fest_kup_float', 'Венки на воде', 'village', 'village', 5, 60, seller='sonya', note='ячейка площади'),
+        _g('fest_kup_moon', 'Лунный камушек', 'curio', 'farm1', 10, 250, seller='magpie', note='ночная диковинка Сороки'),
+        _g('fest_kup_gate', 'Венок на ворота', 'wall', 'fence', 6, 60, source='task:wreath'),
+        _g('fest_kup_fern', 'Цветок папоротника в горшке', 'decor', 'farm1', 3, 60, source='task:fern', note='светится ночью'),
+        _g('fest_kup_fire', 'Костёр у пруда', 'village', 'village', 2, 60, source='task:fire', note='стилизованный, ячейка площади'),
+        _g('fest_kup_firefly', 'Светлячок года', 'keepsake', 'farm1', 3, 0, source='keepsake'),
+    ])
+
+# «День рыбака» (9.2 item 15): the tournament of the fishing mini-game is another system (trip_games.py); here the fair.
+CONTENT['fisher_day'] = dict(
+    tasks=[
+        _t('catch', 'Улов на турнир', 'Лягух Шарик', 5, [{'crucian': 6}, {'perch': 4}], 'fest_fish_rods'),
+        _t('ukha', 'Уха для судей', 'Агата', 5, [{'perch': 3, 'potato': 4, 'carrot': 4}, {'crucian': 4, 'potato': 4, 'herbs': 3}],
+           'fest_fish_flags'),
+        _t('bait', 'Прикормка', 'Игорь', 2, [{'bread': 4, 'corn': 6}, {'oat': 12, 'bread': 2}], 'fest_fish_net'),
+    ],
+    goods=[
+        _g('fest_fish_boat', 'Лодка-клумба', 'decor_big', 'farm2', 20, 600, note='2×2, верхние уровни'),
+        _g('fest_fish_tackle', 'Снасти у сарая', 'decor', 'farm1', 5, 60, seller='host'),
+        _g('fest_fish_boats', 'Лодки у берега', 'village', 'village', 5, 60, seller='host', note='ячейка площади'),
+        _g('fest_fish_path', 'Мостки вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_fish_lure', 'Заморская блесна', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_fish_rods', 'Удочки у пруда', 'decor', 'farm1', 5, 60, source='task:catch'),
+        _g('fest_fish_flags', 'Флажки на причале', 'village', 'village', 5, 60, source='task:ukha', note='ячейка площади'),
+        _g('fest_fish_net', 'Сеть на заборе', 'wall', 'fence', 2, 60, source='task:bait'),
+        _g('fest_fish_float', 'Поплавок года', 'keepsake', 'fence', 2, 0, source='keepsake'),
+    ])
+
+# «День огурца» (9.2 item 16).
+CONTENT['cucumber_day'] = dict(
+    tasks=[
+        _t('pickle', 'Соленья на зиму', 'Игорь', 3, [{'pickles': 4}, {'cucumber': 20}], 'fest_cuc_jars'),
+        _t('crunch', 'Самый хрустящий огурец', 'Кая', 2, [{'cucumber': 12}, {'cucumber': 6, 'herbs': 4}], 'fest_cuc_vines'),
+        _t('ties', 'Подвязка для огуречных плетей', 'Соня', 6, [{'linen_thread': 5}, {'linen': 2}], 'fest_cuc_arch'),
+    ],
+    goods=[
+        _g('fest_cuc_barrel', 'Бочка с огурцами', 'decor', 'farm1', 5, 80, seller='host'),
+        _g('fest_cuc_barrels', 'Бочки у дома Игоря', 'village', 'village', 5, 60, seller='host', note='ячейка площади'),
+        _g('fest_cuc_path', 'Огуречные грядки вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_cuc_scroll', 'Свиток «Огурцы с мёдом»', 'scroll', 'none', 7, 25, seller='host',
+           note='рецепт; откроется, когда его подключат'),
+        _g('fest_cuc_bumpy', 'Заморский «Пупырчатый огурец»', 'curio', 'farm1', 10, 250, seller='magpie',
+           note='диковинка Сороки; сама заморская культура — TODO, когда появится в каталоге'),
+        _g('fest_cuc_jars', 'Банки солений на веранде', 'decor', 'farm1', 3, 60, source='task:pickle'),
+        _g('fest_cuc_vines', 'Огуречные плети на заборе', 'wall', 'fence', 2, 60, source='task:crunch'),
+        _g('fest_cuc_arch', 'Огуречная арка на рынке', 'village', 'village', 6, 60, source='task:ties', note='ячейка площади'),
+        _g('fest_cuc_pickle', 'Огурчик года', 'keepsake', 'farm1', 2, 0, source='keepsake'),
+    ])
+
+# «Спасы: мёд, яблоки, орехи» (9.2 item 8): three fair days, the Magpie on all of them. Fruit of the orchard is not demanded:
+# a farm without a bearing tree must be able to finish the tasks too.
+CONTENT['spas'] = dict(
+    tasks=[
+        _t('honey', 'Мёд к Медовому Спасу', 'Пух', 7, [{'honey': 6}, {'honey': 3, 'gingerbread': 1}], 'fest_spas_hives'),
+        _t('apple', 'Пироги к Яблочному Спасу', 'Агата', 6, [{'pie': 1, 'jam': 2}, {'jam': 4, 'flour': 4}], 'fest_spas_wreath'),
+        _t('nuts', 'Орехи к Ореховому Спасу', 'Игорь', 2, [{'hazelnut': 15}, {'hazelnut': 8, 'wildberry': 6}], 'fest_spas_nuts'),
+    ],
+    goods=[
+        _g('fest_spas_barrel', 'Медовый бочонок', 'decor', 'farm1', 7, 80, seller='host'),
+        _g('fest_spas_apples', 'Корзины яблок у сада', 'decor', 'farm1', 5, 60),
+        _g('fest_spas_stall', 'Медовая лавка Пуха', 'village', 'village', 5, 60, seller='host', note='ячейка площади'),
+        _g('fest_spas_bee', 'Пчёлка', 'mascot', 'mascot', 12, 200, seller='host', note='летает за игроком по деревне'),
+        _g('fest_spas_nutcracker', 'Заморский щелкунчик', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_spas_hives', 'Ленты на ульях', 'roof', 'roof', 7, 60, source='task:honey'),
+        _g('fest_spas_wreath', 'Яблочный венок на площади', 'village', 'village', 6, 60, source='task:apple', note='ячейка площади'),
+        _g('fest_spas_nuts', 'Ореховая гирлянда на забор', 'wall', 'fence', 2, 60, source='task:nuts'),
+        _g('fest_spas_apple', 'Яблочко года', 'keepsake', 'farm1', 2, 0, source='keepsake'),
+    ])
+
+# «День знаний» (9.2 item 17): the quiz marathon of Филиныч is the quiz system; here the book stall and the school tasks.
+CONTENT['knowledge_day'] = dict(
+    tasks=[
+        _t('bouquet', 'Букет учителю', 'Соня', 7, [{'bouquet': 1}, {'lavender': 6, 'herbs': 4}], 'fest_know_porch'),
+        _t('satchel', 'Портфель первоклашке', 'Соня', 6, [{'wool_cloth': 1}, {'linen': 2, 'wool': 3}], 'fest_know_satchel'),
+        _t('board', 'Доска для формул урожая', 'Крот', 2, [{'wood': 10}, {'wood': 5, 'hay': 5}], 'fest_know_board'),
+    ],
+    goods=[
+        _g('fest_know_globe', 'Глобус на подставке', 'decor', 'farm1', 8, 120, seller='host'),
+        _g('fest_know_abc', 'Флажки-азбука на забор', 'wall', 'fence', 5, 40),
+        _g('fest_know_path', 'Классики вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_know_scroll', 'Свиток «Тыквенная каша»', 'scroll', 'none', 6, 25, seller='host',
+           note='рецепт из книжной лавки Филиныча; откроется, когда его подключат'),
+        _g('fest_know_spyglass', 'Заморская подзорная труба', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_know_porch', 'Букет на крыльце', 'decor', 'farm1', 7, 60, source='task:bouquet'),
+        _g('fest_know_satchel', 'Портфель у дома', 'decor', 'farm1', 6, 60, source='task:satchel'),
+        _g('fest_know_board', 'Доска с формулами урожая', 'village', 'village', 2, 60, source='task:board', note='ячейка площади'),
+        _g('fest_know_bell', 'Звонок года', 'keepsake', 'farm1', 2, 0, source='keepsake'),
+    ])
+
+# «Осенняя ярмарка урожая» (9.2 item 9): the biggest fair of the year, every stall and the big decor of the upper levels.
+CONTENT['harvest_fair'] = dict(
+    tasks=[
+        _t('pumpkin', 'Самая большая тыква', 'Кая', 6, [{'pumpkin': 10}, {'pumpkin': 6, 'potato': 10}], 'fest_harv_pumpkins'),
+        _t('tower', 'Пирог до небес: тыквенная башня', 'Агата', 6, [{'pie': 3}, {'pumpkin': 8, 'flour': 6}], 'fest_harv_flag'),
+        _t('convoy', 'Обоз урожая', 'Игорь', 6, [{'wool_cloth': 1, 'potato': 10}, {'linen': 2, 'cabbage': 10}], 'fest_harv_cart'),
+        _t('wreath', 'Колосья на венок', 'Соня', 5, [{'wheat': 20, 'yarn': 1}, {'rye': 15, 'yarn': 1}], 'fest_harv_gate'),
+    ],
+    goods=[
+        _g('fest_harv_monument', 'Памятник урожаю на ферме', 'decor_big', 'farm2', 25, 1000, note='2×2, для самых больших ферм'),
+        _g('fest_harv_sheaf', 'Сноп с лентой', 'decor', 'farm1', 5, 80),
+        _g('fest_harv_rowan', 'Рябинка', 'tree_decor', 'farm1', 8, 120, note='декор, вне лимита сада'),
+        _g('fest_harv_path', 'Тыквы вдоль дорожки', 'path', 'path', 8, 90),
+        _g('fest_harv_sign', 'Вывеска «Урожай!»', 'village', 'village', 5, 60, note='ячейка площади'),
+        _g('fest_harv_hedgehog', 'Ёжик с яблоком', 'mascot', 'mascot', 12, 250, seller='sonya', note='ходит за игроком по деревне'),
+        _g('fest_harv_scroll', 'Свиток «Пирог с тыквой и мёдом»', 'scroll', 'none', 6, 25, note='рецепт; откроется, когда его подключат'),
+        _g('fest_harv_gourd', 'Заморская тыква-горлянка', 'curio', 'farm1', 10, 300, seller='magpie', note='диковинка Сороки'),
+        _g('fest_harv_pumpkins', 'Тыквы у амбара', 'decor', 'farm1', 6, 60, source='task:pumpkin'),
+        _g('fest_harv_flag', 'Флажок «Урожай!» на крыше', 'roof', 'roof', 6, 60, source='task:tower'),
+        _g('fest_harv_cart', 'Телега обоза на площади', 'village', 'village', 6, 60, source='task:convoy', note='ячейка площади'),
+        _g('fest_harv_gate', 'Колосковый венок на ворота', 'wall', 'fence', 5, 60, source='task:wreath'),
+        _g('fest_harv_pumpkin', 'Тыква года', 'keepsake', 'farm1', 5, 0, source='keepsake'),
+    ])
+
+# «Тыквенная ночь» (9.2 item 10): the Jack's gifts and the scares are their own systems (horseman.py, the night layer).
+CONTENT['pumpkin_night'] = dict(
+    tasks=[
+        _t('pie', 'Найди пропавший пирог', 'Филиныч', 6, [{'pie': 1}, {'pumpkin': 6, 'flour': 4}], 'fest_pn_web'),
+        _t('lanterns', 'Фонари для ночной смены', 'Зверушка', 6, [{'pumpkin': 8}, {'pumpkin': 4, 'oil': 2}], 'fest_pn_lanterns'),
+        _t('treat', 'Угощение для ряженых', 'Агата', 3, [{'oat_cookie': 4}, {'jam': 2, 'bun': 2}], 'fest_pn_scarecrow'),
+    ],
+    goods=[
+        _g('fest_pn_lantern', 'Тыква-фонарь', 'decor', 'farm1', 5, 80),
+        _g('fest_pn_glow', 'Светящиеся тыквы у пруда', 'village', 'village', 5, 60, seller='host', note='ячейка площади'),
+        _g('fest_pn_bat', 'Летучая мышка', 'mascot', 'mascot', 12, 200, seller='host', note='летает за игроком по деревне'),
+        _g('fest_pn_thing', 'Неведомая вещь', 'curio', 'farm1', 10, 250, seller='magpie', note='из ночной лавки Сороки и Зверушки'),
+        _g('fest_pn_web', 'Паутина на заборе', 'wall', 'fence', 6, 60, source='task:pie'),
+        _g('fest_pn_lanterns', 'Тыквы-фонари вдоль дорожки', 'path', 'path', 6, 60, source='task:lanterns'),
+        _g('fest_pn_scarecrow', 'Ряженое пугало', 'decor', 'farm1', 3, 60, source='task:treat'),
+        _g('fest_pn_owl', 'Сова года', 'keepsake', 'fence', 3, 0, source='keepsake'),
+    ])
+
+# Every festival of the calendar has its content now; a new one starts as a stub (the fair shows «скоро») until its turn.
 for _fid in FESTIVALS:
     CONTENT.setdefault(_fid, None)
 

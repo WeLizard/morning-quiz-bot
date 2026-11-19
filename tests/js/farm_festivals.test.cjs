@@ -183,3 +183,15 @@ test('every festival item id resolves to an icon: its own symbol in icons.svg, o
  assert.ok(Object.values(F.ICON_FALLBACK).every(id=>symbols.has(id)&&id.startsWith('fest_posid_')));
  assert.equal(F.iconId('fest_posid_socks'),'fest_posid_socks');assert.equal(F.iconId('wool'),'wool');assert.equal(F.iconId('constructor'),'constructor');
 });
+
+test('a host stall wears the host sign; every festival that sells through its host has one',async()=>{
+ const F=await load();
+ assert.equal(F.sellerLabel('host','april_fools'),'Честная лавка Даши');
+ assert.equal(F.sellerLabel('host','ghost'),'Лавка хозяина праздника');
+ assert.equal(F.sellerLabel('magpie','april_fools'),'Тележка Сороки');
+ const py=fs.readFileSync(path.join(__dirname,'../../qw_farm/festivals.py'),'utf8');
+ const hosted=new Set();
+ for(const block of py.split(/\nCONTENT\['/).slice(1)){const fid=block.match(/^([a-z_]+)'/)[1];if(/seller='host'/.test(block.split('\n    ])')[0]))hosted.add(fid);}
+ assert.ok(hosted.size>=8,[...hosted].join());
+ assert.deepEqual([...hosted].filter(fid=>!F.HOST_SHOP[fid]),[]);
+});

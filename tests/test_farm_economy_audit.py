@@ -53,7 +53,8 @@ def test_voucher_is_affordable_at_merchant_and_every_festival():
     assert merchant.ENTRIES['voucher_orchard']['price'] == 380
     assert C.TREE_VOUCHER_DISCOUNT_PCT == 25
     vouchers = [good for content in F.CONTENT.values() if content for good in content['goods'] if good['kind'] == 'voucher']
-    assert len(vouchers) == 3 and all(good['k'] == 2 for good in vouchers)
+    # FARM_FESTIVALS_DESIGN 9.7: not more than 3-4 saplings a year from vouchers (Посиделки, Новый год, Масленица, Весенний сев)
+    assert len(vouchers) == 4 and all(good['k'] == 2 for good in vouchers)
     assert all(F.price(good) == C.income_ref(good['level']) * 2 // 100 for good in vouchers)
 
 

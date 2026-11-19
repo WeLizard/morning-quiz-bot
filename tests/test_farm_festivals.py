@@ -175,7 +175,7 @@ def test_content_contract_and_pilot_shape():
     assert {g['kind'] for g in sold} >= {'decor_big', 'tree_decor', 'graft', 'voucher', 'mascot', 'curio'}
     assert all(g['bound'] and not g['wired'] for g in c['goods'])           # placeholders: nothing is wired to the scene yet
     assert any(g['seller'] == 'magpie' for g in sold) and any(g['seller'] == 'sonya' for g in sold)
-    assert all(F.CONTENT[f] is None for f in F.FESTIVALS if f not in ('posidelki', 'new_year', 'maslenitsa', 'spring_flowers'))    # stubs: TODO
+    assert all(F.CONTENT[f] for f in F.FESTIVALS)                                    # every festival of the calendar has its content
     for g in sold:
         assert F.price(g) == max(1, -(-g['k'] * income_ref(g['level']) // 100))
     big = next(g for g in sold if g['kind'] == 'decor_big')
@@ -320,7 +320,7 @@ def test_old_farm_without_festivals_loads_and_stays_unchanged_otherwise():
     {'posidelki-2026': {**F.blank(), 'bought': {'fest_posid_basket': 1}}},                  # a task reward cannot be "bought"
     {'posidelki-2026': {**F.blank(), 'bought': {'fest_posid_wreath': 2}}},                  # over the yearly limit
     {'posidelki-2026': {**F.blank(), 'tasks': {'ghost': 1}}},
-    {'april_fools-2027': {**F.blank(), 'keepsake': True}},                                 # a stub festival has no memorable item
+    {'april_fools-2027': {**F.blank(), 'rewards': {'fest_fool_cake': 1}}},                 # a fair lot is not a task reward
     {'posidelki-2026': {'tasks': {}}},
 ])
 def test_validate_state_rejects_corrupt_festival_state(bad):
@@ -355,13 +355,14 @@ def test_owner_view_lists_goods_prices_status_and_the_past_shop():
     cmd(f, 'festival_buy', buy('fest_posid_wreath'))
     assert F.owner_view(f, FAIR)['fair']['goods'][2]['status'] == 'owned'
     assert F.owner_view(f, FAIR2)['fair']['goods'][-1]['away'] is True
-    assert view['past'] == [] and F.owner_view(f, ts(2026, 12, 1))['fair'] is None
-    past = F.owner_view(f, AFTER)['past'][0]
+    # Тыквенная ночь 2026 is the only festival over since the launch; its lots (filled later) are in the past shop at x1.5
+    assert [p['key'] for p in view['past']] == ['pumpkin_night-2026'] and F.owner_view(f, ts(2026, 12, 1))['fair'] is None
+    past = next(p for p in F.owner_view(f, AFTER)['past'] if p['id'] == 'posidelki')
     assert past['id'] == 'posidelki' and past['key'] == 'posidelki-2026'
     assert next(g for g in past['goods'] if g['id'] == 'fest_posid_wreath')['status'] == 'owned'
     assert next(g for g in past['goods'] if g['id'] == 'fest_posid_lights')['price'] == F.past_price(F.good_of('posidelki', 'fest_posid_lights'))
-    stub = F.owner_view(f, ts(2027, 4, 1))
-    assert stub['fair']['id'] == 'april_fools' and stub['fair']['todo'] and stub['fair']['tasks'] == [] and stub['fair']['goods'] == []
+    fools = F.owner_view(f, ts(2027, 4, 1))
+    assert fools['fair']['id'] == 'april_fools' and not fools['fair']['todo'] and fools['fair']['tasks'] and fools['fair']['goods']
 
 
 # ---- service: idempotency by command_id and the ledger -------------------------------------------------------------------------
@@ -470,12 +471,17 @@ def test_split_festival_year_has_one_key_for_both_runs_and_the_magpie_comes_once
 
 
 # ---- content of the filled festivals: «Новый год», «Масленица», «Весенние цветы» --------------------------------------------------
-FILLED = ('new_year', 'maslenitsa', 'spring_flowers')
+FILLED = tuple(f for f in F.FESTIVALS if f != 'posidelki')     # the pilot has its own checks (unwired orchard lots, the tower)
 FIRST_FAIR_DAY = {'new_year': ts(2026, 12, 30), 'maslenitsa': ts(2027, 3, 9), 'spring_flowers': ts(2027, 3, 6)}
+FIRST_FAIR_DAY.update({o['id']: F._ts(o['fair'][0][0]) + 3600 for o in F.occurrences(2027) if o['id'] not in FIRST_FAIR_DAY})
 # Value law: small things 0.5-2 income days, big ones 5-10, scroll 0.25; audit vouchers 0.02.
 K_RANGE = {'decor': (50, 200), 'tree_decor': (50, 200), 'wall': (25, 100), 'roof': (25, 100), 'path': (50, 200), 'village': (25, 100),
-           'mascot': (100, 300), 'curio': (100, 300), 'decor_big': (500, 1000), 'scroll': (25, 25), 'graft': (8, 12), 'voucher': (2, 2)}
-PREFIX = {'new_year': 'fest_ny_', 'maslenitsa': 'fest_mas_', 'spring_flowers': 'fest_flw_'}
+           'mascot': (100, 300), 'curio': (100, 300), 'decor_big': (500, 1000), 'scroll': (25, 25), 'graft': (8, 12), 'voucher': (2, 2),
+           'joke': (1, 3)}                                                      # Даша's «Честная лавка»: 1-3 % of a day, a symbol
+PREFIX = {'new_year': 'fest_ny_', 'maslenitsa': 'fest_mas_', 'spring_flowers': 'fest_flw_', 'april_fools': 'fest_fool_',
+          'cosmonautics': 'fest_cosm_', 'spring_sowing': 'fest_sow_', 'milk_day': 'fest_milk_', 'berry_fest': 'fest_berry_',
+          'kupala': 'fest_kup_', 'fisher_day': 'fest_fish_', 'cucumber_day': 'fest_cuc_', 'spas': 'fest_spas_',
+          'knowledge_day': 'fest_know_', 'harvest_fair': 'fest_harv_', 'pumpkin_night': 'fest_pn_'}
 
 
 def _everything_obtainable(level_no):
@@ -510,7 +516,7 @@ def test_filled_festival_content_contract(fid):
         else:
             assert not g['wired'] and not g['ref']
         if g['source'] == 'fair':
-            assert g['seller'] in ('agata', 'sonya', 'magpie')
+            assert g['seller'] in ('agata', 'sonya', 'magpie', 'host')
             lo, hi = K_RANGE[g['kind']]
             assert lo <= g['k'] <= hi, (g['id'], g['k'])
         else:
@@ -545,7 +551,7 @@ def test_tasks_are_completable_from_obtainable_goods_at_their_level(fid):
         have = _everything_obtainable(t['level'])
         assert 1 <= t['level'] <= 30
         for i, option in enumerate(t['options']):
-            assert all(ITEMS[k]['kind'] in ('product', 'crop', 'forest') and not ITEMS[k].get('bound') for k in option)
+            assert all(ITEMS[k]['kind'] in ('product', 'crop', 'forest', 'fish') and not ITEMS[k].get('bound') for k in option)
             assert set(option) <= have, f'{fid}/{t["id"]} option {i} needs goods not obtainable at level {t["level"]}: {set(option) - have}'
         assert len(t['options']) >= 2                                                # a fallback from ordinary goods
         assert sum(ITEMS[k]['price'] * q for k, q in t['options'][0].items()) > 0

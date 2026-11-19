@@ -2,12 +2,42 @@
 // (qw_farm/festivals.py, S.me.festival); this module only shows them and sends festival_task / festival_buy.
 // Decor layers are HOOKS: applyWorld() writes data-festival-* flags on <html>; the designer's scene layers read them.
 export const PREF_KEYS={decor:'qw-farm.festival-decor',scares:'qw-farm.festival-scares'};
-const KIND_LABEL={decor:'Декор',decor_big:'Крупный декор',wall:'На забор',roof:'На крышу',path:'Вдоль дорожки',village:'Для площади',mascot:'Маскот',tree_decor:'Декоративное дерево',voucher:'Талон сада',graft:'Прививка',scroll:'Свиток',curio:'Диковинка',keepsake:'Памятный предмет'};
+const KIND_LABEL={decor:'Декор',decor_big:'Крупный декор',wall:'На забор',roof:'На крышу',path:'Вдоль дорожки',village:'Для площади',mascot:'Маскот',tree_decor:'Декоративное дерево',voucher:'Талон сада',graft:'Прививка',scroll:'Свиток',curio:'Диковинка',keepsake:'Памятный предмет',joke:'Шутка'};
 const SELLER_LABEL={agata:'Шатёр Агаты',sonya:'Лавка Сони',magpie:'Тележка Сороки',host:'Лавка хозяина праздника'};
 const SELLER_ORDER=['agata','sonya','magpie','host'];
+// The host's stall has the host's own sign (qw_farm/festivals.py seller='host'); the generic label is the fallback.
+export const HOST_SHOP={april_fools:'Честная лавка Даши',cosmonautics:'Мастерская Крота',spring_sowing:'Семенной ларёк Игоря',milk_day:'Молочный прилавок Каи',
+ berry_fest:'Прилавок Каи',fisher_day:'Снасти Лягуха Шарика',cucumber_day:'Соленья Игоря',spas:'Медовая лавка Пуха',knowledge_day:'Книжная лавка Филиныча',
+ pumpkin_night:'Лавка неведомых вещей'};
+export function sellerLabel(seller,festival){return seller==='host'&&HOST_SHOP[festival]||SELLER_LABEL[seller]||seller;}
 // Icons of festival items. An item without its own symbol in icons.svg borrows a neutral symbol of the same kind from the first
 // festival (nothing renders blank). When the artist draws icons.svg#<id>, delete the line here (tests/js/farm_festivals.test.cjs checks it).
-export const ICON_FALLBACK={};
+export const ICON_FALLBACK={
+ // День смеха
+ fest_fool_jar:'fest_posid_basket',fest_fool_sock:'fest_posid_basket',fest_fool_horseshoe:'fest_posid_basket',fest_fool_cake:'fest_posid_basket',fest_fool_mirror:'fest_posid_window',fest_fool_stripes:'fest_posid_wreath',fest_fool_whistle:'fest_posid_lantern',fest_fool_cap:'fest_posid_smoke',fest_fool_signs:'fest_posid_window',fest_fool_geese:'fest_posid_basket',fest_fool_scarecrow:'fest_posid_socks',
+ // День космонавтики
+ fest_cosm_rocket:'fest_posid_quilt',fest_cosm_parts:'fest_posid_basket',fest_cosm_path:'fest_posid_lights',fest_cosm_scroll:'fest_posid_basket',fest_cosm_meteor:'fest_posid_lantern',fest_cosm_flags:'fest_posid_wreath',fest_cosm_birdhouse:'fest_posid_basket',fest_cosm_stars:'fest_posid_window',fest_cosm_badge:'fest_posid_socks',
+ // Весенний сев и субботник
+ fest_sow_birch:'fest_posid_rowan',fest_sow_birdhouse:'fest_posid_basket',fest_sow_sprouts:'fest_posid_lights',fest_sow_voucher:'fest_posid_voucher',fest_sow_seeds:'fest_posid_lantern',fest_sow_rakes:'fest_posid_basket',fest_sow_bridge:'fest_posid_window',fest_sow_ties:'fest_posid_wreath',fest_sow_sprout:'fest_posid_socks',
+ // День молока
+ fest_milk_can:'fest_posid_basket',fest_milk_stall:'fest_posid_window',fest_milk_path:'fest_posid_lights',fest_milk_calf:'fest_posid_snowman',fest_milk_scroll:'fest_posid_basket',fest_milk_holes:'fest_posid_lantern',fest_milk_garland:'fest_posid_window',fest_milk_churn:'fest_posid_basket',fest_milk_daisies:'fest_posid_wreath',fest_milk_cow:'fest_posid_socks',
+ // Ягодный праздник
+ fest_berry_kettle:'fest_posid_quilt',fest_berry_baskets:'fest_posid_basket',fest_berry_path:'fest_posid_lights',fest_berry_stall:'fest_posid_window',fest_berry_blue:'fest_posid_lantern',fest_berry_garland:'fest_posid_window',fest_berry_jars:'fest_posid_basket',fest_berry_butterflies:'fest_posid_smoke',fest_berry_berry:'fest_posid_socks',
+ // Иван Купала
+ fest_kup_flies:'fest_posid_basket',fest_kup_path:'fest_posid_lights',fest_kup_lavender:'fest_posid_wreath',fest_kup_float:'fest_posid_window',fest_kup_moon:'fest_posid_lantern',fest_kup_gate:'fest_posid_wreath',fest_kup_fern:'fest_posid_basket',fest_kup_fire:'fest_posid_window',fest_kup_firefly:'fest_posid_socks',
+ // День рыбака
+ fest_fish_boat:'fest_posid_quilt',fest_fish_tackle:'fest_posid_basket',fest_fish_boats:'fest_posid_window',fest_fish_path:'fest_posid_lights',fest_fish_lure:'fest_posid_lantern',fest_fish_rods:'fest_posid_basket',fest_fish_flags:'fest_posid_window',fest_fish_net:'fest_posid_wreath',fest_fish_float:'fest_posid_socks',
+ // День огурца
+ fest_cuc_barrel:'fest_posid_basket',fest_cuc_barrels:'fest_posid_window',fest_cuc_path:'fest_posid_lights',fest_cuc_scroll:'fest_posid_basket',fest_cuc_bumpy:'fest_posid_lantern',fest_cuc_jars:'fest_posid_basket',fest_cuc_vines:'fest_posid_wreath',fest_cuc_arch:'fest_posid_window',fest_cuc_pickle:'fest_posid_socks',
+ // Спасы: мёд, яблоки, орехи
+ fest_spas_barrel:'fest_posid_basket',fest_spas_apples:'fest_posid_basket',fest_spas_stall:'fest_posid_window',fest_spas_bee:'fest_posid_snowman',fest_spas_nutcracker:'fest_posid_lantern',fest_spas_hives:'fest_posid_smoke',fest_spas_wreath:'fest_posid_window',fest_spas_nuts:'fest_posid_wreath',fest_spas_apple:'fest_posid_socks',
+ // День знаний
+ fest_know_globe:'fest_posid_basket',fest_know_abc:'fest_posid_wreath',fest_know_path:'fest_posid_lights',fest_know_scroll:'fest_posid_basket',fest_know_spyglass:'fest_posid_lantern',fest_know_porch:'fest_posid_basket',fest_know_satchel:'fest_posid_basket',fest_know_board:'fest_posid_window',fest_know_bell:'fest_posid_socks',
+ // Осенняя ярмарка урожая
+ fest_harv_monument:'fest_posid_quilt',fest_harv_sheaf:'fest_posid_basket',fest_harv_rowan:'fest_posid_rowan',fest_harv_path:'fest_posid_lights',fest_harv_sign:'fest_posid_window',fest_harv_hedgehog:'fest_posid_snowman',fest_harv_scroll:'fest_posid_basket',fest_harv_gourd:'fest_posid_lantern',fest_harv_pumpkins:'fest_posid_basket',fest_harv_flag:'fest_posid_smoke',fest_harv_cart:'fest_posid_window',fest_harv_gate:'fest_posid_wreath',fest_harv_pumpkin:'fest_posid_socks',
+ // Тыквенная ночь
+ fest_pn_lantern:'fest_posid_basket',fest_pn_glow:'fest_posid_window',fest_pn_bat:'fest_posid_snowman',fest_pn_thing:'fest_posid_lantern',fest_pn_web:'fest_posid_wreath',fest_pn_lanterns:'fest_posid_lights',fest_pn_scarecrow:'fest_posid_basket',fest_pn_owl:'fest_posid_socks',
+};
 export function iconId(id){return Object.prototype.hasOwnProperty.call(ICON_FALLBACK,id)?ICON_FALLBACK[id]:id;}
 
 function readPref(key,store){try{return (store||globalThis.localStorage).getItem(key);}catch{return null;}}
@@ -114,7 +144,7 @@ export function renderFestival(p,view,h){
   if(fair.goods.length){
    const c=card('Ярмарка на площади','Всё за монеты, без дефицита','coin');c.classList.add('fest-stall');
    for(const [seller,items] of groupBySeller(fair.goods)){
-    const group=el('div',null,'fest-group');group.append(el('h3',SELLER_LABEL[seller]||seller));
+    const group=el('div',null,'fest-group');group.append(el('h3',sellerLabel(seller,fair.id)));
     if(seller==='magpie'&&!fair.magpie)group.append(el('small','Сорока приезжает в первый день ярмарки.'));
     for(const g of items)group.append(goodRow(g,g.price,h,fair.id));
     c.append(group);

@@ -62,7 +62,7 @@ test('a /me response started before an in-game contrast save cannot undo its con
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100};let reply,externalContrast;
  const prefs={contrast:false,get(){return{contrast:this.contrast};},setContrast(v){this.contrast=v;},applyAccount(v){this.contrast=v.contrast_mode;}};
  const input={checked:true},context={S:{me:own,farm:own,config:{demo:false}},mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
- QW:{prefs},$:()=>input,request:()=>new Promise(r=>{reply=r;}),requestRaw:async()=>({contrast_mode:true}),toast(){},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateReady(){},connection(){},addEventListener:(type,fn)=>{externalContrast=fn;}};
+ QW:{prefs},$:()=>input,request:()=>new Promise(r=>{reply=r;}),requestRaw:async()=>({contrast_mode:true}),toast(){},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateReady(){},connection(){},addEventListener:(type,fn)=>{externalContrast=fn;}};
  vm.createContext(context);vm.runInContext(refreshCode(source),context);
  const polling=context.refresh({render:false});await context.saveFarmContrast(input);reply({farm:own,contrast_mode:false});await polling;assert.equal(prefs.contrast,true);assert.equal(input.checked,true);
  prefs.contrast=false;const oldPoll=context.refresh({render:false});prefs.contrast=true;externalContrast();reply({farm:own,contrast_mode:false});await oldPoll;assert.equal(prefs.contrast,true,'an external Alchemy/profile event fences an older /me response');assert.equal(input.checked,true);
@@ -72,7 +72,7 @@ test('refresh applies a new farm upkeep catalog revision and redraws the open vi
  const renders={panel:0,seeds:0,scene:0},context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',seed:'wheat',config:{demo:false}},
  mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
  request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},
- sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){renders.scene++;}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,
+ sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){renders.scene++;}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
  queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateHUD(){},renderSeeds(){renders.seeds++;},updateReady(){},renderPanel(){renders.panel++;},connection(){}};
  vm.createContext(context);vm.runInContext(refreshCode(source),context);
  assert.equal(await context.refresh({render:false}),true);assert.equal(context.S.catalog,nextCatalog);assert.equal(renders.scene,1);assert.equal(renders.seeds,1);assert.equal(renders.panel,1);assert.equal(context.S.tab,'economy');assert.equal(context.S.selected,'upkeep');
@@ -81,7 +81,7 @@ test('refresh applies effective upkeep rates at Moscow midnight when the schedul
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100},oldCatalog={economy:{upkeep_revision:5,upkeep_level:10,land_rate_pct:100,plot_upkeep:{10:100},building_rate_pct:1,field_per_hectare:1500,field_upkeep:1500,tree_rate_per_extra_tree:25}},
   nextCatalog={economy:{...oldCatalog.economy,land_rate_pct:150,plot_upkeep:{10:150},building_rate_pct:3}};
  let panels=0;const context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',config:{demo:false}},mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
- request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,
+ request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
  queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateHUD(){},renderSeeds(){},updateReady(){},renderPanel(){panels++;},connection(){}};
  vm.createContext(context);vm.runInContext(refreshCode(source),context);
  assert.equal(oldCatalog.economy.upkeep_revision,nextCatalog.economy.upkeep_revision,'the active config keeps the revision assigned when the settings were scheduled');
@@ -90,7 +90,7 @@ test('refresh applies effective upkeep rates at Moscow midnight when the schedul
 test('a stale /me reply cannot install an old upkeep catalog revision',async()=>{
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100},oldCatalog={economy:{upkeep_revision:4}},staleCatalog={economy:{upkeep_revision:5}};let reply;
  const context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',config:{demo:false}},mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
- request:()=>new Promise(resolve=>{reply=resolve;}),showLogin(){},QW:{prefs:{applyAccount(){}}},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){assert.fail('stale response must not redraw');}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,
+ request:()=>new Promise(resolve=>{reply=resolve;}),showLogin(){},QW:{prefs:{applyAccount(){}}},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){assert.fail('stale response must not redraw');}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
  queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateHUD(){},renderSeeds(){assert.fail('stale response must not redraw');},updateReady(){},renderPanel(){assert.fail('stale response must not redraw');},connection(){}};
  vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function syncFarmContrastControl('),source.indexOf('function renderViewSettings('))+source.slice(source.indexOf('async function refresh('),source.indexOf('async function command(')),context);
  const pending=context.refresh({render:false});context.farmViewEpoch++;reply({farm:own,catalog:staleCatalog,address_form:'n',speed:1});assert.equal(await pending,false);assert.equal(context.S.catalog,oldCatalog);

@@ -1,6 +1,7 @@
-"""Preview of the «Битва с Сантой» art (santa_battle.js) for the owner's approval. Never installs into qw_farm/static.
+"""Preview of the «Битва с Сантой» art (santa_battle.js); --install writes the game scenes. Never installs without the flag.
 
     python scripts/art/village_games/santa_battle.py [--out DIR]
+    python scripts/art/village_games/santa_battle.py --install   # qw_farm/static/santa-battle-{scene,night}.svg
 
 Writes into .local/santa-battle-preview/ (default): the scene SVG per theme, the square with all five fighters, a battle
 moment with effects (day, night, phone width), a sheet of every pose and a sheet of the effects. Checks: two identical runs,
@@ -52,7 +53,22 @@ def staged(svg: str, stage: str) -> str:
     return svg.replace('<g id="sb-stage"></g>', f'<g id="sb-stage">{stage}</g>')
 
 
+def install() -> None:
+    """The art approved by the owner (2026-11-19) into the game: one scene per theme, read by santa-battle.js."""
+    for night in (False, True):
+        result = harness.run('village_games/santa_battle.js', {'night': night})
+        assert result == harness.run('village_games/santa_battle.js', {'night': night}), 'not deterministic'
+        svg = result['svg']
+        check(svg, result)
+        name = 'santa-battle-night.svg' if night else 'santa-battle-scene.svg'
+        (HERE.parent.parent.parent / 'qw_farm' / 'static' / name).write_text(svg, encoding='utf-8', newline=chr(10))
+        print(f'Installed {name}: {hashlib.sha256(svg.encode()).hexdigest()}')
+
+
 def main() -> None:
+    if '--install' in sys.argv:
+        install()
+        return
     out = Path(sys.argv[sys.argv.index('--out') + 1]) if '--out' in sys.argv else harness.ROOT.resolve() / '.local' / 'santa-battle-preview'
     if os.name == 'nt' and out.resolve().drive.upper() != 'F:':
         raise SystemExit('Preview output must be on F:')

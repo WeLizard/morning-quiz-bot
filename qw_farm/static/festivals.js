@@ -58,6 +58,18 @@ export function bannerText(view,format=new Intl.DateTimeFormat('ru-RU',{day:'num
  return up?.soon?`Скоро: ${up.name}, с ${date(up.starts_at)}.`:'';
 }
 
+function santaCard(p,h){
+ const game=h.santa?.();if(!game)return;
+ const {el,button,card}=h,wins=(game.battles||[]).filter(b=>b.stars>0).length;
+ const c=card('Битва с Сантой','Дед Мороз зовёт на площадь у ёлки','journal');c.classList.add('fest-santa');
+ const rows=(game.battles||[]).map(b=>`бой ${b.n}: ${b.stars?'★'.repeat(b.stars)+'☆'.repeat(3-b.stars):b.open?'ждёт':'закрыт'}`).join(' · ');
+ c.append(el('p',`Снежная дуэль: ты, Дед Мороз и Снегурочка против Санты и Крампуса. ${rows}.`,'note'));
+ const label=game.active?'Продолжить бой':wins?'К боям':'Играть';
+ const play=button(label,()=>h.santaGame?.(),'qw-btn primary',!!h.busy?.()||!!game.locked);play.dataset.openSanta='';
+ c.append(play);
+ if(game.locked)c.append(el('p',`С ${game.min_level} уровня.`,'note'));
+ p.append(c);
+}
 export function renderFestival(p,view,h){
  const {el,button,card,goods,note,stock,coins,fmt,command,itemName}=h;
  if(!view){note('Календарь праздников пока недоступен. Обнови ферму.',p);return;}
@@ -70,6 +82,8 @@ export function renderFestival(p,view,h){
  p.append(head);
  // The gift stays in the festival panel even when the optional decor and scares are hidden.
  if(cur?.id==='pumpkin_night')h.horsemanCard?.(p);
+ // «Битва с Сантой» (FARM_SANTA_BATTLE.md): Дед Мороз calls to the square while the New Year lasts.
+ if(cur?.id==='new_year')santaCard(p,h);
  if(fair){
   if(fair.tower){
    const t=fair.tower,pie=h.pie?.(),label=pie?.active?'Продолжить':!pie?'Играть':pie.attempts_left>0?(pie.last_result?'Ещё раз':'Играть'):'Тренировка';

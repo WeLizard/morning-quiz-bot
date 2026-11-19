@@ -111,7 +111,7 @@ test('app.js opens the pie screen from the fair card and closes it like the othe
  assert.match(app,/^import \{mountPieGame\} from '\.\/pie-game\.js';/m);
  assert.match(app,/pieGame:\(\)=>openPieGame\(\)/);
  // declared with the other nested games, re-rendered after /me and commands, closed on tab change, logout and Escape
- assert.match(app,/ballistaGame=null,ballistaGameOpen=false,pieGame=null,pieGameOpen=false;/);
+ assert.match(app,/ballistaGame=null,ballistaGameOpen=false,pieGame=null,pieGameOpen=false[,;]/);
  assert.ok((app.match(/ballistaGame\?\.render\(\);pieGame\?\.render\(\);/g)||[]).length>=2);
  assert.ok((app.match(/if\(pieGameOpen\)closePieGame\(\);/g)||[]).length>=2);
  assert.match(app,/if\(pieGameOpen\)\{e\.preventDefault\(\);closePieGame\(\);return;\}/);

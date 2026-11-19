@@ -1,0 +1,95 @@
+/* «Битва с Сантой» (santa-battle.js): a nested view of the farm like pie-game.css. Shell tokens only; the trailing block is
+   the contrast mode (UI_RULES §16). */
+body.santa-game-open .workspace{position:relative;display:block;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding-bottom:0}
+body.santa-game-open .workspace>#rail,body.santa-game-open .workspace>.scene-area,body.santa-game-open .workspace>.side-panel,body.santa-game-open .header-destinations{display:none!important}
+#santa-game-view[hidden],#santa-game-view [hidden]{display:none!important}
+#santa-game-view{min-width:0;min-height:calc(100dvh - var(--qw-header-h));overflow:auto;background:var(--paper);color:var(--qw-game-text)}
+#santa-game-view *{box-sizing:border-box}
+#santa-game-view .sb-page{max-width:1350px;margin:auto;padding:24px var(--qw-gutter) calc(24px + var(--qw-safe-bottom));display:grid;gap:16px}
+#santa-game-view h1,#santa-game-view p{margin:0}
+#santa-game-view h1{font-size:var(--qw-fs-h1);line-height:1.15}
+#santa-game-view .sb-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#santa-game-view .sb-back{min-height:44px;padding:8px 14px;border:1px solid var(--qw-game-line,#b5c8a9);border-radius:var(--qw-r-control);background:var(--qw-game-surface,#fffaf0);color:inherit;font:inherit;font-weight:700;cursor:pointer}
+#santa-game-view .sb-intro{font-size:var(--qw-fs-body);line-height:1.45}
+#santa-game-view .sb-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);gap:18px;align-items:start}
+#santa-game-view .sb-stage-card,#santa-game-view .sb-controls{min-width:0;background:var(--qw-game-surface,#fffaf0);border:1px solid var(--qw-game-line,#c8d4b9);border-radius:var(--qw-r-card);padding:12px;box-shadow:0 8px 24px #28463019}
+#santa-game-view .sb-scene{width:100%;aspect-ratio:5/3;overflow:hidden;border-radius:12px;background:var(--qw-game-surface-2);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#santa-game-view .sb-scene svg{display:block;width:100%;height:100%}
+#santa-game-view .sb-fighter{cursor:pointer}
+/* Damage and heal numbers over the heads: solid outline so they read on snow and at night. */
+#santa-game-view .sb-num{font:900 46px system-ui,sans-serif;paint-order:stroke;stroke:#1d2433;stroke-width:9px;stroke-linejoin:round;pointer-events:none;animation:sb-num 1.1s ease-out forwards}
+#santa-game-view .sb-num-hit{fill:#ffffff}
+#santa-game-view .sb-num-bonus{fill:#ffd34d;font-size:56px}
+#santa-game-view .sb-num-ouch{fill:#ff9d8f}
+#santa-game-view .sb-num-heal{fill:#8ff0ac}
+#santa-game-view .sb-num-miss{fill:#dfe6f0;font-size:38px}
+@keyframes sb-num{0%{transform:translateY(16px);opacity:0}15%{transform:translateY(0);opacity:1}75%{opacity:1}100%{transform:translateY(-36px);opacity:0}}
+#santa-game-view .sb-flash{animation:sb-flash .5s ease-out}
+@keyframes sb-flash{0%{opacity:0}30%{opacity:1}100%{opacity:1}}
+/* Health plates: a solid bar plus the number, never colour alone; states as an icon and a word. */
+#santa-game-view .sb-plates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+#santa-game-view .sb-side{display:grid;gap:8px;align-content:start}
+#santa-game-view .sb-plate{padding:8px 10px;border:1px solid var(--qw-game-line,#c8d4b9);border-radius:var(--qw-r-control);background:var(--qw-game-surface,#fffaf0)}
+#santa-game-view .sb-plate.active{border-color:#c99a2e;box-shadow:inset 4px 0 0 #e0b23a}
+#santa-game-view .sb-plate.down{opacity:.78}
+#santa-game-view .sb-plate-top{display:flex;justify-content:space-between;gap:8px;font-size:var(--qw-fs-small);line-height:1.3}
+#santa-game-view .sb-plate-hp{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+#santa-game-view .sb-hp{height:10px;margin-top:5px;border-radius:999px;background:#d9dfd2;overflow:hidden;border:1px solid #9aa58f}
+#santa-game-view .sb-hp>span{display:block;height:100%;background:#3f8f55;transition:width .35s}
+#santa-game-view .sb-plate.enemy .sb-hp>span{background:#c9483f}
+#santa-game-view .sb-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+#santa-game-view .sb-chip{padding:1px 8px;border-radius:999px;background:#e7eef6;color:#1d2a3a;font-size:var(--qw-fs-caption);font-weight:700;line-height:1.6}
+#santa-game-view .sb-controls{display:grid;gap:14px;padding:18px}
+#santa-game-view .sb-status{min-height:1.4em;font-size:var(--qw-fs-body);font-weight:750;line-height:1.4}
+#santa-game-view .sb-intents{display:grid;gap:4px;padding:10px 12px;border-radius:var(--qw-r-control);background:#fff3c4;color:#3d2c05}
+#santa-game-view .sb-intents:empty{display:none}
+#santa-game-view .sb-intents-title{font-size:var(--qw-fs-small);font-weight:700}
+#santa-game-view .sb-intent{font-size:var(--qw-fs-body);font-weight:750;line-height:1.35}
+#santa-game-view .sb-panel{display:grid;gap:10px}
+#santa-game-view .sb-turn{font-size:var(--qw-fs-h3);font-weight:800}
+#santa-game-view .sb-ask,#santa-game-view .sb-wait{font-size:var(--qw-fs-body);font-weight:700}
+/* the farm's .primary/.secondary set 12 px: buttons of the battle use the shell control size */
+#santa-game-view .qw-btn{font-size:var(--qw-fs-control)}
+#santa-game-view .sb-move{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:var(--qw-btn-h-primary);text-align:left;padding-block:6px}
+#santa-game-view .sb-move-name{font-weight:800}
+#santa-game-view .sb-move-hint{color:inherit;font-size:var(--qw-fs-small);font-weight:600}
+#santa-game-view .sb-targets>.qw-btn{flex:1 1 9rem}
+#santa-game-view .sb-basket,#santa-game-view .sb-battles{display:grid;gap:10px}
+#santa-game-view .sb-item-text{display:flex;gap:10px;align-items:center;min-width:0}
+#santa-game-view .sb-item-text small,#santa-game-view .sb-battle-text span{display:block;font-size:var(--qw-fs-small);line-height:1.35}
+#santa-game-view .sb-item-icon{width:40px;height:40px;flex:none}
+#santa-game-view .sb-battle{padding:10px 0;border-top:1px solid var(--qw-game-line,#c8d4b9)}
+#santa-game-view .sb-battle:first-child{border-top:0;padding-top:0}
+#santa-game-view .sb-battle-text{display:grid;gap:3px;min-width:0}
+#santa-game-view .sb-battle-stars{font-weight:700}
+#santa-game-view .sb-battle-act{display:grid;gap:4px;justify-items:stretch}
+#santa-game-view .sb-why{font-size:var(--qw-fs-caption);line-height:1.3}
+/* Accuracy bar (§4): the runner crosses in 1.2 s; a press in the yellow zone hits ×1.5. */
+#santa-game-view .sb-bar{display:grid;gap:10px}
+#santa-game-view .sb-bar-track{position:relative;height:48px;border-radius:12px;background:#dfe7ee;border:2px solid #5b6b7d;cursor:pointer;touch-action:none;overflow:hidden}
+#santa-game-view .sb-bar-zone{position:absolute;top:0;bottom:0;background:#f2c94c;border-inline:2px solid #a07a12}
+#santa-game-view .sb-bar-run{position:absolute;top:-2px;bottom:-2px;left:0;width:6px;margin-left:-3px;background:#1d2433;border-radius:3px}
+#santa-game-view .sb-rules{font-size:var(--qw-fs-small);line-height:1.5}
+#santa-game-view :focus-visible{outline:3px solid var(--qw-game-accent,#5b883c);outline-offset:3px}
+html.qw-telegram #santa-game-view .sb-back{display:none}
+:root[data-farm-theme="night"] #santa-game-view .sb-intents{background:#3b3014;color:#fff3c4}
+:root[data-farm-theme="night"] #santa-game-view .sb-chip{background:#26364a;color:#e7eef6}
+:root[data-farm-theme="night"] #santa-game-view .sb-hp{background:#33402f;border-color:#6d7c66}
+@media(prefers-reduced-motion:reduce){#santa-game-view .sb-num,#santa-game-view .sb-flash{animation:none}#santa-game-view .sb-hp>span{transition:none}}
+@media(max-width:850px){#santa-game-view .sb-page{padding-top:14px;gap:12px}#santa-game-view .sb-layout{grid-template-columns:1fr;gap:12px}#santa-game-view .sb-controls{gap:10px;padding:14px}#santa-game-view .sb-title{align-items:start}#santa-game-view .sb-title h1{max-width:70%}#santa-game-view .sb-intro{display:none}#santa-game-view .sb-stage-card{padding:8px}}
+/* phone: compact plates so the hero's buttons stay close to the scene */
+@media(max-width:850px){#santa-game-view .sb-plates{gap:6px;margin-top:8px}#santa-game-view .sb-side{gap:6px}#santa-game-view .sb-plate{padding:5px 8px}#santa-game-view .sb-plate-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}#santa-game-view .sb-hp{height:7px;margin-top:3px}#santa-game-view .sb-chips{margin-top:4px}#santa-game-view .sb-title h1{font-size:var(--qw-fs-h2)}}
+@media(max-width:340px){#santa-game-view .sb-plates{grid-template-columns:1fr}}
+/* Contrast mode (UI_RULES §16) */
+:root[data-qw-contrast="1"] #santa-game-view .sb-stage-card,:root[data-qw-contrast="1"] #santa-game-view .sb-controls,:root[data-qw-contrast="1"] #santa-game-view .sb-plate{border-width:2px}
+:root[data-qw-contrast="1"] #santa-game-view .sb-scene svg{filter:saturate(1.12) contrast(1.08)}
+:root[data-qw-contrast="1"][data-farm-theme="night"] #santa-game-view .sb-scene svg{filter:brightness(1.45) contrast(1.15) saturate(1.1)}
+:root[data-qw-contrast="1"] #santa-game-view .sb-hp{height:12px;border:2px solid #10231a;background:#fff}
+:root[data-qw-contrast="1"] #santa-game-view .sb-hp>span{background:#1f6b35}
+:root[data-qw-contrast="1"] #santa-game-view .sb-plate.enemy .sb-hp>span{background:#a3221a}
+:root[data-qw-contrast="1"] #santa-game-view .sb-plate.active{border-color:#10231a;box-shadow:inset 6px 0 0 #a07a12}
+:root[data-qw-contrast="1"] #santa-game-view .sb-intents{background:#fff;color:#10231a;border:2px solid #10231a}
+:root[data-qw-contrast="1"] #santa-game-view .sb-chip{background:#fff;color:#10231a;border:2px solid #10231a}
+:root[data-qw-contrast="1"][data-farm-theme="night"] #santa-game-view .sb-intents,:root[data-qw-contrast="1"][data-farm-theme="night"] #santa-game-view .sb-chip{background:#0f1d16;color:#fff;border-color:#ffd34d}
+:root[data-qw-contrast="1"] #santa-game-view .sb-bar-track{border-color:#10231a;background:#fff}
+:root[data-qw-contrast="1"] #santa-game-view .sb-bar-zone{background:#ffd34d;border-color:#10231a}

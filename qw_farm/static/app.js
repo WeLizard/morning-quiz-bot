@@ -3,6 +3,7 @@ import {mountDashaGame,dashaReasonText,localizeWagerNotice} from './dasha-game.j
 import {mountOlegGame} from './oleg-game.js';
 import {mountBallistaGame} from './ballista-game.js';
 import {mountPieGame} from './pie-game.js';
+import {mountSantaBattle,calmBattle,playerLook,CALM_KEY} from './santa-battle.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame} from './field_overlay.js?v=20261030c';
@@ -77,7 +78,7 @@ const VILLAGE_VOICES={
 };
 const VOICE_FORMS={'Заходи, друг!':['Заходи, подруга!','Заходи, не стесняйся!'],'Вот это надёжный поставщик!':['Вот это надёжная поставщица!','Вот это надёжные поставки!'],'ты теперь свой!':['ты теперь своя!','теперь ты в нашей компании!']};
 const voiceFor=t=>{for(const[m,[f,n]]of Object.entries(VOICE_FORMS))if(t.includes(m))return t.replace(m,gf(m,f,n));return t;};
-let merchantToastKey='',villageResident=null,villageSheet=null,villageBulletinSource=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false,olegGame=null,olegGameOpen=false,ballistaGame=null,ballistaGameOpen=false,pieGame=null,pieGameOpen=false;
+let merchantToastKey='',villageResident=null,villageSheet=null,villageBulletinSource=null,villageSceneSignature='',villageVisitor=null,dashaGame=null,dashaGameOpen=false,olegGame=null,olegGameOpen=false,ballistaGame=null,ballistaGameOpen=false,pieGame=null,pieGameOpen=false,santaGame=null,santaGameOpen=false;
 let villageSession=null,villagePulseTimer=null,villagePresenceBound=false,villageEnterPending=null,villageTalkPending=false;
 const VILLAGE_POOH='Медведь Пух';
 const VILLAGE_CREW_NAMES=['Механик Крот',VILLAGE_POOH,'Кошка Кая'];
@@ -390,7 +391,7 @@ async function refresh({render=true}={}){
  const plantationsChanged=!!catalog&&JSON.stringify(catalog.plantations)!==JSON.stringify(S.catalog?.plantations);
  const catalogChanged=!!catalog&&(plantationsChanged||upkeepCatalogSnapshot(catalog)!==upkeepCatalogSnapshot(S.catalog));
  if(catalogChanged)S.catalog=catalog;
- S.form=me.address_form||'n';try{if(!farmContrastPending&&prefsEpoch===farmContrastEpoch)globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();
+ S.form=me.address_form||'n';try{if(!farmContrastPending&&prefsEpoch===farmContrastEpoch)globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();
  queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();syncMenuBadges();orchardNotices(prevLevel);
  if(lostAccess){farmViewEpoch++;S.tab='neighbors';toast(gf('Хозяин закрыл доступ. Ты вернулся на свою ферму.','Хозяин закрыл доступ. Ты вернулась на свою ферму.','Доступ закрыт владельцем. Открыта твоя ферма.'));}
  if(beforeScene!==sceneSnapshot()||catalogChanged)scene.set(S.farm,S.catalog);
@@ -424,7 +425,7 @@ async function sendPending(){
  let payload=S.pending,rejectedWagerRoundId=null,bulkView=S.me;
  try{let r=await request(API+'/commands',{method:'POST',data:payload});rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;if(!S.me)return true;if(!r.neighbor_reward_paid)toast(localizeWagerNotice(r.notice,gf));await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});if(['repeat_once','fill_queues'].includes(payload.kind)&&S.me?.id===payload.actor&&S.me===bulkView)S.bulkAwaitingRefresh={actor:payload.actor,view:bulkView};return true;}
  catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(payload.kind==='field_cancel'?REFUND.cancelErrorText(e):e.code==='stale_visit'?MERCH.STALE_TEXT:e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
- finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
+ finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
 }
 // After a real 429 the game recovers by itself: wait out Retry-After, then replay the unconfirmed command with the SAME id
 // (the server is idempotent) or just refresh the screen. No reload is needed.
@@ -456,7 +457,7 @@ function showLogin(message=''){
  if(S.pending)savePending();
  clearTimeout(pendingRetryTimer);pendingRetryTimer=null;pendingRetryAttempt=0;
  clearTimeout(rateRecoveryTimer);rateRecoveryTimer=null;rateRecoveryAttempt=0;
- if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();if(pieGameOpen)closePieGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
+ if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();if(pieGameOpen)closePieGame();if(santaGameOpen)closeSantaGame();farmViewEpoch++;S.me=S.farm=null;S.lastRun=null;S.pending=null;S.selected=null;resetVillageView();
  S.fieldGame?.close();cancelPlacement();if($('dialog').open)$('dialog').close();closePanel();
  toastList.length=0;renderToasts();connection(message||'Войди через QuizzyWizzy',true);
  document.body.classList.add('farm-login');$('game').hidden=true;$('login').hidden=false;const parent=$('login');parent.replaceChildren();let c=el('div',null,'login-card'),img=el('img',null,'login-hero');img.src='/app/farm-card-v2.webp';img.alt='Филиныч с урожаем на своей ферме';c.append(img);
@@ -565,7 +566,7 @@ async function openMenuTab(id){
  selectTab(id);
  if(wasOpen)$('farm-menu-button')?.focus({preventScroll:true});
 }
-function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();if(pieGameOpen)closePieGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
+function selectTab(id){if(dashaGameOpen)closeDashaGame();if(olegGameOpen)closeOlegGame();if(ballistaGameOpen)closeBallistaGame();if(pieGameOpen)closePieGame();if(santaGameOpen)closeSantaGame();const wasVillage=S.tab==='village';farmViewEpoch++;if(id==='village'&&S.me&&S.farm?.id!==S.me.id){S.farm=S.me;scene.set(S.me,S.catalog);updateHUD();renderSeeds();}S.tab=id;S.selected=null;scene.selected=null;if(id!=='village'){villageResident=null;villageSheet=null;if(wasVillage&&typeof villagePresenceStop==='function')villagePresenceStop();}if(id==='village'){villageResident=null;villageSheet=null;document.body.classList.remove('panel-open');document.body.classList.add('panel-collapsed');if(!wasVillage&&typeof villagePresenceStart==='function')villagePresenceStart();}else showPanel();renderRail();renderPanel();}
 function exitVillage(){villageSheet=null;selectTab('orders');closePanel();}
 function returnToFarm(){if(villageVisible())exitVillage();else backHome();}
 function resetVillageView(){if(typeof villagePresenceStop==='function')villagePresenceStop();villageResident=null;villageSheet=null;villageSceneSignature='';villagePos=[...VILLAGE_START];villageWalkStop();syncVillageScene();villageCenter(villagePos,false);if(S.tab==='village'&&typeof villagePresenceStart==='function')villagePresenceStart();}
@@ -1690,6 +1691,7 @@ function syncFestivalWorld(){
 function festivalHelpers(){
  return {el,button,card,goods,note,checkbox,stock,fmt,itemName,command,icon,modal,now,
   pie:()=>S.me?.village_games?.agata_pie||null,pieGame:()=>openPieGame(),
+  santa:()=>S.me?.village_games?.santa_battle||null,santaGame:()=>openSantaGame(),
   getHorseman:()=>S.me?.horseman||null,pending:()=>S.busy||!!S.pending,closeDialog:()=>$('dialog').close(),
   horsemanCard:parent=>renderHorsemanCard(parent,festivalHelpers()),
   busy:()=>S.busy,coins:()=>S.me?.coins||0,rerender:()=>{if(S.me)renderPanel();}};
@@ -1718,6 +1720,16 @@ async function openDashaGame(){
 function closeOlegGame(){if(!olegGameOpen)return true;olegGameOpen=false;document.body.classList.remove('oleg-game-open');olegGame?.destroy();olegGame=null;navPop('oleg-chime');requestAnimationFrame(()=>document.querySelector('[data-open-oleg]')?.focus({preventScroll:true}));return true;}
 function closeBallistaGame(){if(!ballistaGameOpen)return true;ballistaGameOpen=false;document.body.classList.remove('ballista-game-open');ballistaGame?.destroy();ballistaGame=null;navPop('pukh-ballista');requestAnimationFrame(()=>document.querySelector('[data-open-ballista]')?.focus({preventScroll:true}));return true;}
 function closePieGame(){if(!pieGameOpen)return true;pieGameOpen=false;document.body.classList.remove('pie-game-open');pieGame?.destroy();pieGame=null;navPop('agata-pie');requestAnimationFrame(()=>document.querySelector('[data-open-pie]')?.focus({preventScroll:true}));return true;}
+// «Битва с Сантой» (FARM_SANTA_BATTLE.md): the same nested view as the pie; the fighter follows the address form.
+function closeSantaGame(){if(!santaGameOpen)return true;santaGameOpen=false;document.body.classList.remove('santa-game-open');santaGame?.destroy();santaGame=null;navPop('santa-battle');requestAnimationFrame(()=>document.querySelector('[data-open-santa]')?.focus({preventScroll:true}));return true;}
+async function openSantaGame(){
+ if(!own()||!S.me)return;
+ if(!S.me.village_games?.santa_battle){try{await refresh({render:false});}catch(e){toast(e.message,true);return;}}
+ if(!S.me?.village_games?.santa_battle){toast('Битва с Сантой пока недоступна. Обнови ферму.',true);return;}
+ const host=$('santa-game-view');if(santaGameOpen){santaGame?.render();return;}
+ santaGameOpen=true;document.body.classList.add('santa-game-open');
+ santaGame=mountSantaBattle(host,{getState:()=>S.me?.village_games?.santa_battle,command,isCommandPending:()=>!!S.pending||S.busy,onBack:closeSantaGame,stockOf:stock,itemName,icon,look:()=>playerLook(S.form),storageKey:S.me.id});navPush('santa-battle',closeSantaGame);
+}
 async function openPieGame(){
  if(!own()||!S.me)return;
  if(!S.me.village_games?.agata_pie||!S.me.festival?.fair?.tower){try{await refresh({render:false});}catch(e){toast(e.message,true);return;}}
@@ -1901,7 +1913,9 @@ function renderViewSettings(p){
  note('По времени — по часам твоего устройства: рассвет с 05:00, день с 08:00, сумерки с 17:00, ночь с 21:00.',p);
  let [cw,compact]=checkbox('Компактный интерфейс без большого заголовка',document.body.classList.contains('compact'));compact.onchange=()=>{document.body.classList.toggle('compact',compact.checked);try{localStorage.setItem('qw-farm.compact',String(compact.checked));}catch{}scene.resize();};
  let [mw,motion]=checkbox('Спокойный режим: меньше анимаций',!scene.motion);motion.onchange=()=>{scene.motion=!motion.checked;try{localStorage.setItem('qw-farm.reduced-motion',String(motion.checked));}catch{}};
- p.append(cw,mw,el('p','Полный экран и режим «Только ферма и счётчики» — в меню ⚙. Управление и подсказки — там же.','note'));
+ // «Битва с Сантой» §4: the calm battle has no accuracy bar, every hit is plain (the battles are won without the bonus)
+ let [bw,battleCalm]=checkbox('Спокойный бой с Сантой: без полоски меткости',calmBattle());battleCalm.onchange=()=>{try{localStorage.setItem(CALM_KEY,String(battleCalm.checked));}catch{}santaGame?.render();};
+ p.append(cw,mw,bw,el('p','Полный экран и режим «Только ферма и счётчики» — в меню ⚙. Управление и подсказки — там же.','note'));
 }
 // «Управление и подсказки» (⚙ menu): the former hint paragraphs of the settings tab.
 function showControlsHelp(){
@@ -1947,7 +1961,7 @@ async function retryConnection(){
  else if(S.pending)await sendPending();else await refresh();
 }
 document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(olegGameOpen){e.preventDefault();closeOlegGame();return;}if(ballistaGameOpen){e.preventDefault();closeBallistaGame();return;}if(pieGameOpen){e.preventDefault();closePieGame();return;}if(farmMenuOpen){e.preventDefault();closeFarmMenu();$('farm-menu-button')?.focus({preventScroll:true});return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
+ if(e.key==='Escape'){if(dashaGameOpen){e.preventDefault();closeDashaGame();return;}if(olegGameOpen){e.preventDefault();closeOlegGame();return;}if(ballistaGameOpen){e.preventDefault();closeBallistaGame();return;}if(pieGameOpen){e.preventDefault();closePieGame();return;}if(santaGameOpen){e.preventDefault();closeSantaGame();return;}if(farmMenuOpen){e.preventDefault();closeFarmMenu();$('farm-menu-button')?.focus({preventScroll:true});return;}if(!S.placing?.committing)cancelPlacement();closePanel();}
  if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||e.ctrlKey||e.metaKey||e.altKey||$('dialog').open)return;
  if(e.key.toLowerCase()==='f'){e.preventDefault();toggleFullscreen();}
  if(e.key.toLowerCase()==='h'){e.preventDefault();toggleImmersive();}

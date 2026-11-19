@@ -30,7 +30,7 @@ const MIN_SCALE=.25,MAX_SCALE=2,CACHE_MARGIN=.18,MAIN_MAX_PIXELS=4e6,CACHE_MAX_P
 const FIELD_LAYER_MIN=12,FIELD_SWAY_MS=250,FIELD_GROW_MS=4000,FIELD_ZOOM_SETTLE=250;
 // Object sprites (drawObjectSprite): all bitmaps together stay under SPRITE_MAX_PIXELS device pixels (least recently drawn go
 // first); art that read the server clock is repainted every SPRITE_CLOCK_MS; the camera counts as moving for CAMERA_SETTLE ms.
-const SPRITE_MAX_PIXELS=8e6,SPRITE_ONE_MAX=2e6,SPRITE_CLOCK_MS=2000,CAMERA_SETTLE=250,SPRITE_KEEP=['ready','clockBubble','cropBadge','label'];
+const SPRITE_MAX_PIXELS=8e6,SPRITE_ONE_MAX=2e6,SPRITE_CLOCK_MS=2000,CAMERA_SETTLE=250,SPRITE_KEEP=['ready','clockBubble','cropBadge','label','jobMark'];
 const KEY_PAN={ArrowLeft:[1,0],KeyA:[1,0],ArrowRight:[-1,0],KeyD:[-1,0],ArrowUp:[0,1],KeyW:[0,1],ArrowDown:[0,-1],KeyS:[0,-1]};
 const KEY_SPEED=560;
 export const SWAN_FEED_SECONDS=7;
@@ -881,17 +881,19 @@ export class FarmScene {
   if(o.type==='plot'){this.plot(o);return}
   if(o.type==='tree'){if(this.contrast)this.footprint(o,null,'#556447');this.orchardTree(o,p);return}
   if(o.type==='road'){drawRoad(this,o);return}
-  if(o.type==='duckpond'){this.c.save();this.c.translate(p.x,p.y);this.c.scale(.48,.48);this.pond(0,0);this.c.restore();drawBadge(this,o);if(o.animal_job?.ready_at<=this.now())this.ready(p.x,p.y-30);return;}
+  if(o.type==='duckpond'){this.c.save();this.c.translate(p.x,p.y);this.c.scale(.48,.48);this.pond(0,0);this.c.restore();drawBadge(this,o);this.jobMark({animal_job:o.animal_job},p.x,p.y-30,false);return;}
   if(this.contrast)this.footprint(o,null,'#556447');  // contrast mode: a ground outline under every building and decor
   if(specialDecor(this,o,p))return;
   if(o.type==='birdhouse'){this.birdhouse(o,p);return}
   if(['flowerbed','bench','lantern','scarecrow'].includes(o.type)){this.decor(o,p);return}
   const top=drawUpgrade(this,o,drawBuilding(this,o,p));
-  let ready=o.jobs?.some(j=>j.ready_at<=this.now())||(o.animal_job&&o.animal_job.ready_at<=this.now());
   const by=o.w<2&&o.h<2?top+8:Math.max(70,top+6);   // a low 1x1 workshop (the compost heap) keeps its bubble close above it
-  if(ready)this.ready(p.x+22,p.y-by);
-  else if(o.jobs?.length||o.animal_job){let job=o.jobs?.[0]||o.animal_job;this.clockBubble(p.x+25,p.y-by-1,job.ready_at)}
+  this.jobMark(o,p.x+22,p.y-by);
  }
+ // Ready mark or countdown of an object's job, decided when it is drawn: an object sprite records the call and replays it
+ // live, so the building's art itself does not depend on the clock.
+ jobMark(o,x,y,bubble=true){const now=this.now(),ready=o.jobs?.some(j=>j.ready_at<=now)||o.animal_job&&o.animal_job.ready_at<=now;
+  if(ready)this.ready(x,y);else if(bubble&&(o.jobs?.length||o.animal_job))this.clockBubble(x+3,y-1,(o.jobs?.[0]||o.animal_job).ready_at)}
  title(o){return {house:'Дом Филиныча',barn:'Склад',plot:'Грядка'}[o.type]||(o.type==='tree'?this.catalog?.orchard?.trees?.[o.species]?.name:null)||this.catalog?.buildings[o.type]?.name||o.type}
  // Fruit tree (docs/tasks/FARM_ORCHARD.md, section 7): seven species by stage and cycle phase, graft looks and care marks (scene_orchard.js).
  orchardTree(o,p){if(o.fruit?.fert||o.fert)this.fertRing(o,p);drawTree(this,o,p,this.catalog,this.now())}

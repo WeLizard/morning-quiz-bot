@@ -174,7 +174,8 @@ def test_identity_selection_stale_actor_and_lost_command_response(farm_pg_url):
             assert await raw_farm(env, guest) == after
             stored = await receipts(env, guest.account_id, key)
             assert len(stored) == 1 and stored[0]['result'] == retry
-            assert set(retry) == {'command_id', 'notice', 'server_time', 'revision'}
+            # Every command reports the shared daily cash-premium budget (qw_farm/daily_bonus.py).
+            assert set(retry) == {'command_id', 'notice', 'server_time', 'revision', 'daily_cash_bonus'}
             entries = await ledger(env, key=key)
             assert len(entries) == 1 and entries[0]['inventory_delta'] == {'wheat': -2}
             assert after['coins'] == before['coins'] + entries[0]['coins_delta']

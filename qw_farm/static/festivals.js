@@ -138,6 +138,12 @@ export function renderFestival(p,view,h){
  if(cur?.id==='new_year')santaCard(p,h);
  if(view.prep)prepCard(p,view.prep,h);
  if(fair){
+  if(fair.early){
+   const opens=new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Moscow'}).format(new Date(fair.regular_starts_at*1000));
+   const early=card('Первый час ярмарки',`Обычное открытие — ${opens} мск`,'coin');
+   note('Твой вклад в ярмарочное поле открыл праздничные лавки на час раньше.',early);p.append(early);
+  }
+  if(fair.discount_pct)note(`Твоя скидка строителя: ${fair.discount_pct}% на товары этой ярмарки. В кнопках уже указана итоговая цена.`,p);
   if(fair.tower){
    const t=fair.tower,pie=h.pie?.(),label=pie?.active?'Продолжить':!pie?'Играть':pie.attempts_left>0?(pie.last_result?'Ещё раз':'Играть'):'Тренировка';
    const c=card('Пирог до небес','Праздничная игра деревни','journal');c.classList.add('fest-pie');
@@ -151,7 +157,7 @@ export function renderFestival(p,view,h){
    const c=card('Праздничные задания','Награда — предмет праздника, без монет и опыта','journal');c.classList.add('fest-tasks');
    for(const t of fair.tasks){
     const row=el('div',null,`fest-task${t.done?' done':''}`);
-    const reward=el('small',null);reward.append(itemMark(h,t.reward.id),el('span',`${t.host} · награда: ${t.reward.name}${t.locked?` · с ${t.level} уровня`:''}`));
+    const reward=el('small',null);reward.append(itemMark(h,t.reward.id),el('span',`${t.host} · награда: ${t.reward.name}${t.early?' · задания откроются вместе с ярмаркой':t.locked?` · с ${t.level} уровня`:''}`));
     row.append(el('strong',t.done?`${t.title} · готово`:t.title),reward);
     if(!t.done){
      const stack=el('div',null,'qw-btn-stack');
@@ -206,6 +212,7 @@ function itemMark(h,id){const mark=h.el('span',null,'good');mark.append(h.icon(i
 function goodRow(g,cost,h,festival){
  const {el,button,coins,fmt,command}=h,row=el('div',null,`fest-good ${g.status}`);
  const info=el('div');info.append(itemMark(h,g.id),el('strong',g.name),el('small',`${KIND_LABEL[g.kind]||g.kind}${g.note?` · ${g.note}`:''}`));
+ if(g.base_price>cost)info.append(el('small',`Обычная цена: ${h.fmt(g.base_price)} · со скидкой: ${h.fmt(cost)}`));
  const block=goodBlock(g,coins());
  const actions=el('div',null,'qw-btn-stack');
  actions.append(button(`Купить · ${fmt(cost)}`,()=>command('festival_buy',{festival,item:g.id}),'qw-btn secondary',!!block||h.busy?.()));

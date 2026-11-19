@@ -58,6 +58,25 @@ test('pure helpers: need rows, percent, time, site captions and the tier gap',as
  assert.equal(C.energyChoice({},['berry_charge'],86400),null);assert.equal(C.energyChoice({berry_charge:2},['berry_charge'],3600),null);
 });
 
+test('building scene effects use public honours and active festival shops',async()=>{
+ const {buildingEffectState}=await load();
+ assert.deepEqual(buildingEffectState({}),{tavern:[],flag:false,stalls:false,podium:false});
+ const me={village_build:build({projects:[project({id:'tavern',status:'done'})],honor_details:{tavern:[{name:'Сосед',favorite:'bread'}],fairground:[{name:'Сосед'}]},fairground:{open:true}})};
+ assert.deepEqual(buildingEffectState(me),{tavern:[{name:'Сосед',favorite:'bread'}],flag:false,stalls:false,podium:false});
+ me.festival={fair:{id:'posidelki'}};assert.equal(buildingEffectState(me).stalls,true);assert.equal(buildingEffectState(me).flag,true);
+ me.village_build.honor_details={};assert.equal(buildingEffectState(me).flag,false);
+ assert.deepEqual(buildingEffectState(me).tavern,[]);
+});
+
+test('scene controls keep eight pixels clear of the fixed header',async()=>{
+ const {clearOfHeader,cashBonusText}=await load(),header={bottom:104,left:0,right:390};
+ assert.equal(clearOfHeader({top:111.9,left:322,right:370},header),false);
+ assert.equal(clearOfHeader({top:112,left:322,right:370},header),true);
+ assert.equal(clearOfHeader({top:99.768,left:322,right:370},header),false);
+ assert.equal(clearOfHeader({top:90,left:400,right:444},header),true);
+ assert.match(cashBonusText({remaining:0,cap:390}),/0 из 390/);
+});
+
 test('tavern keeps tray placements through reload and resets them on the next day',async t=>{
  const {createConstruction}=await load();
  const values=new Map(),descriptor=Object.getOwnPropertyDescriptor(globalThis,'sessionStorage');
@@ -101,6 +120,46 @@ test('tavern keeps tray placements through reload and resets them on the next da
  render();
  assert.match(by('tavernCell','0').attrs['aria-label'],/Пусто/);
  assert.equal(by('tavernServe','').disabled,true);
+});
+
+test('tavern separate order slots, dinner and favorite use the server projection',async()=>{
+ const {createConstruction}=await load();
+ const tavern={day:5,orders:[{slot:0,id:'5:0',item:'bread',qty:2,coins:40,done:true},{slot:1,id:'5:1',item:'bread',qty:2,coins:40,done:false}],
+  dinner:{amount:130,claimed:true},can_favorite:true,favorite:'bread',dishes:[{id:'bread',name:'Хлеб'}],puzzle:{done:true,stamps:2},toast:'harvest'};
+ const {h,calls}=harness(build({projects:[project({id:'tavern',status:'done'})],tavern}));
+ createConstruction(h).render(h.panel,'site:tavern');
+ assert.match(texts(h.panel),/Второй заказ дня/);assert.match(texts(h.panel),/Сегодня ужин уже получен/);
+ await buttons(h.panel).find(b=>b.dataset.villageFocus==='tavern-order-1').onclick();
+ await buttons(h.panel).find(b=>b.dataset.villageFocus==='tavern-favorite').onclick();
+ assert.deepEqual(calls.map(c=>c.slice(0,2)),[['tavern_order',{day:5,item:'bread',slot:1}],['tavern_favorite',{day:5,item:'bread'}]]);
+ tavern.dinner={nominal_amount:130,amount:0,paid:0,claimed:true};tavern.bonus_budget={remaining:0,cap:390};
+ h.panel.replaceChildren();createConstruction(h).render(h.panel,'site:tavern');
+ assert.match(texts(h.panel),/П = 130/);assert.match(texts(h.panel),/премия — 0 мон/);assert.match(texts(h.panel),/Лимит исчерпан/);
+});
+
+test('greenhouse planting and voting carry the server cycle and next month',async()=>{
+ const {createConstruction}=await load();
+ const greenhouse={open:true,month:'2026-11',crop:'wheat',crop_name:'Пшеница',next_month:'2026-12',can_vote:true,vote:'wheat',
+  crops:[{id:'wheat',name:'Пшеница'}],can_plant:true,bed:{cycle:3,crop:null},seeds:[{id:'exo_mango',name:'Манго',seed:'seed_mango',count:2,level:10}]};
+ const {h,calls}=harness(build({projects:[project({id:'greenhouse',status:'done'})],greenhouse}));
+ createConstruction(h).render(h.panel,'site:greenhouse');
+ assert.doesNotMatch(texts(h.panel),/Эффект здания скоро/);
+ await buttons(h.panel).find(b=>b.dataset.villageFocus==='greenhouse-plant').onclick();
+ await buttons(h.panel).find(b=>b.dataset.villageFocus==='greenhouse-vote').onclick();
+ assert.deepEqual(calls.map(c=>c.slice(0,2)),[['greenhouse_plant',{crop:'exo_mango',cycle:3}],['greenhouse_vote',{month:'2026-12',crop:'wheat'}]]);
+ greenhouse.bed={cycle:4,crop:{id:'exo_mango'},ready:true,ready_at:900};h.panel.replaceChildren();createConstruction(h).render(h.panel,'site:greenhouse');
+ await buttons(h.panel).find(b=>b.dataset.villageFocus==='greenhouse-harvest').onclick();
+ assert.deepEqual(calls.at(-1).slice(0,2),['greenhouse_harvest',{cycle:4}]);
+ greenhouse.can_plant=false;greenhouse.can_harvest=true;
+ h.panel.replaceChildren();createConstruction(h).render(h.panel,'site:greenhouse');
+ assert.equal(buttons(h.panel).find(b=>b.dataset.villageFocus==='greenhouse-harvest').disabled,false,'retained crop stays harvestable after a merge lowers the tier');
+});
+
+test('greenhouse tier locks do not offer unavailable commands',async()=>{
+ const {createConstruction}=await load();
+ const {h}=harness(build({projects:[project({id:'greenhouse',status:'done'})],greenhouse:{open:true,month:'2026-11',crop:'wheat',next_month:'2026-12',can_vote:false,can_plant:false}}));
+ createConstruction(h).render(h.panel,'site:greenhouse');
+ assert.equal(buttons(h.panel).length,0);assert.match(texts(h.panel),/со ступени «Мастер»/);assert.match(texts(h.panel),/почётным строителям/);
 });
 
 test('site sheet in the collecting stage: needs, one primary button, contribute sends exactly the inputs',async()=>{
@@ -188,7 +247,8 @@ test('wiring: assets, stylesheet, map sites are buttons, the market sign leads t
  assert.match(app,/const VILLAGE_SITES=\[\['stalls','Торговые ряды'/);
  assert.match(app,/'village-site village-site-btn'/);
  assert.match(app,/id==='market'&&typeof CONSTR!=='undefined'&&CONSTR\.rowsOpen\(\)\?villageGo\(\[x,y\+2\.4\],\(\)=>openVillageConstruction\('rows'\),e\)/);
- assert.match(app,/syncMerchantFlag\(\);syncVillageMerchant\(\);syncVillageSites\(\)/);
+ assert.match(app,/syncMerchantFlag\(\);syncVillageMerchant\(\)/);
+ assert.match(app,/syncVillageSites\(\);syncVillageBuild\(workingNames\)/);
  assert.match(app,/villageSheet==='rows'\|\|String\(villageSheet\)\.startsWith\('site:'\)/);
  const css=fs.readFileSync(path.join(stat,'construction.css'),'utf8');
  assert.match(css,/\.village-site-btn\{pointer-events:auto;min-height:44px/);

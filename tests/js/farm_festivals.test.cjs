@@ -107,6 +107,19 @@ test('the panel sends only intent: festival id, task, option / item, never a pri
  assert.ok(!walk(p).some(n=>n.tag==='details'),'no past shop before any festival has finished');
 });
 
+test('early fair shows the server discount and sends purchases without a client price',async()=>{
+ const F=await load(),h=helpers(),p=h.el('div');
+ const view=structuredClone(fairView);view.fair.early=true;view.fair.regular_starts_at=1795300000;view.fair.discount_pct=10;
+ view.fair.tasks[0].early=true;view.fair.tasks[0].locked=true;
+ view.fair.goods[0].base_price=1000;view.fair.goods[0].price=900;
+ F.renderFestival(p,view,h);
+ const all=walk(p),text=all.map(n=>`${n.text} ${n.sub||''}`).join('|');
+ assert.match(text,/Первый час ярмарки/);assert.match(text,/Обычное открытие/);assert.match(text,/со скидкой: 900/);
+ assert.match(text,/задания откроются вместе с ярмаркой/);
+ await all.find(n=>n.tag==='button'&&n.text==='Купить · 900').onclick();
+ assert.deepEqual(h.calls,[['festival_buy',{festival:'posidelki',item:'fest_posid_wreath'}]]);
+});
+
 test('past-festivals shop shows the x1.5 prices and buys through the same command',async()=>{
  const F=await load(),h=helpers(),p=new Node('div');
  const view={...fairView,current:null,fair:null,collection:{fest_posid_socks:{name:'Носки года',kind:'keepsake',place:'fence',wired:false,count:1,years:[2026]}},
@@ -131,7 +144,7 @@ test('settings card toggles the hooks; the scares switch exists only on the Pump
 
 test('app wiring: module is served, imported, linked, in the farm menu, the ⚙ menu and the orders banner',()=>{
  const app=fs.readFileSync(path.join(STATIC,'app.js'),'utf8'),api=fs.readFileSync(path.join(STATIC,'../api.py'),'utf8'),html=fs.readFileSync(path.join(STATIC,'index.html'),'utf8');
- assert.match(app,/import \* as FEST from '\.\/festivals\.js'/);
+ assert.match(app,/import \* as FEST from '\.\/festivals\.js(?:\?[^']+)?'/);
  assert.match(api,/'festivals\.js'/);assert.match(api,/'festivals\.css'/);
  assert.match(html,/assets\/festivals\.css/);
  assert.match(fs.readFileSync(path.join(STATIC,'farm_nav.js'),'utf8'),/\['festival','coin','Праздник','festival'\]/,'«Праздник» is a farm menu item shown only while a festival runs');assert.match(app,/renderFestivalTab/);

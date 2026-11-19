@@ -12,7 +12,7 @@ from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, oleg, progression, trip_games, festivals
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
-from . import wagers, friend_requests, construction, tavern
+from . import wagers, friend_requests, construction, tavern, daily_bonus
 from application import farm_village_games
 from .upkeep_config import effective_values as effective_upkeep_config
 
@@ -325,17 +325,18 @@ class FarmService:
         # Normalize the comparison copy too: adding save fields (including
         # home_projects/minigames) is persistence housekeeping, not earned work.
         baseline=upgrade_state(deepcopy(before))
+        if own:await daily_bonus.bootstrap(self.u,farm,self.clock())
+        if own:await construction.tick_account(self.u,farm,self.p.account_id,self.clock())
         settle(farm,self.clock())
         if own:await self._claim_village(farm,self.clock())
         if own:await self._claim_tower(farm,self.clock())
-        if own:await construction.tick_account(self.u,farm,self.p.account_id,self.clock())  # shared stages, perk mirror, own stall rent
         if farm!=before:
             farm['revision']+=1
             validate_state(farm)
             await self.u.save(farm)
             # Market housekeeping (a caravan arriving, the daily contracts rolling over) changes no balance:
             # it is saved, but only real work leaves a receipt in the economic ledger.
-            quiet={'market','events','revision','economy','village_errands','village_bonus','meadow'}
+            quiet={'market','events','revision','economy','village_errands','village_bonus','meadow',daily_bonus.KEY}
             if any(farm.get(k)!=baseline.get(k) for k in set(farm)|set(baseline) if k not in quiet):
                 # Stable per-version economic receipt for automatically completed work.
                 key='auto:'+str(farm['revision'])
@@ -497,6 +498,12 @@ class FarmService:
             await self._settle(other,await self.u.owner_account(other['id']))
         before=deepcopy(me);before_other=deepcopy(other)
         now=self.clock()
+        # The month may change while paid work is being settled. Manual planting
+        # consumes the snapshot of this command's actual timestamp.
+        if 'greenhouse' in (me.get('village_bonus') or {}).get('open', ()):
+            from .village_effects import month
+            if me['village_bonus'].get('month') != month(now):
+                await construction.month_snapshot(self.u,me,now)
         upkeep_config=await self._upkeep_config(now)
         mini_kind=kind in {'minigame_start','minigame_answer'}
         wager_kind=kind in {'wager_start','wager_choose'}
@@ -547,7 +554,7 @@ class FarmService:
             progression.touch(me,now)
             economy.bill(me,now,upkeep_config)
         elif kind in construction.COMMANDS:
-            notice,ledger_kind=await construction.command(self.u,me,other,self.p.account_id,kind,data,now)
+            notice,ledger_kind=await construction.command(self.u,me,other,self.p.account_id,kind,data,now,self.speed)
             event(me,now,notice,kind)
             if kind not in {'tavern_serve','tavern_toast'}:
                 progression.touch(me,now)
@@ -591,6 +598,7 @@ class FarmService:
             await self.u.record(self.p.account_id,key,kind,before_other,other,now)
         await wagers.claim_pending(self.u,me,self.p.account_id,now)
         result=dict(command_id=key,notice=notice,server_time=now,revision=me['revision'])
+        result['daily_cash_bonus']=daily_bonus.public(me,now)
         if mini_kind:result['minigames']=minigames.public(me,now)
         if oleg_kind:result['oleg_game']=oleg.public(me,now)
         if vgame_kind:result['village_games']=farm_village_games.public(me,now)

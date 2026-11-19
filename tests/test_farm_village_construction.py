@@ -539,7 +539,8 @@ def test_tavern_opens_to_an_old_farm_and_cosmetics_follow_moscow_days():
         await w.force('tavern', status='done', stage=2, opened_at=T0)
         initial = await w.farm('a')
         assert 'tavern' not in initial
-        assert (await w.build('a'))['tavern'] == {
+        initial_tavern = (await w.build('a'))['tavern']
+        assert {k:initial_tavern[k] for k in ('day','order','puzzle','toast')} == {
             'day': day, 'order': None, 'puzzle': {'done': False, 'stamps': 0, 'variant': 0}, 'toast': None,
         }
         with pytest.raises(FarmError, match='Олег'):
@@ -678,7 +679,7 @@ def test_postgres_tavern_replays_and_two_tabs_grant_each_daily_action_once(farm_
             after = await raw_farm(env, actor)
             assert after['inventory'][order['item']] == before['inventory'][order['item']] - 1
             persisted = (await view(actor))['village_build']['tavern']
-            assert persisted == dict(day=day, order={**order, 'done': True},
+            assert {k:persisted[k] for k in ('day','order','puzzle','toast')} == dict(day=day, order={**order, 'done': True},
                                      puzzle=dict(done=True, stamps=1, variant=0), toast='harvest')
             env.now[0] = (day + 1) * DAY - market.TZ_OFFSET
             stale = await command(actor, 'tavern_order', {'day': day, 'item': order['item']})

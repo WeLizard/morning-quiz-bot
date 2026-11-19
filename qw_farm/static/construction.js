@@ -14,6 +14,18 @@ const TAVERN_TOASTS={
 export const view=me=>me?.village_build||null;
 export const project=(v,id)=>(v?.projects||[]).find(p=>p.id===id)||null;
 export const rowsOpen=v=>!!v?.rows?.open;
+export const clearOfHeader=(rect,header,gap=8)=>rect.top>=header.bottom+gap||rect.right<=header.left||rect.left>=header.right;
+export function cashBonusText(budget,format=String){
+ return budget?`Общий денежный бонус за московские сутки: ${format(budget.remaining)} из ${format(budget.cap)} мон. осталось (3% дохода).${budget.remaining<=0?' Лимит исчерпан.':''}`:'';
+}
+/** Scene decorations use public honours only; personal tier is never a substitute. */
+export function buildingEffectState(me){
+ const build=view(me),honor=build?.honor_details||{};
+ const tavern=project(build,'tavern')?.status==='done'?(honor.tavern||[]):[];
+ const fair=!!build?.fairground?.open;
+ return {tavern,flag:fair&&!!me?.festival?.fair&&(honor.fairground||[]).length>0,
+  stalls:fair&&!!me?.festival?.fair, podium:fair&&!!me?.festival?.fair};
+}
 /** The art a site shows on the map (§2.4, village-build.svg): the finished works of the stage — soon until the pit is dug,
  * pit while it is dug and until the frame works start, frame from then on, done when open. */
 export function siteArt(p){
@@ -121,16 +133,17 @@ export function createConstruction(h){
  }
 
  function renderTavernOrder(parent,day,order){
-  const card=h.card('Заказ дня',order?`${h.itemName(order.item)} ×${order.qty}`:null,order?.item||'orders');
+  const focus=order?.slot==null?'tavern-order':`tavern-order-${order.slot}`;
+  const card=h.card(order?.slot>0?'Второй заказ дня':'Заказ дня',order?`${h.itemName(order.item)} ×${order.qty}`:null,order?.item||'orders');
   if(!order){
    h.note('Заказ появится, когда на ферме откроется подходящий рецепт.',card);
   }else if(order.done){
-   card.append(tavernStatus(`Заказ сдан · +${h.fmt(order.coins)} мон.`,'tavern-order'));
+   card.append(tavernStatus(`Заказ сдан · +${h.fmt(order.coins)} мон.`,focus));
   }else{
    const stock=h.me().inventory?.[order.item]||0;
    card.append(h.goods({[order.item]:order.qty}));
    const send=tavernControl(h.button(`Сдать заказ · +${h.fmt(order.coins)} мон.`,
-    ()=>h.command('tavern_order',{day,item:order.item}),'qw-btn secondary wide',stock<order.qty),'tavern-order');
+    ()=>h.command('tavern_order',{day,item:order.item,...(order.slot==null?{}:{slot:order.slot})}),'qw-btn secondary wide',stock<order.qty),focus);
    send.dataset.tavernOrder='';
    card.append(send);
    if(stock<order.qty)h.note('На складе пока не хватает блюда.',card);
@@ -221,9 +234,33 @@ export function createConstruction(h){
 
  function renderTavern(parent,tavern){
   h.heading(TAVERN_NAME,'Овёс не подаём. Сами едим');
-  renderTavernOrder(parent,tavern.day,tavern.order);
+  for(const order of tavern.orders?.length?tavern.orders:[tavern.order])renderTavernOrder(parent,tavern.day,order);
+  if(tavern.dinner){
+   const dinner=tavern.dinner;
+   const c=h.card('Ужин строителя',`П = ${h.fmt(dinner.nominal_amount??dinner.amount)} мон.`, 'coin');
+   h.note(dinner.claimed?dinner.paid===0?'Сегодня ужин уже учтён. Денежная премия — 0 мон.':`Сегодня ужин уже получен.${dinner.paid==null?'':` Начислено: ${h.fmt(dinner.paid)} мон.`}`:dinner.available===false?'Ужин доступен со ступени «Помощник».':`При первой сдаче заказа за московские сутки — сейчас до ${h.fmt(dinner.amount)} мон. дополнительно. Сумма зависит от остатка общего денежного бонуса.`,c);
+   const budget=cashBonusText(tavern.bonus_budget,h.fmt);if(budget)h.note(budget,c);
+   parent.append(c);
+  }
+  if(tavern.can_favorite){
+   const c=h.card('Любимое блюдо','Выбор почётного строителя');
+   h.note(tavern.favorite?`Сейчас: ${h.itemName(tavern.favorite)}.`:'Выбери доступное блюдо для своей эмблемы.',c);
+   const form=h.el('div',null,'build-form'),wrap=h.el('label','Блюдо','form-field'),select=h.el('select');
+   select.setAttribute('aria-label','Любимое блюдо');
+   for(const dish of tavern.dishes||[]){const option=h.el('option',dish.name);option.value=dish.id;select.append(option);}
+   if((tavern.dishes||[]).some(dish=>dish.id===tavern.favorite))select.value=tavern.favorite;
+   wrap.append(select);form.append(wrap,tavernControl(h.button('Выбрать блюдо',()=>h.command('tavern_favorite',{day:tavern.day,item:select.value}),'qw-btn secondary',!(tavern.dishes||[]).length),'tavern-favorite'));
+   c.append(form);parent.append(c);
+  }
+  const honors=v()?.honor_details?.tavern||[];
+  if(honors.length){
+   const c=h.card('Скамья почётных строителей','Имена и любимые блюда');
+   for(const row of honors)h.note(`${row.name}${row.favorite?` · ${h.itemName(row.favorite)}`:''}`,c);
+   parent.append(c);
+  }
   renderTray(parent,tavern.day,tavern.puzzle);
   const mug=h.card('Кобыла в пене','Бесплатная кружка дня','fest_mas_tea');
+  mug.classList.add('tavern-toast-card');
   if(tavern.toast){
    mug.append(tavernStatus(TAVERN_TOASTS[tavern.toast],`tavern-toast-${tavern.toast}`));
   }else{
@@ -241,6 +278,49 @@ export function createConstruction(h){
   const reader=h.card('Почтальон Ёж','Читает «Вестник» за столиком');
   reader.append(tavernControl(h.button('Деревенский вестник',()=>h.bulletin('site:tavern'),'qw-btn secondary wide'),'bulletin'));
   parent.append(reader);
+ }
+
+ function renderGreenhouse(parent,g){
+  const month=h.card('Культура месяца',`${g.crop_name||h.itemName(g.crop)} · ${g.month}`,g.crop);
+  h.note('Время роста культуры месяца сокращено на 10%. Уже посаженный урожай сохраняет своё время созревания.',month);
+  parent.append(month);
+  const plot=h.card('Оранжерейная грядка','Отдельно от земельного лимита');
+  if(g.bed?.crop){
+   const bed=g.bed,crop=bed.crop,id=typeof crop==='string'?crop:crop.id;
+   plot.append(h.el('strong',h.itemName(id)));
+   if(bed.ready)plot.append(tavernControl(h.button('Собрать урожай',()=>h.command('greenhouse_harvest',{cycle:bed.cycle}),'qw-btn primary'),'greenhouse-harvest'));
+   else{const line=h.el('p',null,'note');line.append(h.el('span','Созреет через '),h.timer(bed.ready_at));plot.append(line);}
+  }else if(!g.can_plant){h.note('Грядка для заморских культур доступна со ступени «Мастер».',plot);}
+  else{
+   const options=(g.seeds||[]).filter(seed=>seed.count>0&&seed.level<=h.me().level);
+   if(!options.length)h.note('Нужны заморские семена подходящего уровня. Их можно найти у Сороки.',plot);
+   else{
+    const form=h.el('div',null,'build-form'),wrap=h.el('label','Заморская культура','form-field'),select=h.el('select');select.setAttribute('aria-label','Заморская культура');
+    for(const seed of options){const o=h.el('option',`${seed.name} · семян: ${seed.count}`);o.value=seed.id;select.append(o);}
+    wrap.append(select);form.append(wrap,tavernControl(h.button('Посадить',()=>h.command('greenhouse_plant',{crop:select.value,cycle:g.bed?.cycle||0}),'qw-btn primary'),'greenhouse-plant'));plot.append(form);
+   }
+  }
+  if(g.can_plant)h.note('Здесь растут только заморские культуры. Личный бонус строителя сокращает их время роста на 10%.',plot);
+  parent.append(plot);
+  const vote=h.card('Культура следующего месяца',g.next_month);
+  if(g.can_vote){
+   h.note('Один голос почётного строителя. Его можно изменить до начала следующего московского месяца.',vote);
+   const form=h.el('div',null,'build-form'),wrap=h.el('label','Культура','form-field'),select=h.el('select');select.setAttribute('aria-label','Культура следующего месяца');
+   for(const crop of g.crops||[]){const option=h.el('option',crop.name);option.value=crop.id;select.append(option);}
+   if(g.vote)select.value=g.vote;
+   wrap.append(select);form.append(wrap,tavernControl(h.button(g.vote?'Изменить голос':'Голосовать',()=>h.command('greenhouse_vote',{month:g.next_month,crop:select.value}),'qw-btn secondary',!(g.crops||[]).length),'greenhouse-vote'));vote.append(form);
+   if(g.vote)h.note(`Твой голос: ${h.itemName(g.vote)}.`,vote);
+  }else h.note('Голосование доступно почётным строителям оранжереи.',vote);
+  parent.append(vote);
+ }
+
+ function renderFairground(parent,fair){
+  const c=h.card('Праздничная ярмарка','Эффекты открытого ярмарочного поля','coin');
+  h.note('Два дополнительных места предлагают праздничный ассортимент. Сцена и подиум готовы для праздников.',c);
+  if(fair.discount_pct)h.note(`Твоя скидка на активной праздничной ярмарке — ${fair.discount_pct}%. Цена уже учтена в лавке.`,c);
+  if(fair.early_access)h.note('Тебе доступен первый час: за час до обычного открытия ярмарки.',c);
+  h.note('Эти бонусы не распространяются на прошлые праздники, обычную Сороку и лавки игроков.',c);
+  c.append(h.button('К праздникам',h.festival,'qw-btn secondary'));parent.append(c);
  }
 
  function timeline(p,parent){
@@ -331,8 +411,11 @@ export function createConstruction(h){
    h.note(reason||'Каждый энергетос сокращает работы на 2 часа, но не больше суток на этап.',c);
    if(proj.fund_speed>0)h.note('Деревня выполнила цель фонда: бригада работает на сутки быстрее.',c);
   }else{
-   c.append(h.el('p',`Открыто. ${id==='stalls'?'На площади работают торговые ряды.':'Эффект здания скоро включится.'}`,'reward'));
+   const active=id==='greenhouse'&&b.greenhouse?.open||id==='fairground'&&b.fairground?.open;
+   c.append(h.el('p',`Открыто. ${id==='stalls'?'На площади работают торговые ряды.':active?'Эффекты здания действуют.':'Эффект здания скоро включится.'}`,'reward'));
    if(id==='stalls')c.append(h.button('К торговым рядам',()=>h.open('rows'),'qw-btn primary'));
+   if(id==='greenhouse'&&b.greenhouse?.open)renderGreenhouse(p,b.greenhouse);
+   if(id==='fairground'&&b.fairground?.open)renderFairground(p,b.fairground);
    const honor=(b.honor||{})[id]||[];
    if(honor.length)h.note(`Почётные строители: ${honor.join(', ')}.`,c);
   }
@@ -420,5 +503,6 @@ export function createConstruction(h){
   return renderSite(p,String(sheet).slice(5));
  }
  return {render,siteLabel:label,rowsOpen:()=>rowsOpen(v()),
+  effects:()=>buildingEffectState(h.me()),
   art:id=>{const p=project(v(),id);return {stage:siteArt(p),crew:crewAt(p)};},stalls:()=>stallStates(h.me(),h.now())};
 }

@@ -1,7 +1,7 @@
 body.ballista-game-open .workspace{position:relative;display:block;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding-bottom:0}
 body.ballista-game-open .workspace>#rail,body.ballista-game-open .workspace>.scene-area,body.ballista-game-open .workspace>.side-panel,body.ballista-game-open .header-destinations{display:none!important}
 #ballista-game-view[hidden],#ballista-game-view [hidden]{display:none!important}
-#ballista-game-view{min-width:0;min-height:calc(100dvh - var(--qw-header-h));overflow:auto;background:var(--paper);color:var(--qw-game-text)}
+#ballista-game-view{position:absolute;inset:0;min-width:0;min-height:0;overflow:auto;background:var(--paper);color:var(--qw-game-text)}
 #ballista-game-view *{box-sizing:border-box}
 #ballista-game-view .ballista-page{max-width:1350px;margin:auto;padding:24px var(--qw-gutter) calc(24px + var(--qw-safe-bottom));display:grid;gap:16px}
 #ballista-game-view h1,#ballista-game-view p{margin:0}

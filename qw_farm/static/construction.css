@@ -8,7 +8,7 @@
 .build-bonus{display:grid;gap:6px}
 .build-perk{margin:0}.build-perk.got{font-weight:700}
 .build-form{display:grid;gap:12px}
-.build-form input,.stall-form input,.stall-form select{min-height:44px;box-sizing:border-box;width:100%}
+.build-form input,.build-form select,.stall-form input,.stall-form select{min-height:44px;box-sizing:border-box;width:100%}
 .stall-card .qw-btn,.stall-own .qw-btn,.build-form~.card-footer .qw-btn{min-height:44px}
 .stall-form{display:grid;gap:12px}
 .stall-own{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-top:1px solid var(--line)}
@@ -21,3 +21,5 @@
 .tavern-dish[aria-pressed="true"]{background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink);border-color:var(--qw-game-accent)}
 .tavern-tray .tavern-dish{min-height:64px}
 .tavern-hint{min-height:3.1em}
+/* Keep the shared 8px button gap intact while hovering a toast. */
+.tavern-toast-card .qw-btn:hover:not(:disabled){transform:none}

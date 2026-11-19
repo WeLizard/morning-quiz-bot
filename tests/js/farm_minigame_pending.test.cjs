@@ -26,7 +26,8 @@ test('successful pending minigame command rerenders house and barn after busy cl
   barn:{active:{attempt_id:'barn',expires_at:100,sacks:[{id:'one',label:'Первый'},{id:'two',label:'Второй'}],shelves:['a','b']}},
  }},farm:{is_owner:true},pending:{actor:'player',command_id:'command'}};
  const ctx={
-  S,API:'/api',pendingRetryTimer:null,rateRecoveryAttempt:0,
+  S,API:'/api',pendingRetryTimer:null,rateRecoveryAttempt:0,dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
+  cashBonusText:()=>'',fmt:String,note(){},
   clearTimeout(){},connection(){},document:{body:{classList:{add(){},remove(){}}}},
   request:async()=>({neighbor_reward_paid:true}),rememberMachineCommand(){},savePending(){},
   refresh:async options=>{refreshes.push(options);},updateRepeat(){},

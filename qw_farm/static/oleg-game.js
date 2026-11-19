@@ -1,5 +1,6 @@
 // Oleg's chime ("Перезвон с Олегом"): listen to a melody of four bells and repeat it. Three rounds of 3, 4 and 5 notes.
 // The server (qw_farm/oleg.py) owns the melodies, the rounds and the once-a-day reward; this view only plays and collects taps.
+import {cashBonusText} from './construction.js?v=20261116-building-effects';
 const BELL_NAMES=['Первый колокольчик, красный','Второй колокольчик, золотой','Третий колокольчик, зелёный','Четвёртый колокольчик, синий'];
 const FREQUENCIES=[523.25,659.25,783.99,987.77];
 const MODIFIERS={classic:['Запомни и повтори','Повтори мелодию по порядку.'],echo:['Эхо','Повтори мелодию задом наперёд: начни с последней ноты.'],false_note:['Фальшивая нота','Послушай две мелодии. Во второй появится новый колокольчик — нажми его один раз.'],acceleration:['Ускорение','Повтори по порядку. С каждым раундом Олег играет быстрее.'],shuffle:['Перепутанные колокольчики','Повтори по порядку. После мелодии колокольчики поменяются местами; их номера и звуки сохранятся.']};
@@ -145,7 +146,7 @@ export function mountOlegGame(host,{getState,command,onBack,isCommandPending=()=
   roundNode.textContent=`${Math.min(done+1,total)} / ${total}`;
   progress.setAttribute('aria-valuemax',String(total));progress.setAttribute('aria-valuenow',String(done));progress.firstElementChild.style.width=`${done/total*100}%`;
   hintNode.textContent=finished?'Три мелодии сыграны':`Мелодия ${Math.min(done+1,total)} · ${notes} ${olegPlural(notes)}`;
-  rewardNode.textContent=v.rewardedToday?'Награда за сегодня уже получена — можно играть просто так.':`Пройди три мелодии: +${v.coins} монет и +${v.xp} опыта раз в день.`;
+  rewardNode.textContent=(v.rewardedToday?'Награда за сегодня уже получена — можно играть просто так.':`Пройди три мелодии: сейчас до ${v.coins} монет и +${v.xp} опыта раз в день.`)+' '+cashBonusText(getState()?.bonus_budget);
   const rule=MODIFIERS[v.modifier];
   if($('[data-role="modifier-title"]'))$('[data-role="modifier-title"]').textContent=rule[0];
   if($('[data-role="modifier-rule"]'))$('[data-role="modifier-rule"]').textContent=rule[1];

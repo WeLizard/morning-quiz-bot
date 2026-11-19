@@ -1,4 +1,5 @@
 import {shotResult} from './ballista-physics.js';
+import {cashBonusText} from './construction.js?v=20261116-building-effects';
 
 const GAME='pukh_ballista',memory=new Map();
 export function ballistaResultText(result){
@@ -83,6 +84,7 @@ export function mountBallistaGame(host,{getState,command,onBack,isCommandPending
  }
  function render(){
   if(disposed)return;void loadScene();const state=getState(),active=state?.active;
+  $('.ballista-rules').textContent='Три зачётные доставки в день, затем тренировка. За день учитывается лучший результат. Баночки игровые — напитки со склада не расходуются. '+cashBonusText(state?.bonus_budget)+(state?.next_cash_reward==null?'':` Доступная денежная премия сейчас: до ${state.next_cash_reward} мон.`);
   if(active?.plan?.version!==1&&active){status.textContent='Эта версия доставки пока недоступна. Обнови игру.';start.hidden=shoot.hidden=finish.hidden=true;return;}
   if(active&&active.run_id!==runId){runId=active.run_id;log=load(active);flight=null;
    if(log.length&&elapsed(active)<lastEnd(active)){const i=log.length-1;flight={release:log[i][2],result:shotResult(active.plan.targets[i],log[i][0],log[i][1],active.plan.step_ms)};cancelAnimationFrame(raf);raf=requestAnimationFrame(animate);}

@@ -17,12 +17,13 @@ from uuid import UUID, uuid4
 import math
 import sqlalchemy as sa
 
-from . import economy, tavern
-from .catalog import ITEMS, FUND_LEVEL, FUND_MARKUP, VILLAGE_GOAL_FLOOR, LEVELS, income_ref, level
+from . import economy, tavern, village_effects
+from .catalog import ITEMS, CROPS, EXOTIC_BY_FRUIT, FUND_LEVEL, FUND_MARKUP, VILLAGE_GOAL_FLOOR, LEVELS, income_ref, level
 from .domain import FarmError, need, inventory, unbound, event, named
 
 DAY = 86400
-COMMANDS = {'build_contribute', 'build_speedup', 'stall_list', 'stall_buy', 'stall_cancel'} | tavern.SCHEMAS.keys()
+GREENHOUSE_COMMANDS = {'greenhouse_vote', 'greenhouse_plant', 'greenhouse_harvest'}
+COMMANDS = {'build_contribute', 'build_speedup', 'stall_list', 'stall_buy', 'stall_cancel'} | tavern.SCHEMAS.keys() | GREENHOUSE_COMMANDS
 ORDER = ('stalls', 'tavern', 'greenhouse', 'fairground')
 NAMES = dict(stalls='Торговые ряды', tavern='Трактир', greenhouse='Оранжерея', fairground='Ярмарочное поле')
 STAGE_NAMES = ('Котлован', 'Каркас', 'Отделка')
@@ -46,9 +47,9 @@ GOODS = {
 }
 BONUS_TEXT = {
     'stalls': ('−10% у Сороки в рядах', '+1 к лимиту каждого слота Сороки и своя лавка на рядах', 'Именная табличка на лавке'),
-    'tavern': ('«Ужин дня» (скоро)', '+1 заказ трактира в сутки (скоро)', 'Скамья с гербом фермы (скоро)'),
-    'greenhouse': ('Заморские семена растут быстрее (скоро)', 'Оранжерейная грядка (скоро)', 'Голос за культуру месяца (скоро)'),
-    'fairground': ('−10% на ярмарках (скоро)', 'Ранний час на ярмарке (скоро)', 'Флаг фермы над сценой (скоро)'),
+    'tavern': ('«Ужин дня» за первый заказ', '+1 заказ трактира в сутки', 'Скамья с гербом фермы и любимое блюдо'),
+    'greenhouse': ('Заморские семена растут на 10% быстрее', 'Оранжерейная грядка', 'Голос за культуру месяца'),
+    'fairground': ('−10% на ярмарках', 'Ранний час на ярмарке', 'Флаг фермы над сценой'),
 }
 # own stall (docs section 5.3)
 STALL_LOTS, PRICE_MAX_PCT, COMMISSION_PCT, RENT_PCT, RENT_PERIOD = 3, 150, 5, 1, 7 * DAY
@@ -57,6 +58,8 @@ MAX_COINS = 10 ** 12
 
 
 def tables(metadata: sa.MetaData):
+    if 'system_states' not in metadata.tables:
+        sa.Table('system_states', metadata, sa.Column('key', sa.String(128), primary_key=True), sa.Column('payload', sa.JSON, nullable=False))
     if 'farm_village_projects' in metadata.tables:
         return {'projects': metadata.tables['farm_village_projects'], 'contribs': metadata.tables['farm_village_contribs'],
                 'lots': metadata.tables['farm_village_stall_lots']}
@@ -266,10 +269,13 @@ async def refresh_bonus(unit, farm, account_id):
         return
     rows = await _load(unit)
     c = unit.t['contribs']
-    tiers = {r[0]: r[1] for r in (await unit.execute(sa.select(c.c.project_id, c.c.tier).where(
-        c.c.account_id == UUID(str(account_id)), c.c.tier > 0))).all()}
+    own = (await unit.execute(sa.select(c.c.project_id, c.c.tier).where(
+        c.c.account_id == UUID(str(account_id)), c.c.tier > 0))).all()
+    tiers = {r[0]: r[1] for r in own}
     opened = [p for p in ORDER if rows.get(p, {}).get('status') == 'done']
     b = bonus_state(farm)
+    for legacy_key in ('opened_at','tier_since','crop_history'):
+        b.pop(legacy_key,None)
     if b['tiers'] != tiers or b['open'] != opened:
         b['tiers'], b['open'] = tiers, opened
 
@@ -278,9 +284,104 @@ async def tick_account(unit, farm, account_id, now):
     """Everything the service runs on the owner's own visit: transitions, mirror and the rent of the own stall."""
     if not available(unit):
         return
+    # sync itself may UPDATE the working project. Acquire the complete ordered
+    # set first, so another farm cannot hold an earlier project while waiting
+    # for that transition's row.
+    await unit.execute(sa.select(unit.t['projects']).order_by(unit.t['projects'].c.id).with_for_update())
     await sync(unit, farm, account_id, now)
     await refresh_bonus(unit, farm, account_id)
     await stall_rent(unit, farm, account_id, now)
+    if 'greenhouse' in bonus_state(farm)['open']:
+        await month_snapshot(unit, farm, now)
+
+
+MONTH_PREFIX = 'farm.greenhouse.month:'
+
+
+async def month_snapshot(unit, farm, now):
+    """Sparse carry: materialize only this month and the next ballot, never absent intervening months."""
+    table = unit.t['states'].metadata.tables['system_states']
+    current = village_effects.month(now)
+    following = village_effects.next_month(current)
+    for key in (current, following):
+        await _insert_ignore(unit, table, ['key'], key=MONTH_PREFIX + key,
+                             payload=dict(schema_version=1, votes={}, finalized=False))
+    query = sa.select(table).where(table.c.key.like(MONTH_PREFIX + '%'),table.c.key <= MONTH_PREFIX + following)
+    rows = (await unit.execute(query.order_by(table.c.key))).mappings().all()
+    pending = [r['key'] for r in rows if not r['payload'].get('finalized')]
+    if pending:
+        locked = (await unit.execute(query.where(table.c.key.in_(pending)).order_by(table.c.key).with_for_update())).mappings().all()
+        fresh = {r['key']:r for r in locked}
+        rows = [fresh.get(r['key'],r) for r in rows]
+    values = {r['key'][len(MONTH_PREFIX):]: deepcopy(r['payload']) for r in rows}
+    previous = 'wheat'
+    for key, value in values.items():
+        if key > current:
+            continue
+        if not value.get('finalized'):
+            value.update(finalized=True,crop=village_effects.winner(value.get('votes',{}),previous))
+            await unit.execute(table.update().where(table.c.key == MONTH_PREFIX + key).values(payload=value))
+        previous = value['crop']
+    bonus_state(farm).update(month=current, crop=values[current]['crop'])
+    return values
+
+
+async def greenhouse_command(unit, farm, account_id, kind, data, now, speed=1):
+    need('greenhouse' in bonus_state(farm)['open'], 'greenhouse_closed', 'Оранжерея ещё строится.')
+    if kind == 'greenhouse_vote':
+        need(set(data) == {'month','crop'} and perk(farm,'greenhouse',3), 'locked', 'Голосуют почётные строители.')
+        need(data['month'] == village_effects.next_month(village_effects.month(now)), 'stale_month', 'Голосование уже сменилось.')
+        need(isinstance(data['crop'], str) and data['crop'] in village_effects.crop_choices(), 'invalid_command', 'Выбери культуру.',422)
+        values = await month_snapshot(unit, farm, now)
+        value = values[data['month']]
+        value.setdefault('votes', {})[str(account_id)] = data['crop']
+        table = unit.t['states'].metadata.tables['system_states']
+        await unit.execute(table.update().where(table.c.key == MONTH_PREFIX + data['month']).values(payload=value))
+        return 'Голос за культуру следующего месяца принят.'
+    bed = farm.get('greenhouse_bed') or dict(cycle=0,crop=None,revision=0,type='plot')
+    need(type(data.get('cycle')) is int and data['cycle'] == bed['cycle'], 'stale_cycle', 'Грядка уже изменилась.')
+    from . import expansion
+    if kind == 'greenhouse_plant':
+        need(perk(farm,'greenhouse',2), 'locked', 'Грядка доступна мастеру оранжереи.')
+        need(set(data) == {'crop','cycle'} and isinstance(data['crop'],str) and data['crop'] in EXOTIC_BY_FRUIT, 'invalid_command', 'Нужны заморские семена.',422)
+        crop = EXOTIC_BY_FRUIT[data['crop']]
+        need(bed['crop'] is None, 'busy_plot', 'Грядка занята.')
+        need(level(farm['xp']) >= crop['level'], 'locked', 'Нужен более высокий уровень.')
+        inventory(farm,{crop['seed']:1},-1)
+        expansion.plant(farm,bed,dict(crop,cost=0),now,speed,seed=crop['seed'],manual=True)
+        notice = 'Заморская культура посажена.'
+    else:
+        need(set(data) == {'cycle'}, 'invalid_command', 'Некорректное действие.',422)
+        need(bed['crop'] is not None and now >= bed['crop']['ready_at'], 'not_ready', 'Урожай ещё не созрел.')
+        expansion.harvest(farm,bed,now)
+        pending = farm.get('greenhouse_pending', [])
+        if pending:
+            bed['crop'] = pending.pop(0)
+            farm['greenhouse_pending'] = pending
+        notice = 'Урожай оранжереи собран.'
+    bed['cycle'] += 1
+    farm['greenhouse_bed'] = bed
+    return notice
+
+
+async def greenhouse_projection(unit, farm, account_id, now):
+    opened = 'greenhouse' in bonus_state(farm)['open']
+    month = village_effects.month(now)
+    following = village_effects.next_month(month)
+    vote = None
+    if opened:
+        table = unit.t['states'].metadata.tables['system_states']
+        row = (await unit.execute(sa.select(table.c.payload).where(table.c.key == MONTH_PREFIX + following))).scalar_one_or_none()
+        vote = (row or {}).get('votes', {}).get(str(account_id))
+    bed = deepcopy(farm.get('greenhouse_bed') or dict(cycle=0,crop=None))
+    bed['ready_at'] = (bed.get('crop') or {}).get('ready_at')
+    bed['ready'] = bool(bed['ready_at'] and now >= bed['ready_at'])
+    crop = bonus_state(farm).get('crop','wheat')
+    return dict(open=opened,month=month,crop=crop,crop_name=village_effects.crop_choices()[crop]['name'],next_month=following,vote=vote,
+                crops=[dict(id=k,name=v['name']) for k,v in village_effects.crop_choices().items()],
+                can_vote=perk(farm,'greenhouse',3),can_plant=perk(farm,'greenhouse',2),can_harvest=bool(bed.get('crop')),
+                pending_count=len(farm.get('greenhouse_pending') or []),bed=bed,
+                seeds=[dict(id=k,name=c['name'],seed=c['seed'],count=farm['inventory'].get(c['seed'],0),level=c['level']) for k,c in EXOTIC_BY_FRUIT.items()])
 
 
 # ------------------------------------------------------------------------------------------------------------ commands
@@ -502,7 +603,7 @@ async def stall_buy(unit, me, other, account_id, data, now):
 
 
 # ------------------------------------------------------------------------------------------------------------ dispatch
-async def command(unit, farm, other, account_id, kind, data, now):
+async def command(unit, farm, other, account_id, kind, data, now, speed=1):
     """Returns (notice, ledger kind). ``other`` is the second locked farm (only stall_buy uses it)."""
     need(available(unit), 'village_build_unavailable', 'Стройка временно недоступна.', 503)
     if kind != 'stall_buy':
@@ -512,6 +613,8 @@ async def command(unit, farm, other, account_id, kind, data, now):
         status = (await unit.execute(sa.select(t.c.status).where(t.c.id == 'tavern'))).scalar_one_or_none()
         need(status == 'done', 'tavern_closed', 'Трактир ещё строится.')
         return tavern.command(farm, kind, data, now), kind
+    if kind in GREENHOUSE_COMMANDS:
+        return await greenhouse_command(unit, farm, account_id, kind, data, now, speed), kind
     if kind == 'build_contribute':
         return await contribute(unit, farm, account_id, data, now), kind
     if kind == 'build_speedup':
@@ -548,20 +651,25 @@ async def projection(unit, farm, account_id, now):
             speedup_room=max(0, ENERGY_CAP - r['speedup']), opened_at=r['opened_at'],
             mine=dict(value=mc['value'], share_bp=mc['share_bp'], tier=mc['tier']) if mc else dict(value=0, share_bp=0, tier=0),
             bonus=BONUS_TEXT[pid]))
-    honor = {}
+    honor, honor_details = {}, {}
     done = [p for p in ORDER if rows.get(p, {}).get('status') == 'done']
     if done:
         s = unit.t['states']
-        q = sa.select(c.c.project_id, s.c.name).join(s, s.c.id == c.c.farm_id).where(c.c.tier == 3, c.c.project_id.in_(done))
+        q = sa.select(c.c.project_id, s.c.name, s.c.payload, s.c.xp).join(s, s.c.id == c.c.farm_id).where(c.c.tier == 3, c.c.project_id.in_(done))
         if 'rating_hidden' in accounts.c:
             q = q.join(accounts, accounts.c.id == c.c.account_id).where(accounts.c.rating_hidden.is_(False))
-        for pid, name in (await unit.execute(q.order_by(c.c.updated_at).limit(60))).all():
+        for pid, name, payload, xp in (await unit.execute(q.order_by(c.c.updated_at).limit(60))).all():
             honor.setdefault(pid, []).append(name)
-    return dict(level_ok=level(farm['xp']) >= FUND_LEVEL, level=FUND_LEVEL, active=active, projects=projects, honor=honor,
+            favorite = (payload.get('tavern') or {}).get('favorite')
+            honor_details.setdefault(pid, []).append(dict(name=name, favorite=favorite if favorite in tavern.dishes(dict(payload,xp=xp)) else None))
+    return dict(level_ok=level(farm['xp']) >= FUND_LEVEL, level=FUND_LEVEL, active=active, projects=projects, honor=honor,honor_details=honor_details,
                 tier_bp=list(TIER_BP), tier_names=list(TIER_NAMES), energy=list(ENERGY),
                 rows=await rows_projection(unit, farm, account_id, now) if 'stalls' in done else dict(open=False),
                 tavern=tavern.projection(farm, now) if 'tavern' in done else None,
-                stub=dict(effects=['greenhouse', 'fairground'], magpie_third_visit=True))
+                greenhouse=await greenhouse_projection(unit,farm,account_id,now),
+                fairground=dict(open='fairground' in done,discount_pct=10 if perk(farm,'fairground') else 0,
+                                early_access=perk(farm,'fairground',2),extra_stalls=2 if 'fairground' in done else 0,stage='fairground' in done),
+                stub=dict(effects=[], magpie_third_visit=True))
 
 
 async def rows_projection(unit, farm, account_id, now):
@@ -620,3 +728,54 @@ async def merge_prepare(unit, main_id, secondary_id, now):
             await unit.execute(c.update().where(c.c.project_id == r['project_id'], c.c.account_id == UUID(str(main_id))).values(
                 value=keep['value'] + r['value'], share_bp=share, tier=max(keep['tier'], r['tier'], tier_of(share)), farm_id=farm_id))
             await unit.execute(c.delete().where(c.c.project_id == r['project_id'], c.c.account_id == UUID(str(secondary_id))))
+    # Farm and project locks precede all month locks. Only open future ballots change;
+    # historical finalized results and their votes are immutable.
+    await unit.execute(sa.select(unit.t['projects']).order_by(unit.t['projects'].c.id).with_for_update())
+    table = unit.t['states'].metadata.tables['system_states']
+    rows = (await unit.execute(sa.select(table).where(table.c.key.like(MONTH_PREFIX + '%'),
+                   table.c.key > MONTH_PREFIX + village_effects.month(now)).order_by(table.c.key).with_for_update())).mappings().all()
+    for row in rows:
+        value = deepcopy(row['payload'])
+        if value.get('finalized'):
+            continue
+        votes = value.get('votes', {})
+        if str(secondary_id) in votes:
+            secondary_vote = votes.pop(str(secondary_id))
+            votes.setdefault(str(main_id), secondary_vote)
+            await unit.execute(table.update().where(table.c.key == row['key']).values(payload=value))
+
+
+def merge_effect_state(main, secondary, now=None):
+    """Merge private quotas and preserve every growing crop with one usable bed."""
+    from . import daily_bonus
+    if now is not None:
+        daily_bonus.merge(main,secondary,now)
+    left, right = main.setdefault('tavern', {}), secondary.get('tavern') or {}
+    orders = left.setdefault('orders', {})
+    for state in (left, right):
+        old = state.get('order')
+        if old:
+            orders.setdefault(f"{old['day']}:0", deepcopy(old))
+        for key, value in state.get('orders', {}).items():
+            orders.setdefault(key, deepcopy(value))
+    latest_day = max((r['day'] for r in orders.values()), default=-1)
+    left['orders'] = {key:value for key,value in orders.items() if value['day'] == latest_day}
+    # Bounded daily receipts: keep the newest used quota for each daily action.
+    for field in ('order','dinner','toast'):
+        other = right.get(field)
+        if other and other.get('day', -1) > left.get(field, {}).get('day', -1):
+            left[field] = deepcopy(other)
+    left['puzzle_day'] = max(left.get('puzzle_day', -1), right.get('puzzle_day', -1))
+    left['stamps'] = left.get('stamps', 0) + right.get('stamps', 0)
+    if 'favorite' not in left and right.get('favorite'):
+        left['favorite'] = right['favorite']
+    bed = main.setdefault('greenhouse_bed', dict(cycle=0,crop=None,revision=0,type='plot'))
+    incoming = deepcopy(secondary.get('greenhouse_pending') or [])
+    other = secondary.get('greenhouse_bed') or {}
+    if other.get('crop'):
+        incoming.insert(0, deepcopy(other['crop']))
+    if incoming:
+        if bed.get('crop') is None:
+            bed['crop'] = incoming.pop(0)
+        main.setdefault('greenhouse_pending', []).extend(incoming)
+    bed['cycle'] = max(bed['cycle'], other.get('cycle', 0)) + 1

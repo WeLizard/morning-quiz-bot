@@ -7,7 +7,8 @@ const vm=require('node:vm');
 
 const root=path.resolve(__dirname,'../..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
-const source=read('qw_farm/static/oleg-game.js').replace(/export /g,'');
+const budget=read('qw_farm/static/construction.js').match(/export function cashBonusText\([^]*?\n\}/)[0].replace('export ','');
+const source=budget+'\n'+read('qw_farm/static/oleg-game.js').replace(/^import .*;\r?\n/gm,'').replace(/export /g,'');
 const context={Number,Array,Object,Math,Boolean,String,Set,Map,Promise,setTimeout,clearTimeout};
 vm.createContext(context);
 vm.runInContext(`${source}\nglobalThis.api={olegExpectedNotes,olegPlaybackTiming,olegPlural,olegViewState,olegAnswerOutcome,olegResultText,olegMood,olegSceneSvg,mountOlegGame};`,context);
@@ -95,6 +96,18 @@ test('result text shows the reward only when the server paid it',()=>{
  assert.match(olegResultText({rewarded:false,coins:0,xp:0}),/уже получена/);
 });
 
+test('cash budget shows zero or partial server quote without promising nominal cash',()=>{
+ let state=game({next_reward:{coins:0,xp:4},bonus_budget:{remaining:0,cap:390}});
+ const {host,nodes}=fakeHost();
+ const mounted=mountOlegGame(host,{getState:()=>state,command:async()=>true,onBack(){}});
+ assert.match(nodes['[data-role="reward"]'].textContent,/сейчас до 0 монет/);
+ assert.match(nodes['[data-role="reward"]'].textContent,/Лимит исчерпан/);
+ state=game({next_reward:{coins:1,xp:4},bonus_budget:{remaining:1,cap:390}});mounted.render();
+ assert.match(nodes['[data-role="reward"]'].textContent,/сейчас до 1 монет/);
+ assert.match(nodes['[data-role="reward"]'].textContent,/1 из 390/);
+ mounted.destroy();
+});
+
 test('mood follows the phase of the game',()=>{
  assert.equal(olegMood('show',false),'sing');assert.equal(olegMood('input',false),'listen');
  assert.equal(olegMood('retry',false),'oops');assert.equal(olegMood('next',false),'happy');
@@ -163,7 +176,7 @@ test('assets are wired: served, linked and mounted from the resident card',()=>{
  assert.ok(html.includes('/app/farm/assets/oleg-game.css'));
  assert.ok(html.includes('id="oleg-game-view"'));
  for(const asset of ['oleg-game.js','oleg-game.css'])assert.ok(api.includes(`'${asset}'`),asset);
- assert.match(app,/import \{mountOlegGame\} from '\.\/oleg-game\.js'/);
+ assert.match(app,/import \{mountOlegGame\} from '\.\/oleg-game\.js(?:\?[^']+)?'/);
  assert.match(app,/if\(npc==='Петух Олег'\)appendOlegAction\(c\)/);
  assert.match(css,/body\.oleg-game-open \.workspace>#rail/);
  assert.ok(!/window\.addEventListener\('keydown'/.test(read('qw_farm/static/oleg-game.js')),'keys are handled on the game root only');

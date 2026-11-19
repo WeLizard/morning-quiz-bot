@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from .domain import need, FarmError
 from .catalog import income_ref, level, INCOME_REF_BANDS
+from . import daily_bonus
 
 
 GAMES = ('house', 'barn')
@@ -28,10 +29,12 @@ _LEGACY_COIN_REWARDS = {max(10, value // 100) for value in (1100, 7000, 13000, 1
 _STORED_COIN_REWARDS = _COIN_REWARDS | _LEGACY_COIN_REWARDS
 
 
-def next_reward(farm, game=None):
+def next_reward(farm, game=None, now=None):
     reward = {'kind': 'coins', 'amount': max(10, income_ref(level(farm['xp'])) // 100)}
     if game == 'barn':
         reward['bonus_feed'] = 1   # barn pays coins and one feed; the house pays coins only
+    if now is not None:
+        reward['amount'] = daily_bonus.quote(farm,now,reward['amount'])
     return reward
 
 
@@ -74,10 +77,13 @@ def public(farm, now):
             challenge = deepcopy(active['challenge'])
             challenge.update(attempt_id=active['attempt_id'], started_at=active['started_at'],
                              expires_at=active['expires_at'], reward=deepcopy(_attempt_reward(game, active)))
+            if challenge['reward']['kind'] == 'coins':
+                challenge['reward']['amount'] = daily_bonus.quote(farm,now,challenge['reward']['amount'])
         else:
             challenge = None
         result[game] = {'available_at': state['available_at'], 'active': challenge,
-                        'last_result': deepcopy(state['last_result']), 'next_reward': next_reward(farm, game)}
+                        'last_result': deepcopy(state['last_result']), 'next_reward': next_reward(farm, game, now),
+                        'bonus_budget':daily_bonus.public(farm,now)}
     return result
 
 
@@ -152,7 +158,8 @@ def answer(farm, data, now):
     payout = _attempt_reward(game, active)
     reward = payout['amount'] if correct else 0
     if payout['kind'] == 'coins':
-        farm['coins'] += reward
+        if correct:
+            reward = daily_bonus.grant(farm,game,reward,now)
     else:
         farm['inventory']['feed'] = farm['inventory'].get('feed', 0) + reward
     last = {'attempt_id': attempt_id, 'correct': correct,
@@ -229,7 +236,8 @@ def validate(farm):
                 allowed_rewards = {10 if game == 'house' else 1}
             need(_valid_attempt_id(result['attempt_id']) and type(result['correct']) is bool and
                  type(result['reward']) is int and bool(allowed_rewards) and
-                 (result['reward'] in allowed_rewards if result['correct'] else result['reward'] == 0) and
+                 ((0 <= result['reward'] <= max(allowed_rewards) if result.get('reward_kind') == 'coins' else result['reward'] in allowed_rewards)
+                  if result['correct'] else result['reward'] == 0) and
                  _time(result['answered_at']), *_STATE_ERROR)
             if active is not None:
                 need(result['attempt_id'] != active['attempt_id'], *_STATE_ERROR)

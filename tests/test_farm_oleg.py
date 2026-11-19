@@ -174,7 +174,7 @@ def test_validate_rejects_tampered_state_and_accepts_a_farm_without_the_game():
     tampered(lambda state: state['run'].__setitem__('round', 3))
     farm = _farm()
     _solve(farm, _start(farm))
-    farm['oleg_game']['last_result']['coins'] = 0
+    farm['oleg_game']['last_result']['coins'] = oleg.REWARD_COINS + 1
     with pytest.raises(FarmError):
         oleg.validate(farm)
     farm = _farm()

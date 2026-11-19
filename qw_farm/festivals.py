@@ -28,7 +28,7 @@ import re
 
 from .catalog import ITEMS, ORCHARD_WIRED, income_ref, level, tick
 from .domain import need, inventory, pay
-from . import economy
+from . import economy, village_effects
 
 DAY = 86400
 TZ_OFFSET = economy.TZ_OFFSET
@@ -808,11 +808,11 @@ def buy(farm, data, now):
     need(isinstance(fid, str) and fid in FESTIVALS, 'unknown_festival', 'Такого праздника нет.', 422)
     g = good_of(fid, item) if isinstance(item, str) else None
     need(g is not None and g['source'] == 'fair', 'unknown_item', 'Этого нет в продаже.', 422)
-    cur = current(now)
+    cur = fair_access(farm, now, fid)
     fair = cur is not None and cur['id'] == fid and cur['phase'] == 'fair'
     if fair:
         need(g['seller'] != 'magpie' or cur['magpie'], 'seller_away', 'Сорока уже уехала. Её товары — в «Лавке прошлых праздников».')
-        key, cost = cur['key'], price(g)
+        key, cost = cur['key'], fair_price(farm, g)
     else:
         last = last_completed(fid, now)
         need(last is not None, 'festival_not_past', 'Этот праздник ещё не проходил.')
@@ -854,6 +854,33 @@ def _good_view(g, e, lvl, cost, extra=None):
     return row
 
 
+def fair_price(farm, good):
+    base = price(good)
+    return max(1, base * 90 // 100) if village_effects.perk(farm, 'fairground') else base
+
+
+def fair_access(farm, now, fid=None):
+    """Personal early access is evaluated outside the shared calendar cache."""
+    cur = current(now)
+    if village_effects.perk(farm, 'fairground', 2):
+        tomorrow = _ts(economy.moscow_day(now) + 1)
+        if tomorrow - 3600 <= now < tomorrow:
+            upcoming_fair = current(tomorrow)
+            if upcoming_fair and upcoming_fair['phase'] == 'fair' and (fid is None or fid == upcoming_fair['id']) and (
+                    cur is None or cur['key'] != upcoming_fair['key'] or cur['phase'] != 'fair'):
+                return dict(upcoming_fair, early=True, regular_starts_at=tomorrow)
+    if cur and cur['phase'] == 'fair':
+        day = economy.moscow_day(now)
+        first = day
+        while day-first < 60:
+            before = _resolved(first-1)
+            if not before or before[0] != cur['key'] or before[3] != 'fair':
+                break
+            first -= 1
+        return dict(cur, early=False, regular_starts_at=_ts(first))
+    return cur
+
+
 def prep_view(farm, cur, mode, lvl):
     """The task list outside the fair days: 'preview' (shown, locked until the first fair day) or 'late' (taken, same price)."""
     c = content(cur['id'])
@@ -873,21 +900,25 @@ def owner_view(farm, now, tower=None):
     now = tick(now)
     lvl = level(farm['xp'])
     s = farm.get('festivals') or {}
-    cur = current(now)
+    cur = fair_access(farm, now)
     view = dict(public_calendar(farm, now), past_markup_pct=PAST_MARKUP_PCT, fair=None, prep=None, past=[], collection=collection(farm))
     if cur is not None and cur['phase'] == 'fair':
         c = content(cur['id'])
         e = {**blank(), **s.get(cur['key'], {})}
         tasks = [dict(id=t['id'], title=t['title'], host=t['host'], level=t['level'], options=t['options'], done=t['id'] in e['tasks'],
-                      locked=lvl < t['level'], reward=dict(id=t['reward'], name=good_of(cur['id'], t['reward'])['name']))
+                      locked=lvl < t['level'] or cur.get('early',False),early=cur.get('early',False),
+                      starts_at=cur.get('regular_starts_at'),reward=dict(id=t['reward'], name=good_of(cur['id'], t['reward'])['name']))
                  for t in c['tasks']]
         keep = next((g for g in c['goods'] if g['source'] == 'keepsake'), None)
-        goods = [_good_view(g, e, lvl, price(g), dict(away=g['seller'] == 'magpie' and not cur['magpie']))
+        goods = [_good_view(g, e, lvl, fair_price(farm,g), dict(base_price=price(g),away=g['seller'] == 'magpie' and not cur['magpie']))
                  for g in c['goods'] if g['source'] == 'fair']
         view['fair'] = dict(id=cur['id'], name=cur['name'], key=cur['key'], host=cur['host'], magpie=cur['magpie'],
                             ends_at=cur['fair_ends_at'], tasks=tasks, goods=goods, todo=not c['tasks'] and not c['goods'],
                             keepsake=keep and dict(id=keep['id'], name=keep['name'], got=e['keepsake']),
-                            tower=tower)
+                            tower=tower, early=cur.get('early',False),regular_starts_at=cur.get('regular_starts_at'),
+                            discount_pct=10 if village_effects.perk(farm,'fairground') else 0,
+                            extra_stalls=2 if 'fairground' in (farm.get('village_bonus') or {}).get('open',()) else 0,
+                            stage='fairground' in (farm.get('village_bonus') or {}).get('open',()))
     acting = current(now)
     mode = task_mode(acting, now) if view['fair'] is None else None
     if mode in ('preview', 'late'):

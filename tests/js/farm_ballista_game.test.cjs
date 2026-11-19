@@ -7,7 +7,8 @@ const vm=require('node:vm');
 
 const root=path.resolve(__dirname,'../..');
 const physics=fs.readFileSync(path.join(root,'qw_farm/static/ballista-physics.js'),'utf8').replace(/export /g,'');
-const client=fs.readFileSync(path.join(root,'qw_farm/static/ballista-game.js'),'utf8').replace(/^import .*;\r?\n/,'').replace(/export /g,'');
+const budget=fs.readFileSync(path.join(root,'qw_farm/static/construction.js'),'utf8').match(/export function cashBonusText\([^]*?\n\}/)[0].replace('export ','');
+const client=budget+'\n'+fs.readFileSync(path.join(root,'qw_farm/static/ballista-game.js'),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/export /g,'');
 const context={Number,Array,Object,Math,Boolean,String,Set,Map,Promise};
 vm.createContext(context);
 vm.runInContext(`${physics}\n${client}\nglobalThis.api={trajectory,shotResult,replay,ballistaLogValid,ballistaResultText};`,context);

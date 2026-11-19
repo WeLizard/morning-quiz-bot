@@ -1,20 +1,21 @@
 import './address.js';
 import {mountDashaGame,dashaReasonText,localizeWagerNotice} from './dasha-game.js';
-import {mountOlegGame} from './oleg-game.js';
-import {mountBallistaGame} from './ballista-game.js';
+import {mountOlegGame} from './oleg-game.js?v=20261116-cash-budget';
+import {mountBallistaGame} from './ballista-game.js?v=20261116-cash-budget';
 import {mountPieGame} from './pie-game.js';
 import {mountSantaBattle,calmBattle,playerLook,CALM_KEY} from './santa-battle.js';
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame} from './field_overlay.js?v=20261030c';
 import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261030c';
-import * as FEST from './festivals.js';
+import * as FEST from './festivals.js?v=20261116-building-effects';
 import {horsemanDisplay,openHorsemanDialog,renderHorsemanCard} from './horseman.js';
 import * as MERCH from './merchant.js';
 import * as ORCH from './orchard.js';
 const REFUND=ORCH;   // demolition / cancel-sowing refund helpers live in orchard.js (the ASSETS list of qw_farm/api.py)
 import {createFriendRequests} from './friend_requests.js';
-import {createConstruction} from './construction.js?v=20261106-tavern';
+import {createConstruction,clearOfHeader,cashBonusText} from './construction.js?v=20261116-building-effects';
+import {VILLAGE_BUILDING_EFFECTS} from './village_building_effects_manifest.js?v=20261116-approved';
 import {renderBulletin} from './village_bulletin.js';
 import * as NAV from './farm_nav.js?v=20261106-compost';
 import {drawPlotCard} from './lumberjack_art.js';
@@ -723,6 +724,7 @@ function renderMinigame(game,parent){
  const payout=kind==='feed'?`${amount} корма`:bonusFeed?`${amount} монет и ${bonusFeed} корм`:`${amount} монет`;
  const box=card(title,house?`Проверь смекалку · +${payout}`:`Разбери доставку для Филиныча · +${payout}`,'home');
  box.classList.add('minigame-card',`minigame-${game}`);
+ const budget=cashBonusText(state.bonus_budget,fmt);if(budget)note(budget,box);
  box.append(el('p',house?'Выбери правильный ответ. Филиныч вручит приз.':kind==='feed'?'Подбери каждому мешку подходящую полку. За помощь Филиныч даст корм.':'Подбери каждому мешку подходящую полку. Это доставка для Филиныча; за помощь он заплатит монетами'+(bonusFeed?' и даст корм.':'.'),'minigame-intro'));
  if(active){
   const clock=el('div',null,'minigame-clock');clock.append(el('span','На задание осталось'),timer(active.expires_at));box.append(clock);
@@ -2071,7 +2073,7 @@ QW?.menu.register([
  ...FEST.menuItems(()=>S.me?.festival,()=>{if(S.me)renderPanel();})
 ],'Весёлый фермер');
 document.addEventListener('fullscreenchange',()=>{syncFullscreenState();scheduleSceneResize();});
-let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(farmMenuOpen&&!phoneLayout())closeFarmMenu();if(S.me)renderRail();scene.resize();},100);});
+let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(farmMenuOpen&&!phoneLayout())closeFarmMenu();if(S.me)renderRail();scene.resize();villageCullHeaderControls();},100);});
 try{if(localStorage.getItem('qw-farm.reduced-motion')==='true')scene.motion=false;}catch{}
 const RENEW_AFTER=8*60*1000;let sessionRenewing=null;
 async function renewPlatformSession(){
@@ -2255,7 +2257,19 @@ async function deliverVillageOrder(id){const o=villageOrders(villageResident).fi
 function chooseVillageResident(npc){if(!villageNames().includes(npc))return;if(npc==='Лиса Даша')villagePresenceTalk();villageResident=npc;villageSheet='resident';syncVillageScene();showPanel();renderPanel();$('panel-content').querySelector('[data-village-focus=resident]')?.focus({preventScroll:true});}
 // Camera: native scrolling of the scene container, smooth only on request and never under reduced motion.
 function villageCenter(pct,smooth){const r=$('village-scene');if(!r||!r.scrollWidth)return;const o={left:Math.max(0,pct[0]/100*r.scrollWidth-r.clientWidth/2),top:Math.max(0,pct[1]/100*r.scrollHeight-r.clientHeight/2),behavior:smooth&&!villageReduced()?'smooth':'auto'};if(r.scrollTo)r.scrollTo(o);else{r.scrollLeft=o.left;r.scrollTop=o.top;}}
-function villageFrame(){const r=$('village-scene');if(!villageMini?.frame||!r||!r.scrollWidth)return;const f=villageMini.frame;f.style.left=`${(r.scrollLeft/r.scrollWidth*100).toFixed(2)}%`;f.style.top=`${(r.scrollTop/r.scrollHeight*100).toFixed(2)}%`;f.style.width=`${Math.min(100,r.clientWidth/r.scrollWidth*100).toFixed(2)}%`;f.style.height=`${Math.min(100,r.clientHeight/r.scrollHeight*100).toFixed(2)}%`;}
+function villageFrame(){const r=$('village-scene');if(!villageMini?.frame||!r||!r.scrollWidth)return;const f=villageMini.frame;f.style.left=`${(r.scrollLeft/r.scrollWidth*100).toFixed(2)}%`;f.style.top=`${(r.scrollTop/r.scrollHeight*100).toFixed(2)}%`;f.style.width=`${Math.min(100,r.clientWidth/r.scrollWidth*100).toFixed(2)}%`;f.style.height=`${Math.min(100,r.clientHeight/r.scrollHeight*100).toFixed(2)}%`;villageCullHeaderControls();}
+// A partially clipped map target must not touch the fixed header's controls.
+// It becomes available again as soon as the player pans it into the map.
+function villageCullHeaderControls(){
+ const root=$('village-scene'),header=document.querySelector('.topbar');
+ if(!root||root.hidden||!header)return;
+ const boundary=header.getBoundingClientRect();
+ const states=[...root.querySelectorAll('.village-world button')].map(control=>[control,!clearOfHeader(control.getBoundingClientRect(),boundary)]);
+ for(const [control,clipped] of states){
+  control.style.visibility=clipped?'hidden':'';
+  control.dataset.headerClipped=String(clipped);
+ }
+}
 // Walk graph helpers (pure, world units 2400x1800). Snap a point to the nearest point of any edge (README algorithm).
 function villageSnap(W,x,y){let best=null;const n=W.n,e=W.e;for(let k=0;k<e.length;k+=2){const ax=n[2*e[k]],ay=n[2*e[k]+1],bx=n[2*e[k+1]],by=n[2*e[k+1]+1],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1))),qx=ax+t*dx,qy=ay+t*dy,d=Math.hypot(x-qx,y-qy);if(!best||d<best.d)best={k:k/2,a:e[k],b:e[k+1],t,x:qx,y:qy,d};}return best;}
 // Each home sits on a short walk-graph spur. Wander along that spur, extending
@@ -2338,8 +2352,8 @@ function openVillageVisitor(id){villageVisitor=id;villageResident=null;villageSh
 // Static layer built once with the world: place signs, construction sites ("скоро") and today's guests.
 function villagePlaces(){
  const layer=el('div',null,'village-places');
- for(const [id,label,ic,x,y,tab] of VILLAGE_PLACES){const b=button(null,e=>id==='post'?villageGo([x,y+2.4],()=>openVillageBulletin('post'),e):id==='market'&&typeof CONSTR!=='undefined'&&CONSTR.rowsOpen()?villageGo([x,y+2.4],()=>openVillageConstruction('rows'),e):villageGo([x,y+2.4],()=>selectTab(tab),e),'village-place');b.style.left=`${x}%`;b.style.top=`${y}%`;b.dataset.villagePlace=id;b.setAttribute('aria-label',label);b.title=label;b.append(icon(ic));layer.append(b);}
- for(const [id,label,x,y] of VILLAGE_SITES){const t=button(typeof CONSTR==='undefined'?`Скоро · ${label}`:CONSTR.siteLabel(id,label),e=>villageGo([x,y+3.2],()=>openVillageConstruction('site:'+id),e),'village-site village-site-btn');t.dataset.villageSite=id;t.dataset.siteName=label;t.style.left=`${x}%`;t.style.top=`${id==='greenhouse'?23.8:y}%`;layer.append(t);}
+ for(const [id,label,ic,x,y,tab] of VILLAGE_PLACES){const b=button(null,e=>id==='post'?villageGo([x,y+2.4],()=>openVillageBulletin('post'),e):id==='market'&&typeof CONSTR!=='undefined'&&CONSTR.rowsOpen()?villageGo([x,y+2.4],()=>openVillageConstruction('rows'),e):villageGo([x,y+2.4],()=>selectTab(tab),e),'village-place');b.style.left=id==='market'?`calc(${x}% - 4px)`:`${x}%`;b.style.top=`${y}%`;b.dataset.villagePlace=id;b.setAttribute('aria-label',label);b.title=label;b.append(icon(ic));layer.append(b);}
+ for(const [id,label,x,y] of VILLAGE_SITES){const t=button(typeof CONSTR==='undefined'?`Скоро · ${label}`:CONSTR.siteLabel(id,label),e=>villageGo([x,y+3.2],()=>openVillageConstruction('site:'+id),e),'village-site village-site-btn');t.dataset.villageSite=id;t.dataset.siteName=label;t.style.left=`${x}%`;t.style.top=`${id==='greenhouse'?23.8:id==='tavern'?72.5:id==='fairground'?78.4:y}%`;layer.append(t);}
  villageVisitorsToday().forEach(({v,spot},i)=>{const [id,name,face]=v,b=button(null,e=>villageGo([spot[0],spot[1]+1.6],()=>openVillageVisitor(id),e),'village-visitor va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;b.dataset.villageVisitor=id;b.dataset.villageSpot=String(VILLAGE_VISITOR_SPOTS.indexOf(spot));b.setAttribute('aria-label',`${name}: гость деревни`);villageVars(b,{'--wx':`${i?-40:40}px`,'--wy':`${i?20:-20}px`,'--d':`${i*3}s`,'--cycle':`${19+i*4}s`,'--td':`${2+i*5}s`});
   const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(el('span',face,'village-visitor-face'));b.append(walker);const say=el('span','💬','village-thought');say.setAttribute('aria-hidden','true');b.append(say);layer.append(b);});
  layer.append(villageCartButton());
@@ -2391,16 +2405,16 @@ function openVillageBulletin(source='post'){villageBulletinSource=source;village
 // the world). The stage of a site and the open stalls come from construction.js; the stalls stand once the rows are built.
 function villageBuildLayer(kind){const n=el('div',null,`village-build village-build-${kind}`);n.setAttribute('aria-hidden','true');return n;}
 function villageCrewLayer(){const n=el('div',null,'village-crew-layer');n.setAttribute('aria-hidden','true');return n;}
-function villageBuildPiece(layer,key,id){
+function villageBuildPiece(layer,key,id,spec=VILLAGE_BUILD){
  let n=[...layer.children].find(c=>c.dataset?.build===key);
- const box=id&&VILLAGE_BUILD.boxes[id.replace(/-night$/,'')];
+ const box=id&&spec.boxes[id.replace(/-night$/,'')];
  if(!box){n?.remove();return;}
  if(n?.dataset.piece===id)return;
  const ns='http://www.w3.org/2000/svg',u=document.createElementNS(ns,'use');
  if(!n){n=document.createElementNS(ns,'svg');n.dataset.build=key;layer.append(n);}
  n.setAttribute('viewBox',box.join(' '));n.setAttribute('preserveAspectRatio','none');
  n.style.left=`${(box[0]/24).toFixed(3)}%`;n.style.top=`${(box[1]/18).toFixed(3)}%`;n.style.width=`${(box[2]/24).toFixed(3)}%`;n.style.height=`${(box[3]/18).toFixed(3)}%`;
- u.setAttribute('href',`/app/farm/assets/${VILLAGE_BUILD.asset}#${id}`);for(const [k,i] of [['x',0],['y',1],['width',2],['height',3]])u.setAttribute(k,String(box[i]));
+ u.setAttribute('href',`/app/farm/assets/${spec.asset}#${id}`);for(const [k,i] of [['x',0],['y',1],['width',2],['height',3]])u.setAttribute(k,String(box[i]));
  n.replaceChildren(u);n.dataset.piece=id;
 }
 function syncVillageBuild(actors){
@@ -2419,6 +2433,36 @@ function syncVillageBuild(actors){
  }
  const open=CONSTR.rowsOpen(),state=open?CONSTR.stalls():{};
  for(const id of VILLAGE_BUILD.stalls){villageBuildPiece(base,'stall-'+id,open?`stall-${id}-${state[id]}`:'');villageBuildPiece(glow,'stall-'+id,open&&state[id]==='open'?`stall-${id}-open-night`:'');}
+ syncVillageBuildingEffects(base);
+}
+function syncVillageBuildingEffects(layer){
+ if(typeof VILLAGE_BUILDING_EFFECTS==='undefined')return;
+ const effect=CONSTR.effects(),pieces={
+  'tavern-honor-bench':effect.tavern.length>0,'tavern-favorite-menu':effect.tavern.length>0,
+  'fairground-honor-flag':effect.flag,'fairground-extra-stall-agata':effect.stalls,
+  'fairground-extra-stall-sonya':effect.stalls,'fairground-kaya-podium':effect.podium};
+ for(const [id,show] of Object.entries(pieces))villageBuildPiece(layer,'effect-'+id,show?id:'',VILLAGE_BUILDING_EFFECTS);
+ const controls=$('village-scene')?.querySelector('.village-places');
+ for(const [seller,name] of [['agata','Агата'],['sonya','Соня']]){
+  const id='fairground-extra-stall-'+seller,existing=controls?.querySelector(`[data-fair-stall="${seller}"]`);
+  if(!effect.stalls){existing?.remove();continue;}
+  if(!controls||existing)continue;
+  const anchors=['agata','sonya'].map(s=>VILLAGE_BUILDING_EFFECTS.pieces['fairground-extra-stall-'+s].anchor);
+  const x=(anchors[0][0]+anchors[1][0])/2+(seller==='agata'?40:-40),y=Math.max(...anchors.map(anchor=>anchor[1]))+75;
+  const entry=button(null,e=>villageGo([x/24,y/18],()=>selectTab('festival'),e),'village-place');
+  entry.dataset.fairStall=seller;entry.style.left=`${x/24}%`;entry.style.top=`${y/18}%`;
+  entry.setAttribute('aria-label',`${name}: дополнительное место праздничной ярмарки`);entry.title=`${name} · праздничная ярмарка`;entry.append(icon('shop'));controls.append(entry);
+ }
+ const menu=[...layer.children].find(n=>n.dataset.build==='effect-tavern-favorite-menu');
+ if(!menu)return;
+ const favorite=effect.tavern.find(row=>row.favorite&&S.catalog?.items?.[row.favorite])?.favorite;
+ menu.querySelector('[data-favorite-dish]')?.remove();
+ const box=VILLAGE_BUILDING_EFFECTS.pieces['tavern-favorite-menu']?.favoriteIcon;
+ if(!favorite||!box)return;
+ const ns='http://www.w3.org/2000/svg',symbol=document.createElementNS(ns,'svg'),use=document.createElementNS(ns,'use');
+ symbol.dataset.favoriteDish=favorite;symbol.setAttribute('viewBox','0 0 48 48');
+ for(const [key,i] of [['x',0],['y',1],['width',2],['height',3]])symbol.setAttribute(key,String(box[i]));
+ use.setAttribute('href',`/app/farm/assets/icons.svg#${favorite}`);symbol.append(use);menu.append(symbol);
 }
 function villageFestLayer(kind){const n=el('div',null,`village-fest village-fest-${kind}`);n.setAttribute('aria-hidden','true');return n;}
 function syncVillageFest(){
@@ -2468,7 +2512,7 @@ function syncVillageScene(){
  // The world (image, lights, effects, player) is built once; only the actors layer changes with game state.
  if(!villageWorldEl||root.children?.[0]!==villageWorldEl){villageWorldEl=villageBuildWorld();root.replaceChildren(villageWorldEl);villageCenter(villagePos,false);}
  syncVillageSites();syncVillageBuild(workingNames);syncVillageContrast();
- if(sig===villageSceneSignature)return;villageSceneSignature=sig;
+ if(sig===villageSceneSignature){villageCullHeaderControls();return;}villageSceneSignature=sig;
  root.setAttribute('aria-label',(stage===null?(eco()?.fund_open?'Деревня. Данные праздника обновляются.':`Деревня. Сезонный фонд откроется с ${ECON().fund_level} уровня.`):`Деревня. ${['Начало подготовки праздника','Флажки к празднику','Цветы к празднику','Площадь готова к празднику'][stage]}.`)+' Прокручивай карту, нажимай на землю, чтобы идти, или выбирай жителей кнопками.');
  const focused=document.activeElement?.dataset?.villageNpc||document.activeElement?.dataset?.villageTownhall;
  const world=villageWorldEl,actors=world.children.find?world.children.find(n=>n.className==='village-actors'):world.querySelector('.village-actors'),parts=[];
@@ -2536,6 +2580,7 @@ function appendOlegAction(parent){
  else if(g.active)note(`Перезвон сохранён: мелодия ${(Number(g.active.round)||0)+1} из ${Number(g.active.rounds)||3}.`,parent);
  else if(g.rewarded_today)note('Награда за перезвон сегодня получена — можно играть просто так.',parent);
  else note(`Три мелодии на колокольчиках: +${fmt(g.next_reward?.coins||0)} мон. и +${fmt(g.next_reward?.xp||0)} опыта раз в день.`,parent);
+ const budget=cashBonusText(g?.bonus_budget,fmt);if(budget)note(budget,parent);
 }
 function appendBallistaAction(parent){
  if(!own())return;
@@ -2545,6 +2590,8 @@ function appendBallistaAction(parent){
  else if(game.locked)note(`Откроется на ${game.min_level} уровне.`,parent);
  else if(game.active)note('Доставка начата — можно продолжить.',parent);
  else note(`Зачётных доставок осталось: ${game.attempts_left} из 3.`,parent);
+ const budget=cashBonusText(game?.bonus_budget,fmt);if(budget)note(budget,parent);
+ if(game?.next_cash_reward!=null)note(`Доступная денежная премия сейчас: до ${fmt(game.next_cash_reward)} мон.`,parent);
 }
 function renderVillageResident(p){
  const spec=villageQuest(villageResident);

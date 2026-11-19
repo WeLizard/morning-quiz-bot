@@ -2,7 +2,7 @@
 from hashlib import sha256
 import math
 
-from . import market, textile
+from . import market, textile, village_effects, daily_bonus
 from .catalog import ITEMS, RECIPES, level
 from .domain import inventory, need, reachable
 
@@ -11,14 +11,15 @@ SCHEMAS = {
     'tavern_order': {'day', 'item'},
     'tavern_serve': {'day', 'cells'},
     'tavern_toast': {'day', 'toast'},
+    'tavern_favorite': {'day', 'item'},
 }
 TOASTS = {'harvest', 'dill', 'foam'}
 
 
-def _offer(farm, day):
+def dishes(farm):
     kitchens = {obj['type'] for obj in farm['objects']} & {'bakery', 'kitchen'}
     if not kitchens:
-        return None
+        return []
     products = set(reachable(farm))
     lv = level(farm['xp'])
     dishes = sorted({
@@ -27,23 +28,42 @@ def _offer(farm, day):
         and recipe['inputs'].keys() <= products
         for item in recipe['outputs'] if not ITEMS[item].get('bound')
     })
-    if not dishes:
+    return dishes
+
+
+def _offer(farm, day, slot=0):
+    choices = dishes(farm)
+    if not choices:
         return None
-    seed = sha256(f'{farm["id"]}:tavern:{day}'.encode()).hexdigest()[:16]
-    item = dishes[int(seed, 16) % len(dishes)]
+    seed = sha256((f'{farm["id"]}:tavern:{day}' + (f':{slot}' if slot else '')).encode()).hexdigest()[:16]
+    item = choices[int(seed, 16) % len(choices)]
     # The same base price as a resident's one-item order, before reputation bonuses.
     base_coins = math.ceil(ITEMS[item]['price'] * 1.45) + 6
     return dict(item=item, qty=1, coins=base_coins * 4 // 5, done=False)
 
 
+def _receipt(state, day, slot):
+    receipt = state.get('orders', {}).get(f'{day}:{slot}')
+    if receipt is None and slot == 0:
+        receipt = state.get('order')
+    return receipt if receipt and receipt['day'] == day else None
+
+
 def projection(farm, now):
     day = market.moscow_day(now)
     state = farm.get('tavern', {})
-    receipt = state.get('order')
-    order = (dict(item=receipt['item'], qty=1, coins=receipt['coins'], done=True)
-             if receipt and receipt['day'] == day else _offer(farm, day))
+    orders = []
+    for slot in range(2 if village_effects.perk(farm, 'tavern', 2) else 1):
+        receipt = _receipt(state, day, slot)
+        order = dict(item=receipt['item'], qty=1, coins=receipt['coins'], done=True) if receipt else _offer(farm, day, slot)
+        if order:
+            orders.append(dict(order, slot=slot, id=f'{day}:{slot}'))
     toast = state.get('toast')
-    return dict(day=day, order=order,
+    return dict(day=day, order=({k: v for k,v in orders[0].items() if k not in ('slot','id')} if orders else None), orders=orders,
+                dinner=village_effects.dinner(farm, day), favorite=state.get('favorite'),
+                bonus_budget=daily_bonus.public(farm,now),
+                dishes=[dict(id=k,name=ITEMS[k]['name']) for k in dishes(farm)],
+                can_favorite=village_effects.perk(farm, 'tavern', 3),
                 puzzle=dict(done=state.get('puzzle_day') == day, stamps=state.get('stamps', 0), variant=0),
                 toast=toast['key'] if toast and toast['day'] == day else None)
 
@@ -59,7 +79,8 @@ def _serve(cells):
 
 
 def command(farm, kind, data, now):
-    need(isinstance(data, dict) and data.keys() == SCHEMAS[kind] and type(data['day']) is int,
+    fields = SCHEMAS[kind]
+    need(isinstance(data, dict) and (data.keys() == fields or kind == 'tavern_order' and data.keys() == fields | {'slot'}) and type(data['day']) is int,
          'invalid_command', 'Некорректные параметры действия.', 422)
     day = market.moscow_day(now)
     need(data['day'] == day, 'tavern_stale_day', 'В трактире уже новый день. Открой его снова.')
@@ -67,16 +88,37 @@ def command(farm, kind, data, now):
     if kind == 'tavern_order':
         item = data['item']
         need(isinstance(item, str) and item in ITEMS, 'invalid_command', 'Выбери блюдо из заказа.', 422)
-        receipt = state.get('order')
-        need(not receipt or receipt['day'] != day, 'tavern_order_done', 'Заказ на сегодня уже сдан.')
-        order = _offer(farm, day)
+        slot = data.get('slot', 0)
+        need(type(slot) is int and 0 <= slot < (2 if village_effects.perk(farm, 'tavern', 2) else 1), 'invalid_command', 'Этот заказ недоступен.', 422)
+        receipt = _receipt(state, day, slot)
+        need(not receipt, 'tavern_order_done', 'Заказ на сегодня уже сдан.')
+        order = _offer(farm, day, slot)
         need(order and order['item'] == item, 'tavern_order_changed', 'Заказ изменился. Открой трактир снова.')
-        coins = order['coins']
+        bonus = village_effects.dinner(farm, day)
+        premium = bonus['amount'] if bonus['available'] else 0
+        # A legacy daily receipt consumes the dinner quota without a retrospective award.
+        if state.get('order', {}).get('day') == day and 'dinner' not in state:
+            premium = 0
+        coins = order['coins'] + premium
         need(farm['coins'] + coins <= 10 ** 12, 'tavern_balance_full', 'На счёте нет места для оплаты заказа.')
         inventory(farm, {item: order['qty']}, -1)
-        farm['coins'] += coins
-        state['order'] = dict(day=day, item=item, coins=coins)
+        if bonus['available']:
+            premium = daily_bonus.grant(farm,'dinner',premium,now)
+        farm['coins'] += order['coins']
+        receipt = dict(day=day, item=item, coins=order['coins'], bonus=premium)
+        state['orders'] = {key:value for key,value in state.get('orders',{}).items() if value.get('day') == day}
+        state['orders'][f'{day}:{slot}'] = receipt
+        if slot == 0:
+            state['order'] = receipt
+        if bonus['available']:
+            budget = daily_bonus.public(farm,now)
+            state['dinner'] = dict(day=day, paid=premium, income_ref=budget['ref'], cap=budget['cap'])
         notice = f'Трактир принял заказ. +{coins} монет.'
+    elif kind == 'tavern_favorite':
+        need(village_effects.perk(farm, 'tavern', 3), 'locked', 'Нужна ступень «Почётный строитель».')
+        need(data['item'] in dishes(farm), 'invalid_command', 'Выбери доступное блюдо.', 422)
+        state['favorite'] = data['item']
+        notice = 'Любимое блюдо выбрано.'
     elif kind == 'tavern_serve':
         need(state.get('puzzle_day') != day, 'tavern_puzzle_done', 'Печать на сегодня уже получена.')
         _serve(data['cells'])

@@ -348,6 +348,8 @@ for(let i=0;i<30000;i++){const x=-70+rnd()*190,y=-70+rnd()*190,[sx,sy]=scr(P(x,y
 for(let i=0;i<4;i++)for(let j=0;j<3;j++){const x=2.4+i*1.4,y=1.2+j*1.5;if(okTree(x,y,.4))trees.push([x,y,.78,'#d46f6a'])}
 for(let i=0;i<3;i++)for(let j=0;j<2;j++){const x=40.6+i*1.4,y=31.6+j*1.4;if(okTree(x,y,.4))trees.push([x,y,.78,['#d46f6a','#e8b64c','#c9604f'][j]])}
 for(const t of trees){claim(t[0]-.25,t[1]-.25,t[0]+.25,t[1]+.25,'tree');t[4]==='pine'?pine(t[0],t[1],t[2]):tree(t[0],t[1],t[2],t[3])}
+// Geometry-only export for review of live props against the actual tree crowns.
+meta.tree_crowns=trees.map(t=>[t[0],t[1],t[2],t[4]==='pine']);
 // forest floor in the wild ring: logs, stumps, boulders, clearings with flowers and mushrooms
 for(let i=0;i<2600;i++){const x=-70+rnd()*190,y=-70+rnd()*190,[sx,sy]=scr(P(x,y));if(sx<20||sx>W-20||sy<20||sy>H-10)continue;const edge=edgeOf(sx,sy);if(edge>520||!okTree(x,y,.4))continue;const r=rnd();
  r<.12?log(x,y):r<.24?stumpSmall(x,y):r<.36?boulder(x,y):r<.6?bush(x,y,r<.4):r<.85?flowers(x,y):mushrooms(x,y)}

@@ -6,7 +6,7 @@ from uuid import uuid4
 from application import farm_pie_game, farm_santa_battle
 from domain import farm_ballista as ballista
 from domain.farm_village_games import GAMES, stars, reward_total
-from qw_farm import progression
+from qw_farm import progression, daily_bonus
 from qw_farm.catalog import level, income_ref
 from qw_farm.domain import need
 
@@ -101,8 +101,7 @@ def command(farm, kind, data, now):
         if state['reward_kind'] == 'vigour':
             reward = progression.add_vigour(farm, delta, now)
         else:
-            reward = min(delta, max(0, 10**12-farm['coins']))
-            farm['coins'] += reward
+            reward = daily_bonus.grant(farm,'village_games',min(delta,max(0,10**12-farm['coins'])),now)
         # Entitlement is consumed even if another action filled the pool or wallet.
         state['paid'] = target
     state['last_result'] = dict(run_id=run_id, score=score, stars=earned_stars, hits=hits,
@@ -147,6 +146,8 @@ def public(farm, now):
                             attempts=state['attempts'], attempts_left=max(0,3-state['attempts']),
                             best_stars=state['best_stars'], reward_kind=state['reward_kind'],
                             reward_base=state['reward_base'], paid=state['paid'], active=active,
+                            bonus_budget=daily_bonus.public(farm,now),
+                            next_cash_reward=daily_bonus.quote(farm,now,min(max(0,10**12-farm['coins']),max(0,reward_total('premium',state['reward_base'],3)-state['paid']))) if state['reward_kind']=='premium' else None,
                             last_result=visible_last)
     return result
 

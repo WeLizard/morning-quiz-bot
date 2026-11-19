@@ -3,7 +3,7 @@ from copy import deepcopy
 from random import SystemRandom
 from uuid import UUID, uuid4
 
-from . import progression
+from . import progression, daily_bonus
 from .domain import need
 
 ROUNDS = 3
@@ -74,7 +74,8 @@ def public(farm, now):
             active['bell_order'] = [(i + offset) % BELLS for i in range(BELLS)]
     return dict(active=active, rewarded_today=s['reward_day'] == progression.moscow_day(now),
                 modifier=modifier_for_day(now),
-                next_reward=dict(coins=REWARD_COINS, xp=REWARD_XP),
+                next_reward=dict(coins=daily_bonus.quote(farm,now,REWARD_COINS), xp=REWARD_XP),
+                bonus_budget=daily_bonus.public(farm,now),
                 rounds=list(NOTES), last_result=deepcopy(s.get('last_result')))
 
 
@@ -121,13 +122,12 @@ def answer(farm, data, now):
     rewarded = s['reward_day'] != day
     coins = xp = 0
     if rewarded:
+        coins = daily_bonus.grant(farm,'oleg',REWARD_COINS,now)
         s['reward_day'] = day
-        coins = REWARD_COINS
-        farm['coins'] += coins
         xp = progression.grant_xp(farm, REWARD_XP, 'oleg', now, True)
     s['run'] = None
     s['last_result'] = dict(run_id=run_id, at=now, rewarded=rewarded, coins=coins, xp=xp)
-    return ('Три мелодии сыграны! +12 монет и +4 опыта.' if rewarded else
+    return (f'Три мелодии сыграны! +{coins} монет и +{xp} опыта.' if rewarded else
             'Три мелодии сыграны! Сегодняшняя награда уже получена — приходи завтра.'), True
 
 
@@ -164,6 +164,6 @@ def validate(farm):
         need(type(result) is dict and set(result) == {'run_id', 'at', 'rewarded', 'coins', 'xp'} and
              _run_id(result['run_id']) and _time(result['at']) and
              type(result['rewarded']) is bool and type(result['coins']) is int and
-             type(result['xp']) is int and result['coins'] == (REWARD_COINS if result['rewarded'] else 0) and
+             type(result['xp']) is int and (0 <= result['coins'] <= REWARD_COINS if result['rewarded'] else result['coins'] == 0) and
              0 <= result['xp'], *STATE_ERROR)
         need(not result['rewarded'] or result['xp'] >= REWARD_XP, *STATE_ERROR)

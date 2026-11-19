@@ -638,10 +638,11 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
 
 def validate_state(farm):
     from .expansion import validate_expansion
-    from . import minigames, oleg
+    from . import minigames, oleg, daily_bonus
     validate_expansion(farm)
     minigames.validate(farm)
     oleg.validate(farm)
+    daily_bonus.validate(farm)
     from application import farm_village_games
     farm_village_games.validate(farm)
     progression.validate(farm)
@@ -683,6 +684,8 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
     need(can_visit(visitor,farm),'private_farm','Ферма недоступна.',404)
     if own:
         result=deepcopy(farm)
+        from . import daily_bonus
+        result['daily_cash_bonus']=daily_bonus.public(farm,now)
         result.pop('tavern',None)  # exposed only as the current-day village_build projection
         from . import village_quests
         result['village_errands']=village_quests.public(farm,now)

@@ -326,7 +326,8 @@ export function buildArt(V) {
   const sprite = `<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">${symbols}</svg>`;
   const files = Object.fromEntries(Object.entries(pieces).map(([id, p]) => [id, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${p.box.join(' ')}">${p.body}</svg>`]));
   const boxes = Object.fromEntries(Object.entries(pieces).filter(([id]) => !id.endsWith('-night')).map(([id, p]) => [id, p.box]));
-  return {sprite, files, boxes, crew, stalls: STALL_OWNERS.map(([id], i) => ({id, slot: slots[i]}))};
+  return {sprite, files, boxes, crew, stalls: STALL_OWNERS.map(([id], i) => ({id, slot: slots[i]})),
+    layout: {matrix: V.matrix, sites: V.sites, slots: V.slots}};
 }
 
 // shade a #rrggbb colour lighter (+) or darker (−)

@@ -129,8 +129,9 @@ def plant(farm, obj, crop, at, speed, seed=None, manual=False):
     """The one place that plants a bed: a seed-pack planting (``seed`` = the pack item, no coins) and a coin planting alike.
     Only the player's own planting (``manual``: the plant and plant_many commands) may spend a fertilizer unit; a machine never does."""
     gift = pay(farm, crop.get('cost', 0))
+    from .village_effects import crop_multiplier
     obj['crop'] = dict(id=crop['id'], planted_at=at,
-                       ready_at=at + duration(crop['seconds'], speed, farm),
+                       ready_at=at + duration(crop['seconds'] * crop_multiplier(farm, crop['id'], at), speed, farm),
                        yield_qty=crop['yield_qty'], xp=crop['xp'], helped=False,
                        watered=False, version=VERSION, cost=crop.get('cost', 0), gift=gift)
     if seed:

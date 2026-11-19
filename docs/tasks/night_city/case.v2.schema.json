@@ -1,0 +1,2988 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "night-city-case/2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "meta",
+    "ruleset_ref",
+    "setting",
+    "locations",
+    "characters",
+    "facts",
+    "observations",
+    "actions",
+    "dialogues",
+    "variants",
+    "compositions",
+    "flags",
+    "initial",
+    "events",
+    "endings",
+    "victory",
+    "episode_refs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "night-city-case/2"
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "title",
+        "genre",
+        "language",
+        "players",
+        "supernatural",
+        "content_flags",
+        "author",
+        "summary",
+        "npc_name_era"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "genre": {
+          "enum": [
+            "noir",
+            "classic",
+            "mystic"
+          ]
+        },
+        "language": {
+          "const": "ru"
+        },
+        "players": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "properties": {
+            "min": {
+              "const": 4
+            },
+            "max": {
+              "const": 12
+            }
+          }
+        },
+        "supernatural": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "real",
+            "rules"
+          ],
+          "properties": {
+            "real": {
+              "type": "boolean"
+            },
+            "rules": {
+              "type": "string",
+              "maxLength": 1200
+            }
+          }
+        },
+        "content_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 8,
+          "items": {
+            "enum": [
+              "crime_violence_mild",
+              "death_offscreen",
+              "alcohol",
+              "mild_horror",
+              "none"
+            ]
+          }
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "human",
+                "model"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/text"
+        },
+        "npc_name_era": {
+          "enum": [
+            "ru_modern",
+            "ru_1900_1930",
+            "ru_1930_1960",
+            "neutral"
+          ],
+          "description": "Эпоха пула случайных имён NPC (пул ведёт сервер, не автор дела)."
+        },
+        "style_pack": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Пакет визуального стиля дела (палитра, рамки, детали). По умолчанию noir_print_a. Единый стиль держится в пределах одного дела; другому делу может подойти другой пакет."
+        },
+        "world": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Мир (серия дел с общим пакетом стиля и героями), например manor_lake."
+        },
+        "crime_type": {
+          "enum": [
+            "theft",
+            "missing",
+            "forgery",
+            "blackmail",
+            "sabotage",
+            "impostor",
+            "hoax",
+            "prevention",
+            "exoneration"
+          ],
+          "description": "Тип фабулы — для разнообразия плана на год."
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "version_archive",
+              "turning_point",
+              "archive_requests"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Сложность для карточки в меню (1–5)."
+        },
+        "duration": {
+          "const": "week"
+        },
+        "logline": {
+          "$ref": "#/$defs/shorttext",
+          "description": "Публичная завязка для карточки в меню, без спойлеров."
+        }
+      }
+    },
+    "ruleset_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "const": "night_case.core"
+        },
+        "version": {
+          "enum": [
+            1,
+            2
+          ]
+        }
+      }
+    },
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blurb",
+        "crime",
+        "days"
+      ],
+      "properties": {
+        "blurb": {
+          "$ref": "#/$defs/body"
+        },
+        "crime": {
+          "$ref": "#/$defs/body"
+        },
+        "days": {
+          "const": 7
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "body",
+          "connects"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "name": {
+            "$ref": "#/$defs/label"
+          },
+          "body": {
+            "$ref": "#/$defs/body"
+          },
+          "connects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/art"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "minItems": 4,
+      "maxItems": 10
+    },
+    "characters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "title_forms",
+          "gender",
+          "bio",
+          "can_be_player",
+          "faction",
+          "home",
+          "schedule",
+          "secrets",
+          "goal",
+          "ghost_memories"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "title": {
+            "$ref": "#/$defs/label"
+          },
+          "title_forms": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gen",
+              "dat",
+              "acc",
+              "ins",
+              "prep"
+            ],
+            "properties": {
+              "gen": {
+                "$ref": "#/$defs/label"
+              },
+              "dat": {
+                "$ref": "#/$defs/label"
+              },
+              "acc": {
+                "$ref": "#/$defs/label"
+              },
+              "ins": {
+                "$ref": "#/$defs/label"
+              },
+              "prep": {
+                "$ref": "#/$defs/label"
+              }
+            }
+          },
+          "gender": {
+            "enum": [
+              "f",
+              "m"
+            ]
+          },
+          "bio": {
+            "$ref": "#/$defs/body"
+          },
+          "can_be_player": {
+            "type": "boolean"
+          },
+          "faction": {
+            "enum": [
+              "investigation",
+              "shadow",
+              "independent"
+            ]
+          },
+          "home": {
+            "$ref": "#/$defs/id"
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "windows",
+                "location"
+              ],
+              "properties": {
+                "windows": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/window"
+                  },
+                  "minItems": 1,
+                  "maxItems": 14,
+                  "uniqueItems": true
+                },
+                "location": {
+                  "$ref": "#/$defs/id"
+                }
+              }
+            },
+            "minItems": 0,
+            "maxItems": 200
+          },
+          "secrets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "variants",
+                "body"
+              ],
+              "properties": {
+                "variants": {
+                  "$ref": "#/$defs/variant_set"
+                },
+                "body": {
+                  "$ref": "#/$defs/body"
+                }
+              }
+            },
+            "minItems": 0,
+            "maxItems": 200
+          },
+          "goal": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "body",
+              "when"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "body": {
+                "$ref": "#/$defs/body"
+              },
+              "when": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/predicate"
+                },
+                "minItems": 0,
+                "maxItems": 200
+              },
+              "criteria": {
+                "$ref": "#/$defs/body"
+              }
+            }
+          },
+          "ghost_memories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/art"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "minItems": 12,
+      "maxItems": 24
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "body",
+          "true_in"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "body": {
+            "$ref": "#/$defs/body"
+          },
+          "true_in": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/variant_set"
+              },
+              {
+                "const": "none"
+              }
+            ]
+          },
+          "at": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "character",
+              "location",
+              "window"
+            ],
+            "properties": {
+              "character": {
+                "$ref": "#/$defs/id"
+              },
+              "location": {
+                "$ref": "#/$defs/id"
+              },
+              "window": {
+                "const": 0
+              }
+            }
+          }
+        }
+      },
+      "minItems": 6,
+      "maxItems": 120
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "body",
+              "proves",
+              "exists_in"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "kind": {
+                "const": "proof"
+              },
+              "title": {
+                "$ref": "#/$defs/label"
+              },
+              "body": {
+                "$ref": "#/$defs/body"
+              },
+              "proves": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 1,
+                "maxItems": 200,
+                "uniqueItems": true
+              },
+              "exists_in": {
+                "$ref": "#/$defs/variant_set"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "body",
+              "asserts",
+              "speaker",
+              "exists_in"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "kind": {
+                "const": "claim"
+              },
+              "title": {
+                "$ref": "#/$defs/label"
+              },
+              "body": {
+                "$ref": "#/$defs/body"
+              },
+              "asserts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 0,
+                "maxItems": 200,
+                "uniqueItems": true
+              },
+              "speaker": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "exists_in": {
+                "$ref": "#/$defs/variant_set"
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 6,
+      "maxItems": 150
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "location",
+          "label",
+          "available_when",
+          "repeat",
+          "outcomes",
+          "fallback"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "kind": {
+            "enum": [
+              "examine",
+              "interact"
+            ]
+          },
+          "location": {
+            "$ref": "#/$defs/id"
+          },
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "available_when": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/predicate"
+            },
+            "minItems": 0,
+            "maxItems": 200
+          },
+          "repeat": {
+            "enum": [
+              "player_window",
+              "player_game"
+            ]
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/outcome"
+            },
+            "minItems": 0,
+            "maxItems": 8
+          },
+          "fallback": {
+            "$ref": "#/$defs/body"
+          },
+          "personal_step": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 200
+    },
+    "dialogues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "character",
+          "entry_node",
+          "nodes"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "character": {
+            "$ref": "#/$defs/id"
+          },
+          "entry_node": {
+            "$ref": "#/$defs/id"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "prompt",
+                "options"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/id"
+                },
+                "prompt": {
+                  "$ref": "#/$defs/body"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "label",
+                      "available_when",
+                      "outcomes",
+                      "fallback",
+                      "next_node"
+                    ],
+                    "properties": {
+                      "id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "label": {
+                        "$ref": "#/$defs/label"
+                      },
+                      "available_when": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/predicate"
+                        },
+                        "minItems": 0,
+                        "maxItems": 200
+                      },
+                      "outcomes": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/outcome"
+                        },
+                        "minItems": 0,
+                        "maxItems": 8
+                      },
+                      "fallback": {
+                        "$ref": "#/$defs/body"
+                      },
+                      "next_node": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/$defs/id"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "minItems": 0,
+                  "maxItems": 200
+                }
+              }
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 40
+    },
+    "variants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "culprit",
+          "accomplices",
+          "motive",
+          "method",
+          "key_proofs",
+          "min_key",
+          "composition_ids",
+          "final_text"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "culprit": {
+            "$ref": "#/$defs/id"
+          },
+          "accomplices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "motive": {
+            "$ref": "#/$defs/body"
+          },
+          "method": {
+            "$ref": "#/$defs/body"
+          },
+          "key_proofs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "min_key": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "composition_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "final_text": {
+            "$ref": "#/$defs/body"
+          },
+          "required_key_proofs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 0,
+            "maxItems": 8,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 2,
+      "maxItems": 5
+    },
+    "compositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "players",
+          "player_characters"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "players": {
+            "enum": [
+              4,
+              5,
+              8,
+              12
+            ]
+          },
+          "player_characters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 4,
+            "maxItems": 12,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "initial"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "initial": {
+            "type": "boolean"
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 64
+    },
+    "initial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "public_observations",
+        "personal"
+      ],
+      "properties": {
+        "public_observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 200,
+          "uniqueItems": true
+        },
+        "personal": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "character",
+              "observations"
+            ],
+            "properties": {
+              "character": {
+                "$ref": "#/$defs/id"
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 0,
+                "maxItems": 200,
+                "uniqueItems": true
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 200
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "window",
+          "body",
+          "effects"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "window": {
+            "$ref": "#/$defs/window"
+          },
+          "body": {
+            "$ref": "#/$defs/body"
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/effect"
+            },
+            "minItems": 0,
+            "maxItems": 200
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 40
+    },
+    "endings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "solved",
+        "shadow_framed",
+        "no_investigators",
+        "unresolved",
+        "forgotten"
+      ],
+      "properties": {
+        "solved": {
+          "$ref": "#/$defs/body"
+        },
+        "shadow_framed": {
+          "$ref": "#/$defs/body"
+        },
+        "no_investigators": {
+          "$ref": "#/$defs/body"
+        },
+        "unresolved": {
+          "$ref": "#/$defs/body"
+        },
+        "forgotten": {
+          "$ref": "#/$defs/body"
+        }
+      }
+    },
+    "victory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "framed_limit"
+      ],
+      "properties": {
+        "framed_limit": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "episode_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      },
+      "minItems": 0,
+      "maxItems": 0,
+      "uniqueItems": true
+    },
+    "module_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "archive_requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "queries"
+          ],
+          "properties": {
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "label",
+                  "location",
+                  "available_when",
+                  "responses"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "label": {
+                    "$ref": "#/$defs/label"
+                  },
+                  "location": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "available_when": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/predicate"
+                    },
+                    "minItems": 0,
+                    "maxItems": 8
+                  },
+                  "responses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "variants",
+                        "body",
+                        "observations"
+                      ],
+                      "properties": {
+                        "variants": {
+                          "$ref": "#/$defs/variant_set"
+                        },
+                        "body": {
+                          "$ref": "#/$defs/body"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/id"
+                          },
+                          "minItems": 0,
+                          "maxItems": 8,
+                          "uniqueItems": true
+                        }
+                      }
+                    },
+                    "minItems": 1,
+                    "maxItems": 8
+                  }
+                }
+              },
+              "minItems": 1,
+              "maxItems": 12
+            }
+          }
+        },
+        "version_archive": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "documents",
+            "comparisons",
+            "theories"
+          ],
+          "properties": {
+            "documents": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "family",
+                  "revision",
+                  "observation"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "family": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  },
+                  "observation": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              },
+              "minItems": 2,
+              "maxItems": 16
+            },
+            "comparisons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "left",
+                  "right",
+                  "action"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "left": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "right": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "action": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              },
+              "minItems": 1,
+              "maxItems": 16
+            },
+            "theories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "title",
+                  "body",
+                  "links"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "title": {
+                    "$ref": "#/$defs/label"
+                  },
+                  "body": {
+                    "$ref": "#/$defs/body"
+                  },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "observation",
+                        "relation"
+                      ],
+                      "properties": {
+                        "observation": {
+                          "$ref": "#/$defs/id"
+                        },
+                        "relation": {
+                          "enum": [
+                            "supports",
+                            "contradicts"
+                          ]
+                        }
+                      }
+                    },
+                    "minItems": 0,
+                    "maxItems": 32
+                  }
+                }
+              },
+              "minItems": 1,
+              "maxItems": 8
+            }
+          }
+        },
+        "turning_point": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "routes",
+            "scenes",
+            "concealed_npcs",
+            "recovery"
+          ],
+          "properties": {
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "ends",
+                  "open_when",
+                  "opened_flag"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "ends": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "uniqueItems": true
+                  },
+                  "open_when": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/public_predicate"
+                    },
+                    "minItems": 1,
+                    "maxItems": 8
+                  },
+                  "opened_flag": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              },
+              "minItems": 0,
+              "maxItems": 4
+            },
+            "scenes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "not_before",
+                  "through_window",
+                  "when",
+                  "body",
+                  "effects"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "not_before": {
+                    "$ref": "#/$defs/window"
+                  },
+                  "through_window": {
+                    "$ref": "#/$defs/window"
+                  },
+                  "when": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/public_predicate"
+                    },
+                    "minItems": 0,
+                    "maxItems": 8
+                  },
+                  "body": {
+                    "$ref": "#/$defs/body"
+                  },
+                  "effects": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/public_effect"
+                    },
+                    "minItems": 0,
+                    "maxItems": 16
+                  }
+                }
+              },
+              "minItems": 0,
+              "maxItems": 8
+            },
+            "concealed_npcs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "character",
+                  "revealed_flag",
+                  "placements"
+                ],
+                "properties": {
+                  "character": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "revealed_flag": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "placements": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "variants",
+                        "location"
+                      ],
+                      "properties": {
+                        "variants": {
+                          "$ref": "#/$defs/variant_set"
+                        },
+                        "location": {
+                          "$ref": "#/$defs/id"
+                        }
+                      }
+                    },
+                    "minItems": 1,
+                    "maxItems": 8
+                  }
+                }
+              },
+              "minItems": 0,
+              "maxItems": 2
+            },
+            "recovery": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "character",
+                    "through_window",
+                    "requires_board_keys"
+                  ],
+                  "properties": {
+                    "character": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "through_window": {
+                      "$ref": "#/$defs/window"
+                    },
+                    "requires_board_keys": {
+                      "const": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "personal_tasks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "originals",
+        "caches",
+        "works",
+        "commitments",
+        "trips",
+        "topics",
+        "steps"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "originals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "source_location",
+              "initial_holder",
+              "sections",
+              "destroy_locations",
+              "return_to",
+              "return_location",
+              "offer_body"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "source_location": {
+                "$ref": "#/$defs/id"
+              },
+              "initial_holder": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "observation",
+                    "backup_proofs"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "observation": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "backup_proofs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "minItems": 0,
+                      "maxItems": 8,
+                      "uniqueItems": true
+                    }
+                  }
+                },
+                "minItems": 1,
+                "maxItems": 4
+              },
+              "destroy_locations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 0,
+                "maxItems": 4,
+                "uniqueItems": true
+              },
+              "return_to": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "return_location": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "offer_body": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/body"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 4
+        },
+        "caches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "owner",
+              "location",
+              "thaw_flag"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "owner": {
+                "$ref": "#/$defs/id"
+              },
+              "location": {
+                "$ref": "#/$defs/id"
+              },
+              "thaw_flag": {
+                "$ref": "#/$defs/id"
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 4
+        },
+        "works": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "owner",
+              "location",
+              "stages"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "owner": {
+                "$ref": "#/$defs/id"
+              },
+              "location": {
+                "$ref": "#/$defs/id"
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 1,
+                "maxItems": 4,
+                "uniqueItems": true
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 4
+        },
+        "commitments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "issuer",
+              "beneficiary",
+              "document"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "kind": {
+                "enum": [
+                  "recommendation",
+                  "share"
+                ]
+              },
+              "issuer": {
+                "$ref": "#/$defs/id"
+              },
+              "beneficiary": {
+                "$ref": "#/$defs/id"
+              },
+              "document": {
+                "$ref": "#/$defs/body"
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 4
+        },
+        "trips": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "traveler",
+              "work",
+              "road_open_flag",
+              "epilogue"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "traveler": {
+                "$ref": "#/$defs/id"
+              },
+              "work": {
+                "$ref": "#/$defs/id"
+              },
+              "road_open_flag": {
+                "$ref": "#/$defs/id"
+              },
+              "epilogue": {
+                "$ref": "#/$defs/body"
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 4
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "subject",
+              "observations"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "subject": {
+                "$ref": "#/$defs/id"
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 1,
+                "maxItems": 12,
+                "uniqueItems": true
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 12
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "action",
+              "actors",
+              "requires",
+              "choice_group",
+              "operation",
+              "responses"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "action": {
+                "$ref": "#/$defs/id"
+              },
+              "actors": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 1,
+                "maxItems": 12,
+                "uniqueItems": true
+              },
+              "requires": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "choice_group": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "operation": {
+                "$ref": "#/$defs/personal_operation"
+              },
+              "responses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "variants",
+                    "body",
+                    "observations"
+                  ],
+                  "properties": {
+                    "variants": {
+                      "$ref": "#/$defs/variant_set"
+                    },
+                    "body": {
+                      "$ref": "#/$defs/body"
+                    },
+                    "observations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "minItems": 0,
+                      "maxItems": 8,
+                      "uniqueItems": true
+                    }
+                  }
+                },
+                "minItems": 1,
+                "maxItems": 5
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      }
+    },
+    "communication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "max_messages_per_window"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "max_messages_per_window": {
+          "const": 20
+        }
+      }
+    },
+    "npc_delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "window_reveal_budget",
+        "game_reveal_budget",
+        "topics"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "window_reveal_budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "game_reveal_budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "npc",
+              "dialogue",
+              "node",
+              "option",
+              "lines",
+              "slip"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "npc": {
+                "$ref": "#/$defs/id"
+              },
+              "dialogue": {
+                "$ref": "#/$defs/id"
+              },
+              "node": {
+                "$ref": "#/$defs/id"
+              },
+              "option": {
+                "$ref": "#/$defs/id"
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "body"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "body": {
+                      "$ref": "#/$defs/body"
+                    }
+                  }
+                },
+                "minItems": 1,
+                "maxItems": 4
+              },
+              "slip": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "rule_id",
+                      "version",
+                      "probability_bp",
+                      "observation",
+                      "requires"
+                    ],
+                    "properties": {
+                      "rule_id": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "version": {
+                        "const": 1
+                      },
+                      "probability_bp": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "observation": {
+                        "$ref": "#/$defs/id"
+                      },
+                      "requires": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/delivery_predicate"
+                        },
+                        "minItems": 0,
+                        "maxItems": 8
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 32
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^{}]*$"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "mentions"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1200,
+          "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$",
+          "description": "Ссылки на героев: {c:id} — имя (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже. Иных фигурных скобок быть не должно."
+        },
+        "mentions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 200,
+          "uniqueItems": true
+        }
+      }
+    },
+    "art": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "alt"
+      ],
+      "properties": {
+        "asset_id": {
+          "$ref": "#/$defs/id"
+        },
+        "alt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "window": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 14
+    },
+    "variant_set": {
+      "oneOf": [
+        {
+          "const": "all"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        }
+      ]
+    },
+    "predicate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "kind": {
+              "const": "window_in"
+            },
+            "from": {
+              "$ref": "#/$defs/window"
+            },
+            "to": {
+              "$ref": "#/$defs/window"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "knows"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "published"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "flag",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "flag_is"
+            },
+            "flag": {
+              "$ref": "#/$defs/id"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "location"
+          ],
+          "properties": {
+            "kind": {
+              "const": "at"
+            },
+            "location": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "character"
+          ],
+          "properties": {
+            "kind": {
+              "const": "character_active"
+            },
+            "character": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "step"
+          ],
+          "properties": {
+            "kind": {
+              "const": "story_done"
+            },
+            "step": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "steps"
+          ],
+          "properties": {
+            "kind": {
+              "const": "story_any_done"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "step",
+            "boundary"
+          ],
+          "properties": {
+            "kind": {
+              "const": "story_before"
+            },
+            "step": {
+              "$ref": "#/$defs/id"
+            },
+            "boundary": {
+              "$ref": "#/$defs/personal_boundary"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "topic",
+            "by"
+          ],
+          "properties": {
+            "kind": {
+              "const": "story_unexposed"
+            },
+            "topic": {
+              "$ref": "#/$defs/id"
+            },
+            "by": {
+              "enum": [
+                "self",
+                "any"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "trip"
+          ],
+          "properties": {
+            "kind": {
+              "const": "story_departed"
+            },
+            "trip": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    },
+    "effect": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation",
+            "audience"
+          ],
+          "properties": {
+            "kind": {
+              "const": "grant_observation"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            },
+            "audience": {
+              "enum": [
+                "actor",
+                "public"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "flag",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "set_flag"
+            },
+            "flag": {
+              "$ref": "#/$defs/id"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "location",
+            "through_window"
+          ],
+          "properties": {
+            "kind": {
+              "const": "lock_location"
+            },
+            "location": {
+              "$ref": "#/$defs/id"
+            },
+            "through_window": {
+              "$ref": "#/$defs/window"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "location"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unlock_location"
+            },
+            "location": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "character"
+          ],
+          "properties": {
+            "kind": {
+              "const": "reveal_npc"
+            },
+            "character": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "guard",
+        "body",
+        "effects"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "guard": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variants",
+            "when"
+          ],
+          "properties": {
+            "variants": {
+              "$ref": "#/$defs/variant_set"
+            },
+            "when": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              },
+              "minItems": 0,
+              "maxItems": 200
+            }
+          }
+        },
+        "body": {
+          "$ref": "#/$defs/body"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effect"
+          },
+          "minItems": 0,
+          "maxItems": 200
+        }
+      }
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^{}]*$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200,
+      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$",
+      "description": "Ссылки на героев: {c:id} — имя (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже. Иных фигурных скобок быть не должно."
+    },
+    "shorttext": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$"
+    },
+    "core_predicate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "kind": {
+              "const": "window_in"
+            },
+            "from": {
+              "$ref": "#/$defs/window"
+            },
+            "to": {
+              "$ref": "#/$defs/window"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "knows"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "published"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "flag",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "flag_is"
+            },
+            "flag": {
+              "$ref": "#/$defs/id"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "location"
+          ],
+          "properties": {
+            "kind": {
+              "const": "at"
+            },
+            "location": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    },
+    "public_predicate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "kind": {
+              "const": "window_in"
+            },
+            "from": {
+              "$ref": "#/$defs/window"
+            },
+            "to": {
+              "$ref": "#/$defs/window"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "published"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "flag",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "flag_is"
+            },
+            "flag": {
+              "$ref": "#/$defs/id"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "public_effect": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation",
+            "audience"
+          ],
+          "properties": {
+            "kind": {
+              "const": "grant_observation"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            },
+            "audience": {
+              "const": "public"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "flag",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "set_flag"
+            },
+            "flag": {
+              "$ref": "#/$defs/id"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "core_profile_content": {
+      "description": "Recursively forbid module-only kinds without duplicating core structural types.",
+      "not": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "character_active",
+              "reveal_npc"
+            ]
+          }
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/core_profile_content"
+      },
+      "items": {
+        "$ref": "#/$defs/core_profile_content"
+      }
+    },
+    "personal_operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "original",
+            "section"
+          ],
+          "properties": {
+            "kind": {
+              "const": "inspect_original"
+            },
+            "original": {
+              "$ref": "#/$defs/id"
+            },
+            "section": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "original"
+          ],
+          "properties": {
+            "kind": {
+              "const": "take_original"
+            },
+            "original": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "original"
+          ],
+          "properties": {
+            "kind": {
+              "const": "destroy_original"
+            },
+            "original": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "original"
+          ],
+          "properties": {
+            "kind": {
+              "const": "offer_return"
+            },
+            "original": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cache"
+          ],
+          "properties": {
+            "kind": {
+              "const": "recover_cache"
+            },
+            "cache": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "work",
+            "stage"
+          ],
+          "properties": {
+            "kind": {
+              "const": "advance_work"
+            },
+            "work": {
+              "$ref": "#/$defs/id"
+            },
+            "stage": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "record_deed"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "observation",
+            "recipient"
+          ],
+          "properties": {
+            "kind": {
+              "const": "deliver_card"
+            },
+            "observation": {
+              "$ref": "#/$defs/id"
+            },
+            "recipient": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "commitment"
+          ],
+          "properties": {
+            "kind": {
+              "const": "issue_commitment"
+            },
+            "commitment": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "trip"
+          ],
+          "properties": {
+            "kind": {
+              "const": "book_departure"
+            },
+            "trip": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    },
+    "personal_boundary": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "topic",
+            "by"
+          ],
+          "properties": {
+            "kind": {
+              "const": "public_reveal"
+            },
+            "topic": {
+              "$ref": "#/$defs/id"
+            },
+            "by": {
+              "enum": [
+                "self",
+                "any"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "original"
+          ],
+          "properties": {
+            "kind": {
+              "const": "foreign_inspection"
+            },
+            "original": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    },
+    "no_personal_content": {
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "story_done",
+                  "story_any_done",
+                  "story_before",
+                  "story_unexposed",
+                  "story_departed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "personal_step"
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "criteria"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/no_personal_content"
+      },
+      "items": {
+        "$ref": "#/$defs/no_personal_content"
+      }
+    },
+    "delivery_predicate": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/core_predicate"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "character"
+          ],
+          "properties": {
+            "kind": {
+              "const": "character_active"
+            },
+            "character": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "ruleset_ref": {
+            "properties": {
+              "version": {
+                "const": 1
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "module_data"
+              ]
+            },
+            {
+              "required": [
+                "personal_tasks"
+              ]
+            },
+            {
+              "required": [
+                "communication"
+              ]
+            },
+            {
+              "required": [
+                "npc_delivery"
+              ]
+            }
+          ]
+        },
+        "properties": {
+          "meta": {
+            "properties": {
+              "modules": {
+                "maxItems": 0
+              }
+            }
+          },
+          "variants": {
+            "items": {
+              "not": {
+                "required": [
+                  "required_key_proofs"
+                ]
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/$defs/core_profile_content"
+          }
+        ]
+      },
+      "else": {
+        "required": [
+          "module_data"
+        ],
+        "properties": {
+          "meta": {
+            "required": [
+              "modules"
+            ],
+            "properties": {
+              "modules": {
+                "minItems": 1
+              }
+            }
+          },
+          "variants": {
+            "items": {
+              "required": [
+                "required_key_proofs"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "required": [
+            "personal_tasks"
+          ]
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/no_personal_content"
+      }
+    }
+  ]
+}

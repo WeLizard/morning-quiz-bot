@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nc-assets/2",
+  "title": "Immutable Night City case asset pack manifest",
+  "type": "object",
+  "required": ["schema", "world", "files", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "nc-assets/2"},
+    "world": {"const": "manor_lake"},
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^assets/[a-z0-9_]+\\.webp$"},
+      "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    },
+    "assets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^manor_(?:char|loc)_[a-z0-9_]+$"},
+      "additionalProperties": {"$ref": "#/$defs/asset"}
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "pattern": "^assets/[a-z0-9_]+\\.webp$"},
+    "asset": {
+      "type": "object",
+      "required": ["url", "alt"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {"$ref": "#/$defs/path"},
+        "alt": {"type": "string", "minLength": 1},
+        "variants": {
+          "type": "object",
+          "required": ["morning", "day", "evening", "night"],
+          "additionalProperties": false,
+          "properties": {
+            "morning": {"$ref": "#/$defs/path"},
+            "day": {"$ref": "#/$defs/path"},
+            "evening": {"$ref": "#/$defs/path"},
+            "night": {"$ref": "#/$defs/path"}
+          }
+        }
+      }
+    }
+  }
+}

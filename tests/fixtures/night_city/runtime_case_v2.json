@@ -1,0 +1,1614 @@
+{
+  "schema": "night-city-case/2",
+  "meta": {
+    "id": "runtime_demo",
+    "version": 1,
+    "title": "Архив станции",
+    "genre": "noir",
+    "language": "ru",
+    "players": {
+      "min": 4,
+      "max": 12
+    },
+    "supernatural": {
+      "real": false,
+      "rules": ""
+    },
+    "content_flags": [
+      "none"
+    ],
+    "author": {
+      "kind": "human",
+      "name": "Demo"
+    },
+    "summary": "Учебное дело",
+    "npc_name_era": "ru_modern",
+    "modules": [
+      "version_archive",
+      "turning_point",
+      "archive_requests"
+    ],
+    "duration": "week"
+  },
+  "ruleset_ref": {
+    "id": "night_case.core",
+    "version": 2
+  },
+  "setting": {
+    "blurb": {
+      "text": "Вокзал",
+      "mentions": []
+    },
+    "crime": {
+      "text": "Пропажа",
+      "mentions": []
+    },
+    "days": 7
+  },
+  "locations": [
+    {
+      "id": "foyer",
+      "name": "foyer",
+      "body": {
+        "text": "foyer",
+        "mentions": []
+      },
+      "connects": [
+        "platform",
+        "yard"
+      ],
+      "art": null
+    },
+    {
+      "id": "platform",
+      "name": "platform",
+      "body": {
+        "text": "platform",
+        "mentions": []
+      },
+      "connects": [
+        "foyer",
+        "office"
+      ],
+      "art": null
+    },
+    {
+      "id": "office",
+      "name": "office",
+      "body": {
+        "text": "office",
+        "mentions": []
+      },
+      "connects": [
+        "platform",
+        "yard"
+      ],
+      "art": null
+    },
+    {
+      "id": "yard",
+      "name": "yard",
+      "body": {
+        "text": "yard",
+        "mentions": []
+      },
+      "connects": [
+        "office",
+        "foyer"
+      ],
+      "art": null
+    }
+  ],
+  "characters": [
+    {
+      "id": "person_00",
+      "title": "Участник 0",
+      "title_forms": {
+        "gen": "Участника 0",
+        "dat": "Участнику 0",
+        "acc": "Участника 0",
+        "ins": "Участником 0",
+        "prep": "Участнике 0"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 0",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_00",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_01",
+      "title": "Участник 1",
+      "title_forms": {
+        "gen": "Участника 1",
+        "dat": "Участнику 1",
+        "acc": "Участника 1",
+        "ins": "Участником 1",
+        "prep": "Участнике 1"
+      },
+      "gender": "f",
+      "bio": {
+        "text": "Досье 1",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_01",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_02",
+      "title": "Участник 2",
+      "title_forms": {
+        "gen": "Участника 2",
+        "dat": "Участнику 2",
+        "acc": "Участника 2",
+        "ins": "Участником 2",
+        "prep": "Участнике 2"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 2",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_02",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_03",
+      "title": "Участник 3",
+      "title_forms": {
+        "gen": "Участника 3",
+        "dat": "Участнику 3",
+        "acc": "Участника 3",
+        "ins": "Участником 3",
+        "prep": "Участнике 3"
+      },
+      "gender": "f",
+      "bio": {
+        "text": "Досье 3",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_03",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_04",
+      "title": "Участник 4",
+      "title_forms": {
+        "gen": "Участника 4",
+        "dat": "Участнику 4",
+        "acc": "Участника 4",
+        "ins": "Участником 4",
+        "prep": "Участнике 4"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 4",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_04",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_05",
+      "title": "Участник 5",
+      "title_forms": {
+        "gen": "Участника 5",
+        "dat": "Участнику 5",
+        "acc": "Участника 5",
+        "ins": "Участником 5",
+        "prep": "Участнике 5"
+      },
+      "gender": "f",
+      "bio": {
+        "text": "Досье 5",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_05",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_06",
+      "title": "Участник 6",
+      "title_forms": {
+        "gen": "Участника 6",
+        "dat": "Участнику 6",
+        "acc": "Участника 6",
+        "ins": "Участником 6",
+        "prep": "Участнике 6"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 6",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_06",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_07",
+      "title": "Участник 7",
+      "title_forms": {
+        "gen": "Участника 7",
+        "dat": "Участнику 7",
+        "acc": "Участника 7",
+        "ins": "Участником 7",
+        "prep": "Участнике 7"
+      },
+      "gender": "f",
+      "bio": {
+        "text": "Досье 7",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_07",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_08",
+      "title": "Участник 8",
+      "title_forms": {
+        "gen": "Участника 8",
+        "dat": "Участнику 8",
+        "acc": "Участника 8",
+        "ins": "Участником 8",
+        "prep": "Участнике 8"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 8",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_08",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_09",
+      "title": "Участник 9",
+      "title_forms": {
+        "gen": "Участника 9",
+        "dat": "Участнику 9",
+        "acc": "Участника 9",
+        "ins": "Участником 9",
+        "prep": "Участнике 9"
+      },
+      "gender": "f",
+      "bio": {
+        "text": "Досье 9",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_09",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_10",
+      "title": "Участник 10",
+      "title_forms": {
+        "gen": "Участника 10",
+        "dat": "Участнику 10",
+        "acc": "Участника 10",
+        "ins": "Участником 10",
+        "prep": "Участнике 10"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 10",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_10",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "person_11",
+      "title": "Участник 11",
+      "title_forms": {
+        "gen": "Участника 11",
+        "dat": "Участнику 11",
+        "acc": "Участника 11",
+        "ins": "Участником 11",
+        "prep": "Участнике 11"
+      },
+      "gender": "f",
+      "bio": {
+        "text": "Досье 11",
+        "mentions": []
+      },
+      "can_be_player": true,
+      "faction": "investigation",
+      "home": "foyer",
+      "schedule": [
+        {
+          "windows": [
+            1
+          ],
+          "location": "platform"
+        }
+      ],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "goal_11",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    },
+    {
+      "id": "missing_keeper",
+      "title": "Хранитель",
+      "title_forms": {
+        "gen": "Участника 0",
+        "dat": "Участнику 0",
+        "acc": "Участника 0",
+        "ins": "Участником 0",
+        "prep": "Участнике 0"
+      },
+      "gender": "m",
+      "bio": {
+        "text": "Досье 0",
+        "mentions": []
+      },
+      "can_be_player": false,
+      "faction": "investigation",
+      "home": "office",
+      "schedule": [],
+      "secrets": [
+        {
+          "variants": "all",
+          "body": {
+            "text": "Личный секрет",
+            "mentions": []
+          }
+        }
+      ],
+      "goal": {
+        "id": "keeper_goal",
+        "body": {
+          "text": "Найти запись",
+          "mentions": []
+        },
+        "when": [
+          {
+            "kind": "knows",
+            "observation": "public_note"
+          }
+        ]
+      },
+      "ghost_memories": [
+        "public_note"
+      ],
+      "art": null
+    }
+  ],
+  "facts": [
+    {
+      "id": "fact_a",
+      "body": {
+        "text": "fact_a",
+        "mentions": []
+      },
+      "true_in": [
+        "variant_a"
+      ],
+      "at": {
+        "character": "person_00",
+        "location": "foyer",
+        "window": 0
+      }
+    },
+    {
+      "id": "fact_b",
+      "body": {
+        "text": "fact_b",
+        "mentions": []
+      },
+      "true_in": [
+        "variant_b"
+      ],
+      "at": {
+        "character": "person_00",
+        "location": "foyer",
+        "window": 0
+      }
+    },
+    {
+      "id": "fact_c",
+      "body": {
+        "text": "fact_c",
+        "mentions": []
+      },
+      "true_in": "all",
+      "at": {
+        "character": "person_00",
+        "location": "foyer",
+        "window": 0
+      }
+    },
+    {
+      "id": "fact_d",
+      "body": {
+        "text": "fact_d",
+        "mentions": []
+      },
+      "true_in": "all",
+      "at": {
+        "character": "person_00",
+        "location": "foyer",
+        "window": 0
+      }
+    },
+    {
+      "id": "fact_e",
+      "body": {
+        "text": "fact_e",
+        "mentions": []
+      },
+      "true_in": "all",
+      "at": {
+        "character": "person_00",
+        "location": "foyer",
+        "window": 0
+      }
+    },
+    {
+      "id": "false_claim",
+      "body": {
+        "text": "false_claim",
+        "mentions": []
+      },
+      "true_in": "none",
+      "at": {
+        "character": "person_00",
+        "location": "foyer",
+        "window": 0
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "proof_a",
+      "kind": "proof",
+      "title": "Запись А",
+      "body": {
+        "text": "Запись А",
+        "mentions": []
+      },
+      "proves": [
+        "fact_a"
+      ],
+      "exists_in": [
+        "variant_a"
+      ]
+    },
+    {
+      "id": "proof_b",
+      "kind": "proof",
+      "title": "Запись Б",
+      "body": {
+        "text": "Запись Б",
+        "mentions": []
+      },
+      "proves": [
+        "fact_b"
+      ],
+      "exists_in": [
+        "variant_b"
+      ]
+    },
+    {
+      "id": "public_note",
+      "kind": "claim",
+      "title": "Общее",
+      "body": {
+        "text": "Общее",
+        "mentions": []
+      },
+      "asserts": [
+        "fact_c"
+      ],
+      "speaker": null,
+      "exists_in": "all"
+    },
+    {
+      "id": "false_statement",
+      "kind": "claim",
+      "title": "Слух",
+      "body": {
+        "text": "Неверный слух",
+        "mentions": []
+      },
+      "asserts": [
+        "false_claim"
+      ],
+      "speaker": "person_11",
+      "exists_in": "all"
+    },
+    {
+      "id": "variant_only",
+      "kind": "claim",
+      "title": "Особое",
+      "body": {
+        "text": "Особое",
+        "mentions": []
+      },
+      "asserts": [],
+      "speaker": null,
+      "exists_in": [
+        "variant_a"
+      ]
+    },
+    {
+      "id": "proof_common",
+      "kind": "proof",
+      "title": "Общее доказательство",
+      "body": {
+        "text": "Общее доказательство",
+        "mentions": []
+      },
+      "proves": [
+        "fact_c"
+      ],
+      "exists_in": "all"
+    },
+    {
+      "id": "proof_mechanism",
+      "kind": "proof",
+      "title": "Механизм",
+      "body": {
+        "text": "Следы механизма",
+        "mentions": []
+      },
+      "proves": [
+        "fact_c"
+      ],
+      "exists_in": "all"
+    },
+    {
+      "id": "archive_copy",
+      "kind": "claim",
+      "title": "Копия",
+      "body": {
+        "text": "Запись архива",
+        "mentions": []
+      },
+      "asserts": [],
+      "speaker": null,
+      "exists_in": "all"
+    },
+    {
+      "id": "keeper_slip",
+      "kind": "claim",
+      "title": "Оговорка хранителя",
+      "body": {
+        "text": "Хранитель вспоминает шум бумаг",
+        "mentions": []
+      },
+      "asserts": [],
+      "speaker": "missing_keeper",
+      "exists_in": "all"
+    }
+  ],
+  "actions": [
+    {
+      "id": "inspect_desk",
+      "kind": "interact",
+      "location": "foyer",
+      "label": "Осмотреть стол",
+      "available_when": [
+        {
+          "kind": "knows",
+          "observation": "public_note"
+        },
+        {
+          "kind": "knows",
+          "observation": "archive_copy"
+        }
+      ],
+      "repeat": "player_game",
+      "outcomes": [
+        {
+          "id": "result_a",
+          "guard": {
+            "variants": [
+              "variant_a"
+            ],
+            "when": []
+          },
+          "body": {
+            "text": "Запись А",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "grant_observation",
+              "observation": "proof_a",
+              "audience": "actor"
+            }
+          ]
+        },
+        {
+          "id": "result_b",
+          "guard": {
+            "variants": [
+              "variant_b"
+            ],
+            "when": []
+          },
+          "body": {
+            "text": "Запись Б",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "grant_observation",
+              "observation": "proof_b",
+              "audience": "actor"
+            }
+          ]
+        }
+      ],
+      "fallback": {
+        "text": "Ничего",
+        "mentions": []
+      }
+    },
+    {
+      "id": "inspect_key",
+      "kind": "examine",
+      "location": "foyer",
+      "label": "inspect_key",
+      "available_when": [],
+      "repeat": "player_game",
+      "outcomes": [
+        {
+          "id": "found",
+          "guard": {
+            "variants": "all",
+            "when": []
+          },
+          "body": {
+            "text": "inspect_key",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "grant_observation",
+              "observation": "proof_common",
+              "audience": "actor"
+            }
+          ]
+        }
+      ],
+      "fallback": {
+        "text": "Нет новых следов",
+        "mentions": []
+      }
+    },
+    {
+      "id": "inspect_mechanism",
+      "kind": "examine",
+      "location": "foyer",
+      "label": "inspect_mechanism",
+      "available_when": [],
+      "repeat": "player_game",
+      "outcomes": [
+        {
+          "id": "found",
+          "guard": {
+            "variants": "all",
+            "when": []
+          },
+          "body": {
+            "text": "inspect_mechanism",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "grant_observation",
+              "observation": "proof_mechanism",
+              "audience": "actor"
+            }
+          ]
+        }
+      ],
+      "fallback": {
+        "text": "Нет новых следов",
+        "mentions": []
+      }
+    },
+    {
+      "id": "search_office",
+      "kind": "examine",
+      "location": "office",
+      "label": "Поиск",
+      "available_when": [
+        {
+          "kind": "character_active",
+          "character": "missing_keeper"
+        }
+      ],
+      "repeat": "player_game",
+      "outcomes": [
+        {
+          "id": "found",
+          "guard": {
+            "variants": [
+              "variant_a"
+            ],
+            "when": []
+          },
+          "body": {
+            "text": "Хранитель найден",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "reveal_npc",
+              "character": "missing_keeper"
+            }
+          ]
+        }
+      ],
+      "fallback": {
+        "text": "Комната пуста",
+        "mentions": []
+      }
+    },
+    {
+      "id": "search_yard",
+      "kind": "examine",
+      "location": "yard",
+      "label": "Поиск",
+      "available_when": [
+        {
+          "kind": "character_active",
+          "character": "missing_keeper"
+        }
+      ],
+      "repeat": "player_game",
+      "outcomes": [
+        {
+          "id": "found",
+          "guard": {
+            "variants": [
+              "variant_b"
+            ],
+            "when": []
+          },
+          "body": {
+            "text": "Хранитель найден",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "reveal_npc",
+              "character": "missing_keeper"
+            }
+          ]
+        }
+      ],
+      "fallback": {
+        "text": "Комната пуста",
+        "mentions": []
+      }
+    }
+  ],
+  "dialogues": [
+    {
+      "id": "station_talk",
+      "character": "person_11",
+      "entry_node": "opening",
+      "nodes": [
+        {
+          "id": "opening",
+          "prompt": {
+            "text": "Вопрос",
+            "mentions": []
+          },
+          "options": [
+            {
+              "id": "ask",
+              "label": "Спросить",
+              "available_when": [],
+              "outcomes": [],
+              "fallback": {
+                "text": "Нет ответа",
+                "mentions": []
+              },
+              "next_node": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "keeper_dialogue",
+      "character": "missing_keeper",
+      "entry_node": "keeper_entry",
+      "nodes": [
+        {
+          "id": "keeper_entry",
+          "prompt": {
+            "text": "Хранитель готов поговорить",
+            "mentions": []
+          },
+          "options": [
+            {
+              "id": "keeper_question",
+              "label": "Спросить о бумагах",
+              "available_when": [],
+              "outcomes": [],
+              "fallback": {
+                "text": "Больше об этом нечего добавить",
+                "mentions": []
+              },
+              "next_node": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variants": [
+    {
+      "id": "variant_a",
+      "culprit": "person_10",
+      "accomplices": [],
+      "motive": {
+        "text": "Мотив А",
+        "mentions": []
+      },
+      "method": {
+        "text": "Метод А",
+        "mentions": []
+      },
+      "key_proofs": [
+        "proof_common",
+        "proof_mechanism",
+        "proof_a"
+      ],
+      "min_key": 3,
+      "composition_ids": [
+        "players_04",
+        "players_05",
+        "players_08",
+        "players_12"
+      ],
+      "final_text": {
+        "text": "Итог А",
+        "mentions": []
+      },
+      "required_key_proofs": [
+        "proof_a"
+      ]
+    },
+    {
+      "id": "variant_b",
+      "culprit": "person_11",
+      "accomplices": [],
+      "motive": {
+        "text": "Мотив Б",
+        "mentions": []
+      },
+      "method": {
+        "text": "Метод Б",
+        "mentions": []
+      },
+      "key_proofs": [
+        "proof_common",
+        "proof_mechanism",
+        "proof_b"
+      ],
+      "min_key": 3,
+      "composition_ids": [
+        "players_04",
+        "players_05",
+        "players_08",
+        "players_12"
+      ],
+      "final_text": {
+        "text": "Итог Б",
+        "mentions": []
+      },
+      "required_key_proofs": [
+        "proof_b"
+      ]
+    }
+  ],
+  "compositions": [
+    {
+      "id": "players_04",
+      "players": 4,
+      "player_characters": [
+        "person_00",
+        "person_01",
+        "person_02",
+        "person_03"
+      ]
+    },
+    {
+      "id": "players_05",
+      "players": 5,
+      "player_characters": [
+        "person_00",
+        "person_01",
+        "person_02",
+        "person_03",
+        "person_04"
+      ]
+    },
+    {
+      "id": "players_08",
+      "players": 8,
+      "player_characters": [
+        "person_00",
+        "person_01",
+        "person_02",
+        "person_03",
+        "person_04",
+        "person_05",
+        "person_06",
+        "person_07"
+      ]
+    },
+    {
+      "id": "players_12",
+      "players": 12,
+      "player_characters": [
+        "person_00",
+        "person_01",
+        "person_02",
+        "person_03",
+        "person_04",
+        "person_05",
+        "person_06",
+        "person_07",
+        "person_08",
+        "person_09",
+        "person_10",
+        "person_11"
+      ]
+    }
+  ],
+  "flags": [
+    {
+      "id": "route_opened",
+      "initial": false
+    },
+    {
+      "id": "keeper_revealed",
+      "initial": false
+    },
+    {
+      "id": "scene_ready",
+      "initial": false
+    }
+  ],
+  "initial": {
+    "public_observations": [
+      "public_note"
+    ],
+    "personal": []
+  },
+  "events": [],
+  "endings": {
+    "solved": {
+      "text": "Решено",
+      "mentions": []
+    },
+    "shadow_framed": {
+      "text": "Подставили",
+      "mentions": []
+    },
+    "no_investigators": {
+      "text": "Следователей нет",
+      "mentions": []
+    },
+    "unresolved": {
+      "text": "Не решено",
+      "mentions": []
+    },
+    "forgotten": {
+      "text": "Забыто",
+      "mentions": []
+    }
+  },
+  "victory": {
+    "framed_limit": null
+  },
+  "episode_refs": [],
+  "module_data": {
+    "version_archive": {
+      "documents": [
+        {
+          "id": "paper_draft",
+          "family": "register",
+          "revision": 1,
+          "observation": "public_note"
+        },
+        {
+          "id": "paper_copy",
+          "family": "register",
+          "revision": 2,
+          "observation": "archive_copy"
+        }
+      ],
+      "comparisons": [
+        {
+          "id": "compare_register",
+          "left": "paper_draft",
+          "right": "paper_copy",
+          "action": "inspect_desk"
+        }
+      ],
+      "theories": [
+        {
+          "id": "theory_a",
+          "title": "Версия А",
+          "body": {
+            "text": "Проверим записи",
+            "mentions": []
+          },
+          "links": [
+            {
+              "observation": "proof_a",
+              "relation": "supports"
+            }
+          ]
+        },
+        {
+          "id": "theory_b",
+          "title": "Версия Б",
+          "body": {
+            "text": "Проверим путь",
+            "mentions": []
+          },
+          "links": [
+            {
+              "observation": "proof_b",
+              "relation": "supports"
+            }
+          ]
+        }
+      ]
+    },
+    "archive_requests": {
+      "queries": [
+        {
+          "id": "register_query",
+          "label": "Архивная запись",
+          "location": "foyer",
+          "available_when": [],
+          "responses": [
+            {
+              "variants": "all",
+              "body": {
+                "text": "Копия из заранее полученного архива",
+                "mentions": []
+              },
+              "observations": [
+                "archive_copy"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "turning_point": {
+      "routes": [
+        {
+          "id": "secret_route",
+          "ends": [
+            "foyer",
+            "office"
+          ],
+          "open_when": [
+            {
+              "kind": "published",
+              "observation": "proof_common"
+            },
+            {
+              "kind": "published",
+              "observation": "proof_mechanism"
+            }
+          ],
+          "opened_flag": "route_opened"
+        }
+      ],
+      "scenes": [
+        {
+          "id": "archive_scene",
+          "not_before": 1,
+          "through_window": 12,
+          "when": [
+            {
+              "kind": "flag_is",
+              "flag": "route_opened",
+              "value": true
+            }
+          ],
+          "body": {
+            "text": "Открылся путь",
+            "mentions": []
+          },
+          "effects": [
+            {
+              "kind": "set_flag",
+              "flag": "scene_ready",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "concealed_npcs": [
+        {
+          "character": "missing_keeper",
+          "revealed_flag": "keeper_revealed",
+          "placements": [
+            {
+              "variants": [
+                "variant_a"
+              ],
+              "location": "office"
+            },
+            {
+              "variants": [
+                "variant_b"
+              ],
+              "location": "yard"
+            }
+          ]
+        }
+      ],
+      "recovery": {
+        "character": "missing_keeper",
+        "through_window": 12,
+        "requires_board_keys": true
+      }
+    }
+  },
+  "communication": {
+    "version": 1,
+    "max_messages_per_window": 20
+  },
+  "npc_delivery": {
+    "version": 1,
+    "window_reveal_budget": 2,
+    "game_reveal_budget": 4,
+    "topics": [
+      {
+        "id": "keeper_topic",
+        "npc": "missing_keeper",
+        "dialogue": "keeper_dialogue",
+        "node": "keeper_entry",
+        "option": "keeper_question",
+        "lines": [
+          {
+            "id": "keeper_line_a",
+            "body": {
+              "text": "Хранитель задумался.",
+              "mentions": []
+            }
+          },
+          {
+            "id": "keeper_line_b",
+            "body": {
+              "text": "Хранитель помолчал.",
+              "mentions": []
+            }
+          }
+        ],
+        "slip": {
+          "rule_id": "keeper_rule",
+          "version": 1,
+          "probability_bp": 10000,
+          "observation": "keeper_slip",
+          "requires": []
+        }
+      }
+    ]
+  }
+}

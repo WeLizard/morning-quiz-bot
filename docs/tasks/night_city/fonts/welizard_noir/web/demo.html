@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WeLizard Noir — Web Font Demo</title>
+  <link rel="stylesheet" href="welizard-noir.css" />
+  <style>
+    :root { color-scheme: dark; --paper:#e9ddc9; --ink:#0e1011; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui, sans-serif; background:#0e1011; color:var(--paper); }
+    main { max-width:1100px; margin:48px auto; padding:0 28px 64px; }
+    h1,h2,.sample,.noir { font-family:'WeLizard Noir',Georgia,serif; font-weight:400; }
+    h1 { font-size:clamp(54px,10vw,112px); line-height:1; margin:0; }
+    .sub { color:#b5a28a; letter-spacing:.13em; text-transform:uppercase; margin:18px 0 35px; }
+    .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:20px; padding:18px; border:1px solid #554b41; }
+    .toolbar input[type=range] { width:220px; accent-color:#bfad8e; }
+    .toolbar label { display:flex; align-items:center; gap:10px; }
+    textarea { width:100%; min-height:145px; padding:17px; resize:vertical; background:#181b1d; color:#eee0c9;
+       border:1px solid #625749; font:18px system-ui,sans-serif; margin-top:16px; }
+    .sample { margin:30px 0; font-size:52px; line-height:1.3; overflow-wrap:anywhere; }
+    .label { color:#a3927a; font:14px system-ui,sans-serif; letter-spacing:.12em; text-transform:uppercase; margin-top:40px; }
+    .grid { font:40px 'WeLizard Noir',Georgia,serif; overflow-wrap:anywhere; line-height:1.45; }
+    .small { font-size:14px; color:#ab9982; margin-top:50px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>WeLizard Noir</h1>
+  <p class="sub">Regular · Cyrillic + Latin · Web Open Font Format 2</p>
+  <div class="toolbar"><label>Размер <input id="size" type="range" min="20" max="110" value="52"></label><output id="value">52 px</output></div>
+  <textarea id="source" spellcheck="false" aria-label="Пример текста">Дело № 016: Детектив вошёл в тёмную комнату.
+«Истина скрывается в деталях…»
+WeLizard Noir — The detective's case.
+0123456789  ₽ € £ $ ½ ¼ ¾
+Проверка v1.1: ъ ы ь — съёмка, подъём, мышь.</textarea>
+  <div id="preview" class="sample"></div>
+  <p class="label">Алфавиты</p>
+  <div class="grid">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>abcdefghijklmnopqrstuvwxyz<br>АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ<br>абвгдеёжзийклмнопрстуфхцчшщъыьэюя</div>
+  <p class="label">Знаки</p>
+  <div class="grid">!?.,:; «» — … № ₽ @ # % &amp; ★ ☆ ▲ ▼ ♠ ♥ ♦ ♣</div>
+  <p class="small">Все показанные буквы и знаки — векторные контуры из исходного авторского SVG. Шрифт предназначен преимущественно для заголовков и крупного текста.</p>
+</main>
+<script>
+ const src=document.getElementById('source'),prev=document.getElementById('preview'),size=document.getElementById('size'),out=document.getElementById('value');
+ function update(){ prev.textContent=src.value; prev.style.whiteSpace='pre-line'; prev.style.fontSize=size.value+'px'; out.textContent=size.value+' px'; }
+ src.addEventListener('input',update); size.addEventListener('input',update); update();
+</script>
+</body>
+</html>

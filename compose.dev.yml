@@ -216,6 +216,7 @@ services:
       <<: *app-environment
       DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_test
       TEST_DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_test
+      NIGHT_CASE_TEST_DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@postgres:5432/morning_quiz_test
       MQB_TEST_DUMP_RESTORE: "1"
       MQB_DEV_CONTAINER: "1"
       ADMIN_ALLOWED_HOSTS: localhost,127.0.0.1,::1

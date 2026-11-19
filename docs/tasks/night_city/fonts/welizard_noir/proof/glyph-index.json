@@ -1,0 +1,2224 @@
+{
+  "family": "WeLizard Noir",
+  "style": "Regular",
+  "glyphs": 275,
+  "supported_codepoints": 274,
+  "source_file": "original-character-set.svg",
+  "source_elements": 389,
+  "blocks": {
+    "Latin capitals": 26,
+    "Latin lower": 26,
+    "Cyrillic capitals": 33,
+    "Cyrillic lower": 33,
+    "digits": 10
+  },
+  "characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789½¼¾$€£¥¢₵¤ƒ₩₿₱₨₺₹₸₽!?.,:;-_—'\"‘’“”‚„«»‹›/\\()[]{}<>…¡¿–‐‑@#№%&*+=~^©®™†‡•ªº¦§¶◈♠♥♦♣♢−×÷≠±∓≈∝≅≤≥≪≫√∛∞∂∇∏∑∫∬∮℠◦►♯♭♮▲▼◀▶◆❖■□●○★☆✦✧✸✺✹·′″⁄∕╱‒―⁂°",
+  "unicode": {
+    "U+0041": {
+      "char": "A",
+      "source_elements": [
+        319
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0041"
+    },
+    "U+0042": {
+      "char": "B",
+      "source_elements": [
+        277
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0042"
+    },
+    "U+0043": {
+      "char": "C",
+      "source_elements": [
+        328
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0043"
+    },
+    "U+0044": {
+      "char": "D",
+      "source_elements": [
+        276
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0044"
+    },
+    "U+0045": {
+      "char": "E",
+      "source_elements": [
+        305
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0045"
+    },
+    "U+0046": {
+      "char": "F",
+      "source_elements": [
+        316
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0046"
+    },
+    "U+0047": {
+      "char": "G",
+      "source_elements": [
+        291
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0047"
+    },
+    "U+0048": {
+      "char": "H",
+      "source_elements": [
+        273
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0048"
+    },
+    "U+0049": {
+      "char": "I",
+      "source_elements": [
+        343
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0049"
+    },
+    "U+004A": {
+      "char": "J",
+      "source_elements": [
+        324
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni004A"
+    },
+    "U+004B": {
+      "char": "K",
+      "source_elements": [
+        281
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni004B"
+    },
+    "U+004C": {
+      "char": "L",
+      "source_elements": [
+        322
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni004C"
+    },
+    "U+004D": {
+      "char": "M",
+      "source_elements": [
+        267
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni004D"
+    },
+    "U+004E": {
+      "char": "N",
+      "source_elements": [
+        299
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni004E"
+    },
+    "U+004F": {
+      "char": "O",
+      "source_elements": [
+        278
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni004F"
+    },
+    "U+0050": {
+      "char": "P",
+      "source_elements": [
+        292
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0050"
+    },
+    "U+0051": {
+      "char": "Q",
+      "source_elements": [
+        272
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0051"
+    },
+    "U+0052": {
+      "char": "R",
+      "source_elements": [
+        275
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0052"
+    },
+    "U+0053": {
+      "char": "S",
+      "source_elements": [
+        313
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0053"
+    },
+    "U+0054": {
+      "char": "T",
+      "source_elements": [
+        315
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0054"
+    },
+    "U+0055": {
+      "char": "U",
+      "source_elements": [
+        310
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0055"
+    },
+    "U+0056": {
+      "char": "V",
+      "source_elements": [
+        326
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0056"
+    },
+    "U+0057": {
+      "char": "W",
+      "source_elements": [
+        269
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0057"
+    },
+    "U+0058": {
+      "char": "X",
+      "source_elements": [
+        307
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0058"
+    },
+    "U+0059": {
+      "char": "Y",
+      "source_elements": [
+        321
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni0059"
+    },
+    "U+005A": {
+      "char": "Z",
+      "source_elements": [
+        312
+      ],
+      "type": "latinupper",
+      "glyph_name": "uni005A"
+    },
+    "U+0061": {
+      "char": "a",
+      "source_elements": [
+        320
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0061"
+    },
+    "U+0062": {
+      "char": "b",
+      "source_elements": [
+        283
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0062"
+    },
+    "U+0063": {
+      "char": "c",
+      "source_elements": [
+        366
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0063"
+    },
+    "U+0064": {
+      "char": "d",
+      "source_elements": [
+        284
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0064"
+    },
+    "U+0065": {
+      "char": "e",
+      "source_elements": [
+        339
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0065"
+    },
+    "U+0066": {
+      "char": "f",
+      "source_elements": [
+        333
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0066"
+    },
+    "U+0067": {
+      "char": "g",
+      "source_elements": [
+        293
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0067"
+    },
+    "U+0068": {
+      "char": "h",
+      "source_elements": [
+        282
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0068"
+    },
+    "U+0069": {
+      "char": "i",
+      "source_elements": [
+        379,
+        389
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0069"
+    },
+    "U+006A": {
+      "char": "j",
+      "source_elements": [
+        341,
+        388
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni006A"
+    },
+    "U+006B": {
+      "char": "k",
+      "source_elements": [
+        287
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni006B"
+    },
+    "U+006C": {
+      "char": "l",
+      "source_elements": [
+        342
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni006C"
+    },
+    "U+006D": {
+      "char": "m",
+      "source_elements": [
+        271
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni006D"
+    },
+    "U+006E": {
+      "char": "n",
+      "source_elements": [
+        300
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni006E"
+    },
+    "U+006F": {
+      "char": "o",
+      "source_elements": [
+        317
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni006F"
+    },
+    "U+0070": {
+      "char": "p",
+      "source_elements": [
+        288
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0070"
+    },
+    "U+0071": {
+      "char": "q",
+      "source_elements": [
+        289
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0071"
+    },
+    "U+0072": {
+      "char": "r",
+      "source_elements": [
+        358
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0072"
+    },
+    "U+0073": {
+      "char": "s",
+      "source_elements": [
+        361
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0073"
+    },
+    "U+0074": {
+      "char": "t",
+      "source_elements": [
+        365
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0074"
+    },
+    "U+0075": {
+      "char": "u",
+      "source_elements": [
+        303
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0075"
+    },
+    "U+0076": {
+      "char": "v",
+      "source_elements": [
+        368
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0076"
+    },
+    "U+0077": {
+      "char": "w",
+      "source_elements": [
+        295
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0077"
+    },
+    "U+0078": {
+      "char": "x",
+      "source_elements": [
+        348
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0078"
+    },
+    "U+0079": {
+      "char": "y",
+      "source_elements": [
+        347
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni0079"
+    },
+    "U+007A": {
+      "char": "z",
+      "source_elements": [
+        349
+      ],
+      "type": "latinlower",
+      "glyph_name": "uni007A"
+    },
+    "U+0410": {
+      "char": "А",
+      "source_elements": [
+        363
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0410"
+    },
+    "U+0411": {
+      "char": "Б",
+      "source_elements": [
+        318
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0411"
+    },
+    "U+0412": {
+      "char": "В",
+      "source_elements": [
+        304
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0412"
+    },
+    "U+0413": {
+      "char": "Г",
+      "source_elements": [
+        370
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0413"
+    },
+    "U+0414": {
+      "char": "Д",
+      "source_elements": [
+        323
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0414"
+    },
+    "U+0415": {
+      "char": "Е",
+      "source_elements": [
+        351
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0415"
+    },
+    "U+0401": {
+      "char": "Ё",
+      "source_elements": [
+        352,
+        390,
+        391
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0401"
+    },
+    "U+0416": {
+      "char": "Ж",
+      "source_elements": [
+        279
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0416"
+    },
+    "U+0417": {
+      "char": "З",
+      "source_elements": [
+        357
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0417"
+    },
+    "U+0418": {
+      "char": "И",
+      "source_elements": [
+        297
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0418"
+    },
+    "U+0419": {
+      "char": "Й",
+      "source_elements": [
+        298,
+        386
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0419"
+    },
+    "U+041A": {
+      "char": "К",
+      "source_elements": [
+        314
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni041A"
+    },
+    "U+041B": {
+      "char": "Л",
+      "source_elements": [
+        338
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni041B"
+    },
+    "U+041C": {
+      "char": "М",
+      "source_elements": [
+        285
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni041C"
+    },
+    "U+041D": {
+      "char": "Н",
+      "source_elements": [
+        306
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni041D"
+    },
+    "U+041E": {
+      "char": "О",
+      "source_elements": [
+        309
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni041E"
+    },
+    "U+041F": {
+      "char": "П",
+      "source_elements": [
+        301
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni041F"
+    },
+    "U+0420": {
+      "char": "Р",
+      "source_elements": [
+        331
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0420"
+    },
+    "U+0421": {
+      "char": "С",
+      "source_elements": [
+        364
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0421"
+    },
+    "U+0422": {
+      "char": "Т",
+      "source_elements": [
+        355
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0422"
+    },
+    "U+0423": {
+      "char": "У",
+      "source_elements": [
+        367
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0423"
+    },
+    "U+0424": {
+      "char": "Ф",
+      "source_elements": [
+        286
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0424"
+    },
+    "U+0425": {
+      "char": "Х",
+      "source_elements": [
+        346
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0425"
+    },
+    "U+0426": {
+      "char": "Ц",
+      "source_elements": [
+        296
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0426"
+    },
+    "U+0427": {
+      "char": "Ч",
+      "source_elements": [
+        337
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0427"
+    },
+    "U+0428": {
+      "char": "Ш",
+      "source_elements": [
+        270
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0428"
+    },
+    "U+0429": {
+      "char": "Щ",
+      "source_elements": [
+        268
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni0429"
+    },
+    "U+042A": {
+      "char": "Ъ",
+      "source_elements": [
+        325
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni042A"
+    },
+    "U+042B": {
+      "char": "Ы",
+      "source_elements": [
+        340,
+        381
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni042B"
+    },
+    "U+042C": {
+      "char": "Ь",
+      "source_elements": [
+        332
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni042C"
+    },
+    "U+042D": {
+      "char": "Э",
+      "source_elements": [
+        353
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni042D"
+    },
+    "U+042E": {
+      "char": "Ю",
+      "source_elements": [
+        274
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni042E"
+    },
+    "U+042F": {
+      "char": "Я",
+      "source_elements": [
+        311
+      ],
+      "type": "cyrupper",
+      "glyph_name": "uni042F"
+    },
+    "U+0430": {
+      "char": "а",
+      "source_elements": [
+        359
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0430"
+    },
+    "U+0431": {
+      "char": "б",
+      "source_elements": [
+        330
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0431"
+    },
+    "U+0432": {
+      "char": "в",
+      "source_elements": [
+        354
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0432"
+    },
+    "U+0433": {
+      "char": "г",
+      "source_elements": [
+        385
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0433"
+    },
+    "U+0434": {
+      "char": "д",
+      "source_elements": [
+        362
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0434"
+    },
+    "U+0435": {
+      "char": "е",
+      "source_elements": [
+        375
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0435"
+    },
+    "U+0451": {
+      "char": "ё",
+      "source_elements": [
+        374,
+        392,
+        393
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0451"
+    },
+    "U+0436": {
+      "char": "ж",
+      "source_elements": [
+        308
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0436"
+    },
+    "U+0437": {
+      "char": "з",
+      "source_elements": [
+        382
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0437"
+    },
+    "U+0438": {
+      "char": "и",
+      "source_elements": [
+        335
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0438"
+    },
+    "U+0439": {
+      "char": "й",
+      "source_elements": [
+        336,
+        387
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0439"
+    },
+    "U+043A": {
+      "char": "к",
+      "source_elements": [
+        360
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni043A"
+    },
+    "U+043B": {
+      "char": "л",
+      "source_elements": [
+        371
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni043B"
+    },
+    "U+043C": {
+      "char": "м",
+      "source_elements": [
+        329
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni043C"
+    },
+    "U+043D": {
+      "char": "н",
+      "source_elements": [
+        344
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni043D"
+    },
+    "U+043E": {
+      "char": "о",
+      "source_elements": [
+        356
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni043E"
+    },
+    "U+043F": {
+      "char": "п",
+      "source_elements": [
+        345
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni043F"
+    },
+    "U+0440": {
+      "char": "р",
+      "source_elements": [
+        327
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0440"
+    },
+    "U+0441": {
+      "char": "с",
+      "source_elements": [
+        384
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0441"
+    },
+    "U+0442": {
+      "char": "т",
+      "source_elements": [
+        383
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0442"
+    },
+    "U+0443": {
+      "char": "у",
+      "source_elements": [
+        377
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0443"
+    },
+    "U+0444": {
+      "char": "ф",
+      "source_elements": [
+        280
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0444"
+    },
+    "U+0445": {
+      "char": "х",
+      "source_elements": [
+        378
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0445"
+    },
+    "U+0446": {
+      "char": "ц",
+      "source_elements": [
+        334
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0446"
+    },
+    "U+0447": {
+      "char": "ч",
+      "source_elements": [
+        369
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0447"
+    },
+    "U+0448": {
+      "char": "ш",
+      "source_elements": [
+        294
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0448"
+    },
+    "U+0449": {
+      "char": "щ",
+      "source_elements": [
+        290
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni0449"
+    },
+    "U+044A": {
+      "char": "ъ",
+      "source_elements": [
+        376
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni044A"
+    },
+    "U+044B": {
+      "char": "ы",
+      "source_elements": [
+        372,
+        395
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni044B"
+    },
+    "U+044C": {
+      "char": "ь",
+      "source_elements": [
+        373
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni044C"
+    },
+    "U+044D": {
+      "char": "э",
+      "source_elements": [
+        380
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni044D"
+    },
+    "U+044E": {
+      "char": "ю",
+      "source_elements": [
+        302
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni044E"
+    },
+    "U+044F": {
+      "char": "я",
+      "source_elements": [
+        350
+      ],
+      "type": "cyrlower",
+      "glyph_name": "uni044F"
+    },
+    "U+0030": {
+      "char": "0",
+      "source_elements": [
+        7
+      ],
+      "type": "digits",
+      "glyph_name": "uni0030"
+    },
+    "U+0031": {
+      "char": "1",
+      "source_elements": [
+        43
+      ],
+      "type": "digits",
+      "glyph_name": "uni0031"
+    },
+    "U+0032": {
+      "char": "2",
+      "source_elements": [
+        30
+      ],
+      "type": "digits",
+      "glyph_name": "uni0032"
+    },
+    "U+0033": {
+      "char": "3",
+      "source_elements": [
+        23
+      ],
+      "type": "digits",
+      "glyph_name": "uni0033"
+    },
+    "U+0034": {
+      "char": "4",
+      "source_elements": [
+        33
+      ],
+      "type": "digits",
+      "glyph_name": "uni0034"
+    },
+    "U+0035": {
+      "char": "5",
+      "source_elements": [
+        26
+      ],
+      "type": "digits",
+      "glyph_name": "uni0035"
+    },
+    "U+0036": {
+      "char": "6",
+      "source_elements": [
+        11
+      ],
+      "type": "digits",
+      "glyph_name": "uni0036"
+    },
+    "U+0037": {
+      "char": "7",
+      "source_elements": [
+        42
+      ],
+      "type": "digits",
+      "glyph_name": "uni0037"
+    },
+    "U+0038": {
+      "char": "8",
+      "source_elements": [
+        8
+      ],
+      "type": "digits",
+      "glyph_name": "uni0038"
+    },
+    "U+0039": {
+      "char": "9",
+      "source_elements": [
+        12
+      ],
+      "type": "digits",
+      "glyph_name": "uni0039"
+    },
+    "U+00BD": {
+      "char": "½",
+      "source_elements": [
+        72,
+        56,
+        78
+      ],
+      "type": "fractions",
+      "glyph_name": "uni00BD"
+    },
+    "U+00BC": {
+      "char": "¼",
+      "source_elements": [
+        65,
+        54,
+        76
+      ],
+      "type": "fractions",
+      "glyph_name": "uni00BC"
+    },
+    "U+00BE": {
+      "char": "¾",
+      "source_elements": [
+        58,
+        57,
+        77
+      ],
+      "type": "fractions",
+      "glyph_name": "uni00BE"
+    },
+    "U+0024": {
+      "char": "$",
+      "source_elements": [
+        16
+      ],
+      "type": "currency",
+      "glyph_name": "uni0024"
+    },
+    "U+20AC": {
+      "char": "€",
+      "source_elements": [
+        28
+      ],
+      "type": "currency",
+      "glyph_name": "uni20AC"
+    },
+    "U+00A3": {
+      "char": "£",
+      "source_elements": [
+        20
+      ],
+      "type": "currency",
+      "glyph_name": "uni00A3"
+    },
+    "U+00A5": {
+      "char": "¥",
+      "source_elements": [
+        21
+      ],
+      "type": "currency",
+      "glyph_name": "uni00A5"
+    },
+    "U+00A2": {
+      "char": "¢",
+      "source_elements": [
+        25
+      ],
+      "type": "currency",
+      "glyph_name": "uni00A2"
+    },
+    "U+20B5": {
+      "char": "₵",
+      "source_elements": [
+        27
+      ],
+      "type": "currency",
+      "glyph_name": "uni20B5"
+    },
+    "U+00A4": {
+      "char": "¤",
+      "source_elements": [
+        36
+      ],
+      "type": "currency",
+      "glyph_name": "uni00A4"
+    },
+    "U+0192": {
+      "char": "ƒ",
+      "source_elements": [
+        17
+      ],
+      "type": "currency",
+      "glyph_name": "uni0192"
+    },
+    "U+20A9": {
+      "char": "₩",
+      "source_elements": [
+        4
+      ],
+      "type": "currency",
+      "glyph_name": "uni20A9"
+    },
+    "U+20BF": {
+      "char": "₿",
+      "source_elements": [
+        5
+      ],
+      "type": "currency",
+      "glyph_name": "uni20BF"
+    },
+    "U+20B1": {
+      "char": "₱",
+      "source_elements": [
+        10
+      ],
+      "type": "currency",
+      "glyph_name": "uni20B1"
+    },
+    "U+20A8": {
+      "char": "₨",
+      "source_elements": [
+        6,
+        29
+      ],
+      "type": "currency",
+      "glyph_name": "uni20A8"
+    },
+    "U+20BA": {
+      "char": "₺",
+      "source_elements": [
+        14
+      ],
+      "type": "currency",
+      "glyph_name": "uni20BA"
+    },
+    "U+20B9": {
+      "char": "₹",
+      "source_elements": [
+        15
+      ],
+      "type": "currency",
+      "glyph_name": "uni20B9"
+    },
+    "U+20B8": {
+      "char": "₸",
+      "source_elements": [
+        41,
+        73
+      ],
+      "type": "currency",
+      "glyph_name": "uni20B8"
+    },
+    "U+20BD": {
+      "char": "₽",
+      "source_elements": [
+        13
+      ],
+      "type": "currency",
+      "glyph_name": "uni20BD"
+    },
+    "U+0021": {
+      "char": "!",
+      "source_elements": [
+        70,
+        126
+      ],
+      "type": "punct",
+      "glyph_name": "uni0021"
+    },
+    "U+003F": {
+      "char": "?",
+      "source_elements": [
+        52,
+        128
+      ],
+      "type": "punct",
+      "glyph_name": "uni003F"
+    },
+    "U+002E": {
+      "char": ".",
+      "source_elements": [
+        125
+      ],
+      "type": "punct",
+      "glyph_name": "uni002E"
+    },
+    "U+002C": {
+      "char": ",",
+      "source_elements": [
+        121
+      ],
+      "type": "punct",
+      "glyph_name": "uni002C"
+    },
+    "U+003A": {
+      "char": ":",
+      "source_elements": [
+        131,
+        123
+      ],
+      "type": "punct",
+      "glyph_name": "uni003A"
+    },
+    "U+003B": {
+      "char": ";",
+      "source_elements": [
+        130,
+        114
+      ],
+      "type": "punct",
+      "glyph_name": "uni003B"
+    },
+    "U+002D": {
+      "char": "-",
+      "source_elements": [
+        134
+      ],
+      "type": "punct",
+      "glyph_name": "uni002D"
+    },
+    "U+005F": {
+      "char": "_",
+      "source_elements": [
+        122
+      ],
+      "type": "punct",
+      "glyph_name": "uni005F"
+    },
+    "U+2014": {
+      "char": "—",
+      "source_elements": [
+        83
+      ],
+      "type": "punct",
+      "glyph_name": "uni2014"
+    },
+    "U+0027": {
+      "char": "'",
+      "source_elements": [
+        108
+      ],
+      "type": "punct",
+      "glyph_name": "uni0027"
+    },
+    "U+0022": {
+      "char": "\"",
+      "source_elements": [
+        105,
+        117
+      ],
+      "type": "punct",
+      "glyph_name": "uni0022"
+    },
+    "U+2018": {
+      "char": "‘",
+      "source_elements": [
+        107
+      ],
+      "type": "punct",
+      "glyph_name": "uni2018"
+    },
+    "U+2019": {
+      "char": "’",
+      "source_elements": [
+        108
+      ],
+      "type": "punct",
+      "glyph_name": "uni2019"
+    },
+    "U+201C": {
+      "char": "“",
+      "source_elements": [
+        102,
+        104
+      ],
+      "type": "punct",
+      "glyph_name": "uni201C"
+    },
+    "U+201D": {
+      "char": "”",
+      "source_elements": [
+        119,
+        106
+      ],
+      "type": "punct",
+      "glyph_name": "uni201D"
+    },
+    "U+201A": {
+      "char": "‚",
+      "source_elements": [
+        120
+      ],
+      "type": "punct",
+      "glyph_name": "uni201A"
+    },
+    "U+201E": {
+      "char": "„",
+      "source_elements": [
+        111,
+        115
+      ],
+      "type": "punct",
+      "glyph_name": "uni201E"
+    },
+    "U+00AB": {
+      "char": "«",
+      "source_elements": [
+        87,
+        84
+      ],
+      "type": "punct",
+      "glyph_name": "uni00AB"
+    },
+    "U+00BB": {
+      "char": "»",
+      "source_elements": [
+        86,
+        85
+      ],
+      "type": "punct",
+      "glyph_name": "uni00BB"
+    },
+    "U+2039": {
+      "char": "‹",
+      "source_elements": [
+        92
+      ],
+      "type": "punct",
+      "glyph_name": "uni2039"
+    },
+    "U+203A": {
+      "char": "›",
+      "source_elements": [
+        93
+      ],
+      "type": "punct",
+      "glyph_name": "uni203A"
+    },
+    "U+002F": {
+      "char": "/",
+      "source_elements": [
+        64
+      ],
+      "type": "punct",
+      "glyph_name": "uni002F"
+    },
+    "U+005C": {
+      "char": "\\",
+      "source_elements": [
+        63
+      ],
+      "type": "punct",
+      "glyph_name": "uni005C"
+    },
+    "U+0028": {
+      "char": "(",
+      "source_elements": [
+        49
+      ],
+      "type": "punct",
+      "glyph_name": "uni0028"
+    },
+    "U+0029": {
+      "char": ")",
+      "source_elements": [
+        51
+      ],
+      "type": "punct",
+      "glyph_name": "uni0029"
+    },
+    "U+005B": {
+      "char": "[",
+      "source_elements": [
+        45
+      ],
+      "type": "punct",
+      "glyph_name": "uni005B"
+    },
+    "U+005D": {
+      "char": "]",
+      "source_elements": [
+        50
+      ],
+      "type": "punct",
+      "glyph_name": "uni005D"
+    },
+    "U+007B": {
+      "char": "{",
+      "source_elements": [
+        47
+      ],
+      "type": "punct",
+      "glyph_name": "uni007B"
+    },
+    "U+007D": {
+      "char": "}",
+      "source_elements": [
+        46
+      ],
+      "type": "punct",
+      "glyph_name": "uni007D"
+    },
+    "U+003C": {
+      "char": "<",
+      "source_elements": [
+        81
+      ],
+      "type": "punct",
+      "glyph_name": "uni003C"
+    },
+    "U+003E": {
+      "char": ">",
+      "source_elements": [
+        80
+      ],
+      "type": "punct",
+      "glyph_name": "uni003E"
+    },
+    "U+2026": {
+      "char": "…",
+      "source_elements": [
+        124,
+        129,
+        127
+      ],
+      "type": "punct",
+      "glyph_name": "uni2026"
+    },
+    "U+00A1": {
+      "char": "¡",
+      "source_elements": [
+        133,
+        71
+      ],
+      "type": "punct",
+      "glyph_name": "uni00A1"
+    },
+    "U+00BF": {
+      "char": "¿",
+      "source_elements": [
+        132,
+        53
+      ],
+      "type": "punct",
+      "glyph_name": "uni00BF"
+    },
+    "U+2013": {
+      "char": "–",
+      "source_elements": [
+        83
+      ],
+      "type": "punct",
+      "glyph_name": "uni2013"
+    },
+    "U+2010": {
+      "char": "‐",
+      "source_elements": [
+        134
+      ],
+      "type": "punct",
+      "glyph_name": "uni2010"
+    },
+    "U+2011": {
+      "char": "‑",
+      "source_elements": [
+        134
+      ],
+      "type": "punct",
+      "glyph_name": "uni2011"
+    },
+    "U+0040": {
+      "char": "@",
+      "source_elements": [
+        9
+      ],
+      "type": "symbols",
+      "glyph_name": "uni0040"
+    },
+    "U+0023": {
+      "char": "#",
+      "source_elements": [
+        37
+      ],
+      "type": "symbols",
+      "glyph_name": "uni0023"
+    },
+    "U+2116": {
+      "char": "№",
+      "source_elements": [
+        32,
+        55,
+        135
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2116"
+    },
+    "U+0025": {
+      "char": "%",
+      "source_elements": [
+        62,
+        61,
+        79
+      ],
+      "type": "symbols",
+      "glyph_name": "uni0025"
+    },
+    "U+0026": {
+      "char": "&",
+      "source_elements": [
+        18
+      ],
+      "type": "symbols",
+      "glyph_name": "uni0026"
+    },
+    "U+002A": {
+      "char": "*",
+      "source_elements": [
+        82
+      ],
+      "type": "symbols",
+      "glyph_name": "uni002A"
+    },
+    "U+002B": {
+      "char": "+",
+      "source_elements": [
+        74
+      ],
+      "type": "symbols",
+      "glyph_name": "uni002B"
+    },
+    "U+003D": {
+      "char": "=",
+      "source_elements": [
+        118,
+        116
+      ],
+      "type": "symbols",
+      "glyph_name": "uni003D"
+    },
+    "U+007E": {
+      "char": "~",
+      "source_elements": [
+        94
+      ],
+      "type": "symbols",
+      "glyph_name": "uni007E"
+    },
+    "U+005E": {
+      "char": "^",
+      "source_elements": [
+        75
+      ],
+      "type": "symbols",
+      "glyph_name": "uni005E"
+    },
+    "U+00A9": {
+      "char": "©",
+      "source_elements": [
+        39,
+        137
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00A9"
+    },
+    "U+00AE": {
+      "char": "®",
+      "source_elements": [
+        60,
+        138
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00AE"
+    },
+    "U+2122": {
+      "char": "™",
+      "source_elements": [
+        89,
+        59
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2122"
+    },
+    "U+2020": {
+      "char": "†",
+      "source_elements": [
+        44
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2020"
+    },
+    "U+2021": {
+      "char": "‡",
+      "source_elements": [
+        38
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2021"
+    },
+    "U+2022": {
+      "char": "•",
+      "source_elements": [
+        90
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2022"
+    },
+    "U+00AA": {
+      "char": "ª",
+      "source_elements": [
+        66
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00AA"
+    },
+    "U+00BA": {
+      "char": "º",
+      "source_elements": [
+        69
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00BA"
+    },
+    "U+00A6": {
+      "char": "¦",
+      "source_elements": [
+        88,
+        91
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00A6"
+    },
+    "U+00A7": {
+      "char": "§",
+      "source_elements": [
+        31
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00A7"
+    },
+    "U+00B6": {
+      "char": "¶",
+      "source_elements": [
+        24
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00B6"
+    },
+    "U+25C8": {
+      "char": "◈",
+      "source_elements": [
+        97,
+        95,
+        98,
+        96
+      ],
+      "type": "symbols",
+      "glyph_name": "uni25C8"
+    },
+    "U+2660": {
+      "char": "♠",
+      "source_elements": [
+        34
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2660"
+    },
+    "U+2665": {
+      "char": "♥",
+      "source_elements": [
+        22
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2665"
+    },
+    "U+2666": {
+      "char": "♦",
+      "source_elements": [
+        40
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2666"
+    },
+    "U+2663": {
+      "char": "♣",
+      "source_elements": [
+        19
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2663"
+    },
+    "U+2662": {
+      "char": "♢",
+      "source_elements": [
+        48
+      ],
+      "type": "symbols",
+      "glyph_name": "uni2662"
+    },
+    "U+2212": {
+      "char": "−",
+      "source_elements": [
+        249
+      ],
+      "type": "math",
+      "glyph_name": "uni2212"
+    },
+    "U+00D7": {
+      "char": "×",
+      "source_elements": [
+        214
+      ],
+      "type": "math",
+      "glyph_name": "uni00D7"
+    },
+    "U+00F7": {
+      "char": "÷",
+      "source_elements": [
+        262,
+        263,
+        246
+      ],
+      "type": "math",
+      "glyph_name": "uni00F7"
+    },
+    "U+2260": {
+      "char": "≠",
+      "source_elements": [
+        207
+      ],
+      "type": "math",
+      "glyph_name": "uni2260"
+    },
+    "U+00B1": {
+      "char": "±",
+      "source_elements": [
+        232,
+        241
+      ],
+      "type": "math",
+      "glyph_name": "uni00B1"
+    },
+    "U+2213": {
+      "char": "∓",
+      "source_elements": [
+        231,
+        242
+      ],
+      "type": "math",
+      "glyph_name": "uni2213"
+    },
+    "U+2248": {
+      "char": "≈",
+      "source_elements": [
+        238,
+        239
+      ],
+      "type": "math",
+      "glyph_name": "uni2248"
+    },
+    "U+221D": {
+      "char": "∝",
+      "source_elements": [
+        206
+      ],
+      "type": "math",
+      "glyph_name": "uni221D"
+    },
+    "U+2245": {
+      "char": "≅",
+      "source_elements": [
+        245,
+        247
+      ],
+      "type": "math",
+      "glyph_name": "uni2245"
+    },
+    "U+2264": {
+      "char": "≤",
+      "source_elements": [
+        221,
+        250
+      ],
+      "type": "math",
+      "glyph_name": "uni2264"
+    },
+    "U+2265": {
+      "char": "≥",
+      "source_elements": [
+        220,
+        251
+      ],
+      "type": "math",
+      "glyph_name": "uni2265"
+    },
+    "U+226A": {
+      "char": "≪",
+      "source_elements": [
+        217,
+        218
+      ],
+      "type": "math",
+      "glyph_name": "uni226A"
+    },
+    "U+226B": {
+      "char": "≫",
+      "source_elements": [
+        222,
+        219
+      ],
+      "type": "math",
+      "glyph_name": "uni226B"
+    },
+    "U+221A": {
+      "char": "√",
+      "source_elements": [
+        179
+      ],
+      "type": "math",
+      "glyph_name": "uni221A"
+    },
+    "U+221B": {
+      "char": "∛",
+      "source_elements": [
+        205,
+        240
+      ],
+      "type": "math",
+      "glyph_name": "uni221B"
+    },
+    "U+221E": {
+      "char": "∞",
+      "source_elements": [
+        194
+      ],
+      "type": "math",
+      "glyph_name": "uni221E"
+    },
+    "U+2202": {
+      "char": "∂",
+      "source_elements": [
+        181
+      ],
+      "type": "math",
+      "glyph_name": "uni2202"
+    },
+    "U+2207": {
+      "char": "∇",
+      "source_elements": [
+        188
+      ],
+      "type": "math",
+      "glyph_name": "uni2207"
+    },
+    "U+220F": {
+      "char": "∏",
+      "source_elements": [
+        172
+      ],
+      "type": "math",
+      "glyph_name": "uni220F"
+    },
+    "U+2211": {
+      "char": "∑",
+      "source_elements": [
+        190
+      ],
+      "type": "math",
+      "glyph_name": "uni2211"
+    },
+    "U+222B": {
+      "char": "∫",
+      "source_elements": [
+        185
+      ],
+      "type": "math",
+      "glyph_name": "uni222B"
+    },
+    "U+222C": {
+      "char": "∬",
+      "source_elements": [
+        184,
+        176
+      ],
+      "type": "math",
+      "glyph_name": "uni222C"
+    },
+    "U+222E": {
+      "char": "∮",
+      "source_elements": [
+        176
+      ],
+      "type": "math",
+      "glyph_name": "uni222E"
+    },
+    "U+2120": {
+      "char": "℠",
+      "source_elements": [
+        215,
+        196
+      ],
+      "type": "ornament",
+      "glyph_name": "uni2120"
+    },
+    "U+25E6": {
+      "char": "◦",
+      "source_elements": [
+        233
+      ],
+      "type": "ornament",
+      "glyph_name": "uni25E6"
+    },
+    "U+25BA": {
+      "char": "►",
+      "source_elements": [
+        204
+      ],
+      "type": "ornament",
+      "glyph_name": "uni25BA"
+    },
+    "U+266F": {
+      "char": "♯",
+      "source_elements": [
+        177
+      ],
+      "type": "ornament",
+      "glyph_name": "uni266F"
+    },
+    "U+266D": {
+      "char": "♭",
+      "source_elements": [
+        195
+      ],
+      "type": "ornament",
+      "glyph_name": "uni266D"
+    },
+    "U+266E": {
+      "char": "♮",
+      "source_elements": [
+        187
+      ],
+      "type": "ornament",
+      "glyph_name": "uni266E"
+    },
+    "U+25B2": {
+      "char": "▲",
+      "source_elements": [
+        167
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25B2"
+    },
+    "U+25BC": {
+      "char": "▼",
+      "source_elements": [
+        168
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25BC"
+    },
+    "U+25C0": {
+      "char": "◀",
+      "source_elements": [
+        170
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25C0"
+    },
+    "U+25B6": {
+      "char": "▶",
+      "source_elements": [
+        171
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25B6"
+    },
+    "U+25C6": {
+      "char": "◆",
+      "source_elements": [
+        166
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25C6"
+    },
+    "U+2756": {
+      "char": "❖",
+      "source_elements": [
+        224,
+        226,
+        223,
+        225
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2756"
+    },
+    "U+25A0": {
+      "char": "■",
+      "source_elements": [
+        143
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25A0"
+    },
+    "U+25A1": {
+      "char": "□",
+      "source_elements": [
+        198
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25A1"
+    },
+    "U+25CF": {
+      "char": "●",
+      "source_elements": [
+        147
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25CF"
+    },
+    "U+25CB": {
+      "char": "○",
+      "source_elements": [
+        203
+      ],
+      "type": "geometric",
+      "glyph_name": "uni25CB"
+    },
+    "U+2605": {
+      "char": "★",
+      "source_elements": [
+        178
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2605"
+    },
+    "U+2606": {
+      "char": "☆",
+      "source_elements": [
+        201
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2606"
+    },
+    "U+2726": {
+      "char": "✦",
+      "source_elements": [
+        183
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2726"
+    },
+    "U+2727": {
+      "char": "✧",
+      "source_elements": [
+        197
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2727"
+    },
+    "U+2738": {
+      "char": "✸",
+      "source_elements": [
+        174
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2738"
+    },
+    "U+273A": {
+      "char": "✺",
+      "source_elements": [
+        191
+      ],
+      "type": "geometric",
+      "glyph_name": "uni273A"
+    },
+    "U+2739": {
+      "char": "✹",
+      "source_elements": [
+        175
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2739"
+    },
+    "U+00B7": {
+      "char": "·",
+      "source_elements": [
+        90
+      ],
+      "type": "symbols",
+      "glyph_name": "uni00B7"
+    },
+    "U+2032": {
+      "char": "′",
+      "source_elements": [
+        108
+      ],
+      "type": "punct",
+      "glyph_name": "uni2032"
+    },
+    "U+2033": {
+      "char": "″",
+      "source_elements": [
+        105,
+        117
+      ],
+      "type": "punct",
+      "glyph_name": "uni2033"
+    },
+    "U+2044": {
+      "char": "⁄",
+      "source_elements": [
+        64
+      ],
+      "type": "punct",
+      "glyph_name": "uni2044"
+    },
+    "U+2215": {
+      "char": "∕",
+      "source_elements": [
+        64
+      ],
+      "type": "punct",
+      "glyph_name": "uni2215"
+    },
+    "U+2571": {
+      "char": "╱",
+      "source_elements": [
+        64
+      ],
+      "type": "punct",
+      "glyph_name": "uni2571"
+    },
+    "U+2012": {
+      "char": "‒",
+      "source_elements": [
+        83
+      ],
+      "type": "punct",
+      "glyph_name": "uni2012"
+    },
+    "U+2015": {
+      "char": "―",
+      "source_elements": [
+        83
+      ],
+      "type": "punct",
+      "glyph_name": "uni2015"
+    },
+    "U+2042": {
+      "char": "⁂",
+      "source_elements": [
+        174
+      ],
+      "type": "geometric",
+      "glyph_name": "uni2042"
+    },
+    "U+00B0": {
+      "char": "°",
+      "source_elements": [
+        233
+      ],
+      "type": "ornament",
+      "glyph_name": "uni00B0"
+    }
+  },
+  "spaces": {
+    "U+0020": 270,
+    "U+00A0": 270,
+    "U+2002": 500,
+    "U+2003": 1000,
+    "U+2009": 180,
+    "U+202F": 200,
+    "U+200B": 0
+  }
+}

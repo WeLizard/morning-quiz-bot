@@ -1,0 +1,58 @@
+"""Reuse accepted legacy scenarios in T-owned isolated0050 schemas.
+
+No legacy fixture setup/teardown is called: the canonical opt-in helper and
+owned schema lifecycle come from the dispatch fixture, never public reset.
+"""
+import unittest
+
+from tests import test_night_ai_dispatch_application_postgres as owned
+from tests import test_night_ai_control_postgres as control
+from tests import test_night_case_orchestrator_postgres as orch_legacy
+
+
+class LegacyControlWithDispatchSchemaTests(unittest.IsolatedAsyncioTestCase):
+    asyncSetUp=owned.DispatchApplicationPostgresTests.asyncSetUp
+    cleanup=owned.DispatchApplicationPostgresTests.cleanup
+    service=owned.DispatchApplicationPostgresTests.service
+    lobby_command=owned.DispatchApplicationPostgresTests.lobby_command
+    lobby=owned.DispatchApplicationPostgresTests.lobby
+    ready_lobby=owned.DispatchApplicationPostgresTests.ready_lobby
+    player_command=owned.DispatchApplicationPostgresTests.player_command
+    ai=control.NightAIControlPostgresTests.ai
+    call=control.NightAIControlPostgresTests.call
+    profile=control.NightAIControlPostgresTests.profile
+    start=control.NightAIControlPostgresTests.start
+    decide=control.NightAIControlPostgresTests.decide
+    synthetic_render_jobs=control.NightAIControlPostgresTests.synthetic_render_jobs
+
+    test_disable_reenable=control.NightAIControlPostgresTests.test_disable_reenable_never_revives_old_binding_and_stale_cleanup_keeps_new_key
+    test_staged_rotation=control.NightAIControlPostgresTests.test_staged_start_rotates_id_nonce_aad_erases_old_and_old_receipt_is_only_replay
+    test_approve_byok_race=control.NightAIControlPostgresTests.test_approve_racing_byok_cannot_replace_the_new_epoch
+    test_departure_cleanup=control.NightAIControlPostgresTests.test_starter_departure_immediately_blocks_new_effects_then_cleanup_erases_byok
+    test_terminal_merge_history=control.NightAIControlPostgresTests.test_terminal_merge_preserves_audit_ids_and_proven_alias_receipt_without_reviving_key
+    test_two_session_receipt=control.NightAIControlPostgresTests.test_two_sessions_same_request_id_replay_one_epoch_receipt_and_notification
+
+
+class LegacyOrchestrationWithDispatchSchemaTests(unittest.IsolatedAsyncioTestCase):
+    asyncSetUp=owned.DispatchApplicationPostgresTests.asyncSetUp
+    cleanup=owned.DispatchApplicationPostgresTests.cleanup
+    service=owned.DispatchApplicationPostgresTests.service
+    lobby_command=owned.DispatchApplicationPostgresTests.lobby_command
+    lobby=owned.DispatchApplicationPostgresTests.lobby
+    ready_lobby=owned.DispatchApplicationPostgresTests.ready_lobby
+    player_command=owned.DispatchApplicationPostgresTests.player_command
+    ai=orch_legacy.NightCaseOrchestratorPostgresTests.ai
+    orchestration=orch_legacy.NightCaseOrchestratorPostgresTests.orchestration
+    start=orch_legacy.NightCaseOrchestratorPostgresTests.start
+    bind=orch_legacy.NightCaseOrchestratorPostgresTests.bind
+    selection=orch_legacy.NightCaseOrchestratorPostgresTests.selection
+    direct_button=orch_legacy.NightCaseOrchestratorPostgresTests.direct_button
+    response=orch_legacy.NightCaseOrchestratorPostgresTests.response
+    fake=orch_legacy.NightCaseOrchestratorPostgresTests.fake
+
+    test_old_start_replay=orch_legacy.NightCaseOrchestratorPostgresTests.test_direct_authored_initial_identity_and_old_start_replay_never_request_ai
+    test_start_atomic_callback=orch_legacy.NightCaseOrchestratorPostgresTests.test_orchestrated_start_sets_control_and_started_at_before_director_and_rolls_back_all
+    test_cross_path_request_identity=orch_legacy.NightCaseOrchestratorPostgresTests.test_cross_path_identity_and_button_128_new_prepare_96_boundary
+    test_original_deadline_and_no_locks=orch_legacy.NightCaseOrchestratorPostgresTests.test_prepare_commits_no_ap_http_has_no_locks_and_proposal_keeps_prepare_deadline
+    test_finalize_stale_guards=orch_legacy.NightCaseOrchestratorPostgresTests.test_finalize_stale_epoch_expiry_and_wrong_actor_are_safe
+    test_missing_master_rollback=orch_legacy.NightCaseOrchestratorPostgresTests.test_selected_byok_missing_master_rolls_back_real_orchestrated_start

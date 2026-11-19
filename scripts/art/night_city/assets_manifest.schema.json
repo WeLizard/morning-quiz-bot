@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nc-assets/1",
+  "title": "Night City case asset manifest",
+  "type": "object",
+  "required": ["schema", "world", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "nc-assets/1"},
+    "world": {"const": "manor_lake"},
+    "assets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^manor_(?:char|loc)_[a-z0-9_]+$"},
+      "additionalProperties": {"$ref": "#/$defs/asset"}
+    }
+  },
+  "$defs": {
+    "url": {"type": "string", "pattern": "^/app/night/worlds/manor_lake/assets/[a-z0-9_]+\\.webp$"},
+    "asset": {
+      "type": "object",
+      "required": ["url", "alt"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {"$ref": "#/$defs/url"},
+        "alt": {"type": "string", "minLength": 1},
+        "variants": {
+          "type": "object",
+          "required": ["morning", "day", "evening", "night"],
+          "additionalProperties": false,
+          "properties": {
+            "morning": {"$ref": "#/$defs/url"},
+            "day": {"$ref": "#/$defs/url"},
+            "evening": {"$ref": "#/$defs/url"},
+            "night": {"$ref": "#/$defs/url"}
+          }
+        }
+      }
+    }
+  }
+}

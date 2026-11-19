@@ -1,0 +1,12 @@
+/* WeLizard Noir v1.1 | SVG-outline-source based display font */
+@font-face {
+  font-family: 'WeLizard Noir';
+  src: url('./WeLizardNoir-Regular.woff2') format('woff2'),
+       url('./WeLizardNoir-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+/* For titles, lettering, covers and decorative headings; use a readable
+   UI text font for body copy on mobile. */
+.welizard-noir { font-family: 'WeLizard Noir', Georgia, serif; font-weight: 400; }

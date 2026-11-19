@@ -20,13 +20,14 @@ import argparse
 import colorsys
 import hashlib
 import json
+import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
-import numpy as np
-from PIL import Image
-from scipy import ndimage
+import PIL
+from PIL import Image, features
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -35,6 +36,7 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
+MANOR_CASE_CANONICAL_SHA256 = 'e4b63f1810a9de5d9cac061b4dabcccb864b30c53c46e4aa7354be7611804ada'
 
 BUDGET = {'scene': 150_000, 'back': 90_000, 'frame': 90_000, 'frame_small': 60_000, 'icon': 30_000, 'thumb': 20_000}
 
@@ -241,6 +243,9 @@ def trimmed(writer, path, name, width, kind, src, quality=78):
 
 def hole(im):
     """Transparent region around the centre, as fractions [left, top, right, bottom] of the image."""
+    import numpy as np
+    from scipy import ndimage
+
     a = np.array(im)[:, :, 3] < 40
     lab, _ = ndimage.label(a)
     c = lab[im.height // 2, im.width // 2]
@@ -255,6 +260,8 @@ def head_box(im, tweak=None):
     """Square head-and-shoulders box from the alpha mask: scan down from the top of the head, past the widest part of the
     head (or hat) to the narrowest row (neck) after which the width at least doubles (shoulders). Works for full-length
     and half-length cut-outs; tweak = [dx, dy, scale] in units of the box side for a figure the rule misreads."""
+    import numpy as np
+
     a = np.array(im)[:, :, 3] > 60
     rows = np.where(a.any(axis=1))[0]
     top, bottom = rows[0], rows[-1]
@@ -477,6 +484,335 @@ def index(out_root, packs, defaults):
     (out_root / 'index.js').write_text('window.NC_WORLDS = %s;\n' % json.dumps(data, ensure_ascii=False), encoding='utf-8')
 
 
+def alpha_info(path):
+    with Image.open(path) as im:
+        return list(im.size), 'A' in im.getbands() or 'transparency' in im.info
+
+
+def encode_asset(path, target, width, quality):
+    """Encode a case asset as WebP, retaining its alpha channel and aspect ratio."""
+    with Image.open(path) as opened:
+        has_alpha = 'A' in opened.getbands() or 'transparency' in opened.info
+        im = opened.convert('RGBA' if has_alpha else 'RGB')
+    im.thumbnail((width, width * 4), Image.Resampling.LANCZOS)
+    im.save(target, 'WEBP', quality=quality, method=4, exact=True)
+    with Image.open(target) as encoded:
+        if ('A' in encoded.getbands()) != ('A' in im.getbands()):
+            raise ValueError(f'alpha channel changed while encoding {path}')
+        return list(encoded.size), 'A' in encoded.getbands(), target.stat().st_size
+
+
+def build_manor_assets(world, defaults, out_dir, report_out=None):
+    """Build the public H asset manifest and compact raster exports for Manor Lake only.
+
+    The public manifest contains only art.asset_id and art.alt from the authored case.
+    Source paths and hashes go to the optional private report, never to assets.json.
+    """
+    case_path = ROOT / 'content/night_city/manor_lake.case.json'
+    case_bytes = case_path.read_bytes()
+    case = json.loads(case_bytes.decode('utf-8'))
+    case_canonical_hash = hashlib.sha256(canonical_json_bytes(case)).hexdigest()
+    source = Source(world['style'])
+    planned = plan(world, defaults)
+    heroes_by_id = {h['id']: h for h in planned['heroes'] if h.get('file')}
+    case_chars = case.get('characters', [])
+    case_places = case.get('locations', [])
+    if len(case_chars) != 20 or len(case_places) != 8:
+        raise SystemExit(f'manor_lake authored case expected 20 characters and 8 locations, found {len(case_chars)} and {len(case_places)}')
+    if set(h.get('id') for h in case_chars) != set(heroes_by_id):
+        raise SystemExit('manor_lake case character IDs do not match canon source mapping')
+
+    out_dir = Path(out_dir)
+    report_path = Path(report_out) if report_out else None
+    if report_path:
+        resolved_report = report_path.resolve()
+        resolved_public = out_dir.resolve()
+        if resolved_report == resolved_public or resolved_public in resolved_report.parents:
+            raise SystemExit('--report-out must be outside the public asset folder')
+    assets_dir = out_dir / 'assets'
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    assets = {}
+    entries = []
+
+    def export_one(path, rel_target, width, quality, asset_id=None):
+        target = assets_dir / rel_target
+        size, alpha, byte_count = encode_asset(path, target, width, quality)
+        source_size, source_alpha = alpha_info(path)
+        if alpha != source_alpha:
+            raise ValueError(f'alpha mismatch for {path}')
+        encoded_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+        source_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        rec = {
+            'asset_id': asset_id,
+            'source': source.rel(path),
+            'source_dimensions': source_size,
+            'source_alpha': source_alpha,
+            'source_sha256': source_hash,
+            'export': f'assets/{rel_target}',
+            'export_dimensions': size,
+            'export_alpha': alpha,
+            'export_sha256': encoded_hash,
+            'quality': quality,
+            'bytes': byte_count,
+        }
+        entries.append(rec)
+        return f'/app/night/worlds/manor_lake/assets/{rel_target}'
+
+    for character in case_chars:
+        art = character.get('art') or {}
+        asset_id, alt = art.get('asset_id'), art.get('alt')
+        hero = heroes_by_id[character['id']]
+        path = source.find(f"characters/{hero['file']}.png")
+        if not isinstance(asset_id, str) or not isinstance(alt, str) or path is None:
+            raise SystemExit(f"missing public art reference or source for character {character['id']}")
+        if asset_id in assets:
+            raise SystemExit(f'duplicate case art asset_id: {asset_id}')
+        url = export_one(path, f"character_{character['id']}.webp", 512, 82, asset_id)
+        assets[asset_id] = {'url': url, 'alt': alt}
+
+    for place in case_places:
+        art = place.get('art') or {}
+        asset_id, alt, place_id = art.get('asset_id'), art.get('alt'), place.get('id')
+        if not isinstance(asset_id, str) or not isinstance(alt, str) or not isinstance(place_id, str):
+            raise SystemExit('missing public art reference for a Manor Lake location')
+        if asset_id in assets:
+            raise SystemExit(f'duplicate case art asset_id: {asset_id}')
+        variants = {}
+        for time in TIMES:
+            path = source.find(f'locations/{place_id}_{time}.png')
+            if path is None:
+                raise SystemExit(f'missing source location image {place_id}_{time}')
+            variants[time] = export_one(path, f'location_{place_id}_{time}.webp', 600, 76, asset_id)
+        assets[asset_id] = {'url': variants['day'], 'alt': alt, 'variants': variants}
+
+    item_paths = sorted((source.dir / 'items').glob('i_*.png'))
+    if len(item_paths) != 81:
+        raise SystemExit(f'expected 81 individual Manor item PNGs, found {len(item_paths)}')
+    item_start = len(entries)
+    item_quality = 80
+    for item_path in item_paths:
+        stem = item_path.stem
+        export_one(item_path, f'item_{stem}.webp', 400, item_quality)
+    item_bytes = sum(rec['bytes'] for rec in entries[item_start:])
+    while item_bytes > 10_000_000 and item_quality > 60:
+        item_quality -= 4
+        for index_ in range(item_start, len(entries)):
+            rec = entries[index_]
+            original = source.dir / rec['source'].removeprefix(f"{world['style']}/")
+            target = out_dir / rec['export']
+            size, alpha, byte_count = encode_asset(original, target, 400, item_quality)
+            rec.update({
+                'export_dimensions': size, 'export_alpha': alpha,
+                'export_sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                'quality': item_quality, 'bytes': byte_count,
+            })
+        item_bytes = sum(rec['bytes'] for rec in entries[item_start:])
+    if item_bytes > 10_000_000:
+        raise SystemExit(f'81 item WebPs exceed 10 MB at quality {item_quality}: {item_bytes} bytes')
+
+    manifest = {'schema': 'nc-assets/1', 'world': 'manor_lake', 'assets': assets}
+    (out_dir / 'assets.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(f"manor_lake assets: {len(case_chars)} characters, {len(case_places) * len(TIMES)} place variants, "
+          f"{len(item_paths)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
+    if report_out:
+        report = {
+            'schema': 'nc-assets-build-report/1', 'world': 'manor_lake',
+            'case_canonical_sha256': case_canonical_hash,
+            'encoder': {
+                'python': sys.version.split()[0],
+                'pillow': PIL.__version__,
+                'libwebp': features.version('webp'),
+            },
+            'manifest_sha256': hashlib.sha256((out_dir / 'assets.json').read_bytes()).hexdigest(),
+            'manifest_asset_ids': sorted(assets), 'manifest_count': len(assets),
+            'character_count': len(case_chars), 'location_count': len(case_places),
+            'location_variant_count': len(case_places) * len(TIMES), 'item_count': len(item_paths),
+            'item_bytes': item_bytes, 'total_export_bytes': sum(r['bytes'] for r in entries),
+            'assets': entries,
+        }
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+    return manifest
+
+
+def canonical_json_bytes(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
+
+
+def case_art_refs(case_path):
+    """Read only the pinned case version/hash and public art IDs/alt strings."""
+    raw = Path(case_path).read_bytes()
+    case = json.loads(raw.decode('utf-8'))
+    canonical_hash = hashlib.sha256(canonical_json_bytes(case)).hexdigest()
+    if case.get('meta', {}).get('version') != 2 or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
+        raise SystemExit('manor_lake case does not match the pinned v2 art source')
+    refs = {}
+    for group in ('characters', 'locations'):
+        for entry in case.get(group, []):
+            art = entry.get('art') or {}
+            asset_id, alt = art.get('asset_id'), art.get('alt')
+            if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc)_[a-z0-9_]+', asset_id):
+                raise SystemExit(f'missing or invalid public art.asset_id in {group}')
+            if not isinstance(alt, str) or not alt:
+                raise SystemExit(f'missing public art.alt for {asset_id}')
+            if asset_id in refs:
+                raise SystemExit(f'duplicate public art.asset_id: {asset_id}')
+            refs[asset_id] = {'group': group, 'id': entry.get('id'), 'alt': alt}
+    if len(refs) != 28:
+        raise SystemExit(f'pinned Manor Lake case must have 28 art references, found {len(refs)}')
+    return refs, canonical_hash
+
+
+def safe_immutable_asset_path(value):
+    return isinstance(value, str) and re.fullmatch(r'assets/[a-z0-9_]+\.webp', value) is not None
+
+
+def verify_immutable_pack(directory, manifest_bytes, files):
+    """Accept an existing digest directory only if its exact contents already match."""
+    directory = Path(directory)
+    if directory.is_symlink() or not directory.is_dir():
+        raise SystemExit(f'content-addressed path exists but is not a regular directory: {directory}')
+    expected_names = set(files) | {'assets.json'}
+    actual_files = set()
+    actual_dirs = set()
+    for path in directory.rglob('*'):
+        if path.is_symlink():
+            raise SystemExit(f'symlink is forbidden in immutable pack: {path.relative_to(directory).as_posix()}')
+        rel = path.relative_to(directory).as_posix()
+        if path.is_dir():
+            actual_dirs.add(rel)
+        elif path.is_file():
+            actual_files.add(rel)
+    if actual_dirs != {'assets'} or actual_files != expected_names:
+        raise SystemExit(f'content-addressed path has unexpected/missing entries: {directory}')
+    manifest_path = directory / 'assets.json'
+    if manifest_path.read_bytes() != manifest_bytes:
+        raise SystemExit(f'content-addressed manifest differs; refusing overwrite: {directory}')
+    for rel, digest in files.items():
+        if hashlib.sha256((directory / rel).read_bytes()).hexdigest() != digest:
+            raise SystemExit(f'content-addressed file differs; refusing overwrite: {directory / rel}')
+
+
+def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_assets=None):
+    """Publish immutable nc-assets/2 from existing WebPs. Does not re-encode or edit nc-assets/1."""
+    assets_out, packs_root, report_path = Path(assets_out), Path(packs_root), Path(report_out)
+    resolved_report = report_path.resolve()
+    for public_path in (assets_out.resolve(), packs_root.resolve()):
+        if resolved_report == public_path or public_path in resolved_report.parents:
+            raise SystemExit('--report-out must be outside public asset folders')
+    legacy_path = assets_out / 'assets.json'
+    legacy_bytes = legacy_path.read_bytes()
+    legacy = json.loads(legacy_bytes.decode('utf-8'))
+    if legacy.get('schema') != 'nc-assets/1' or legacy.get('world') != 'manor_lake':
+        raise SystemExit('immutable publishing requires the existing nc-assets/1 Manor Lake manifest')
+    refs, case_hash = case_art_refs(ROOT / 'content/night_city/manor_lake.case.json')
+    if set(legacy.get('assets', {})) != set(refs):
+        raise SystemExit('legacy asset IDs do not match the pinned case art IDs')
+    for asset_id, entry in legacy['assets'].items():
+        if not isinstance(entry, dict) or entry.get('alt') != refs[asset_id]['alt']:
+            raise SystemExit(f'legacy alt text differs from pinned case for {asset_id}')
+
+    source_files = sorted((assets_out / 'assets').glob('*.webp'))
+    if len(source_files) != 133 or any(not re.fullmatch(r'[A-Za-z0-9_]+\.webp', f.name) for f in source_files):
+        raise SystemExit(f'expected 133 flat, safely named WebPs, found {len(source_files)}')
+    source_by_relative = {f'assets/{path.name.lower()}': path for path in source_files}
+    if len(source_by_relative) != 133:
+        raise SystemExit('source WebP names collide after canonical lowercase path mapping')
+    files = {rel: hashlib.sha256(path.read_bytes()).hexdigest() for rel, path in source_by_relative.items()}
+    if sum(name.rsplit('/', 1)[1].startswith('item_') for name in files) != 81:
+        raise SystemExit('immutable source set must contain all 81 item WebPs')
+
+    def relative_url(url):
+        prefix = '/app/night/worlds/manor_lake/'
+        if not isinstance(url, str) or not url.startswith(prefix):
+            raise SystemExit(f'non-local or cross-world legacy URL: {url!r}')
+        rel = url[len(prefix):]
+        if not re.fullmatch(r'assets/[A-Za-z0-9_]+\.webp', rel):
+            raise SystemExit(f'unsafe or missing legacy asset path: {url!r}')
+        canonical_rel = rel.lower()
+        if not safe_immutable_asset_path(canonical_rel) or canonical_rel not in files:
+            raise SystemExit(f'unsafe or missing legacy asset path: {url!r}')
+        return canonical_rel
+
+    assets = {}
+    location_ids = {asset_id for asset_id, ref in refs.items() if ref['group'] == 'locations'}
+    for asset_id, entry in legacy['assets'].items():
+        record = {'url': relative_url(entry.get('url')), 'alt': entry['alt']}
+        variants = entry.get('variants')
+        if asset_id in location_ids:
+            if not isinstance(variants, dict) or set(variants) != set(TIMES):
+                raise SystemExit(f'location variants incomplete for {asset_id}')
+            record['variants'] = {time: relative_url(variants[time]) for time in TIMES}
+            if record['url'] != record['variants']['day']:
+                raise SystemExit(f'location default does not select day for {asset_id}')
+        elif variants is not None:
+            raise SystemExit(f'character art cannot have time variants: {asset_id}')
+        assets[asset_id] = record
+    referenced = {entry['url'] for entry in assets.values()}
+    referenced.update(url for entry in assets.values() for url in entry.get('variants', {}).values())
+    if not referenced.issubset(files):
+        raise SystemExit('asset references escape the hashed file table')
+    if not report_path.is_file():
+        raise SystemExit(f'private source/hash report is required: {report_path}')
+    report = json.loads(report_path.read_text(encoding='utf-8'))
+    if report.get('manifest_sha256') != hashlib.sha256(legacy_bytes).hexdigest():
+        raise SystemExit('private source/hash report does not match the legacy manifest')
+    exported = {row.get('export', '').lower(): row.get('export_sha256') for row in report.get('assets', [])}
+    if len(exported) != 133 or any(exported.get(rel) != digest for rel, digest in files.items()):
+        raise SystemExit('private source/hash report does not match all 133 WebPs')
+    comparison = None
+    if compare_assets:
+        compare_dir = Path(compare_assets)
+        previous = {f.name.lower(): hashlib.sha256(f.read_bytes()).hexdigest() for f in compare_dir.glob('*.webp')}
+        current = {name.rsplit('/', 1)[1]: digest for name, digest in files.items()}
+        changed = sorted(name for name in set(previous) | set(current) if previous.get(name) != current.get(name))
+        comparison = {
+            'directory': str(compare_dir.resolve()), 'same_file_set': set(previous) == set(current),
+            'identical': not changed, 'changed_files': changed,
+        }
+
+    manifest = {'schema': 'nc-assets/2', 'world': 'manor_lake', 'files': files, 'assets': assets}
+    manifest_bytes = canonical_json_bytes(manifest)
+    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+    destination = packs_root / manifest_sha
+    packs_root.mkdir(parents=True, exist_ok=True)
+
+    if destination.exists() or destination.is_symlink():
+        verify_immutable_pack(destination, manifest_bytes, files)
+        action = 'reused'
+    else:
+        destination.mkdir()
+        (destination / 'assets').mkdir()
+        for rel in sorted(files):
+            source_file = source_by_relative[rel]
+            target_file = destination / rel
+            with source_file.open('rb') as source_handle, target_file.open('xb') as target_handle:
+                shutil.copyfileobj(source_handle, target_handle)
+            if hashlib.sha256(target_file.read_bytes()).hexdigest() != files[rel]:
+                raise SystemExit(f'copy hash mismatch for {rel}')
+        # Publish the manifest only after every immutable file has passed its hash check.
+        for rel, digest in files.items():
+            if hashlib.sha256((destination / rel).read_bytes()).hexdigest() != digest:
+                raise SystemExit(f'pre-publication verification failed for {rel}')
+        with (destination / 'assets.json').open('xb') as manifest_handle:
+            manifest_handle.write(manifest_bytes)
+        verify_immutable_pack(destination, manifest_bytes, files)
+        action = 'published'
+
+    report.update({
+        'case_canonical_sha256': case_hash,
+        'immutable_manifest_sha256': manifest_sha,
+        'immutable_manifest_path': str((destination / 'assets.json').resolve()),
+        'public_manifest_url': f'/app/night/packs/{manifest_sha}/assets.json',
+        'immutable_publish_action': action,
+    })
+    if comparison is not None:
+        report['legacy_webp_comparison'] = comparison
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(f"immutable manor pack {action}: sha256={manifest_sha} files={len(files)} url=/app/night/packs/{manifest_sha}/assets.json")
+    return manifest_sha
+
+
 def inventory(config, out_root):
     defaults = config['defaults']
     rows = []
@@ -525,9 +861,30 @@ def main():
     parser.add_argument('--inventory', action='store_true')
     parser.add_argument('--places', action='store_true')
     parser.add_argument('--out', default=str(ROOT / '.local/night-city-packs/worlds'))
+    parser.add_argument('--assets-only', action='store_true', help='build only the Manor Lake H asset manifest and WebPs')
+    parser.add_argument('--immutable-only', action='store_true', help='publish a content-addressed pack from existing Manor Lake WebPs')
+    parser.add_argument('--assets-out', default=str(ROOT / 'web/mini_client/night/worlds/manor_lake'))
+    parser.add_argument('--immutable-out', default=str(ROOT / 'web/mini_client/night/packs'))
+    parser.add_argument('--compare-assets', help='optional legacy WebP directory for a private byte comparison')
+    parser.add_argument('--report-out', help='optional private inventory/hash report; not copied to the web asset folder')
     args = parser.parse_args()
     config = json.loads((HERE / 'worlds.json').read_text(encoding='utf-8'))
     out_root = Path(args.out)
+    if args.immutable_only:
+        if args.assets_only or args.worlds or args.all or args.inventory or args.places:
+            parser.error('--immutable-only is standalone; do not combine it with other build options')
+        if not args.report_out:
+            parser.error('--report-out is required with --immutable-only')
+        publish_immutable_manor_assets(args.assets_out, args.immutable_out, args.report_out, args.compare_assets)
+        return
+    if args.assets_only:
+        if args.worlds or args.all or args.inventory or args.places:
+            parser.error('--assets-only is a standalone Manor Lake export; do not combine it with world-pack options')
+        manor = next(w for w in config['worlds'] if w['id'] == 'manor_lake')
+        build_manor_assets(manor, config['defaults'], args.assets_out, args.report_out)
+        return
+    if args.report_out or args.compare_assets:
+        parser.error('--report-out and --compare-assets are only valid with --assets-only or --immutable-only')
     if args.inventory:
         inventory(config, out_root)
         return

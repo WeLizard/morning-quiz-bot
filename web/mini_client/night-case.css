@@ -1,0 +1,26 @@
+/* Weekly case additions to the approved NightCity kit. Shared controls/gaps remain in qw-shell. */
+.ncase-bar {padding-bottom:var(--qw-s-2)}
+.ncase-main {display:flex;flex-direction:column;gap:var(--qw-s-4);max-width:var(--qw-col-read,760px);margin-inline:auto;padding-bottom:calc(var(--qw-s-7) + var(--qw-safe-bottom))}
+.ncase-main > * {min-width:0}
+.ncase-main .nc-card {display:flex;flex-direction:column;gap:var(--qw-s-3)}
+.ncase-main .nc-note {white-space:pre-wrap;overflow-wrap:anywhere;max-width:75ch}
+.ncase-main .qw-btn {white-space:normal;overflow-wrap:anywhere}
+.ncase-tabs {flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;padding-block:var(--qw-s-1);flex-shrink:0}
+.ncase-tabs .qw-btn {flex:0 0 auto;min-width:5rem}
+.ncase-tabs [aria-current=page] {border-color:var(--qw-game-accent);color:var(--qw-game-accent);font-weight:750}
+.ncase-field {display:flex;flex-direction:column;gap:var(--qw-s-2);font-size:var(--qw-fs-body);color:var(--qw-game-text)}
+.ncase-field .nc-field {width:100%;min-height:var(--qw-btn-h);box-sizing:border-box;font:inherit;color:var(--qw-game-text);border-radius:var(--qw-r-control)}
+.ncase-field textarea {min-height:7rem;resize:vertical}
+.ncase-field select {background:var(--nc-field,var(--qw-game-surface));padding:var(--qw-s-3)}
+.ncase-checkbox {display:flex;align-items:center;gap:var(--qw-s-3);min-height:var(--qw-btn-h);font-size:var(--qw-fs-body);cursor:pointer}
+.ncase-checkbox input {width:24px;height:24px;flex:none;accent-color:var(--qw-game-accent)}
+.ncase-citations,.ncase-recipients {display:flex;flex-direction:column;gap:var(--qw-s-2)}
+.ncase-claim {color:var(--qw-game-muted);font-size:var(--qw-fs-small)}
+.ncase-proof {color:var(--qw-game-accent);font-size:var(--qw-fs-small)}
+.ncase-message,.ncase-event {display:flex;flex-direction:column;gap:var(--qw-s-2);border-bottom:var(--qw-outline-w) solid var(--qw-game-line);padding-bottom:var(--qw-s-3)}
+.ncase-message>strong {font-size:var(--qw-fs-body)}
+.ncase-main .nc-hero {width:100%;box-sizing:border-box;min-height:200px}
+.ncase-main .nc-hero .copy {min-width:0}
+.ncase-role-portrait {width:min(100%,240px);max-height:320px;object-fit:contain;align-self:center}
+@media(min-width:1024px) {.ncase-main {padding-inline:var(--qw-s-4)}.ncase-main .nc-hero {min-height:260px}}
+@media(prefers-reduced-motion:reduce) {.ncase-main * {scroll-behavior:auto}}

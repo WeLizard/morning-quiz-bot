@@ -14,6 +14,10 @@ const BUDGET_FILE=path.join(__dirname,'farm_perf_budget.json');
 const UPDATE=process.env.FARM_PERF_UPDATE==='1';
 const TOLERANCE={ratio:.15,calls:25};   // a layer may grow 15% + 25 calls a frame before the test fails
 const NEW_SECTION_LIMIT=150;             // a layer that has no budget yet may cost this much a frame
+// Cache repaints over the measured frames: a cache that starts expiring (a sprite reading the clock) costs few calls
+// on average but stalls the frame it repaints in, so the counters have their own budget.
+const REPAINTS={staticPaints:'земля',fieldPaints:'посев',spritePaints:'постройки и деревья'};
+const allowedRepaints=b=>b+Math.max(2,Math.ceil(b*TOLERANCE.ratio));
 const WARMUP=30,FRAMES=60;               // ~1 s to fill caches, then ~2 s measured at the 33 ms idle rate
 
 const SCENARIOS={
@@ -56,7 +60,11 @@ function compare(name,s,budget){
  over.sort((a,b)=>(b.v-b.b)-(a.v-a.b));
  for(const o of over)lines.push(o.limit?`  ${o.id}: ${Math.round(o.v)} вызовов/кадр — нового слоя нет в бюджете, без записи допускается ${o.limit}`:
   `  ${o.id}: ${Math.round(o.v)} вызовов/кадр, бюджет ${allowed(o.b)} (база ${o.b}, ${pct(o.v,o.b)})`);
- return lines.length?`Сцена «${name}» превысила бюджет вызовов canvas на кадр:\n${lines.join('\n')}\n`+
+ for(const [k,label] of Object.entries(REPAINTS)){
+  const v=s.stats[k]||0,b=budget.stats?.[k]||0;
+  if(v>allowedRepaints(b))lines.push(`  перерисовки кэша «${label}» (${k}): ${v} за ${FRAMES} кадров, бюджет ${allowedRepaints(b)} (база ${b})`);
+ }
+ return lines.length?`Сцена «${name}» превысила бюджет отрисовки:\n${lines.join('\n')}\n`+
   'Найди, что стало рисоваться чаще (оверлей ?debug=perf покажет то же в миллисекундах). Если рост оправдан — перезапиши бюджет:\n'+
   "  $env:FARM_PERF_UPDATE='1'; node --test tests/js/farm_perf_budget.test.cjs; Remove-Item Env:FARM_PERF_UPDATE":'';
 }
@@ -89,6 +97,13 @@ test('budget file is written in update mode',{skip:!UPDATE},()=>{
 test('the same scene and clock give the same counts (the budget does not depend on the machine)',async()=>{
  const a=await measure('idle'),b=await measure('idle');
  assert.equal(a.avg,b.avg);assert.equal(a.max,b.max);
+});
+
+test('a cache that starts repainting is reported even when the average calls barely move',async()=>{
+ const s=await measure('idle'),budget=record(s);
+ assert.equal(compare('idle',s,budget),'');
+ const leaking={...s,stats:{...s.stats,spritePaints:(s.stats.spritePaints||0)+12}};
+ assert.match(compare('idle',leaking,budget),/перерисовки кэша «постройки и деревья» \(spritePaints\)/);
 });
 
 test('a building that paints more is reported by its type',async()=>{

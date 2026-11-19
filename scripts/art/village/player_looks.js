@@ -1,6 +1,6 @@
 // The player's two looks in the village (owner's decision 2026-11-19): a grown-up farmer with a moustache and a pleasant
 // slim farmer woman, chosen by the account's address form (MQB-011: 'f' → the farmer woman, otherwise the farmer).
-// Preview only: player.js (the figure the game shows now) stays as it is until the owner approves these drawings.
+// Approved by the owner 2026-11-19 and installed in the game (player.js, app.js, lumberjack_art.js, santa_battle.js).
 // Same frame contract as player.js — stand / stepA / stepB facing right, feet at 0,0, viewBox -17 -48 34 52 — and the same
 // FarmScene primitives (ellipse / line / poly), recorded as SVG (svg_ctx.js).
 import {FarmScene} from '/static/scene.js';

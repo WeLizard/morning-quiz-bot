@@ -23,11 +23,15 @@ test('walk graph: an approach node for every place the player is sent to',()=>{
  assert.deepEqual(Object.keys(W.a).sort(),want.sort());
  for(const k of want)assert.ok(Number.isInteger(W.a[k])&&W.a[k]<n);
 });
-test('player figure: generated farm-style frames, mirrored for walking left, steps only while walking',()=>{
- const svg=value('VILLAGE_PLAYER_SVG');
- for(const f of ['vp-stand','vp-stepA','vp-stepB'])assert.match(svg,new RegExp(`<g class="${f}">`));
- assert.doesNotMatch(svg,/stroke="#fff/,'no white outlines');
- assert.match(app,/player\.innerHTML=VILLAGE_PLAYER_SVG/);
+test('player figure: two looks of generated farm-style frames, mirrored for walking left, steps only while walking',()=>{
+ for(const svg of [value('VILLAGE_PLAYER_SVG'),value('VILLAGE_PLAYER_SVG_F')]){
+  for(const f of ['vp-stand','vp-stepA','vp-stepB'])assert.match(svg,new RegExp(`<g class="${f}">`));
+  assert.doesNotMatch(svg,/stroke="#fff/,'no white outlines');
+ }
+ assert.notEqual(value('VILLAGE_PLAYER_SVG'),value('VILLAGE_PLAYER_SVG_F'));
+ // the look follows the address form: «она» → the farmer woman, «он» and neutral → the farmer
+ assert.match(app,/const villagePlayerSvg=\(\)=>S\.form==='f'\?VILLAGE_PLAYER_SVG_F:VILLAGE_PLAYER_SVG;/);
+ assert.match(app,/player\.innerHTML=villagePlayerSvg\(\)/);
  assert.match(css,/\.village-player\[data-face=left\] \.vp-art\{transform:scaleX\(-1\)\}/);
  assert.match(css,/\.vp-stepA,\.vp-stepB\{display:none\}/);
  assert.match(css,/prefers-reduced-motion:no-preference\)\{[^@]*\.is-walking \.vp-stand\{display:none\}/);

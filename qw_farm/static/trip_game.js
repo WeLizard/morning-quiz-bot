@@ -949,7 +949,7 @@ function openFellGame(opts){
   const i=Math.min(ti,N-1),tr=trees[i],over=phase==='over',fallMs=last?t-last.end:0,resting=phase==='done'&&fallMs>=FELL_ANIM.fall_ms;
   const shown=phase==='done'&&!resting?results.slice(0,-1):results;
   const aim=phase==='aim'?markPosition(t,tr.phase,rules,period):markPosition(over?lastAim():aimAt,tr.phase,rules,period);
-  const st={t,calm:reducedMotion(),night:isNight(),contrast:isContrast(),index:i,total:N,felled:shown.map(r=>({crooked:fellVerdict(r).crooked})),
+  const st={t,look:opts.look,calm:reducedMotion(),night:isNight(),contrast:isContrast(),index:i,total:N,felled:shown.map(r=>({crooked:fellVerdict(r).crooked})),
    gap:{center:tr.gap_center,width:tr.gap_width},pinches:marks[i],aim};
   st.phase=!started?'intro':over?'over':phase==='aim'?'aim':phase==='saw'?'cut':resting?'tree_result':'fall';
   if(phase==='saw'){

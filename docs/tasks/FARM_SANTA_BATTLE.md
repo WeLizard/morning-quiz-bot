@@ -4,7 +4,8 @@
 (движок боя) готов: `domain/farm_santa_battle.py`, JS-зеркало `qw_farm/static/santa-battle-engine.js`,
 симулятор `scripts/farm_santa_battle_sim.py`, тесты `tests/test_farm_santa_battle.py` и
 `tests/js/farm_santa_battle.test.cjs`; шаг 3 (сервер) готов: `application/farm_santa_battle.py`, тесты
-`tests/test_farm_santa_battle_service.py` и `tests/test_farm_santa_battle_http.py`.** Экрана игры ещё нет. Персонажи и позы — `scripts/art/village/new_year_guests.js`; сцена, фермер и эффекты —
+`tests/test_farm_santa_battle_service.py` и `tests/test_farm_santa_battle_http.py`; две фигуры игрока
+(фермер и фермерша по обращению) поставлены в деревню и «Пилю сам».** Экрана игры ещё нет. Персонажи и позы — `scripts/art/village/new_year_guests.js`; сцена, фермер и эффекты —
 `scripts/art/village_games/santa_battle.js`, превью — `python scripts/art/village_games/santa_battle.py`
 (в `.local/santa-battle-preview/`).
 
@@ -196,8 +197,9 @@
 3. Игра открывается с 5 уровня.
 4. Награды из §6 подходят; «Санта и Крампус в гостях» — 2×2, «Сани с подарками» в лавке — 1×1.
 5. Фигур игрока две — везде, не только в бою: усатый фермер и приятная стройная фермерша, по обращению
-   из настроек (MQB-011); нейтральное обращение — фермер. Превью готово, ждёт одобрения: деревня —
-   `scripts/art/village/player_looks.js`, `python scripts/art/village/preview_player_looks.py`
-   (`.local/player-looks-preview/`); бой — боец `player_f` в `santa_battle.js` (кадры `*-f-*` в
-   `.local/santa-battle-preview/`). После одобрения: `player.js` и `VILLAGE_PLAYER_SVG` в `app.js` по обращению,
-   те же голова и одежда у фермера в «Пилю сам» (`lumberjack_art.js`).
+   из настроек (MQB-011); нейтральное обращение — фермер. Одобрены и поставлены 2026-11-19: деревня —
+   `VILLAGE_PLAYER_SVG` / `VILLAGE_PLAYER_SVG_F` в `app.js`, выбор `villagePlayerSvg()` по `S.form`
+   (источник `scripts/art/village/player_looks.js`, превью `python scripts/art/village/preview_player_looks.py`
+   в `.local/player-looks-preview/`); «Пилю сам» — фигуры `farmer` / `farmer_f` в `lumberjack_art.js`
+   (`trip_game.js` получает `look` из `app.js`). В бою — боец `player` или `player_f` из `santa_battle.js`
+   (кадры `*-f-*` в `.local/santa-battle-preview/`); экран боя выберет его по `S.form` (шаг 4).

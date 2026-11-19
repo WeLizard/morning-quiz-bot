@@ -29,10 +29,18 @@ export const LJ_PAL = {
   needle: '#456d54', needleMid: '#557d5f', needleLight: '#6c9670', trunk: '#8a6c4c',
   shadow: '#41623530'
 };
-// The farmer (the player) — the palette of scripts/art/village/player.js, so «Пилю сам» shows the same person.
+// The player in two looks — the palettes and heads of scripts/art/village/player_looks.js, so «Пилю сам» shows the same
+// person as the village: the farmer with a moustache ('farmer') or the farmer woman ('farmer_f', address form «она»).
 export const FARMER_PAL = {
-  skin: '#f3d3b0', cheek: '#efb4a0', eye: '#3d4a3f', hair: '#a8724a', shirt: '#efdcb4', overall: '#7fa3c4', bib: '#8fb2cf',
-  strap: '#6d90b0', boot: '#6f5a46', hat: '#ecd283', brim: '#e3c56f', brimShade: '#cfae58', band: '#c98a5a', glove: '#c99a62'
+  skin: '#f3d3b0', skinShade: '#e6c29e', ear: '#e6b896', cheek: '#efb4a0', nose: '#ecb48f', eye: '#3d4a3f', hair: '#8a5a3a',
+  tache: '#6b3f26', shirt: '#efdcb4', overall: '#7fa3c4', bib: '#8fb2cf', strap: '#6d90b0', boot: '#6f5a46', hat: '#ecd283',
+  brim: '#e3c56f', brimShade: '#cfae58', band: '#c98a5a', glove: '#c99a62'
+};
+// the farmer woman works in rose dungarees over her blouse (the colour of her village sarafan)
+export const FARMER_F_PAL = {
+  skin: '#f5d6b6', nose: '#efc09e', cheek: '#f0a99a', eye: '#3d4a3f', lips: '#c0605a', hair: '#9a5a36', hairShade: '#7e4529',
+  shirt: '#f6ead0', overall: '#cf6f6a', bib: '#dc827c', strap: '#b85b57', boot: '#7a5a44', hat: '#ecd283', brim: '#e3c56f',
+  brimShade: '#cfae58', ribbon: '#cf6f6a', petal: '#ffffff', heart: '#f2c94c', glove: '#c99a62'
 };
 
 /* ---------------------------------------------------------------- primitives (same as FarmScene.poly/ellipse/line) */
@@ -107,11 +115,11 @@ const POSES = {
 export const FIGURE_BOX = {x: -24, y: -56, w: 64, h: 60};          // covers every pose with the saw (stand: bar behind the head)
 export const SAW_POSE = {tip: {x: 35.6, y: -12.6}, body: {x: 13, y: -13}};   // where the bar of the «saw» pose is (figure units)
 
-function legs(p, J, L, farmer) {
-  const col = farmer ? L.overall : L.jeans;
+function legs(p, J, L, farmer, slim = false) {
+  const col = farmer ? L.overall : L.jeans, w = slim ? .82 : 1;
   for (let i = 0; i < 2; i++) {
     const [hx, hy] = J.hips[i], [kx, ky] = J.knees[i], [fx, fy] = J.feet[i];
-    p.line(hx, hy, kx, ky, col, 4.8); p.line(kx, ky, fx, fy - 2.2, col, 4.6);
+    p.line(hx, hy, kx, ky, col, 4.8 * w); p.line(kx, ky, fx, fy - 2.2, col, 4.6 * w);
     if (farmer) { p.ellipse(fx + .6, fy - 1.1, 3.2, 1.9, L.boot); continue; }
     p.ellipse(fx + .3, fy - 3, 2.7, 1.6, LJ_PAL.bootTop);
     p.ellipse(fx + 1, fy - 1.3, 3.6, 2, LJ_PAL.boot); p.line(fx - 2.2, fy - .1, fx + 4.2, fy - .1, LJ_PAL.sole, 1.3);
@@ -152,63 +160,102 @@ function stepanHead(p, J) {
 }
 function farmerTorso(p, J) {
   const L = FARMER_PAL, [tx, ty] = J.torso;
-  p.ellipse(tx, ty - .4, 7.4, 7.4, L.shirt);
-  p.ellipse(tx, ty + 6, 7.8, 6, L.overall);
-  p.pf([tx - 4.6, ty - 3.4, tx + 4.6, ty - 3.4, tx + 5, ty + 5, tx - 5, ty + 5], L.bib);
-  p.line(tx - 3.8, ty - 3.2, tx - 4.8, ty - 7, L.strap, 1.4); p.line(tx + 3.8, ty - 3.2, tx + 4.8, ty - 7, L.strap, 1.4);
-  p.ellipse(tx - 2.8, ty - 2.2, .8, .8, '#e8d9a8'); p.ellipse(tx + 2.8, ty - 2.2, .8, .8, '#e8d9a8');
+  // grown-up overalls of the village figure: broad shoulders, a straight bib, no belly
+  p.ellipse(tx, ty - 2.2, 6.6, 5.4, L.shirt);
+  p.pf([tx - 5.6, ty - 1.4, tx + 5.6, ty - 1.4, tx + 6, ty + 7, tx + 4, ty + 9.4, tx - 4, ty + 9.4, tx - 6, ty + 7], L.overall);
+  p.pf([tx - 4.2, ty - 4.4, tx + 4.2, ty - 4.4, tx + 4.6, ty + 3.6, tx - 4.6, ty + 3.6], L.bib);
+  p.line(tx - 3.4, ty - 4.2, tx - 4.6, ty - 7, L.strap, 1.4); p.line(tx + 3.4, ty - 4.2, tx + 4.6, ty - 7, L.strap, 1.4);
+  p.ellipse(tx - 2.6, ty - 3.2, .8, .8, '#e8d9a8'); p.ellipse(tx + 2.6, ty - 3.2, .8, .8, '#e8d9a8');
+  p.line(tx - 5.8, ty + 4, tx + 5.8, ty + 4, L.strap, .9);
 }
 function farmerHead(p, J) {
-  const L = FARMER_PAL, [x, y] = J.head;
-  p.ellipse(x - .2, y + 6, 3, 2.4, '#e6c29e');
-  p.ellipse(x, y, 6.6, 6.6, L.skin);
-  p.ellipse(x - 4.4, y - 1.6, 3.2, 3.4, L.hair);
-  p.ellipse(x + 3.3, y + 1.6, 1.7, 1.1, L.cheek);
-  p.ellipse(x + 2.7, y - .8, .9, 1.15, L.eye);
-  p.ellipse(x, y - 4, 10.6, 2.6, L.brimShade); p.ellipse(x, y - 4.6, 10.6, 3, L.brim);
-  p.ellipse(x, y - 5.4, 5.6, 1.5, L.band); p.ellipse(x, y - 8, 5.8, 4, L.hat); p.ellipse(x - 1.8, y - 8.8, 2.2, 1.2, '#f4e2a4');
+  // the village head of player_looks.js (centre .6 there): neck, hair, sideburn, ear, nose, eye, brow, the moustache, the hat
+  const L = FARMER_PAL, x = J.head[0] - .6, y = J.head[1];
+  p.ellipse(x + .4, y + 5.6, 2, 1.8, L.skinShade);
+  p.ellipse(x + .6, y, 5.2, 5.6, L.skin);
+  p.ellipse(x - 3, y - 1, 2.6, 3.4, L.hair); p.ellipse(x - 1.6, y + 2.2, 1.2, 1.8, L.hair);
+  p.ellipse(x - .4, y + .4, 1.1, 1.5, L.ear);
+  p.pf([x + 5.2, y - 1.4, x + 7.4, y + 1.4, x + 5.6, y + 2], L.nose);
+  p.ellipse(x + 3.4, y - 1.2, .8, 1.05, L.eye); p.ellipse(x + 3.6, y - 1.5, .25, .25, '#fff');
+  p.line(x + 2.2, y - 3.2, x + 4.6, y - 3.3, L.hair, .9);
+  p.ellipse(x + 2.4, y + 1.2, 1.1, .7, L.cheek);
+  p.ellipse(x + 5.2, y + 2.6, 2.3, 1.05, L.tache); p.ellipse(x + 3.2, y + 2.8, 1.9, 1, L.tache);
+  p.ellipse(x + 6.9, y + 3.2, .9, .8, L.tache); p.ellipse(x + 1.6, y + 3.3, .9, .75, L.tache);
+  p.ellipse(x + .6, y - 4, 9.8, 2.5, L.brimShade); p.ellipse(x + .6, y - 4.6, 9.8, 2.9, L.brim);
+  p.ellipse(x + .6, y - 5.4, 5, 1.4, L.band); p.ellipse(x + .6, y - 7.8, 5.2, 3.8, L.hat); p.ellipse(x - 1.2, y - 8.6, 2, 1.1, '#f4e2a4');
+}
+function farmerWomanTorso(p, J) {
+  const L = FARMER_F_PAL, [tx, ty] = J.torso;
+  p.ellipse(tx, ty - 1.6, 5.6, 5.4, L.shirt);                                       // blouse: narrower shoulders
+  p.pf([tx - 4.4, ty + 1.6, tx + 4.4, ty + 1.6, tx + 5.6, ty + 8.6, tx - 5.6, ty + 8.6], L.overall);
+  p.pf([tx - 3.4, ty - 4, tx + 3.4, ty - 4, tx + 3.8, ty + 2.4, tx - 3.8, ty + 2.4], L.bib);
+  p.line(tx - 3.8, ty + 2, tx + 3.8, ty + 2, L.strap, 1.1);                          // waist
+  p.line(tx - 2.8, ty - 3.8, tx - 3.6, ty - 6.8, L.strap, 1.2); p.line(tx + 2.8, ty - 3.8, tx + 3.6, ty - 6.8, L.strap, 1.2);
+  p.ellipse(tx + 4.2, ty - 4.2, 2, 1.8, L.shirt);                                    // puffed sleeve
+}
+function farmerWomanHead(p, J) {
+  // the village head of player_looks.js (centre .8 there): braid, neck, hair, fringe, nose, lashes, lips, hat with a daisy
+  const L = FARMER_F_PAL, x = J.head[0] - .8, y = J.head[1];
+  for (let k = 0; k < 6; k++) p.ellipse(x - 4 - k * .3, y + 2.6 + k * 2.1, 1.4, 1.25, k % 2 ? L.hairShade : L.hair);
+  p.ellipse(x - 5.9, y + 15.2, 1.5, .9, L.ribbon);
+  p.ellipse(x + .4, y + 5.6, 1.4, 1.6, L.skin);
+  p.ellipse(x + .8, y, 4.9, 5.3, L.skin);
+  p.ellipse(x - 2.6, y - .6, 3.4, 4.1, L.hair);
+  p.pf([x - 1.2, y - 5.1, x + 4.2, y - 4.9, x + 5.4, y - 3, x + 2.6, y - 3.6, x + .6, y - 2.8], L.hair);
+  p.pf([x + 5.4, y - .4, x + 6.5, y + 1.3, x + 5.4, y + 1.6], L.nose);
+  p.ellipse(x + 2.8, y + 1.6, 1.2, .75, L.cheek);
+  p.ellipse(x + 3.5, y - .8, .78, 1.02, L.eye); p.ellipse(x + 3.7, y - 1.1, .24, .24, '#fff');
+  p.line(x + 4, y - 1.7, x + 5, y - 2.4, L.eye, .5); p.line(x + 3.4, y - 1.9, x + 3.9, y - 2.8, L.eye, .5);
+  p.ellipse(x + 4.6, y + 3, .85, .48, L.lips);
+  p.ellipse(x + .8, y - 4.4, 9.2, 2.3, L.brimShade); p.ellipse(x + .8, y - 5, 9.2, 2.7, L.brim);
+  p.ellipse(x + .8, y - 5.8, 4.8, 1.3, L.ribbon); p.ellipse(x + .8, y - 8.1, 5, 3.6, L.hat); p.ellipse(x - 1, y - 8.9, 1.9, 1.05, '#f4e2a4');
+  p.line(x - 3.8, y - 5.4, x - 6.4, y - 2.4, L.ribbon, 1); p.line(x - 3.4, y - 5.4, x - 5.2, y - 1.6, L.ribbon, 1);
+  for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; p.ellipse(x + 4.1 + Math.cos(a) * 1.15, y - 6.4 + Math.sin(a) * 1.15, .78, .78, L.petal); }
+  p.ellipse(x + 4.1, y - 6.4, .72, .72, L.heart);
 }
 function hand(p, x, y, col) { p.ellipse(x, y, 2.2, 2.1, col); }
 
 /**
- * A full figure: Stepan (look 'stepan') or the farmer ('farmer'), feet at (x, y), facing right (dir 1) or left (-1).
+ * A full figure: Stepan (look 'stepan'), the farmer ('farmer') or the farmer woman ('farmer_f'), feet at (x, y), facing
+ * right (dir 1) or left (-1).
  * pose: 'stand' — saw on the shoulder, bar in its cover; 'point' — shows the way with the near arm (opt.pointAngle,
  * radians in the figure's own space, 0 = forward, negative = up); 'carry' — saw held low at the side;
  * 'saw' — sawing, both hands on the saw, bar forward (SAW_POSE.tip). opt: {scale, t (ms), run, grey, bar: false
  * to leave the bar out (the scene draws it clipped at the trunk), shadow: false}.
  */
 export function drawFigure(g, x, y, look = 'stepan', pose = 'stand', opt = {}) {
-  const p = asPainter(g), c = p.c, J = POSES[pose] || POSES.stand, farmer = look === 'farmer';
-  const L = farmer ? FARMER_PAL : LJ_PAL, sc = opt.scale ?? 1, dir = opt.dir ?? 1, glove = L.glove;
+  const p = asPainter(g), c = p.c, J = POSES[pose] || POSES.stand, woman = look === 'farmer_f', farmer = look === 'farmer' || woman;
+  const L = woman ? FARMER_F_PAL : farmer ? FARMER_PAL : LJ_PAL, sc = opt.scale ?? 1, dir = opt.dir ?? 1, glove = L.glove;
   c.save(); c.translate(x, y); c.scale(sc * dir, sc);
   if (opt.shadow !== false) p.ellipse(1.5, .6, 11.5, 3.2, LJ_PAL.shadow);
-  const torso = () => farmer ? farmerTorso(p, J) : stepanTorso(p, J), head = () => farmer ? farmerHead(p, J) : stepanHead(p, J);
+  const torso = () => woman ? farmerWomanTorso(p, J) : farmer ? farmerTorso(p, J) : stepanTorso(p, J);
+  const head = () => woman ? farmerWomanHead(p, J) : farmer ? farmerHead(p, J) : stepanHead(p, J);
   const arm = pts => farmer ? (pts.forEach((q, i) => i && p.line(pts[i - 1][0], pts[i - 1][1], q[0], q[1], L.shirt, 3.6))) : sleeve(p, pts, 4.2, LJ_PAL);
   const [tx, ty] = J.torso, sB = [tx - 5.6, ty - 5.4], sF = [tx + 5.2, ty - 5.6];
   if (pose === 'stand') {
     // the saw on the near shoulder: engine in front held by the hand, bar in its cover going back and down behind the body
     const carry = () => { c.translate(tx + 14.6, ty - 6.6); c.scale(-.84, .84); c.rotate(.36); };
-    legs(p, J, L, farmer);
+    legs(p, J, L, farmer, woman);
     c.save(); carry(); sawBar(p, {len: 27, sheath: true}); c.restore();
     arm([sB, [sB[0] - 2.4, sB[1] + 7], [sB[0] - 1.6, sB[1] + 13.4]]); hand(p, sB[0] - 1.6, sB[1] + 13.6, glove);
     torso(); head();
     c.save(); carry(); chainsaw(p, {noBar: true}); c.restore();
     arm([sF, [sF[0] + 4.4, sF[1] + 4.6], [sF[0] + 8.2, sF[1] + .6]]); hand(p, sF[0] + 8.2, sF[1] + .4, glove);
   } else if (pose === 'point') {
-    legs(p, J, L, farmer);
+    legs(p, J, L, farmer, woman);
     arm([sB, [sB[0] - 1.8, sB[1] + 7], [sB[0] - .8, sB[1] + 13.2]]); hand(p, sB[0] - .8, sB[1] + 13.4, glove);
     torso(); head();
     const a = opt.pointAngle ?? -.7, e = [sF[0] + Math.cos(a) * 6.4, sF[1] + Math.sin(a) * 6.4], h = [sF[0] + Math.cos(a) * 12.6, sF[1] + Math.sin(a) * 12.6];
     arm([sF, e, h]); hand(p, h[0], h[1], glove);
     p.line(h[0], h[1], h[0] + Math.cos(a) * 3.4, h[1] + Math.sin(a) * 3.4, glove, 1.6);          // the pointing finger
   } else if (pose === 'carry') {
-    legs(p, J, L, farmer);
+    legs(p, J, L, farmer, woman);
     arm([sB, [sB[0] - 2, sB[1] + 7], [sB[0] - 1.2, sB[1] + 13.4]]); hand(p, sB[0] - 1.2, sB[1] + 13.6, glove);
     torso(); head();
     c.save(); c.translate(sF[0] + 3.4, sF[1] + 18.6); c.rotate(.18); chainsaw(p, {len: 15, grey: opt.grey}); c.restore();
     arm([sF, [sF[0] + 1.6, sF[1] + 6.4], [sF[0] + 2.6, sF[1] + 10.2]]); hand(p, sF[0] + 2.6, sF[1] + 10.4, glove);
   } else {   // saw
-    legs(p, J, L, farmer);
+    legs(p, J, L, farmer, woman);
     torso(); head();
     const shake = opt.run && !opt.grey ? Math.sin(opt.run / 16) * .45 : 0;
     c.save(); c.translate(SAW_POSE.body.x, SAW_POSE.body.y + shake);
@@ -523,6 +570,7 @@ export function drawFellScene(g, w, h, st = {}) {
   };
   if (k === 0) drawTarget();
   // ---- the people: the farmer (player) at the back cut, Stepan aside showing the way
+  const me = st.look === 'f' ? 'farmer_f' : 'farmer';   // the player's look by the address form (trip_game passes it)
   const fs = G.fs, cutting = phase === 'cut', run = cutting && st.holding && !st.stalled ? (st.t || 1) : 0;
   const kerf = clamp((st.cut || 0) / 1000, 0, 1) * tw * .96, kerfEnd = G.base.x - side * tw / 2 + side * kerf;
   const sawX = kerfEnd - side * SAW_POSE.tip.x * fs, sawY = B.y - 2.4 - SAW_POSE.tip.y * fs;
@@ -533,7 +581,7 @@ export function drawFellScene(g, w, h, st = {}) {
   drawFigure(p, stepan.x, stepan.y, 'stepan', phase === 'over' ? 'stand' : 'point', {scale: fs * .92, dir: side, pointAngle: clamp(pa, -1.45, -.15)});
   if (phase === 'aim' || phase === 'intro' || cutting) {
     const grey = !!st.stalled;
-    drawFigure(p, sawX, sawY, 'farmer', 'saw', {scale: fs, dir: side, run, grey, bar: false});
+    drawFigure(p, sawX, sawY, me, 'saw', {scale: fs, dir: side, run, grey, bar: false});
     // the bar: visible only outside the trunk
     g.save(); g.beginPath(); if (side > 0) g.rect(0, 0, G.base.x - tw / 2, h); else g.rect(G.base.x + tw / 2, 0, w, h); g.clip();
     g.save(); g.translate(sawX, sawY); g.scale(fs * side, fs); g.translate(SAW_POSE.body.x, SAW_POSE.body.y + (run ? Math.sin(run / 16) * .45 : 0)); sawBar(p, {len: 20, run: grey ? 0 : run}); g.restore();
@@ -548,7 +596,7 @@ export function drawFellScene(g, w, h, st = {}) {
     }
     if (grey && !st.calm) for (let i = 0; i < 3; i++) { const ph = ((t / 1400) + i / 3) % 1, bx = sawX - side * 4 * fs, by = sawY - 22 * fs; g.globalAlpha = .55 * (1 - ph); p.ellipse(bx - side * ph * 10, by - ph * 34, 4 + ph * 7, 3 + ph * 5, '#c9cfc9'); g.globalAlpha = 1; }
   } else {
-    drawFigure(p, sawX - side * (G.L * .08) * retreat, Math.min(h - 40, sawY + h * .05), 'farmer', 'carry', {scale: fs, dir: side});
+    drawFigure(p, sawX - side * (G.L * .08) * retreat, Math.min(h - 40, sawY + h * .05), me, 'carry', {scale: fs, dir: side});
   }
   if (k > 0) drawTarget();
   front.forEach(drawNeighbour);

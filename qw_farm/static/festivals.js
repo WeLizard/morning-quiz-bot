@@ -13,8 +13,6 @@ export function sellerLabel(seller,festival){return seller==='host'&&HOST_SHOP[f
 // Icons of festival items. An item without its own symbol in icons.svg borrows a neutral symbol of the same kind from the first
 // festival (nothing renders blank). When the artist draws icons.svg#<id>, delete the line here (tests/js/farm_festivals.test.cjs checks it).
 export const ICON_FALLBACK={
- // День смеха
- fest_fool_jar:'fest_posid_basket',fest_fool_sock:'fest_posid_basket',fest_fool_horseshoe:'fest_posid_basket',fest_fool_cake:'fest_posid_basket',fest_fool_mirror:'fest_posid_window',fest_fool_stripes:'fest_posid_wreath',fest_fool_whistle:'fest_posid_lantern',fest_fool_cap:'fest_posid_smoke',fest_fool_signs:'fest_posid_window',fest_fool_geese:'fest_posid_basket',fest_fool_scarecrow:'fest_posid_socks',
  // День космонавтики
  fest_cosm_rocket:'fest_posid_quilt',fest_cosm_parts:'fest_posid_basket',fest_cosm_path:'fest_posid_lights',fest_cosm_scroll:'fest_posid_basket',fest_cosm_meteor:'fest_posid_lantern',fest_cosm_flags:'fest_posid_wreath',fest_cosm_birdhouse:'fest_posid_basket',fest_cosm_stars:'fest_posid_window',fest_cosm_badge:'fest_posid_socks',
  // Весенний сев и субботник

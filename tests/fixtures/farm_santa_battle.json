@@ -1,0 +1,8240 @@
+[
+ {
+  "seed": "fixture-1-calm",
+  "battle": 1,
+  "bot": "calm",
+  "plan": {
+   "version": 1,
+   "battle": 1,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     526,
+     786
+    ],
+    [
+     505,
+     765
+    ],
+    [
+     609,
+     869
+    ],
+    [
+     224,
+     484
+    ],
+    [
+     486,
+     746
+    ],
+    [
+     198,
+     458
+    ],
+    [
+     355,
+     615
+    ],
+    [
+     456,
+     716
+    ],
+    [
+     303,
+     563
+    ],
+    [
+     289,
+     549
+    ],
+    [
+     726,
+     986
+    ],
+    [
+     251,
+     511
+    ],
+    [
+     853,
+     1113
+    ],
+    [
+     819,
+     1079
+    ],
+    [
+     316,
+     576
+    ],
+    [
+     520,
+     780
+    ],
+    [
+     397,
+     657
+    ],
+    [
+     833,
+     1093
+    ],
+    [
+     832,
+     1092
+    ],
+    [
+     658,
+     918
+    ],
+    [
+     808,
+     1068
+    ],
+    [
+     667,
+     927
+    ],
+    [
+     231,
+     491
+    ],
+    [
+     678,
+     938
+    ],
+    [
+     407,
+     667
+    ],
+    [
+     190,
+     450
+    ],
+    [
+     556,
+     816
+    ],
+    [
+     236,
+     496
+    ],
+    [
+     400,
+     660
+    ],
+    [
+     504,
+     764
+    ],
+    [
+     847,
+     1107
+    ],
+    [
+     472,
+     732
+    ],
+    [
+     325,
+     585
+    ],
+    [
+     569,
+     829
+    ],
+    [
+     559,
+     819
+    ],
+    [
+     281,
+     541
+    ],
+    [
+     787,
+     1047
+    ],
+    [
+     374,
+     634
+    ],
+    [
+     719,
+     979
+    ],
+    [
+     660,
+     920
+    ],
+    [
+     484,
+     744
+    ],
+    [
+     408,
+     668
+    ],
+    [
+     329,
+     589
+    ],
+    [
+     233,
+     493
+    ],
+    [
+     193,
+     453
+    ],
+    [
+     481,
+     741
+    ],
+    [
+     357,
+     617
+    ],
+    [
+     472,
+     732
+    ],
+    [
+     655,
+     915
+    ],
+    [
+     184,
+     444
+    ],
+    [
+     344,
+     604
+    ],
+    [
+     405,
+     665
+    ],
+    [
+     358,
+     618
+    ],
+    [
+     557,
+     817
+    ],
+    [
+     797,
+     1057
+    ],
+    [
+     502,
+     762
+    ],
+    [
+     835,
+     1095
+    ],
+    [
+     719,
+     979
+    ],
+    [
+     703,
+     963
+    ],
+    [
+     389,
+     649
+    ]
+   ],
+   "targets": [
+    5,
+    1,
+    5,
+    0,
+    1,
+    4,
+    2,
+    4,
+    5,
+    1,
+    4,
+    4,
+    4,
+    5,
+    4,
+    5,
+    1,
+    4,
+    3,
+    3,
+    5,
+    4,
+    4,
+    1,
+    1,
+    2,
+    4,
+    0,
+    3,
+    3,
+    2,
+    5,
+    0,
+    4,
+    0,
+    4,
+    2,
+    5,
+    4,
+    3
+   ],
+   "gifts": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    null
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "round",
+     "n": 4
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "skip",
+     "who": "ded_moroz",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "krampus"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 5,
+   "stars": 2,
+   "items": {},
+   "hp": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 0
+   }
+  },
+  "state": {
+   "battle": 1,
+   "round": 5,
+   "hp": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 160
+   },
+   "enemies": [
+    "krampus"
+   ],
+   "cd": {
+    "wall": 0,
+    "blizzard": 0,
+    "freeze": 2,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": false,
+   "honey": [],
+   "items": {},
+   "n_items": 0,
+   "bar": 12,
+   "tk": 4,
+   "gk": 0,
+   "er": {
+    "krampus": 5
+   },
+   "intents": {
+    "krampus": {
+     "move": "switch",
+     "target": "player"
+    }
+   },
+   "turn": 2,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-1-skilled",
+  "battle": 1,
+  "bot": "skilled",
+  "plan": {
+   "version": 1,
+   "battle": 1,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     728,
+     988
+    ],
+    [
+     702,
+     962
+    ],
+    [
+     854,
+     1114
+    ],
+    [
+     284,
+     544
+    ],
+    [
+     527,
+     787
+    ],
+    [
+     808,
+     1068
+    ],
+    [
+     593,
+     853
+    ],
+    [
+     609,
+     869
+    ],
+    [
+     192,
+     452
+    ],
+    [
+     357,
+     617
+    ],
+    [
+     381,
+     641
+    ],
+    [
+     392,
+     652
+    ],
+    [
+     841,
+     1101
+    ],
+    [
+     338,
+     598
+    ],
+    [
+     369,
+     629
+    ],
+    [
+     741,
+     1001
+    ],
+    [
+     740,
+     1000
+    ],
+    [
+     436,
+     696
+    ],
+    [
+     715,
+     975
+    ],
+    [
+     469,
+     729
+    ],
+    [
+     801,
+     1061
+    ],
+    [
+     410,
+     670
+    ],
+    [
+     684,
+     944
+    ],
+    [
+     268,
+     528
+    ],
+    [
+     380,
+     640
+    ],
+    [
+     812,
+     1072
+    ],
+    [
+     751,
+     1011
+    ],
+    [
+     410,
+     670
+    ],
+    [
+     587,
+     847
+    ],
+    [
+     493,
+     753
+    ],
+    [
+     366,
+     626
+    ],
+    [
+     544,
+     804
+    ],
+    [
+     377,
+     637
+    ],
+    [
+     478,
+     738
+    ],
+    [
+     509,
+     769
+    ],
+    [
+     834,
+     1094
+    ],
+    [
+     835,
+     1095
+    ],
+    [
+     402,
+     662
+    ],
+    [
+     241,
+     501
+    ],
+    [
+     508,
+     768
+    ],
+    [
+     284,
+     544
+    ],
+    [
+     683,
+     943
+    ],
+    [
+     533,
+     793
+    ],
+    [
+     342,
+     602
+    ],
+    [
+     572,
+     832
+    ],
+    [
+     449,
+     709
+    ],
+    [
+     460,
+     720
+    ],
+    [
+     521,
+     781
+    ],
+    [
+     252,
+     512
+    ],
+    [
+     717,
+     977
+    ],
+    [
+     361,
+     621
+    ],
+    [
+     386,
+     646
+    ],
+    [
+     407,
+     667
+    ],
+    [
+     290,
+     550
+    ],
+    [
+     290,
+     550
+    ],
+    [
+     371,
+     631
+    ],
+    [
+     646,
+     906
+    ],
+    [
+     376,
+     636
+    ],
+    [
+     794,
+     1054
+    ],
+    [
+     587,
+     847
+    ]
+   ],
+   "targets": [
+    0,
+    0,
+    1,
+    3,
+    4,
+    3,
+    0,
+    4,
+    4,
+    2,
+    2,
+    1,
+    2,
+    1,
+    1,
+    4,
+    3,
+    1,
+    0,
+    1,
+    2,
+    3,
+    1,
+    2,
+    0,
+    3,
+    1,
+    5,
+    0,
+    2,
+    2,
+    2,
+    0,
+    3,
+    4,
+    3,
+    5,
+    4,
+    2,
+    5
+   ],
+   "gifts": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "snowball",
+    "krampus",
+    858
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    832
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    984
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    414
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    657
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    938
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    723
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    739
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "down",
+     "who": "krampus"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 3,
+   "stars": 3,
+   "items": {},
+   "hp": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 0
+   }
+  },
+  "state": {
+   "battle": 1,
+   "round": 3,
+   "hp": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 160
+   },
+   "enemies": [
+    "krampus"
+   ],
+   "cd": {
+    "wall": 0,
+    "blizzard": 0,
+    "freeze": 1,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 2,
+   "wall": false,
+   "honey": [],
+   "items": {},
+   "n_items": 0,
+   "bar": 8,
+   "tk": 2,
+   "gk": 0,
+   "er": {
+    "krampus": 3
+   },
+   "intents": {
+    "krampus": {
+     "move": "chain",
+     "target": "player"
+    }
+   },
+   "turn": 2,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-1-random",
+  "battle": 1,
+  "bot": "random",
+  "plan": {
+   "version": 1,
+   "battle": 1,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     500,
+     760
+    ],
+    [
+     651,
+     911
+    ],
+    [
+     410,
+     670
+    ],
+    [
+     817,
+     1077
+    ],
+    [
+     791,
+     1051
+    ],
+    [
+     336,
+     596
+    ],
+    [
+     591,
+     851
+    ],
+    [
+     313,
+     573
+    ],
+    [
+     205,
+     465
+    ],
+    [
+     654,
+     914
+    ],
+    [
+     470,
+     730
+    ],
+    [
+     392,
+     652
+    ],
+    [
+     271,
+     531
+    ],
+    [
+     532,
+     792
+    ],
+    [
+     251,
+     511
+    ],
+    [
+     749,
+     1009
+    ],
+    [
+     303,
+     563
+    ],
+    [
+     186,
+     446
+    ],
+    [
+     665,
+     925
+    ],
+    [
+     724,
+     984
+    ],
+    [
+     461,
+     721
+    ],
+    [
+     807,
+     1067
+    ],
+    [
+     701,
+     961
+    ],
+    [
+     522,
+     782
+    ],
+    [
+     444,
+     704
+    ],
+    [
+     430,
+     690
+    ],
+    [
+     624,
+     884
+    ],
+    [
+     828,
+     1088
+    ],
+    [
+     448,
+     708
+    ],
+    [
+     657,
+     917
+    ],
+    [
+     508,
+     768
+    ],
+    [
+     315,
+     575
+    ],
+    [
+     369,
+     629
+    ],
+    [
+     799,
+     1059
+    ],
+    [
+     489,
+     749
+    ],
+    [
+     693,
+     953
+    ],
+    [
+     364,
+     624
+    ],
+    [
+     385,
+     645
+    ],
+    [
+     198,
+     458
+    ],
+    [
+     336,
+     596
+    ],
+    [
+     378,
+     638
+    ],
+    [
+     281,
+     541
+    ],
+    [
+     677,
+     937
+    ],
+    [
+     452,
+     712
+    ],
+    [
+     367,
+     627
+    ],
+    [
+     368,
+     628
+    ],
+    [
+     687,
+     947
+    ],
+    [
+     551,
+     811
+    ],
+    [
+     389,
+     649
+    ],
+    [
+     703,
+     963
+    ],
+    [
+     334,
+     594
+    ],
+    [
+     530,
+     790
+    ],
+    [
+     775,
+     1035
+    ],
+    [
+     478,
+     738
+    ],
+    [
+     626,
+     886
+    ],
+    [
+     771,
+     1031
+    ],
+    [
+     643,
+     903
+    ],
+    [
+     231,
+     491
+    ],
+    [
+     464,
+     724
+    ],
+    [
+     574,
+     834
+    ]
+   ],
+   "targets": [
+    5,
+    0,
+    2,
+    1,
+    3,
+    1,
+    1,
+    2,
+    5,
+    2,
+    3,
+    5,
+    0,
+    5,
+    5,
+    5,
+    2,
+    0,
+    2,
+    5,
+    4,
+    1,
+    3,
+    3,
+    2,
+    5,
+    4,
+    1,
+    3,
+    5,
+    2,
+    2,
+    0,
+    2,
+    2,
+    0,
+    1,
+    0,
+    1,
+    5
+   ],
+   "gifts": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "gingerbread",
+    null,
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    1014
+   ],
+   [
+    "ded_moroz",
+    "pancake",
+    "snegurochka",
+    null
+   ],
+   [
+    "snegurochka",
+    "pancake",
+    "player",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    999
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    886
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    912
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    209
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    45
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    780
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    59
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    896
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    707
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    941
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    852
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "ded_moroz",
+     "item": "gingerbread",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "player",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "ded_moroz",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "snegurochka",
+     "amount": 0
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "ded_moroz",
+     "item": "pancake",
+     "to": "snegurochka"
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "snegurochka",
+     "amount": 0
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "snegurochka",
+     "item": "pancake",
+     "to": "player"
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 0
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "player"
+    },
+    {
+     "t": "round",
+     "n": 4
+    },
+    {
+     "t": "skip",
+     "who": "player",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "snegurochka",
+     "amount": 80,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 15
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "ded_moroz",
+     "amount": 62,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "player"
+    },
+    {
+     "t": "round",
+     "n": 7
+    },
+    {
+     "t": "skip",
+     "who": "player",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "krampus"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 7,
+   "stars": 2,
+   "items": {
+    "gingerbread": 1,
+    "pancake": 2
+   },
+   "hp": {
+    "player": 100,
+    "ded_moroz": 78,
+    "snegurochka": 25,
+    "krampus": 0
+   }
+  },
+  "state": {
+   "battle": 1,
+   "round": 7,
+   "hp": {
+    "player": 100,
+    "ded_moroz": 78,
+    "snegurochka": 25,
+    "krampus": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 160
+   },
+   "enemies": [
+    "krampus"
+   ],
+   "cd": {
+    "wall": 0,
+    "blizzard": 0,
+    "freeze": 0,
+    "song": 1
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": false,
+   "honey": [],
+   "items": {
+    "gingerbread": 1,
+    "pancake": 2
+   },
+   "n_items": 3,
+   "bar": 12,
+   "tk": 6,
+   "gk": 0,
+   "er": {
+    "krampus": 7
+   },
+   "intents": {
+    "krampus": {
+     "move": "switch",
+     "target": "ded_moroz"
+    }
+   },
+   "turn": 1,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-2-calm",
+  "battle": 2,
+  "bot": "calm",
+  "plan": {
+   "version": 1,
+   "battle": 2,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     588,
+     848
+    ],
+    [
+     387,
+     647
+    ],
+    [
+     405,
+     665
+    ],
+    [
+     369,
+     629
+    ],
+    [
+     729,
+     989
+    ],
+    [
+     386,
+     646
+    ],
+    [
+     222,
+     482
+    ],
+    [
+     418,
+     678
+    ],
+    [
+     233,
+     493
+    ],
+    [
+     645,
+     905
+    ],
+    [
+     346,
+     606
+    ],
+    [
+     290,
+     550
+    ],
+    [
+     528,
+     788
+    ],
+    [
+     835,
+     1095
+    ],
+    [
+     569,
+     829
+    ],
+    [
+     236,
+     496
+    ],
+    [
+     769,
+     1029
+    ],
+    [
+     517,
+     777
+    ],
+    [
+     507,
+     767
+    ],
+    [
+     780,
+     1040
+    ],
+    [
+     802,
+     1062
+    ],
+    [
+     399,
+     659
+    ],
+    [
+     271,
+     531
+    ],
+    [
+     555,
+     815
+    ],
+    [
+     758,
+     1018
+    ],
+    [
+     815,
+     1075
+    ],
+    [
+     501,
+     761
+    ],
+    [
+     698,
+     958
+    ],
+    [
+     619,
+     879
+    ],
+    [
+     471,
+     731
+    ],
+    [
+     376,
+     636
+    ],
+    [
+     248,
+     508
+    ],
+    [
+     677,
+     937
+    ],
+    [
+     786,
+     1046
+    ],
+    [
+     569,
+     829
+    ],
+    [
+     293,
+     553
+    ],
+    [
+     688,
+     948
+    ],
+    [
+     849,
+     1109
+    ],
+    [
+     839,
+     1099
+    ],
+    [
+     780,
+     1040
+    ],
+    [
+     695,
+     955
+    ],
+    [
+     237,
+     497
+    ],
+    [
+     603,
+     863
+    ],
+    [
+     210,
+     470
+    ],
+    [
+     373,
+     633
+    ],
+    [
+     687,
+     947
+    ],
+    [
+     452,
+     712
+    ],
+    [
+     523,
+     783
+    ],
+    [
+     623,
+     883
+    ],
+    [
+     824,
+     1084
+    ],
+    [
+     585,
+     845
+    ],
+    [
+     698,
+     958
+    ],
+    [
+     568,
+     828
+    ],
+    [
+     324,
+     584
+    ],
+    [
+     857,
+     1117
+    ],
+    [
+     575,
+     835
+    ],
+    [
+     294,
+     554
+    ],
+    [
+     327,
+     587
+    ],
+    [
+     643,
+     903
+    ],
+    [
+     671,
+     931
+    ]
+   ],
+   "targets": [
+    1,
+    5,
+    1,
+    1,
+    1,
+    3,
+    0,
+    4,
+    1,
+    1,
+    3,
+    5,
+    4,
+    2,
+    0,
+    1,
+    5,
+    2,
+    4,
+    0,
+    5,
+    3,
+    2,
+    5,
+    3,
+    3,
+    2,
+    0,
+    1,
+    5,
+    5,
+    2,
+    3,
+    1,
+    0,
+    5,
+    3,
+    2,
+    2,
+    1
+   ],
+   "gifts": [
+    0,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 16,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 16,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 16,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 4
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 7
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 8
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 9
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 10
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 11
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "santa"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 11,
+   "stars": 2,
+   "items": {},
+   "hp": {
+    "player": 84,
+    "ded_moroz": 124,
+    "snegurochka": 74,
+    "santa": 0
+   }
+  },
+  "state": {
+   "battle": 2,
+   "round": 11,
+   "hp": {
+    "player": 84,
+    "ded_moroz": 124,
+    "snegurochka": 74,
+    "santa": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "santa": 240
+   },
+   "enemies": [
+    "santa"
+   ],
+   "cd": {
+    "wall": 2,
+    "blizzard": 0,
+    "freeze": 2,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": false,
+   "honey": [],
+   "items": {},
+   "n_items": 0,
+   "bar": 25,
+   "tk": 2,
+   "gk": 6,
+   "er": {
+    "santa": 11
+   },
+   "intents": {
+    "santa": {
+     "move": "coal",
+     "target": "snegurochka"
+    }
+   },
+   "turn": 0,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-2-skilled",
+  "battle": 2,
+  "bot": "skilled",
+  "plan": {
+   "version": 1,
+   "battle": 2,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     739,
+     999
+    ],
+    [
+     363,
+     623
+    ],
+    [
+     678,
+     938
+    ],
+    [
+     551,
+     811
+    ],
+    [
+     491,
+     751
+    ],
+    [
+     767,
+     1027
+    ],
+    [
+     714,
+     974
+    ],
+    [
+     189,
+     449
+    ],
+    [
+     222,
+     482
+    ],
+    [
+     222,
+     482
+    ],
+    [
+     648,
+     908
+    ],
+    [
+     274,
+     534
+    ],
+    [
+     505,
+     765
+    ],
+    [
+     700,
+     960
+    ],
+    [
+     574,
+     834
+    ],
+    [
+     448,
+     708
+    ],
+    [
+     183,
+     443
+    ],
+    [
+     275,
+     535
+    ],
+    [
+     738,
+     998
+    ],
+    [
+     252,
+     512
+    ],
+    [
+     422,
+     682
+    ],
+    [
+     206,
+     466
+    ],
+    [
+     299,
+     559
+    ],
+    [
+     543,
+     803
+    ],
+    [
+     303,
+     563
+    ],
+    [
+     807,
+     1067
+    ],
+    [
+     243,
+     503
+    ],
+    [
+     823,
+     1083
+    ],
+    [
+     227,
+     487
+    ],
+    [
+     217,
+     477
+    ],
+    [
+     483,
+     743
+    ],
+    [
+     486,
+     746
+    ],
+    [
+     541,
+     801
+    ],
+    [
+     199,
+     459
+    ],
+    [
+     344,
+     604
+    ],
+    [
+     199,
+     459
+    ],
+    [
+     404,
+     664
+    ],
+    [
+     722,
+     982
+    ],
+    [
+     209,
+     469
+    ],
+    [
+     728,
+     988
+    ],
+    [
+     571,
+     831
+    ],
+    [
+     784,
+     1044
+    ],
+    [
+     453,
+     713
+    ],
+    [
+     642,
+     902
+    ],
+    [
+     571,
+     831
+    ],
+    [
+     414,
+     674
+    ],
+    [
+     313,
+     573
+    ],
+    [
+     718,
+     978
+    ],
+    [
+     273,
+     533
+    ],
+    [
+     637,
+     897
+    ],
+    [
+     751,
+     1011
+    ],
+    [
+     853,
+     1113
+    ],
+    [
+     371,
+     631
+    ],
+    [
+     351,
+     611
+    ],
+    [
+     290,
+     550
+    ],
+    [
+     297,
+     557
+    ],
+    [
+     749,
+     1009
+    ],
+    [
+     517,
+     777
+    ],
+    [
+     657,
+     917
+    ],
+    [
+     287,
+     547
+    ]
+   ],
+   "targets": [
+    5,
+    1,
+    1,
+    1,
+    5,
+    4,
+    3,
+    5,
+    3,
+    4,
+    3,
+    5,
+    3,
+    0,
+    1,
+    0,
+    4,
+    2,
+    2,
+    3,
+    2,
+    0,
+    0,
+    1,
+    1,
+    2,
+    4,
+    0,
+    4,
+    3,
+    1,
+    5,
+    5,
+    5,
+    1,
+    3,
+    1,
+    1,
+    0,
+    1
+   ],
+   "gifts": [
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "snowball",
+    "santa",
+    869
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    493
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    808
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    681
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    621
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    897
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    844
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    319
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    352
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    352
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    778
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    404
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    635
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 16,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 16,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 16,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 4
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    },
+    {
+     "t": "down",
+     "who": "santa"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 6,
+   "stars": 3,
+   "items": {},
+   "hp": {
+    "player": 84,
+    "ded_moroz": 124,
+    "snegurochka": 74,
+    "santa": 0
+   }
+  },
+  "state": {
+   "battle": 2,
+   "round": 6,
+   "hp": {
+    "player": 84,
+    "ded_moroz": 124,
+    "snegurochka": 74,
+    "santa": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "santa": 240
+   },
+   "enemies": [
+    "santa"
+   ],
+   "cd": {
+    "wall": 3,
+    "blizzard": 0,
+    "freeze": 2,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": true,
+   "honey": [],
+   "items": {},
+   "n_items": 0,
+   "bar": 13,
+   "tk": 2,
+   "gk": 3,
+   "er": {
+    "santa": 6
+   },
+   "intents": {
+    "santa": {
+     "move": "hohoho",
+     "target": null
+    }
+   },
+   "turn": 1,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-2-random",
+  "battle": 2,
+  "bot": "random",
+  "plan": {
+   "version": 1,
+   "battle": 2,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     410,
+     670
+    ],
+    [
+     375,
+     635
+    ],
+    [
+     639,
+     899
+    ],
+    [
+     684,
+     944
+    ],
+    [
+     724,
+     984
+    ],
+    [
+     460,
+     720
+    ],
+    [
+     350,
+     610
+    ],
+    [
+     460,
+     720
+    ],
+    [
+     671,
+     931
+    ],
+    [
+     391,
+     651
+    ],
+    [
+     573,
+     833
+    ],
+    [
+     281,
+     541
+    ],
+    [
+     291,
+     551
+    ],
+    [
+     361,
+     621
+    ],
+    [
+     411,
+     671
+    ],
+    [
+     623,
+     883
+    ],
+    [
+     419,
+     679
+    ],
+    [
+     182,
+     442
+    ],
+    [
+     356,
+     616
+    ],
+    [
+     852,
+     1112
+    ],
+    [
+     292,
+     552
+    ],
+    [
+     273,
+     533
+    ],
+    [
+     541,
+     801
+    ],
+    [
+     217,
+     477
+    ],
+    [
+     444,
+     704
+    ],
+    [
+     505,
+     765
+    ],
+    [
+     510,
+     770
+    ],
+    [
+     296,
+     556
+    ],
+    [
+     345,
+     605
+    ],
+    [
+     526,
+     786
+    ],
+    [
+     394,
+     654
+    ],
+    [
+     617,
+     877
+    ],
+    [
+     217,
+     477
+    ],
+    [
+     312,
+     572
+    ],
+    [
+     606,
+     866
+    ],
+    [
+     350,
+     610
+    ],
+    [
+     717,
+     977
+    ],
+    [
+     639,
+     899
+    ],
+    [
+     389,
+     649
+    ],
+    [
+     822,
+     1082
+    ],
+    [
+     712,
+     972
+    ],
+    [
+     817,
+     1077
+    ],
+    [
+     400,
+     660
+    ],
+    [
+     570,
+     830
+    ],
+    [
+     704,
+     964
+    ],
+    [
+     749,
+     1009
+    ],
+    [
+     733,
+     993
+    ],
+    [
+     682,
+     942
+    ],
+    [
+     369,
+     629
+    ],
+    [
+     717,
+     977
+    ],
+    [
+     463,
+     723
+    ],
+    [
+     847,
+     1107
+    ],
+    [
+     824,
+     1084
+    ],
+    [
+     501,
+     761
+    ],
+    [
+     502,
+     762
+    ],
+    [
+     432,
+     692
+    ],
+    [
+     545,
+     805
+    ],
+    [
+     468,
+     728
+    ],
+    [
+     563,
+     823
+    ],
+    [
+     829,
+     1089
+    ]
+   ],
+   "targets": [
+    2,
+    5,
+    1,
+    5,
+    1,
+    0,
+    2,
+    0,
+    1,
+    5,
+    0,
+    0,
+    2,
+    2,
+    2,
+    3,
+    1,
+    3,
+    5,
+    1,
+    1,
+    1,
+    1,
+    3,
+    4,
+    4,
+    0,
+    4,
+    5,
+    5,
+    1,
+    4,
+    3,
+    0,
+    4,
+    5,
+    2,
+    4,
+    1,
+    5
+   ],
+   "gifts": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "honey",
+    "player",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    173
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "tea",
+    "snegurochka",
+    null
+   ],
+   [
+    "ded_moroz",
+    "honey",
+    "ded_moroz",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    1190
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    805
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    1114
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    56
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    652
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    1076
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    1147
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    472
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    665
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    1044
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    912
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    741
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    818
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "item",
+     "by": "player",
+     "item": "honey",
+     "to": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 0
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 60,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "player",
+     "item": "tea",
+     "to": "snegurochka"
+    },
+    {
+     "t": "heal",
+     "by": "player",
+     "to": "snegurochka",
+     "amount": 10
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "ded_moroz",
+     "item": "honey",
+     "to": "ded_moroz"
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 24,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 30,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 60,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "snegurochka"
+    },
+    {
+     "t": "round",
+     "n": 4
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 60,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 32,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 32,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 7
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 60,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "ded_moroz"
+    },
+    {
+     "t": "round",
+     "n": 8
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "round",
+     "n": 9
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 10
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 32,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 11
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "player"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 60,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "player"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "lose",
+   "rounds": 11,
+   "stars": 0,
+   "items": {
+    "honey": 2,
+    "tea": 1
+   },
+   "hp": {
+    "player": 0,
+    "ded_moroz": 0,
+    "snegurochka": 0,
+    "santa": 66
+   }
+  },
+  "state": {
+   "battle": 2,
+   "round": 11,
+   "hp": {
+    "player": 0,
+    "ded_moroz": 0,
+    "snegurochka": 0,
+    "santa": 66
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "santa": 240
+   },
+   "enemies": [
+    "santa"
+   ],
+   "cd": {
+    "wall": 1,
+    "blizzard": 0,
+    "freeze": 0,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": false,
+   "honey": [],
+   "items": {
+    "honey": 2,
+    "tea": 1
+   },
+   "n_items": 3,
+   "bar": 14,
+   "tk": 5,
+   "gk": 6,
+   "er": {
+    "santa": 11
+   },
+   "intents": {
+    "santa": {
+     "move": "coal",
+     "target": "player"
+    }
+   },
+   "turn": 3,
+   "outcome": "lose"
+  }
+ },
+ {
+  "seed": "fixture-3-calm",
+  "battle": 3,
+  "bot": "calm",
+  "plan": {
+   "version": 1,
+   "battle": 3,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     335,
+     595
+    ],
+    [
+     198,
+     458
+    ],
+    [
+     405,
+     665
+    ],
+    [
+     552,
+     812
+    ],
+    [
+     521,
+     781
+    ],
+    [
+     676,
+     936
+    ],
+    [
+     615,
+     875
+    ],
+    [
+     471,
+     731
+    ],
+    [
+     369,
+     629
+    ],
+    [
+     641,
+     901
+    ],
+    [
+     787,
+     1047
+    ],
+    [
+     551,
+     811
+    ],
+    [
+     363,
+     623
+    ],
+    [
+     437,
+     697
+    ],
+    [
+     534,
+     794
+    ],
+    [
+     445,
+     705
+    ],
+    [
+     420,
+     680
+    ],
+    [
+     838,
+     1098
+    ],
+    [
+     713,
+     973
+    ],
+    [
+     760,
+     1020
+    ],
+    [
+     536,
+     796
+    ],
+    [
+     425,
+     685
+    ],
+    [
+     648,
+     908
+    ],
+    [
+     529,
+     789
+    ],
+    [
+     215,
+     475
+    ],
+    [
+     434,
+     694
+    ],
+    [
+     695,
+     955
+    ],
+    [
+     843,
+     1103
+    ],
+    [
+     341,
+     601
+    ],
+    [
+     679,
+     939
+    ],
+    [
+     222,
+     482
+    ],
+    [
+     502,
+     762
+    ],
+    [
+     480,
+     740
+    ],
+    [
+     563,
+     823
+    ],
+    [
+     328,
+     588
+    ],
+    [
+     620,
+     880
+    ],
+    [
+     349,
+     609
+    ],
+    [
+     258,
+     518
+    ],
+    [
+     462,
+     722
+    ],
+    [
+     734,
+     994
+    ],
+    [
+     276,
+     536
+    ],
+    [
+     748,
+     1008
+    ],
+    [
+     536,
+     796
+    ],
+    [
+     509,
+     769
+    ],
+    [
+     594,
+     854
+    ],
+    [
+     353,
+     613
+    ],
+    [
+     300,
+     560
+    ],
+    [
+     477,
+     737
+    ],
+    [
+     423,
+     683
+    ],
+    [
+     197,
+     457
+    ],
+    [
+     694,
+     954
+    ],
+    [
+     495,
+     755
+    ],
+    [
+     279,
+     539
+    ],
+    [
+     365,
+     625
+    ],
+    [
+     553,
+     813
+    ],
+    [
+     644,
+     904
+    ],
+    [
+     848,
+     1108
+    ],
+    [
+     337,
+     597
+    ],
+    [
+     531,
+     791
+    ],
+    [
+     529,
+     789
+    ]
+   ],
+   "targets": [
+    1,
+    3,
+    3,
+    1,
+    5,
+    4,
+    5,
+    5,
+    0,
+    1,
+    4,
+    5,
+    2,
+    3,
+    3,
+    5,
+    1,
+    5,
+    1,
+    1,
+    1,
+    2,
+    3,
+    0,
+    0,
+    3,
+    4,
+    4,
+    5,
+    0,
+    1,
+    1,
+    0,
+    3,
+    1,
+    1,
+    3,
+    0,
+    2,
+    4
+   ],
+   "gifts": [
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    null
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "player"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 4
+    },
+    {
+     "t": "skip",
+     "who": "player",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "miss",
+     "by": "ded_moroz",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 14,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "krampus"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 7
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 15
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 8
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 9
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 10
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 15
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 7,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 7,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 7,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 11
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 12
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 13
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 15
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 14
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 15
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "santa"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 15,
+   "stars": 2,
+   "items": {},
+   "hp": {
+    "player": 72,
+    "ded_moroz": 86,
+    "snegurochka": 50,
+    "krampus": 0,
+    "santa": 0
+   }
+  },
+  "state": {
+   "battle": 3,
+   "round": 15,
+   "hp": {
+    "player": 72,
+    "ded_moroz": 86,
+    "snegurochka": 50,
+    "krampus": 0,
+    "santa": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 150,
+    "santa": 210
+   },
+   "enemies": [
+    "krampus",
+    "santa"
+   ],
+   "cd": {
+    "wall": 2,
+    "blizzard": 0,
+    "freeze": 2,
+    "song": 1
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": false,
+   "honey": [],
+   "items": {},
+   "n_items": 0,
+   "bar": 33,
+   "tk": 9,
+   "gk": 8,
+   "er": {
+    "krampus": 6,
+    "santa": 15
+   },
+   "intents": {
+    "santa": {
+     "move": "coal",
+     "target": "player"
+    }
+   },
+   "turn": 2,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-3-skilled",
+  "battle": 3,
+  "bot": "skilled",
+  "plan": {
+   "version": 1,
+   "battle": 3,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     442,
+     702
+    ],
+    [
+     253,
+     513
+    ],
+    [
+     372,
+     632
+    ],
+    [
+     744,
+     1004
+    ],
+    [
+     271,
+     531
+    ],
+    [
+     354,
+     614
+    ],
+    [
+     215,
+     475
+    ],
+    [
+     592,
+     852
+    ],
+    [
+     838,
+     1098
+    ],
+    [
+     233,
+     493
+    ],
+    [
+     846,
+     1106
+    ],
+    [
+     511,
+     771
+    ],
+    [
+     606,
+     866
+    ],
+    [
+     443,
+     703
+    ],
+    [
+     801,
+     1061
+    ],
+    [
+     215,
+     475
+    ],
+    [
+     803,
+     1063
+    ],
+    [
+     274,
+     534
+    ],
+    [
+     365,
+     625
+    ],
+    [
+     277,
+     537
+    ],
+    [
+     184,
+     444
+    ],
+    [
+     377,
+     637
+    ],
+    [
+     362,
+     622
+    ],
+    [
+     181,
+     441
+    ],
+    [
+     685,
+     945
+    ],
+    [
+     492,
+     752
+    ],
+    [
+     556,
+     816
+    ],
+    [
+     840,
+     1100
+    ],
+    [
+     230,
+     490
+    ],
+    [
+     434,
+     694
+    ],
+    [
+     249,
+     509
+    ],
+    [
+     788,
+     1048
+    ],
+    [
+     338,
+     598
+    ],
+    [
+     521,
+     781
+    ],
+    [
+     855,
+     1115
+    ],
+    [
+     214,
+     474
+    ],
+    [
+     458,
+     718
+    ],
+    [
+     457,
+     717
+    ],
+    [
+     447,
+     707
+    ],
+    [
+     572,
+     832
+    ],
+    [
+     555,
+     815
+    ],
+    [
+     508,
+     768
+    ],
+    [
+     233,
+     493
+    ],
+    [
+     628,
+     888
+    ],
+    [
+     342,
+     602
+    ],
+    [
+     392,
+     652
+    ],
+    [
+     485,
+     745
+    ],
+    [
+     203,
+     463
+    ],
+    [
+     344,
+     604
+    ],
+    [
+     359,
+     619
+    ],
+    [
+     504,
+     764
+    ],
+    [
+     252,
+     512
+    ],
+    [
+     687,
+     947
+    ],
+    [
+     758,
+     1018
+    ],
+    [
+     678,
+     938
+    ],
+    [
+     552,
+     812
+    ],
+    [
+     626,
+     886
+    ],
+    [
+     796,
+     1056
+    ],
+    [
+     387,
+     647
+    ],
+    [
+     487,
+     747
+    ]
+   ],
+   "targets": [
+    0,
+    5,
+    3,
+    2,
+    3,
+    1,
+    4,
+    4,
+    5,
+    2,
+    0,
+    1,
+    4,
+    3,
+    4,
+    2,
+    3,
+    2,
+    5,
+    0,
+    1,
+    1,
+    5,
+    1,
+    4,
+    5,
+    3,
+    0,
+    5,
+    2,
+    3,
+    1,
+    4,
+    4,
+    2,
+    4,
+    4,
+    5,
+    4,
+    4
+   ],
+   "gifts": [
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    572
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    383
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    502
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    874
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    401
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    484
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    345
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    722
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    968
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    363
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    976
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    641
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    736
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    573
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    931
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    345
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    933
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    404
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    495
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "player"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "player"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 4
+    },
+    {
+     "t": "skip",
+     "who": "player",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 27,
+     "bonus": true
+    },
+    {
+     "t": "down",
+     "who": "krampus"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "player",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 7,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 7,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 7,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 7
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 28,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 8
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 18,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 27,
+     "bonus": true
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "down",
+     "who": "santa"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "win",
+   "rounds": 8,
+   "stars": 3,
+   "items": {},
+   "hp": {
+    "player": 54,
+    "ded_moroz": 78,
+    "snegurochka": 56,
+    "krampus": 0,
+    "santa": 0
+   }
+  },
+  "state": {
+   "battle": 3,
+   "round": 8,
+   "hp": {
+    "player": 54,
+    "ded_moroz": 78,
+    "snegurochka": 56,
+    "krampus": 0,
+    "santa": 0
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 150,
+    "santa": 210
+   },
+   "enemies": [
+    "krampus",
+    "santa"
+   ],
+   "cd": {
+    "wall": 1,
+    "blizzard": 0,
+    "freeze": 0,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 0,
+   "wall": false,
+   "honey": [],
+   "items": {},
+   "n_items": 0,
+   "bar": 19,
+   "tk": 6,
+   "gk": 4,
+   "er": {
+    "krampus": 4,
+    "santa": 8
+   },
+   "intents": {
+    "santa": {
+     "move": "sack",
+     "target": null
+    }
+   },
+   "turn": 2,
+   "outcome": "win"
+  }
+ },
+ {
+  "seed": "fixture-3-random",
+  "battle": 3,
+  "bot": "random",
+  "plan": {
+   "version": 1,
+   "battle": 3,
+   "bar_ms": 1200,
+   "zones": [
+    [
+     712,
+     972
+    ],
+    [
+     225,
+     485
+    ],
+    [
+     406,
+     666
+    ],
+    [
+     805,
+     1065
+    ],
+    [
+     678,
+     938
+    ],
+    [
+     807,
+     1067
+    ],
+    [
+     272,
+     532
+    ],
+    [
+     271,
+     531
+    ],
+    [
+     344,
+     604
+    ],
+    [
+     266,
+     526
+    ],
+    [
+     658,
+     918
+    ],
+    [
+     324,
+     584
+    ],
+    [
+     350,
+     610
+    ],
+    [
+     709,
+     969
+    ],
+    [
+     642,
+     902
+    ],
+    [
+     837,
+     1097
+    ],
+    [
+     702,
+     962
+    ],
+    [
+     508,
+     768
+    ],
+    [
+     379,
+     639
+    ],
+    [
+     279,
+     539
+    ],
+    [
+     736,
+     996
+    ],
+    [
+     675,
+     935
+    ],
+    [
+     781,
+     1041
+    ],
+    [
+     268,
+     528
+    ],
+    [
+     386,
+     646
+    ],
+    [
+     843,
+     1103
+    ],
+    [
+     592,
+     852
+    ],
+    [
+     209,
+     469
+    ],
+    [
+     848,
+     1108
+    ],
+    [
+     811,
+     1071
+    ],
+    [
+     515,
+     775
+    ],
+    [
+     546,
+     806
+    ],
+    [
+     189,
+     449
+    ],
+    [
+     180,
+     440
+    ],
+    [
+     461,
+     721
+    ],
+    [
+     735,
+     995
+    ],
+    [
+     802,
+     1062
+    ],
+    [
+     303,
+     563
+    ],
+    [
+     589,
+     849
+    ],
+    [
+     604,
+     864
+    ],
+    [
+     466,
+     726
+    ],
+    [
+     820,
+     1080
+    ],
+    [
+     409,
+     669
+    ],
+    [
+     495,
+     755
+    ],
+    [
+     540,
+     800
+    ],
+    [
+     708,
+     968
+    ],
+    [
+     352,
+     612
+    ],
+    [
+     571,
+     831
+    ],
+    [
+     636,
+     896
+    ],
+    [
+     796,
+     1056
+    ],
+    [
+     530,
+     790
+    ],
+    [
+     385,
+     645
+    ],
+    [
+     408,
+     668
+    ],
+    [
+     727,
+     987
+    ],
+    [
+     819,
+     1079
+    ],
+    [
+     582,
+     842
+    ],
+    [
+     272,
+     532
+    ],
+    [
+     695,
+     955
+    ],
+    [
+     355,
+     615
+    ],
+    [
+     841,
+     1101
+    ]
+   ],
+   "targets": [
+    3,
+    3,
+    1,
+    0,
+    1,
+    5,
+    0,
+    0,
+    3,
+    4,
+    3,
+    4,
+    3,
+    4,
+    5,
+    0,
+    0,
+    4,
+    4,
+    4,
+    5,
+    0,
+    5,
+    4,
+    4,
+    3,
+    1,
+    2,
+    1,
+    5,
+    2,
+    4,
+    1,
+    2,
+    1,
+    2,
+    5,
+    3,
+    0,
+    5
+   ],
+   "gifts": [
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    0
+   ]
+  },
+  "log": [
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "gingerbread",
+    null,
+    null
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "pancake",
+    "snegurochka",
+    null
+   ],
+   [
+    "ded_moroz",
+    "pancake",
+    "snegurochka",
+    null
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    26
+   ],
+   [
+    "player",
+    "snowball",
+    "krampus",
+    1128
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    963
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    310
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    131
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    616
+   ],
+   [
+    "player",
+    "wall",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    793
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "player",
+    "snowball",
+    "santa",
+    1181
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    748
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    278
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    528
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "santa",
+    null
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    1175
+   ],
+   [
+    "snegurochka",
+    "song",
+    null,
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "krampus",
+    1196
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "santa",
+    58
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    668
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    1174
+   ],
+   [
+    "snegurochka",
+    "freeze",
+    "krampus",
+    null
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    987
+   ],
+   [
+    "snegurochka",
+    "icestar",
+    "krampus",
+    704
+   ],
+   [
+    "ded_moroz",
+    "blizzard",
+    null,
+    308
+   ],
+   [
+    "ded_moroz",
+    "staff",
+    "santa",
+    601
+   ]
+  ],
+  "events": [
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "ded_moroz",
+     "item": "gingerbread",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "player",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "ded_moroz",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "snegurochka",
+     "amount": 0
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 0
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 0
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "player"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "player"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 14,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 2
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "player",
+     "item": "pancake",
+     "to": "snegurochka"
+    },
+    {
+     "t": "heal",
+     "by": "player",
+     "to": "snegurochka",
+     "amount": 0
+    }
+   ],
+   [
+    {
+     "t": "item",
+     "by": "ded_moroz",
+     "item": "pancake",
+     "to": "snegurochka"
+    },
+    {
+     "t": "heal",
+     "by": "ded_moroz",
+     "to": "snegurochka",
+     "amount": 0
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 3
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "krampus",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "player"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 28,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 4
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "ded_moroz",
+     "amount": 31,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "player",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 5
+    }
+   ],
+   [
+    {
+     "t": "wall",
+     "by": "player"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "miss",
+     "by": "ded_moroz",
+     "to": "santa",
+     "why": "sack"
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "player",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 15
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 6
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "player",
+     "to": "santa",
+     "amount": 12,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "santa",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "player"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "player",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 7
+    },
+    {
+     "t": "skip",
+     "who": "player",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "santa"
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "player"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "player",
+     "amount": 24,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "player"
+    },
+    {
+     "t": "skip",
+     "who": "santa",
+     "why": "freeze"
+    },
+    {
+     "t": "round",
+     "n": 8
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 10,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "ded_moroz",
+     "amount": 15
+    },
+    {
+     "t": "heal",
+     "by": "snegurochka",
+     "to": "snegurochka",
+     "amount": 15
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "snegurochka",
+     "amount": 24,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 9
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "miss",
+     "by": "snegurochka",
+     "to": "santa",
+     "why": "sack"
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "candy",
+     "to": null
+    },
+    {
+     "t": "heal",
+     "by": "santa",
+     "to": "santa",
+     "amount": 20
+    },
+    {
+     "t": "round",
+     "n": 10
+    },
+    {
+     "t": "skip",
+     "who": "ded_moroz",
+     "why": "chain"
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 11
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "freeze",
+     "by": "snegurochka",
+     "to": "krampus"
+    },
+    {
+     "t": "skip",
+     "who": "krampus",
+     "why": "freeze"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 28,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 12
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "snegurochka",
+     "to": "krampus",
+     "amount": 15,
+     "bonus": true
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "chain",
+     "to": "snegurochka"
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "sack",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "reindeer",
+     "move": "sleigh",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "ded_moroz",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "hit",
+     "by": "reindeer",
+     "to": "snegurochka",
+     "amount": 12,
+     "bonus": false
+    },
+    {
+     "t": "round",
+     "n": 13
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "krampus",
+     "amount": 10,
+     "bonus": false
+    },
+    {
+     "t": "miss",
+     "by": "ded_moroz",
+     "to": "santa",
+     "why": "sack"
+    },
+    {
+     "t": "skip",
+     "who": "snegurochka",
+     "why": "chain"
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "switch",
+     "to": "ded_moroz"
+    },
+    {
+     "t": "hit",
+     "by": "krampus",
+     "to": "ded_moroz",
+     "amount": 24,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "coal",
+     "to": "snegurochka"
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "snegurochka",
+     "amount": 28,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "snegurochka"
+    },
+    {
+     "t": "round",
+     "n": 14
+    }
+   ],
+   [
+    {
+     "t": "hit",
+     "by": "ded_moroz",
+     "to": "santa",
+     "amount": 18,
+     "bonus": false
+    },
+    {
+     "t": "move",
+     "who": "krampus",
+     "move": "roar",
+     "to": null
+    },
+    {
+     "t": "move",
+     "who": "santa",
+     "move": "hohoho",
+     "to": null
+    },
+    {
+     "t": "hit",
+     "by": "santa",
+     "to": "ded_moroz",
+     "amount": 15,
+     "bonus": false
+    },
+    {
+     "t": "down",
+     "who": "ded_moroz"
+    }
+   ]
+  ],
+  "result": {
+   "outcome": "lose",
+   "rounds": 14,
+   "stars": 0,
+   "items": {
+    "gingerbread": 1,
+    "pancake": 2
+   },
+   "hp": {
+    "player": 0,
+    "ded_moroz": 0,
+    "snegurochka": 0,
+    "krampus": 14,
+    "santa": 101
+   }
+  },
+  "state": {
+   "battle": 3,
+   "round": 14,
+   "hp": {
+    "player": 0,
+    "ded_moroz": 0,
+    "snegurochka": 0,
+    "krampus": 14,
+    "santa": 101
+   },
+   "max": {
+    "player": 100,
+    "ded_moroz": 140,
+    "snegurochka": 90,
+    "krampus": 150,
+    "santa": 210
+   },
+   "enemies": [
+    "krampus",
+    "santa"
+   ],
+   "cd": {
+    "wall": 0,
+    "blizzard": 1,
+    "freeze": 0,
+    "song": 0
+   },
+   "chain": [],
+   "frozen": [],
+   "sack": false,
+   "rage": 3,
+   "wall": false,
+   "honey": [],
+   "items": {
+    "gingerbread": 1,
+    "pancake": 2
+   },
+   "n_items": 3,
+   "bar": 20,
+   "tk": 15,
+   "gk": 7,
+   "er": {
+    "krampus": 14,
+    "santa": 14
+   },
+   "intents": {
+    "krampus": {
+     "move": "roar",
+     "target": null
+    },
+    "santa": {
+     "move": "hohoho",
+     "target": null
+    }
+   },
+   "turn": 3,
+   "outcome": "lose"
+  }
+ }
+]

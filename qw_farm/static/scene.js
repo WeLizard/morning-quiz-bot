@@ -29,8 +29,9 @@ const MIN_SCALE=.25,MAX_SCALE=2,CACHE_MARGIN=.18,MAIN_MAX_PIXELS=4e6,CACHE_MAX_P
 // FIELD_SWAY_MS (longer on slow devices), growth alone every FIELD_GROW_MS; a zoom keeps live drawing until it settles.
 const FIELD_LAYER_MIN=12,FIELD_SWAY_MS=250,FIELD_GROW_MS=4000,FIELD_ZOOM_SETTLE=250;
 // Object sprites (drawObjectSprite): all bitmaps together stay under SPRITE_MAX_PIXELS device pixels (least recently drawn go
-// first); art that read the server clock is repainted every SPRITE_CLOCK_MS; the camera counts as moving for CAMERA_SETTLE ms.
-const SPRITE_MAX_PIXELS=8e6,SPRITE_ONE_MAX=2e6,SPRITE_CLOCK_MS=2000,CAMERA_SETTLE=250,SPRITE_KEEP=['ready','clockBubble','cropBadge','label','jobMark'];
+// first); art that read the server clock (a tree's fruit growing over minutes) is repainted every SPRITE_CLOCK_MS and as soon
+// as its fruit ripens; the camera counts as moving for CAMERA_SETTLE ms.
+const SPRITE_MAX_PIXELS=8e6,SPRITE_ONE_MAX=2e6,SPRITE_CLOCK_MS=15000,CAMERA_SETTLE=250,SPRITE_KEEP=['ready','clockBubble','cropBadge','label','jobMark'];
 const KEY_PAN={ArrowLeft:[1,0],KeyA:[1,0],ArrowRight:[-1,0],KeyD:[-1,0],ArrowUp:[0,1],KeyW:[0,1],ArrowDown:[0,-1],KeyS:[0,-1]};
 const KEY_SPEED=560;
 export const SWAN_FEED_SECONDS=7;
@@ -360,7 +361,7 @@ export class FarmScene {
   let e=S.map.get(o.id);
   if(e?.animated&&!moving){this.drawObject(o);return}
   // An animated sprite is refreshed once as the camera starts moving, so smoke and sails do not jump back to an old frame.
-  const stale=e&&(e.scale!==this.scale||e.clock&&now-e.at>=SPRITE_CLOCK_MS),restart=e?.animated&&moving&&e.at<this.moveStart;
+  const stale=e&&(e.scale!==this.scale||e.clock&&(now-e.at>=SPRITE_CLOCK_MS||e.due&&this.now()>=e.due)),restart=e?.animated&&moving&&e.at<this.moveStart;
   if(!e||restart||stale&&!moving){e=this.rasterObject(o,e,S);if(!e){this.drawObject(o);return}this.stats.spritePaints=(this.stats.spritePaints||0)+1}
   S.map.delete(o.id);S.map.set(o.id,e);e.frame=this.stats.frames;
   if(e.animated&&!moving){this.drawObject(o);return}
@@ -394,6 +395,7 @@ export class FarmScene {
   this.c=g;this.lanternLights=e.lights;this.lightMarkers=e.markers;
   try{this.drawObject(o)}
   finally{delete this.time;this.time=t;delete this.now;for(const name of SPRITE_KEEP)delete this[name];Object.assign(this,keep,Object.fromEntries(own))}
+  const due=o.fruit?.ready_at;if(e.clock&&due>serverNow.call(this))e.due=due;   // the ripe look must not wait for the slow clock
   e.ms=performance.now()-at;S.pixels+=w*h;
   return e;
  }

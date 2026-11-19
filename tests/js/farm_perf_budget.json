@@ -3,20 +3,20 @@
  "scenarios": {
   "idle": {
    "total": {
-    "avg": 26417,
+    "avg": 26412,
     "max": 32927
    },
    "stats": {
     "staticPaints": 0,
     "staticBlits": 60,
     "fieldPaints": 8,
-    "spritePaints": 6,
+    "spritePaints": 0,
     "spriteBlits": 1680,
     "objects": 205,
     "drawn": 205
    },
    "sections": {
-    "trees": 5769,
+    "trees": 5764,
     "building:mill": 1626,
     "building:weavery": 1357,
     "paintFields": 1003,
@@ -233,20 +233,20 @@
   },
   "night": {
    "total": {
-    "avg": 25974,
+    "avg": 25969,
     "max": 32484
    },
    "stats": {
     "staticPaints": 0,
     "staticBlits": 60,
     "fieldPaints": 8,
-    "spritePaints": 6,
+    "spritePaints": 0,
     "spriteBlits": 1680,
     "objects": 205,
     "drawn": 205
    },
    "sections": {
-    "trees": 5615,
+    "trees": 5610,
     "building:mill": 1626,
     "building:weavery": 1357,
     "paintFields": 1003,

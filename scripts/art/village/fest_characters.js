@@ -167,10 +167,10 @@ export function festCharacterSvgs() {
     'resident-sonya-posidelki': svgOf('fcso', '-18 -50 36 54', 'bc-art', [['', sonyaDozing]]),
     'resident-hedgehog-new_year': svgOf('fche', '-18 -50 36 54', 'bc-art', [['', hedgehogNewYear]]),
     // New Year guests (new_year_guests.js): people are taller than the residents, same units
-    'guest-ded_moroz': svgOf('fcdm', '-20 -56 40 60', 'bc-art', [['', dedMoroz]]),
-    'guest-snegurochka': svgOf('fcsg', '-20 -56 40 60', 'bc-art', [['', snegurochka]]),
-    'guest-santa': svgOf('fcsa', '-20 -56 40 60', 'bc-art', [['', santa]]),
-    'guest-krampus': svgOf('fckr', '-20 -56 40 60', 'bc-art', [['', krampus]]),
+    'guest-ded_moroz': svgOf('fcdm', '-20 -56 40 60', 'bc-art', [['', s => dedMoroz(s)]]),
+    'guest-snegurochka': svgOf('fcsg', '-20 -56 40 60', 'bc-art', [['', s => snegurochka(s)]]),
+    'guest-santa': svgOf('fcsa', '-20 -56 40 60', 'bc-art', [['', s => santa(s)]]),
+    'guest-krampus': svgOf('fckr', '-20 -56 40 60', 'bc-art', [['', s => krampus(s)]]),
     // New Year winter clothes: overlays laid over the everyday resident figure (winter_residents.js)
     ...Object.fromEntries(Object.entries(WINTER).map(([key, draw]) => [`winter-${key}`, svgOf(`fcw${key}`, '-18 -50 36 54', 'bc-winter', [['', draw]])])),
   };

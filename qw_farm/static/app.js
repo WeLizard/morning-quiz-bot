@@ -124,20 +124,24 @@ const VILLAGE_WHEEL_SVG=(()=>{
  // The wheel is 9 units wide along the axle: five synchronised layers (back rim, three paddle slices, front face) read as boards
  // spanning the width. Everything below the waterline (local y > 21) is clipped, so the race painted in village.svg shows through.
  const paddles=(fill,edge)=>Array.from({length:8},(_,i)=>`<rect x="-3" y="-30.5" width="6" height="9.5" rx="1" transform="rotate(${i*45})" fill="${fill}"${edge?` stroke="${edge}" stroke-width="1"`:''}/>`).join('');
- const layer=(dx,body)=>`<g transform="matrix(.894,-.447,0,1,${dx},${dx*.48})" clip-path="url(#vw-race)"><g class="vw-rot">${body}</g></g>`;
- return '<svg class="vfx-wheel-art" viewBox="-40 -50 80 95" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
- +'<defs><clipPath id="vw-race" clipPathUnits="userSpaceOnUse"><rect x="-40" y="-40" width="80" height="61"/></clipPath>'
- +'<filter id="vw-night" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".34 0 0 0 .075 0 .34 0 0 .122 0 0 .34 0 .259 0 0 0 1 0"/></filter></defs><g class="vw-all">'
+ // Each layer is an HTML plane in the wall (style.css .vw-plane: the same matrix, clipped at the waterline) holding its paddles as
+ // one small <svg>: turning that whole <svg> runs on the compositor. Rotating <g>s inside one SVG repainted the wheel on the main
+ // thread every frame and kept the whole village (≈90 animations) on main-thread frames.
+ const layer=(dx,body)=>`<span class="vw-plane vw-dx${-dx}"><span class="vw-race"><svg class="vw-rot" viewBox="-32 -32 64 64" aria-hidden="true" focusable="false"><g class="vw-body">${body}</g></svg></span></span>`;
+ return '<span class="vfx-wheel-art">'
  +layer(-8,`${paddles('#6f4f32','#4f3722')}<circle r="24" fill="none" stroke="#5f432a" stroke-width="4"/>`)
  +layer(-6,paddles('#8a6340'))+layer(-4,paddles('#966b44'))+layer(-2,paddles('#a3764a'))
  +layer(0,`<circle r="22" fill="#6a4e34"/>${paddles('#c99c69','#6e4c30')}<circle r="24" fill="none" stroke="#a77a4c" stroke-width="4"/><circle r="24" fill="none" stroke="#6e4c30" stroke-width=".8"/>`
   +'<path d="M-20.5 0H20.5M0 -20.5V20.5M-14.5 -14.5L14.5 14.5M-14.5 14.5L14.5 -14.5" stroke="#8b6440" stroke-width="2.6" stroke-linecap="round"/>')
+ // the still parts (hub, foam, flume water) over the planes; the night colour matrix lives here for all of them
+ +'<svg class="vw-still" viewBox="-40 -50 80 95" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+ +'<defs><filter id="vw-night" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".34 0 0 0 .075 0 .34 0 0 .122 0 0 .34 0 .259 0 0 0 1 0"/></filter></defs><g class="vw-all">'
  +'<g transform="matrix(.894,-.447,0,1,0,0)"><circle r="5" fill="#4f3824"/><circle cx="-1.2" cy="-1.3" r="1.8" fill="#7a5a3c"/>'
  // foam where the paddles enter the race
  +'<path d="M-19 21.2H-9M-4 21.2H6M11 21.2H18" stroke="#e4f2ef" stroke-width="1.5" stroke-linecap="round" opacity=".9"/>'
  // flume water: leaves the lip on the tower side, arcs over the top and falls on the far paddles
  +'<path d="M13.6 -28.2C9 -33.5 0 -34 -5.5 -28.5" fill="none" stroke="#bfe0de" stroke-width="3" stroke-linecap="round" opacity=".9"/><path d="M12 -29.6C8 -32.4 1 -32.8 -3.6 -29.8" fill="none" stroke="#f1f9f7" stroke-width=".9" stroke-linecap="round"/>'
- +'<circle cx="-8.4" cy="-24.6" r="1.1" fill="#d7eae6"/><circle cx="-6.6" cy="-21.4" r=".85" fill="#d7eae6"/></g></g></svg>';
+ +'<circle cx="-8.4" cy="-24.6" r="1.1" fill="#d7eae6"/><circle cx="-6.6" cy="-21.4" r=".85" fill="#d7eae6"/></g></g></svg></span>';
 })();
 const VILLAGE_SPEED=260,VILLAGE_MAX_WALK=7;let villageWalkRaf=0,villageWalkPlayer=null;let villagePos=[...VILLAGE_START],villageWalkToken=0,villageDragged=false,villageMini=null;
 // Living village: idle thought, stroll offset in px (x, y) per resident. Motion is pure CSS, no timers.

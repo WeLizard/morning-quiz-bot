@@ -559,9 +559,15 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 }
 /* water wheel of the river mill: inline SVG in the long-wall plane (app.js VILLAGE_WHEEL_SVG). It sits above the night window layer,
    so at night it takes the colour of the .vn-tint overlay through its own colour matrix instead of a blanket brightness filter. */
-.vfx-wheel{position:absolute;display:block;pointer-events:none}.vfx-wheel-art{display:block;width:100%;height:100%;overflow:visible}
-.vfx-wheel .vw-rot{transform-box:fill-box;transform-origin:50% 50%}
-:root[data-farm-theme=night] .vfx-wheel .vw-all{filter:url(#vw-night)}
+.vfx-wheel{position:absolute;display:block;pointer-events:none}.vfx-wheel-art{position:absolute;inset:0;display:block}
+/* The box is 80 x 95 wheel units (hub at 40, 50). A plane = the SVG matrix(.894,-.447,0,1,dx,.48dx) about the hub; its race clips at
+   the waterline (y -40..21); the paddles <svg> (64 units, centred on the hub) turns as a whole, on the compositor. */
+.vfx-wheel .vw-plane{position:absolute;inset:0;transform-origin:50% 52.632%;transform:translate(calc(var(--dx) * 1.25%),calc(var(--dx) * .50526%)) matrix(.894,-.447,0,1,0,0)}
+.vfx-wheel .vw-dx8{--dx:-8}.vfx-wheel .vw-dx6{--dx:-6}.vfx-wheel .vw-dx4{--dx:-4}.vfx-wheel .vw-dx2{--dx:-2}.vfx-wheel .vw-dx0{--dx:0}   /* no inline styles under the farm CSP */
+.vfx-wheel .vw-race{position:absolute;left:0;top:10.526%;width:100%;height:64.211%;overflow:hidden}
+.vfx-wheel .vw-rot{position:absolute;left:10%;top:13.115%;width:80%;height:104.918%;display:block;overflow:visible;transform-origin:50% 50%}
+.vfx-wheel .vw-still{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+:root[data-farm-theme=night] .vfx-wheel .vw-all,:root[data-farm-theme=night] .vfx-wheel .vw-body{filter:url(#vw-night)}
 .vfx-gear{position:absolute;width:1%;aspect-ratio:1;border-radius:50%;box-sizing:border-box;border:4px dotted #6f6a5e;background:#a9a091;translate:-50% -50%}
 .vfx-cloud{position:absolute;left:-6%!important;width:6%;aspect-ratio:3/1;background:radial-gradient(22% 46% at 28% 62%,#fffffff0 96%,transparent),radial-gradient(26% 62% at 52% 44%,#fffffff0 96%,transparent),radial-gradient(20% 44% at 75% 62%,#fffffff0 96%,transparent),radial-gradient(44% 22% at 52% 78%,#f3f6eef0 96%,transparent);opacity:.42}
 .vfx-birds{position:absolute;left:-6%!important;width:6%;aspect-ratio:2/1}
@@ -574,9 +580,9 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 @media(prefers-reduced-motion:no-preference){
  .vfx-smoke{animation:vfx-smoke 5.5s ease-out infinite;animation-delay:var(--d,0s)}
  @keyframes vfx-smoke{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}18%{opacity:.8}100%{opacity:0;transform:translate(10%,-330%) scale(2.2)}}
- .vfx-sails{animation:vfx-spin 30s linear infinite}.vfx-wheel .vw-rot{animation:vfx-spin-ccw 10s linear infinite}.vfx-gear{animation:vfx-spin 14s linear infinite}
+ .vfx-sails{animation:vfx-spin 30s linear infinite}.vfx-wheel .vw-rot{animation:vw-turn 10s linear infinite}.vfx-gear{animation:vfx-spin 14s linear infinite}
  @keyframes vfx-spin{from{rotate:0deg}to{rotate:360deg}}
- @keyframes vfx-spin-ccw{from{rotate:0deg}to{rotate:-360deg}}
+ @keyframes vw-turn{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
  .vfx-cloud{animation:vfx-cloud var(--t,240s) linear infinite;animation-delay:var(--d,0s)}
  @keyframes vfx-cloud{from{transform:translateX(0)}to{transform:translateX(1800%)}}
  .vfx-birds{animation:vfx-birds 80s linear infinite;animation-delay:var(--d,0s)}
@@ -685,8 +691,11 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
   0%,18%,70%,100%{translate:0 0}
   34%,52%{translate:calc(var(--resident-dx) * var(--village-width)) calc(var(--resident-dy) * var(--village-width))}
  }
- [data-resident-mode=roaming] .village-walker>svg{animation-name:v-flip,v-resident-gait;animation-duration:var(--cycle),var(--cycle)}
- [data-resident-mode=roaming]:focus-visible,[data-resident-mode=roaming]:focus-visible .village-walker>svg{animation-play-state:paused}
+ /* The gait steps the HTML walker, not the <svg>: an independent translate on an SVG element is not composited, and that alone
+    kept every village frame on the main thread. */
+ [data-resident-mode=roaming] .village-walker>svg{animation-name:v-flip;animation-duration:var(--cycle)}
+ [data-resident-mode=roaming] .village-walker{animation:v-resident-gait var(--cycle) ease-in-out infinite;animation-delay:calc(var(--d,0s) - var(--e,0s))}
+ [data-resident-mode=roaming]:focus-visible,[data-resident-mode=roaming]:focus-visible .village-walker,[data-resident-mode=roaming]:focus-visible .village-walker>svg{animation-play-state:paused}
  @keyframes v-resident-gait{
   0%,18%,22%,26%,30%,34%,52%,56%,60%,64%,68%,70%,100%{translate:0 0}
   20%,24%,28%,32%,54%,58%,62%,66%{translate:0 -1.5px}
@@ -1050,7 +1059,7 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 html.qw-desktop .header-destinations .forest-door[data-label]::after{font-size:13px}
 @media(prefers-reduced-motion:no-preference){
  .village-npc.is-stealing{animation:none;translate:var(--steal-x,0) var(--steal-y,0);transition:translate 1.2s ease-in-out}
- .village-npc.is-stealing .village-walker>svg{animation:none}
+ .village-npc.is-stealing .village-walker,.village-npc.is-stealing .village-walker>svg{animation:none}
 }
 .inv-search{position:relative;margin:4px 0 10px}.inv-search input{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:10px 48px 10px 12px;border:1px solid #dce3cf;border-radius:12px;background:#fcfcf5;color:var(--ink);font-size:16px;outline-color:#91a57b}.inv-search input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 .inv-clear{position:absolute;right:0;top:0;width:44px;height:44px;min-width:44px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:22px;line-height:1}.inv-clear[hidden]{display:none}

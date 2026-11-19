@@ -90,9 +90,13 @@ test('farm header: one 10px rhythm around the 36px gear plate, map tools and zoo
  assert.match(tail,/\.map-controls>button\{[^}]*width:44px;height:44px/);
 });
 test('river-mill wheel stands in the wall plane, turns away from the flume and pauses off-screen',()=>{
- assert.match(app,/const layer=\(dx,body\)=>`<g transform="matrix\(\.894,-\.447,0,1,/);
- assert.match(css,/\.vfx-wheel \.vw-rot\{animation:vfx-spin-ccw/);assert.match(css,/@keyframes vfx-spin-ccw\{from\{rotate:0deg\}to\{rotate:-360deg\}\}/);
+ // each layer is an HTML plane in the wall (the SVG matrix about the hub) whose paddles <svg> turns whole, on the compositor
+ assert.match(app,/const layer=\(dx,body\)=>`<span class="vw-plane vw-dx\$\{-dx\}"><span class="vw-race"><svg class="vw-rot"/);
+ assert.match(css,/\.vfx-wheel \.vw-plane\{[^}]*transform-origin:50% 52\.632%;transform:translate\(calc\(var\(--dx\) \* 1\.25%\),calc\(var\(--dx\) \* \.50526%\)\) matrix\(\.894,-\.447,0,1,0,0\)\}/);
+ assert.match(css,/\.vfx-wheel \.vw-race\{[^}]*overflow:hidden\}/);
+ assert.doesNotMatch(app,/style="--dx/);   // the farm CSP drops inline style attributes
+ assert.match(css,/\.vfx-wheel \.vw-rot\{animation:vw-turn/);assert.match(css,/@keyframes vw-turn\{from\{transform:rotate\(0deg\)\}to\{transform:rotate\(-360deg\)\}\}/);
  assert.match(app,/el\('i',null,'vfx-wheel va'\)/);
- assert.match(css,/:root\[data-farm-theme=night\] \.vfx-wheel \.vw-all\{filter:url\(#vw-night\)\}/);
+ assert.match(css,/:root\[data-farm-theme=night\] \.vfx-wheel \.vw-all,:root\[data-farm-theme=night\] \.vfx-wheel \.vw-body\{filter:url\(#vw-night\)\}/);
 });
 

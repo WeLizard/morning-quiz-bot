@@ -23,6 +23,7 @@ const seed=(x,y=0)=>{let n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.fl
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 // Plant detail drops to a stem and a head below this zoom. 0 = never (identical art at every zoom); ~.4 would save ~25% on a 20x20 phone view.
 const PLANT_LOD_SCALE=0;
+const PLANT_BOX={x:-18,y:-42,w:36,h:54},PLANT_SPRITE_MAX=240;   // world px around a plant's foot (scene.plantSprite)
 const MIN_SCALE=.25,MAX_SCALE=2,CACHE_MARGIN=.18,MAIN_MAX_PIXELS=4e6,CACHE_MAX_PIXELS=6e6;
 const KEY_PAN={ArrowLeft:[1,0],KeyA:[1,0],ArrowRight:[-1,0],KeyD:[-1,0],ArrowUp:[0,1],KeyW:[0,1],ArrowDown:[0,-1],KeyS:[0,-1]};
 const KEY_SPEED=560;
@@ -213,10 +214,13 @@ export class FarmScene {
  burst(obj,color='#e2bd62'){let p=P(obj.x+.5,obj.y+.5);for(let i=0;i<12;i++)this.particles.push({x:p.x,y:p.y-12,dx:(seed(i,Date.now()%5000)-.5)*2.5,dy:-1-seed(i+8)*2,age:0,color});this.dirty=true}
  tick(t){this.raf=0;if(this.isPaused())return;this.raf=requestAnimationFrame(this.tick);this.stepCamera(t);
   let reacting=false;for(const g of this.walkingGeese||[])if(g.mode&&g.mode!=='idle')reacting=true;
-  const interval=this.motion?this.frameInterval:reacting?100:1000;if(this.particles.length||reacting&&t-this.lastFrame>=interval)this.dirty=true;
+  // Input, camera flights and bursts keep the adaptive rate; the idle ambience (sway, smoke, petals) slows down on slow devices
+  // so that a heavy farm leaves the main thread free (fast phones still get ~30 fps).
+  const busy=this.dirty||!!this.anim||this.particles.length>0||reacting;
+  const interval=this.motion?(busy?this.frameInterval:this.ambientInterval||this.frameInterval):reacting?100:1000;if(this.particles.length||reacting&&t-this.lastFrame>=interval)this.dirty=true;
   const elapsed=t-this.lastFrame;if(elapsed<interval&&(this.motion||reacting||!this.dirty))return;this.dirty=false;const remainder=this.motion&&this.lastFrame>0?elapsed%interval:0;const a=performance.now();this.draw(t/1000);
   // Slow devices: stretch the animation interval to ~2.5 frame costs (32..100 ms), including during camera movement.
-  this.cost=this.cost?this.cost*.88+(performance.now()-a)*.12:performance.now()-a;this.frameInterval=clamp(this.cost*2.5,32,100);
+  this.cost=this.cost?this.cost*.88+(performance.now()-a)*.12:performance.now()-a;this.frameInterval=clamp(this.cost*2.5,32,100);this.ambientInterval=clamp(this.cost*4,32,300);
   // Preserve sub-frame time on displays whose refresh period does not divide the target interval.
   this.lastFrame=t-(this.motion?remainder%this.frameInterval:0)}
  poly(points,fill,stroke=null,width=1){const c=this.c;c.beginPath();points.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();if(fill){c.fillStyle=fill;c.fill()}if(stroke){c.strokeStyle=stroke;c.lineWidth=width;c.stroke()}}
@@ -867,7 +871,32 @@ export class FarmScene {
  plant(x,y,id,f,t){
   // Zoomed far out (whole 20x20 land on a phone) a plant is a few pixels: draw a stem and a head in the crop colour.
   if(this.scale<PLANT_LOD_SCALE){const h=6+f*9;this.line(x,y,x,y-h,'#719856',1.8);if(f>.55)this.ellipse(x,y-h-1,2.6,2.8,f>.8?(this.catalog?.crops?.[id]?.color||'#d9c777'):'#8fb06a');return}
-  let sway=this.motion?Math.sin(t*1.2+x)*1.2:0,green='#719856';this.shadow(x,y,4,2);if(f<.6){this.sapling(x,y,id,f,sway);return}
+  const sway=this.motion?Math.sin(t*1.2+x)*1.2:0;this.shadow(x,y,4,2);
+  if(!this.plantSprite(x,y,id,f,sway))this.plantBody(x,y,id,f,sway);
+ }
+ // A plant is a pure picture of (crop, growth, sway) around its foot: a bed of 120 barley plots was ~33 000 canvas calls a
+ // frame. Each distinct picture is rasterised once at the current device scale (bucketed in 1/8 octaves, always down-sampled)
+ // and stamped with drawImage. Growth is quantised to 1/40, sway to 0.4 px: below a device pixel at any zoom.
+ plantSprite(x,y,id,f,sway){
+  const c=this.c;if(typeof document==='undefined'||!c?.getTransform)return false;
+  const m=c.getTransform();if(m.b||m.c||!(m.a>0))return false;
+  const kq=2**(Math.ceil(Math.log2(m.a)*8)/8),fq=f>=1?1:Math.round(f*40)/40,sq=Math.round(sway*2.5)/2.5;
+  let cache=this.plantSprites;
+  if(!cache||cache.k!==kq||cache.catalog!==this.catalog||cache.contrast!==this.contrast)cache=this.plantSprites={k:kq,catalog:this.catalog,contrast:this.contrast,map:new Map()};
+  const key=id+'|'+fq+'|'+sq;let sp=cache.map.get(key);
+  if(!sp){
+   if(cache.map.size>=PLANT_SPRITE_MAX)cache.map.clear();
+   sp=document.createElement('canvas');sp.width=Math.ceil(PLANT_BOX.w*kq);sp.height=Math.ceil(PLANT_BOX.h*kq);
+   const g=sp.getContext('2d');if(!g)return false;
+   g.setTransform(kq,0,0,kq,-PLANT_BOX.x*kq,-PLANT_BOX.y*kq);
+   const main=this.c;this.c=g;try{this.plantBody(0,0,id,fq,sq)}finally{this.c=main}
+   cache.map.set(key,sp);
+  }
+  c.drawImage(sp,x+PLANT_BOX.x,y+PLANT_BOX.y,sp.width/kq,sp.height/kq);
+  return true;
+ }
+ plantBody(x,y,id,f,sway){
+  const green='#719856';if(f<.6){this.sapling(x,y,id,f,sway);return}
   if(this.plantNew(x,y,id,f,sway))return;
   let h=8+f*13;this.line(x,y,x+sway,y-h,green,1.3);
   if(id==='wheat'){for(let d of [0,1,2]){this.line(x+(d-1)*3,y,x+sway+(d-1)*3,y-h+(d%2)*3,'#a4a966',1);for(let k=0;k<3;k++){this.ellipse(x+sway+(d-1)*3-1,y-h+k*3,2,2.5,f>.72?'#edd088':'#b8c789')}}}

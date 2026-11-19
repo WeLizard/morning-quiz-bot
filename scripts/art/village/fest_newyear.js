@@ -4,6 +4,7 @@
 // plaids on the plaza benches, warm windows and chimney smoke. vf-night: windows, ridge lights, fir lights and star above the tint.
 import {festKit} from './fest_kit.js';
 import {snowCover} from './fest_snow.js';
+import {placeGuests} from './santa_guests.js';
 
 const BULBS = ['#e8c25a', '#d9553f', '#7fa3c4', '#8fae86', '#e7a8b5'];
 const SNOW = '#eef2f4';
@@ -167,5 +168,8 @@ export function newYear(V) {
   c.end();
   // world units (2400x1800) for the client: where the fir stands and where a named toy (fest_ny_toy) can hang
   const [ma, , , md, me, mf] = V.matrix, W = ([x, y]) => [Math.round(ma * x + me), Math.round(md * y + mf)];
-  return {svg: K.wrap(), problems, fir: W([base.x, base.y]), hooks: hooks.map(W), snow};
+  // «Битва с Сантой» guests by the swan pond: a live button over the layer (santa_guests.js); the fir and the snowman are taken
+  K.taken.push([fx - .8, fy - .8, fx + .8, fy + .8]); if (sm) K.taken.push([sm[0] - .4, sm[1] - .4, sm[0] + .4, sm[1] + .4]);
+  const svg = K.wrap(), guests = placeGuests(K, V, [fx, fy]);
+  return {svg, problems, fir: W([base.x, base.y]), hooks: hooks.map(W), snow, guests};
 }

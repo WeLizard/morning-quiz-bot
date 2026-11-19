@@ -54,13 +54,45 @@ export function snowCover(V, K, opts) {
     }
     flush();
   }
-  // the cells of one look (snow, shade or trodden; one edge-fade bucket) as outlines on the diamond grid: every cell edge
-  // with no cell of the same look behind it, chained into loops (counter-clockwise in u, v, so holes come out reversed and
-  // the default nonzero fill keeps them empty), points on straight runs dropped
-  const strips = (list, fill) => {
+  // Pixel rim (owner's request 2026-11-19): the snow does not stop on a hard staircase. Its rim is drawn on a twice finer grid
+  // (m = 2n): a rim diamond keeps each of its four small diamonds by how much snow lies toward it, and the bare diamonds
+  // beside the snow get a sparse bluish crumb of small diamonds, thinning out away from it. A crumb lies only where its own
+  // five points are bare grass, so it never climbs a wall, a field or a path.
+  const m = 2 * n, fine = {snow: new Map(), shade: new Map()};   // kind -> key -> fade bucket
+  const coarse = new Map();
+  for (const kind of ['snow', 'shade']) for (const [v, u0, u1, f] of runs[kind]) for (let u = u0; u < u1; u++) coarse.set(key(u, v), [kind, f]);
+  const isSnow = (u, v) => coarse.has(key(u, v));
+  const toward = (u, v, i, j) => { const du = i ? 1 : -1, dv = j ? 1 : -1; return isSnow(u + du, v) + isSnow(u, v + dv) + isSnow(u + du, v + dv) };
+  const rimOf = (u, v) => { for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) if ((du || dv) && !isSnow(u + du, v + dv)) return true; return false };
+  const KEEP = [.35, .55, .85, 1], CRUMB = [0, .18, .35, .5];
+  const fineBare = (fu, fv) => { const d = 1 / m; return Math.max(...[[.5, .5], [.2, .2], [.8, .2], [.2, .8], [.8, .8]].map(([a, b]) => V.bare(fu * d + a * d, fv * d + b * d))) };
+  const crumbs = new Map();   // coarse bare cells beside the snow
+  for (const [k, [kind, f]] of coarse) {
+    const u = Math.round(k / 100000), v = k - u * 100000, rim = rimOf(u, v);
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+      const fu = 2 * u + i, fv = 2 * v + j;
+      if (!rim || h2(fu, fv, 5) < KEEP[toward(u, v, i, j)]) fine[kind].set(key(fu, fv), f);
+    }
+    if (rim) for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) {
+      const kk = key(u + du, v + dv); if (!isSnow(u + du, v + dv)) crumbs.set(kk, Math.max(crumbs.get(kk) ?? 0, f));
+    }
+  }
+  for (const [k, f] of crumbs) {
+    const u = Math.round(k / 100000), v = k - u * 100000;
+    if (near.some(([tx, ty, r]) => Math.hypot((u + .5) / n - tx, (v + .5) / n - ty) < r)) continue;
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+      const fu = 2 * u + i, fv = 2 * v + j, x = (fu + .5) / m, y = (fv + .5) / m;
+      if (h2(fu, fv, 6) >= CRUMB[toward(u, v, i, j)] || V.edge(x, y) <= 0 || V.kind(x, y) !== 'grass' || fineBare(fu, fv) === 2) continue;
+      fine.shade.set(key(fu, fv), Math.min(f, V.edge(x, y) >= 1 ? 3 : Math.floor(V.edge(x, y) * 3)));
+    }
+  }
+  // the cells of one look (snow, shade or trodden; one edge-fade bucket) as outlines on a diamond grid of `g` per tile: every
+  // cell edge with no cell of the same look behind it, chained into loops (counter-clockwise in u, v, so holes come out
+  // reversed and the default nonzero fill keeps them empty), points on straight runs dropped
+  const strips = (cellsByKey, fill, g) => {
     for (let f = 0; f <= 3; f++) {
       const set = new Set();
-      for (const [v, u0, u1, ff] of list) if (ff === f) for (let u = u0; u < u1; u++) set.add(key(u, v));
+      for (const [k, ff] of cellsByKey) if (ff === f) set.add(k);
       if (!set.size) continue;
       const out = new Map(), vk = (u, v) => `${u},${v}`, edge = (a, b) => { const k = vk(...a); (out.get(k) || out.set(k, []).get(k)).push(b) };
       for (const k of set) {
@@ -70,7 +102,12 @@ export function snowCover(V, K, opts) {
         if (!has(0, 1)) edge([u + 1, v + 1], [u, v + 1]);
         if (!has(-1, 0)) edge([u, v + 1], [u, v]);
       }
-      c.beginPath();
+      // the outline as relative steps between points rounded to 0.1 px (the steps add up exactly, no drift): a third of the bytes
+      let d = '', last = null;
+      const r10 = v => Math.round(v * 10), f10 = v => { const s = (v / 10).toFixed(1); return (s.endsWith('.0') ? s.slice(0, -2) : s).replace(/^(-?)0\./, '$1.') };
+      const to = (q, move) => { const X = r10(q.x), Y = r10(q.y);
+        if (!last) d += `M${f10(X)} ${f10(Y)}`; else { const dx = X - last[0], dy = Y - last[1]; d += `${move ? 'm' : 'l'}${f10(dx)}${dy < 0 ? '' : ' '}${f10(dy)}` }
+        last = [X, Y] };
       for (const start of [...out.keys()].sort()) {
         while ((out.get(start) || []).length) {
           const loop = [start.split(',').map(Number)];
@@ -78,17 +115,19 @@ export function snowCover(V, K, opts) {
           for (;;) { const nx = out.get(at).pop(); at = vk(...nx); if (at === start) break; loop.push(nx) }
           const pts = loop.filter((p, i) => { const a = loop[(i + loop.length - 1) % loop.length], b = loop[(i + 1) % loop.length];
             return (p[0] - a[0]) * (b[1] - p[1]) !== (p[1] - a[1]) * (b[0] - p[0]) });
-          pts.forEach(([u, v], i) => { const q = pt(u / n, v / n); i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y) }); c.closePath();
+          let first = null;
+          pts.forEach(([u, v], i) => { const q = pt(u / g, v / g); if (!i) first = [r10(q.x), r10(q.y)]; to(q, !i) }); d += 'z'; last = first;
         }
       }
-      c.fillStyle = fill(f); c.fill();
+      c.beginPath(); c.d = d; c.fillStyle = fill(f); c.fill();
     }
   };
+  const byKey = list => { const map = new Map(); for (const [v, u0, u1, f] of list) for (let u = u0; u < u1; u++) map.set(key(u, v), f); return map };
   const alpha = (a, f) => +(a * [.25, .5, .78, 1][f]).toFixed(2);
-  strips(runs.snow, f => f === 3 ? SNOW : `rgba(242,245,247,${alpha(1, f)})`);
-  strips(runs.shade, f => f === 3 ? SHADE : `rgba(223,231,236,${alpha(1, f)})`);   // snow in the shadows of houses and trees
-  if (opts.trodden) strips(runs.trodden, f => `rgba(244,246,247,${alpha(opts.trodden, f)})`);
-  const snowSet = new Set([...runs.snow, ...runs.shade].flatMap(([v, u0, u1]) => Array.from({length: u1 - u0}, (_, i) => key(u0 + i, v))));
+  strips(fine.snow, f => f === 3 ? SNOW : `rgba(242,245,247,${alpha(1, f)})`, m);
+  strips(fine.shade, f => f === 3 ? SHADE : `rgba(223,231,236,${alpha(1, f)})`, m);   // snow in the shadows, and the crumb
+  if (opts.trodden) strips(byKey(runs.trodden), f => `rgba(244,246,247,${alpha(opts.trodden, f)})`, n);
+  const snowSet = new Set(coarse.keys());
   const snowAt = (x, y) => snowSet.has(key(Math.floor(x * n), Math.floor(y * n)));
 
   // drifts along the roads: grass tiles beside a road, snow all around, an elongated mound along the road

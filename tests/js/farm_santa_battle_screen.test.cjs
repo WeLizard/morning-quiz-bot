@@ -126,3 +126,16 @@ test('wiring: served assets, page host, app view, festival card and the calm set
  for(const rule of tail.split('\n').slice(1).filter(Boolean))assert.match(rule,/^:root\[data-qw-contrast="1"\]/,rule);
  assert.match(css,/prefers-reduced-motion/);
 });
+
+test('village: the guests stand by the pond only while the New Year lasts and open the battle',()=>{
+ const app=read('qw_farm/static/app.js'),css=read('qw_farm/static/santa-battle.css'),svg=read('qw_farm/static/santa-guests.svg');
+ assert.match(app,/santaGuests=own\(\)&&!!S\.me\?\.village_games\?\.santa_battle\?\.available;/);
+ assert.match(app,/const sig=JSON\.stringify\(\[S\.me\.id,stage,villageSheet,villageResident,jack,santaGuests,/,'the square redraws when the festival starts');
+ assert.match(app,/if\(santaGuests\)\{\s*const guests=button\(null,e=>villageWalk\(\[1238\.26\/24,1174\.63\/18\],\(\)=>openSantaGame\(\),!e\.detail,'santa-guests'\),'village-santa-guests'\);/);
+ assert.match(app,/art\.src='\/app\/farm\/assets\/santa-guests\.svg'/);
+ assert.ok(read('qw_farm/api.py').includes("'santa-guests.svg'"));
+ assert.match(css,/\.village-santa-guests\{[^}]*min-width:44px;min-height:44px/);
+ assert.doesNotMatch(css,/\.village-santa-guests\{[^}]*translate/,'the box is the generator\'s, no transform');
+ assert.match(svg,/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" class="ny-guests-art" viewBox="-72 -60 144 66"/);
+ assert.ok(!/<image|data:image|<filter| style=/.test(svg));
+});

@@ -2454,14 +2454,14 @@ function syncVillageScene(){
  const visible=villageVisible(),entering=visible&&root.hidden===true;root.hidden=!visible;hud.hidden=!visible;document.body.classList.toggle('village-open',visible);$('farm-canvas').inert=visible;if(!visible){villageWalkStop();villageResident=null;villageSheet=null;}syncScenePause();if(!visible)return;
  villageBindWorld(root);if(entering)villageCenter(villagePos,false);syncVillageFest();syncMerchantFlag();syncVillageMerchant();
  if(!villageVisBound&&document.addEventListener){villageVisBound=true;document.addEventListener('visibilitychange',()=>$('village-scene')?.classList?.toggle('village-paused',document.hidden));}
- const names=villageNames(),stage=villageStage(),jack=own()&&horsemanDisplay(S.me.horseman,now())?.stale===false&&S.me.horseman?.active===true;
+ const names=villageNames(),stage=villageStage(),jack=own()&&horsemanDisplay(S.me.horseman,now())?.stale===false&&S.me.horseman?.active===true,santaGuests=own()&&!!S.me?.village_games?.santa_battle?.available;
  const workSite=typeof CONSTR!=='undefined'?VILLAGE_BUILD.sites.find(id=>CONSTR.art(id).crew):undefined;
  const workingNames=workSite?VILLAGE_CREW_NAMES.filter(name=>names.includes(name)):[];
  const npcSpot=npc=>{
   const foot=workingNames.includes(npc)?VILLAGE_BUILD.crew[workSite][VILLAGE_CREW_NAMES.indexOf(npc)]:VILLAGE_RESIDENT_FIGURES[npc]?.[0];
   return foot&&[foot[0]/24,foot[1]/18];
  };
- const sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,jack,workSite,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)]),villageQuestPhase(n)])]);
+ const sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,jack,santaGuests,workSite,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)]),villageQuestPhase(n)])]);
  // The world (image, lights, effects, player) is built once; only the actors layer changes with game state.
  if(!villageWorldEl||root.children?.[0]!==villageWorldEl){villageWorldEl=villageBuildWorld();root.replaceChildren(villageWorldEl);villageCenter(villagePos,false);}
  syncVillageSites();syncVillageBuild(workingNames);syncVillageContrast();
@@ -2499,6 +2499,14 @@ function syncVillageScene(){
   rider.dataset.villageHorseman='1';rider.dataset.qwCrumb='horseman-dialog';rider.setAttribute('aria-label','Джек — призрачный всадник. Бесплатный подарок');
   rider.style.left=`${(1090.8/24).toFixed(3)}%`;rider.style.top=`${(467.48/18).toFixed(3)}%`;
   const art=el('img');art.src='/app/farm/assets/pumpkin-jack.svg';art.alt='';art.setAttribute('aria-hidden','true');rider.append(art);parts.push(rider);
+ }
+ // «Битва с Сантой» (FARM_SANTA_BATTLE.md §2): Дед Мороз, Снегурочка and the guests by the swan pond while the New Year lasts;
+ // art, box and approach from scripts/art/village/santa_guests.js (build_village.py -> santa-guests.json)
+ if(santaGuests){
+  const guests=button(null,e=>villageWalk([1238.26/24,1174.63/18],()=>openSantaGame(),!e.detail,'santa-guests'),'village-santa-guests');
+  guests.dataset.villageSanta='1';guests.setAttribute('aria-label','Дед Мороз, Снегурочка и гости — Санта с Крампусом. «Битва с Сантой»');
+  guests.style.left=`${(1082.37/24).toFixed(3)}%`;guests.style.top=`${(1156.58/18).toFixed(3)}%`;guests.style.width=`${(144/24).toFixed(3)}%`;guests.style.height=`${(66/18).toFixed(3)}%`;
+  const art=el('img');art.src='/app/farm/assets/santa-guests.svg';art.alt='';art.setAttribute('aria-hidden','true');guests.append(art);parts.push(guests);
  }
  const hall=button(null,e=>villageGo([VILLAGE_HALL[0],VILLAGE_HALL[1]+3.6],()=>openVillageTownHall(),e),'village-townhall');hall.style.left=`${VILLAGE_HALL[0]}%`;hall.style.top=`${VILLAGE_HALL[1]}%`;hall.dataset.villageTownhall='townhall';hall.setAttribute('aria-label','Ратуша: фонд, содержание и украшения');hall.setAttribute('aria-controls','panel-content');hall.setAttribute('aria-pressed',String(villageSheet==='townhall'));hall.append(icon('friends'),el('span','Ратуша'));parts.push(hall);
  actors.replaceChildren(...parts);villageObserve(world);

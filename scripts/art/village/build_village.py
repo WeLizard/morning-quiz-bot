@@ -142,7 +142,7 @@ INPUTS = ("scripts/art/village/residents.js", "scripts/art/village/crew-resident
 
 def inputs() -> dict:
     """sha256 of everything the picture depends on: a changed hash here explains a changed picture."""
-    out = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()[:16] for p in (*INPUTS, "scripts/art/village/fest_pumpkin.js", "scripts/art/village/pumpkin_jack.js")}
+    out = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()[:16] for p in (*INPUTS, "scripts/art/village/fest_pumpkin.js", "scripts/art/village/pumpkin_jack.js", "scripts/art/village/santa_guests.js")}
     return out
 
 
@@ -188,6 +188,11 @@ def build(out: Path, install: bool = False) -> dict:
         # Review artifact only: the live character is integrated separately after owner approval.
         (out / "pumpkin-jack.svg").write_text(jack["svg"], encoding="utf-8", newline="")
         (out / "pumpkin-jack.json").write_text(json.dumps({k: v for k, v in jack.items() if k != "svg"}, ensure_ascii=False, indent=2), encoding="utf-8")
+    guests = res["meta"]["fest"]["new_year"].get("guests")
+    if guests:
+        # «Битва с Сантой» guests by the swan pond (santa_guests.js): a live button, installed with the battle (owner approval first)
+        (out / "santa-guests.svg").write_text(guests["svg"], encoding="utf-8", newline="")
+        (out / "santa-guests.json").write_text(json.dumps({k: v for k, v in guests.items() if k != "svg"}, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "gate_board.svg").write_text(res["meta"]["gate_art"]["board"]["svg"], encoding="utf-8", newline="")
     # «Контрастный режим» path edges (contrast_paths.js): a vector layer of the game, qw_farm/static/village-contrast-paths.svg
     (out / "village-contrast-paths.svg").write_text(res["meta"]["contrast_paths"]["svg"], encoding="utf-8", newline="")
@@ -212,6 +217,8 @@ def build(out: Path, install: bool = False) -> dict:
             (GAME_SVG.parent / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
         (GAME_SVG.parent / "village-merchant.svg").write_text(res["meta"]["merchant"]["svg"], encoding="utf-8", newline="")
         (GAME_SVG.parent / "village-build.svg").write_text(res["meta"]["build"]["sprite"], encoding="utf-8", newline="")
+        if guests:
+            (GAME_SVG.parent / "santa-guests.svg").write_text(guests["svg"], encoding="utf-8", newline="")
         (GAME_SVG.parent / "village-contrast-paths.svg").write_text(res["meta"]["contrast_paths"]["svg"], encoding="utf-8", newline="")
         print("installed", GAME_SVG, "and festival layers", ", ".join(res["meta"]["fest"]))
     return hashes

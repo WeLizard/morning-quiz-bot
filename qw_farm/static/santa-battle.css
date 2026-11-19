@@ -80,6 +80,11 @@ html.qw-telegram #santa-game-view .sb-back{display:none}
 /* phone: compact plates so the hero's buttons stay close to the scene */
 @media(max-width:850px){#santa-game-view .sb-plates{gap:6px;margin-top:8px}#santa-game-view .sb-side{gap:6px}#santa-game-view .sb-plate{padding:5px 8px}#santa-game-view .sb-plate-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}#santa-game-view .sb-hp{height:7px;margin-top:3px}#santa-game-view .sb-chips{margin-top:4px}#santa-game-view .sb-title h1{font-size:var(--qw-fs-h2)}}
 @media(max-width:340px){#santa-game-view .sb-plates{grid-template-columns:1fr}}
+/* The guests on the village square (app.js syncVillageScene): a live button like Jack, the hit area never below 44 px. */
+.village-santa-guests{position:absolute;z-index:4;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;cursor:pointer}
+.village-santa-guests img{display:block;width:100%;height:100%;pointer-events:none;filter:drop-shadow(0 3px 3px #2b251a55)}
+.village-santa-guests:hover img,.village-santa-guests:focus-visible img{filter:drop-shadow(0 0 8px #ffd680)}
+.village-santa-guests:focus-visible{outline:3px solid var(--qw-game-accent,var(--qw-accent));outline-offset:3px;border-radius:8px}
 /* Contrast mode (UI_RULES §16) */
 :root[data-qw-contrast="1"] #santa-game-view .sb-stage-card,:root[data-qw-contrast="1"] #santa-game-view .sb-controls,:root[data-qw-contrast="1"] #santa-game-view .sb-plate{border-width:2px}
 :root[data-qw-contrast="1"] #santa-game-view .sb-scene svg{filter:saturate(1.12) contrast(1.08)}

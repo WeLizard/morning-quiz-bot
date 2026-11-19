@@ -8,7 +8,7 @@ import {categoryOf} from './scene_map.js';
 export const MENU=[
  {id:'farm',title:'Хозяйство',items:[['orders','orders','Заказы'],['inventory','shop','Склад'],['team','tractor','Команда'],['land','home','Участок']]},
  {id:'production',title:'Производство',items:[['production','workshop','Мастерские'],['orchard','orchard','Сад']]},
- {id:'outside',title:'За околицей',art:true,items:[['forest','forest','Лес'],['lake','lake','Озеро'],['fields','tractor','Поля'],['plantations','grape','Плантации','plantations']]},
+ {id:'outside',title:'За околицей',art:true,items:[['forest','forest','Лес'],['lake','lake','Озеро'],['fields','tractor','Поля'],['plantations','grape','План\u00adтации','plantations']]},
  {id:'village',title:'Деревня и соседи',items:[['village','coin','Деревня'],['neighbors','friends','Соседи'],['festival','coin','Праздник','festival']]},
  {id:'info',title:'Сведения',items:[['secrets','discovery','Находки'],['journal','journal','Журнал']]}
 ];

@@ -181,7 +181,7 @@ test('app.js plants from packs: bar buttons, request through plantRequest, no ca
  const app=read('qw_farm/static/app.js');
  assert.ok(app.includes('for(const k of MERCH.seedPacks(S.catalog,stock,S.me.level))'));
  assert.ok(app.includes('b.dataset.seedPack=k.id'));
- assert.ok(app.includes("const r=MERCH.plantRequest(o,S.seed,S.catalog,stock);if(r.error){toast(r.error,true);S.seed='wheat';renderSeeds();return;}command(...r.command)"));
+ assert.match(app,/const r=MERCH\.plantRequest\(o,S\.seed,S\.catalog,stock\);if\(r\.error\)\{toast\(r\.error,true\);S\.seed='wheat';renderSeeds\(\);return;\}[^\n]{0,100}command\(\.\.\.r\.command\)/);
  assert.ok(app.includes('!c||c.exotic||c.level>S.me.level){box.hidden=true'));
  assert.ok(app.includes('afford=crop&&!crop.exotic?'));
 });

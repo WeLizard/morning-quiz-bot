@@ -675,7 +675,8 @@ const projectFinished=entry=>entry.finished===true||entry.completed===true||entr
 const projectStage=(id,entry=projectEntry(id))=>homeProjects()[id]?.stages?.[entry.stage]||null;
 function projectMissing(project,entry){
  if(entry.needs)return entry.needs;
- if(entry.legacy_needs)return entry.legacy_needs;
+ // projects.validate keeps legacy_needs only while goods are reserved for the stage; mirror that rule
+ if(entry.legacy_needs&&Object.keys(entry.reserved||{}).length)return entry.legacy_needs;
  return projectStage(project,entry)?.needs||{};
 }
 function projectPickCrop(item){

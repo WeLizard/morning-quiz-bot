@@ -28,7 +28,7 @@ function client(){
   refresh:async()=>true,showLogin:()=>{},rememberMachineCommand:()=>{},
   // Non-target app dependencies called during command cleanup/login; rate-limit code remains real.
   closeFarmMenu:()=>{},updateRepeat:()=>{},resetVillageView:()=>{},cancelPlacement:()=>{},closePanel:()=>{},renderPanel:()=>{},renderToasts:()=>{},
-  toastList:[],dashaGameOpen:false,olegGameOpen:false,dashaGame:null,olegGame:null,farmViewEpoch:0,mode:'web',SESSION_ENDED:'Session ended',quizzyLoginLink:()=>makeNode()};
+  toastList:[],dashaGameOpen:false,olegGameOpen:false,dashaGame:null,olegGame:null,ballistaGame:null,ballistaGameOpen:false,pieGame:null,pieGameOpen:false,farmViewEpoch:0,mode:'web',SESSION_ENDED:'Session ended',quizzyLoginLink:()=>makeNode()};
  vm.createContext(c);
  const feedback=source.slice(source.indexOf('const rateUntil='),source.indexOf('function field('));
  const request=source.slice(source.indexOf('async function request('),source.indexOf('let farmViewEpoch=0,'));

@@ -80,10 +80,10 @@ test('command receipt suppresses the ordinary toast only when payment is confirm
  const notices=[],responses=[{notice:'Соседство принято. Награда: +100 монет.',neighbor_reward_paid:true},
   {notice:'Соседство принято. Лимит наград исчерпан.'}];
  const S={me:{id:'a'},pending:{actor:'a',kind:'accept_neighbor',data:{},target:'b',command_id:'one'},busy:false};
- const context={S,clearTimeout(){},pendingRetryTimer:null,rateRecoveryAttempt:0,
+ const context={S,clearTimeout(){},pendingRetryTimer:null,rateRecoveryAttempt:0,dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,
   connection(){},document:{body:{classList:{add(){},remove(){}}}},API:'/api/farm/v1',
   request:async()=>responses.shift(),rememberMachineCommand(){},savePending(){},toast:text=>notices.push(text),localizeWagerNotice:text=>text,gf:(m,f,n)=>n,
-  refresh:async()=>true,updateRepeat(){},scheduleRateRecovery(){},schedulePendingRetry(){}};
+  refresh:async()=>true,updateRepeat(){},renderPanel(){},scheduleRateRecovery(){},schedulePendingRetry(){}};
  vm.createContext(context);vm.runInContext(snippet+'\nthis.sendPending=sendPending',context);
  assert.equal(await context.sendPending(),true);
  assert.deepEqual(notices,[]);

@@ -1527,6 +1527,9 @@ dialog.entry-info-dialog{max-width:520px}
 /* ===== E27 F4: «Отменить посев» on the field card: a full-width 44px tap, the countdown in the label does not jump the width. ===== */
 .field-cancel{min-height:44px}.field-cancel span{font-variant-numeric:tabular-nums}
 
+/* A disabled button reads as «not now» in every mode (the contrast block below overrides it with higher specificity). */
+:is(.primary,.secondary,.light,.qw-btn):disabled{opacity:1;filter:none;background:#e9eadf;color:#536550;border:1px dashed #8e9a84;box-shadow:none}
+:root[data-farm-theme=night] :is(.primary,.secondary,.light,.qw-btn):disabled{background:var(--surface-soft);color:var(--muted);border-color:#6f8573}
 /* ==== «Контрастный режим» (UI_RULES §16, E3 .local/mockups-2026-10-23) ====
    Only with <html data-qw-contrast="1">, set by qw-shell.js from the Account setting; the regular style is untouched.
    Solid backings (white by day, dark at night), 2 px outlines (--qw-outline-w), text 1–2 px larger,
@@ -1668,5 +1671,3 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"] .toast-item :is(b,strong,small,span){color:inherit}
 :root[data-qw-contrast="1"] .toast-item.error{background:#7a2d1f;color:#fff}
 :root[data-qw-contrast="1"] .toast-action{background:var(--hc-pick-ink);color:var(--hc-pick);border:2px solid var(--hc-pick-ink)}
-:is(.primary,.secondary,.light,.qw-btn):disabled{opacity:1;filter:none;background:#e9eadf;color:#536550;border:1px dashed #8e9a84;box-shadow:none}
-:root[data-farm-theme=night] :is(.primary,.secondary,.light,.qw-btn):disabled{background:var(--surface-soft);color:var(--muted);border-color:#6f8573}

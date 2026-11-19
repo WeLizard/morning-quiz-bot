@@ -47,7 +47,9 @@ test('app.js: layers under and above the night tint, the crew, synced with the v
  assert.match(app,/villageFestLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageBuildLayer\('glow'\),/);
  assert.match(app,/villageWaterWheel\(\),villageCrewLayer\(\),actors,/);
  assert.match(app,/syncVillageBuild\(workingNames\);syncVillageContrast\(\);/);
- assert.match(app,/u\.setAttribute\('href',`\/app\/farm\/assets\/\$\{VILLAGE_BUILD\.asset\}#\$\{id\}`\)/);
+ // one piece placer for every pack (village-build.svg by default, the building effects pass their own spec)
+ assert.match(app,/function villageBuildPiece\(layer,key,id,spec=VILLAGE_BUILD\)\{/);
+ assert.match(app,/u\.setAttribute\('href',`\/app\/farm\/assets\/\$\{spec\.asset\}#\$\{id\}`\)/);
  assert.match(css,/:root:not\(\[data-farm-theme=night\]\) \.village-build-glow\{display:none\}/);
  for(const tool of ['plan','hammer','shovel']){
   const motion=css.match(/@media\(prefers-reduced-motion:no-preference\)\{\n :is\(\.village-crew,\[data-resident-mode=working\]\) \.bc-plan\{animation:[^\n]*\n[^\n]*\n[^\n]*/)?.[0];

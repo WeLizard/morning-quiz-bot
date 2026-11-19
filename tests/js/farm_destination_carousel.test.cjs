@@ -29,7 +29,8 @@ test('fields stays visible before level 22 and advertises its existing lock expl
 
 const source=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/app.js'),'utf8');
 const start=source.indexOf('function bindDestinationCarousel(');
-const end=source.indexOf('\n// Every destination card',start);
+const end=source.indexOf('\n// The same factory keeps size, caption',start);
+if(start<0||end<start)throw new Error('bindDestinationCarousel slice markers moved');
 const context={setTimeout,clearTimeout};
 vm.createContext(context);
 vm.runInContext(source.slice(start,end)+'\nthis.bindDestinationCarousel=bindDestinationCarousel;',context);

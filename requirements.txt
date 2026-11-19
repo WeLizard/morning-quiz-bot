@@ -3,6 +3,7 @@ python-dotenv==1.2.2
 aiofiles==23.2.1
 openai==2.21.0
 pytz==2024.2
+tzdata==2026.3
 Pillow>=12.3.0
 fastapi==0.133.0
 starlette==1.3.1
@@ -12,5 +13,9 @@ python-multipart==0.0.32
 SQLAlchemy[asyncio]>=2.0.43,<2.1
 asyncpg>=0.30.0,<1
 alembic>=1.15.2,<2
+jsonschema==4.25.1
+cryptography==50.0.2
+httpcore==1.0.9
+anyio==4.14.2
 # Встроенные библиотеки: os, sys, logging, asyncio, typing, json, pathlib, re, copy, html, collections, datetime
 # Совместимость: Python 3.10+, проверяемая локальная среда — Python 3.13

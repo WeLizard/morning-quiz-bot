@@ -11,7 +11,7 @@ from telegram.error import Forbidden, RetryAfter, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler
 
 from application.mafia import MafiaApplicationService
-from modules.mini_app_launch import direct_mafia_link, room_open_param, short_name_from_env, startapp_url
+from modules.mini_app_launch import direct_mafia_link, direct_photo_link, room_open_param, short_name_from_env, startapp_url
 from modules.telegram_menu import acknowledge, card
 from storage.repositories import OperationalRepository
 
@@ -556,11 +556,20 @@ class MafiaHandlers:
         ]
         if effect['mask']:
             lines.append(f'Слово: <code>{escape(effect["mask"])}</code>')
-        lines.extend(['', 'Напишите ответ обычным сообщением.'])
+        keyboard = None
+        if effect.get('answer_policy') == 'group_private_deadline':
+            url = direct_photo_link(getattr(context.bot, 'username', None), effect['chat_id'], effect['round_id'])
+            if not url:
+                raise RuntimeError('Для группового Photo нужна настроенная личная форма Mini App')
+            lines.extend(['', 'Ответь в личной форме. Чужие ответы и очки скрыты до конца раунда.'])
+            keyboard = InlineKeyboardMarkup([[Button('Ответить лично', url=url)]])
+        else:
+            lines.extend(['', 'Напишите ответ обычным сообщением.'])
         with open(effect['image_path'], 'rb') as photo:
             await context.bot.send_photo(
                 chat_id=effect['chat_id'], photo=photo,
                 caption='\n'.join(lines), parse_mode='HTML',
+                reply_markup=keyboard,
             )
 
     async def _deliver_photo_text(self, context, item):
@@ -571,7 +580,15 @@ class MafiaHandlers:
             text = ('🔥 Очень близко! Соберите точное слово.' if payload.get('verdict') == 'almost'
                     else '❌ Пока мимо. Попробуйте ещё раз.')
         elif item['kind'] == 'photo.result':
-            if payload.get('correct'):
+            if 'solvers' in payload:
+                lines = [f'⏰ Раунд завершён. Ответ: <b>{escape(str(payload.get("answer") or "—"))}</b>']
+                solvers = payload.get('solvers') or []
+                lines.extend(f'{escape(str(player.get("name") or "Игрок"))}: +{escape(str(player.get("points") or 0))}'
+                             for player in solvers)
+                if not solvers:
+                    lines.append('Правильных ответов в этом раунде нет.')
+                text = '\n'.join(lines)
+            elif payload.get('correct'):
                 winner = (f' Отгадал(а): {escape(str(payload["winner_name"]))}.'
                           if payload.get('winner_name') else '')
                 text = (f'🎉 <b>Правильно!</b> {escape(str(payload.get("answer") or ""))}{winner}\n'
@@ -583,6 +600,11 @@ class MafiaHandlers:
             reason = payload.get('reason')
             if reason == 'stopped':
                 text = '🛑 Фото-викторина остановлена. Все заработанные баллы сохранены.'
+            elif payload.get('answer_policy') == 'group_private_deadline':
+                text = (f'🏁 <b>Фото-викторина завершена</b>\n'
+                        f'Вопросов в серии: {int(payload.get("question_count") or 0)}. '
+                        f'Верных ответов участников: {int(payload.get("correct") or 0)}.\n'
+                        f'Всего очков: {escape(str(payload.get("score") or 0))}')
             else:
                 text = (f'🏁 <b>Фото-викторина завершена</b>\n'
                         f'{int(payload.get("correct") or 0)} из {int(payload.get("question_count") or 0)} · '

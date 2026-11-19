@@ -14,6 +14,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     JSON,
@@ -29,6 +30,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import text as sql_text  # `text` is a column name inside ProblemReport
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class Base(DeclarativeBase):
@@ -385,6 +387,8 @@ class Game(TimestampMixin, Base):
     __table_args__ = (
         Index('ix_games_room_mode_history', 'room_id', 'mode', 'created_at'),
         Index('ix_games_chat_mode_history', 'chat_id', 'mode', 'created_at'),
+        Index('uq_games_current_night_family', 'room_id', unique=True,
+              postgresql_where=text("is_current AND ((mode='night_case' AND status NOT IN ('finished','stopped')) OR (mode='mafia' AND status NOT IN ('finished','stopped','interrupted')))")),
         Index(
             'uq_games_current_chat_mode', 'chat_id', 'mode', unique=True,
             postgresql_where=text('is_current'),
@@ -514,6 +518,10 @@ class GameDeadline(Base):
     claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
+    last_error_code: Mapped[Optional[str]] = mapped_column(String(64))
+    retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    quarantined_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         UniqueConstraint('game_id', 'kind', name='uq_game_deadline_kind'),
@@ -749,13 +757,18 @@ class AdminAction(Base):
     __tablename__ = "admin_actions"
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
-    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    target_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    target_account_id: Mapped[Optional[UUID]] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'))
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     request: Mapped[dict] = mapped_column(JSON, nullable=False)
     before: Mapped[dict] = mapped_column(JSON, nullable=False)
     after: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    __table_args__ = (Index("ix_admin_actions_target", "scope", "target_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_admin_actions_target", "scope", "target_id", "created_at"),
+        Index("ix_admin_actions_account_target", "target_account_id", "created_at"),
+        CheckConstraint("(scope = 'accounts' AND target_id IS NULL AND target_account_id IS NOT NULL) OR (scope <> 'accounts' AND target_id IS NOT NULL AND target_account_id IS NULL)", name="ck_admin_actions_typed_target"),
+    )
 
 
 class MiniAppSession(Base):
@@ -961,3 +974,211 @@ class ScoreTotal(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (Index('ix_score_totals_source_total', 'source', 'total'),)
+
+
+# Night Case storage is intentionally absent from generic game serializers.
+class NightCase(Base):
+    __tablename__ = 'night_cases'
+    case_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    content_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    compiler_version: Mapped[str] = mapped_column(String(96), nullable=False)
+    engine_build: Mapped[str] = mapped_column(String(96), nullable=False)
+    validation_report: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    registered_by: Mapped[Optional[UUID]] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'))
+    registered_operator_id: Mapped[Optional[str]] = mapped_column(String(128))
+    admission: Mapped[str] = mapped_column(String(16), nullable=False, server_default='registered')
+    __table_args__ = (
+        CheckConstraint('version > 0', name='ck_night_case_version'),
+        CheckConstraint('registered_by IS NOT NULL OR registered_operator_id IS NOT NULL', name='ck_night_case_registration_principal'),
+        CheckConstraint("registered_operator_id IS NULL OR (registered_operator_id LIKE 'operator:%' AND length(registered_operator_id) > 9)", name='ck_night_case_operator_namespace'),
+        CheckConstraint("admission IN ('registered','rehearsal','retired')", name='ck_night_case_admission'),
+        UniqueConstraint('case_id', 'version', 'content_hash', name='uq_night_case_pinned'),
+    )
+
+
+class NightGameSealed(Base):
+    __tablename__ = 'night_game_sealed'
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)
+    case_id: Mapped[str] = mapped_column(String(96), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    rules: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    rules_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    engine_build: Mapped[str] = mapped_column(String(96), nullable=False)
+    compiler_version: Mapped[str] = mapped_column(String(96), nullable=False)
+    storage_version: Mapped[int] = mapped_column(Integer, server_default='1', nullable=False)
+    kernel: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB(none_as_null=True))
+    lobby: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB(none_as_null=True))
+    snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_revision: Mapped[int] = mapped_column(BigInteger, server_default='0', nullable=False)
+    lifecycle: Mapped[str] = mapped_column(String(16), nullable=False)
+    interruption: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB(none_as_null=True))
+    __table_args__ = (
+        ForeignKeyConstraint(['case_id','version','content_hash'], ['night_cases.case_id','night_cases.version','night_cases.content_hash'], ondelete='RESTRICT'),
+        CheckConstraint('storage_version = 1 AND storage_revision >= 0', name='ck_night_sealed_version'),
+        CheckConstraint("lifecycle IN ('lobby','running','finished','interrupted','stopped')", name='ck_night_sealed_lifecycle'),
+    )
+
+
+class NightLobbyCommand(Base):
+    __tablename__ = 'night_lobby_commands'
+    room_id: Mapped[str] = mapped_column(String(64), ForeignKey('rooms.id', ondelete='RESTRICT'), primary_key=True)
+    original_actor_account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), primary_key=True)
+    client_command_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), server_default='create_lobby', nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (CheckConstraint("kind = 'create_lobby'", name='ck_night_lobby_kind'),)
+
+
+class NightEvent(Base):
+    __tablename__ = 'night_events'
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(64), nullable=False)
+    audience_seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    window_idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        UniqueConstraint('game_id','scope','audience_seq', name='uq_night_event_audience'),
+        CheckConstraint("scope = 'public' OR scope ~ '^account:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'", name='ck_night_event_scope'),
+        CheckConstraint('audience_seq >= 0', name='ck_night_event_seq'),
+    )
+
+
+class NightMessage(Base):
+    __tablename__ = 'night_messages'
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    command_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    thread_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    sender_account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), nullable=False)
+    recipients: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    window_idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    text_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        UniqueConstraint('game_id','sender_account_id','command_id', name='uq_night_message_command'),
+        CheckConstraint("channel IN ('square','whisper','ghost')", name='ck_night_message_channel'),
+        CheckConstraint("jsonb_typeof(recipients) = 'array' AND jsonb_array_length(recipients) BETWEEN 1 AND 12", name='ck_night_message_recipients'),
+        CheckConstraint('length(text) BETWEEN 1 AND 1000 AND octet_length(text) <= 4096', name='ck_night_message_text'),
+    )
+
+
+class NightRenderJob(Base):
+    __tablename__ = 'night_render_jobs'
+    job_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), nullable=False)
+    cause_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    kind: Mapped[str] = mapped_column(String(64), nullable=False)
+    audience_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    knowledge_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    template_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    frozen_view: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fallback: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, server_default='pending')
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default='0')
+    lease_owner: Mapped[Optional[str]] = mapped_column(String(96))
+    lease_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    sanitized_error: Mapped[Optional[str]] = mapped_column(String(64))
+    __table_args__ = (UniqueConstraint('game_id','cause_id','kind','audience_key','knowledge_revision','template_version', name='uq_night_render_cause'),)
+
+
+class NightRendering(Base):
+    __tablename__ = 'night_renderings'
+    job_id: Mapped[str] = mapped_column(String(96), ForeignKey('night_render_jobs.job_id', ondelete='RESTRICT'), primary_key=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    references: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    catalog_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_shown_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (CheckConstraint("source IN ('authored','ai') AND length(text) <= 4000", name='ck_night_rendering_source'),)
+
+
+class NightIntentProposal(Base):
+    __tablename__ = 'night_intent_proposals'
+    proposal_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), nullable=False)
+    original_actor_account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), nullable=False)
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    proposal: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    confirmed_command_id: Mapped[Optional[str]] = mapped_column(String(128))
+    __table_args__ = (UniqueConstraint('game_id','original_actor_account_id','request_id', name='uq_night_proposal_request'),)
+
+
+class NightEpisodeDraft(Base):
+    __tablename__ = 'night_episode_drafts'
+    draft_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    candidate: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    world_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    contract_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_job_id: Mapped[Optional[str]] = mapped_column(String(96), ForeignKey('night_render_jobs.job_id', ondelete='RESTRICT'))
+    owner_review: Mapped[str] = mapped_column(String(16), server_default='draft', nullable=False)
+    reviewed_by: Mapped[Optional[UUID]] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'))
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (CheckConstraint("owner_review IN ('draft','rejected','approved')", name='ck_night_draft_review'),)
+
+
+class NightRewardClaim(Base):
+    __tablename__ = 'night_reward_claims'
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)
+    original_account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    reward_facts: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    seen_observation_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    formula_version: Mapped[int] = mapped_column(Integer, server_default='1', nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (CheckConstraint("kind = 'case_result' AND formula_version = 1", name='ck_night_reward_kind'),)
+
+
+class NightRuntimeOutage(Base):
+    __tablename__ = 'night_runtime_outages'
+    outage_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=True, nullable=False)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    detected_by: Mapped[str] = mapped_column(String(16), nullable=False)
+    __table_args__ = (
+        CheckConstraint("detected_by IN ('api','worker','operator')", name='ck_night_outage_detector'),
+        CheckConstraint('ended_at IS NULL OR ended_at > started_at', name='ck_night_outage_interval'),
+    )
+
+
+class NightRuntimeHealth(Base):
+    __tablename__ = 'night_runtime_health'
+    runtime_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    api_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    worker_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    active_outage_id: Mapped[Optional[str]] = mapped_column(String(96), ForeignKey('night_runtime_outages.outage_id', ondelete='RESTRICT'))
+
+
+class NightNarratorLimit(Base):
+    __tablename__ = 'night_narrator_limits'
+    scope: Mapped[str] = mapped_column(String(128), primary_key=True)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    reserved_requests: Mapped[int] = mapped_column(Integer, nullable=False, server_default='0')
+    reserved_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default='0')
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default='0')
+    circuit_open_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (CheckConstraint('reserved_requests >= 0 AND reserved_tokens >= 0 AND failures >= 0', name='ck_night_limits_nonnegative'),)
+
+
+# Register the owning AI module on this same Base; no parallel metadata/backend.
+# Module import (rather than symbol imports) also supports explicit AI-first import.
+from storage import night_ai_models as _night_ai_models  # noqa: E402,F401

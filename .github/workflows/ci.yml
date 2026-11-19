@@ -33,6 +33,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@127.0.0.1:55433/morning_quiz_test
       TEST_DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@127.0.0.1:55433/morning_quiz_test
+      NIGHT_CASE_TEST_DATABASE_URL: postgresql+asyncpg://mqb_dev:local-development-only@127.0.0.1:55433/morning_quiz_test
       MQB_TEST_DUMP_RESTORE: "1"
       MQB_CI_POSTGRES_SERVICE: "1"
       ADMIN_ALLOWED_HOSTS: localhost,127.0.0.1,::1

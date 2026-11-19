@@ -46,6 +46,7 @@ def test_offline_runtime_real_start_quiz_buttons_and_stop(pg_env, monkeypatch, t
     from storage.settings import SettingsService
     from storage.question_bank import QuestionBank
     monkeypatch.setenv('MQB_DEV_RUNTIME', 'offline')
+    monkeypatch.setenv('MINI_APP_URL', 'https://quiz.example.com/app')
     monkeypatch.setenv('BOT_TOKEN', '')
     monkeypatch.setenv('STORAGE_BACKEND', 'postgres')
     monkeypatch.setattr(dev_backups, 'guard', lambda db: None)
@@ -125,7 +126,27 @@ def test_offline_runtime_real_start_quiz_buttons_and_stop(pg_env, monkeypatch, t
                 start = next((m['message_id'], b) for m in result['messages'] for row in m.get('reply_markup', {}).get('inline_keyboard', []) for b in row if b.get('callback_data') == 'pqcfg_start')
                 result = await runtime.input(message_id=start[0], callback=start[1]['callback_data'])
                 assert any(m.get('photo') for m in result['messages']), result['messages']
+                photo_message = next(m for m in result['messages'] if m.get('photo'))
+                assert any('startapp=photo_n' in button.get('url', '')
+                           for row in photo_message.get('reply_markup', {}).get('inline_keyboard', [])
+                           for button in row)
+                # Group text is public: only the separate private form records an answer.
                 await runtime.input(message='сова')
+                async with db.transaction() as session:
+                    assert (await session.get(User, DEMO_USER)).global_score == before
+                from application.photo import PhotoApplicationService
+                from application.game_deadlines import GameDeadlineProcessor
+                async with db.transaction() as session:
+                    service = PhotoApplicationService(db, session)
+                    current = await service.current(chat_id=DEMO_CHAT, user_id=DEMO_USER)
+                    accepted = await service.answer(chat_id=DEMO_CHAT, user_id=DEMO_USER,
+                        display_name='Dev', round_id=current['question']['round_id'], answer='сова',
+                        command_id=str(uuid4()))
+                    assert accepted['status'] == 'active' and accepted['question']['answered']
+                    deadline = current['question']['ends_at']
+                async with db.transaction() as session:
+                    assert (await session.get(User, DEMO_USER)).global_score == before
+                await GameDeadlineProcessor(db).run_once(now=deadline)
                 async with db.transaction() as session:
                     total = (await session.get(User, DEMO_USER)).global_score
                     assert total > before

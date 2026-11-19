@@ -28,6 +28,18 @@ def _deadline(value):
     return datetime.fromtimestamp(value, tz=timezone.utc)
 
 
+async def night_room_lock(session, room_id: str) -> None:
+    """Family lifecycle lock, then existing mode keys in platform order."""
+    keys = [f'room:night:{room_id}', *(f'game:{m}:room:{room_id}' for m in ('classic', 'mafia', 'photo', 'night_case'))]
+    for key in keys:
+        await session.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))'), {'key': key})
+
+
+def night_family_unfinished(game: Game) -> bool:
+    return game.is_current and ((game.mode == 'night_case' and game.status not in {'finished', 'stopped'})
+        or (game.mode == 'mafia' and game.status not in {'finished', 'stopped', 'interrupted'}))
+
+
 class GameRepository:
     """All adapters share these locks and projections; no transport state lives here."""
 
@@ -96,6 +108,8 @@ class GameRepository:
     async def current_in_room(self, *, room_id: str, mode: str, lock: bool = False):
         """Find the current game by its platform room, independent of transport."""
         if lock:
+            if mode in {'mafia', 'night_case'}:
+                await night_room_lock(self.session, room_id)
             await self.session.execute(
                 text('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))'),
                 {'key': f'game:{mode}:room:{room_id}'},
@@ -173,6 +187,11 @@ class GameRepository:
         """
         async with self.session.begin_nested():
             existing = await self.current_in_room(room_id=room_id, mode=mode, lock=True)
+            if mode in {'mafia', 'night_case'}:
+                other = await self.session.scalar(select(Game).where(Game.room_id == room_id,
+                    Game.mode == ('night_case' if mode == 'mafia' else 'mafia'), Game.is_current.is_(True)))
+                if other is not None and night_family_unfinished(other):
+                    raise ValueError('active_game_conflict')
             if existing is not None:
                 raise ValueError('В этой комнате уже есть текущая игра.')
             room = await self.session.scalar(select(Room).where(
@@ -255,6 +274,8 @@ class GameRepository:
         phase: str | None = None,
         deadlines: dict[str, object] | None = None,
     ) -> None:
+        if row.mode == 'night_case':
+            raise ValueError('night_case_use_mode_repository')
         previous_status = row.status
         status = str(status or state.get('status') or row.status or 'lobby')
         phase = str(phase or state.get('phase') or status)
@@ -283,7 +304,7 @@ class GameRepository:
         ) or 0) + 1
         self.session.add(GameEvent(
             game_id=row.id, event_index=next_index, kind=event_kind,
-            visibility='private' if event_kind == 'night_action' else 'public',
+            visibility='private' if event_kind in {'night_action', 'photo_private_response'} else 'public',
             actor_user_id=actor_user_id,
             actor_account_id=await self._resolve_actor_account(
                 actor_user_id=actor_user_id, actor_account_id=actor_account_id,
@@ -297,6 +318,8 @@ class GameRepository:
         visibility: str, payload: dict, actor_account_id=None,
     ) -> GameEvent:
         """Append a non-state-changing event while the caller holds the game lock."""
+        if row.mode == 'night_case':
+            raise ValueError('night_case_use_mode_repository')
         if visibility not in {'public', 'private'}:
             raise ValueError('Invalid game event visibility')
         next_index = int(await self.session.scalar(
@@ -326,6 +349,21 @@ class GameRepository:
         current envelope atomically, preserve the last mode state for history,
         and make room for a fresh game after access is restored.
         """
+        if row.mode == 'night_case':
+            from .night_cases import NightCaseRepository
+            repo = NightCaseRepository(self.session)
+            locked = await repo.lock_game(row.id)
+            if locked is None or locked.sealed.lifecycle in {'finished', 'stopped', 'interrupted'}:
+                return
+            sealed = locked.sealed
+            await repo.write_snapshot(locked, expected_storage_revision=sealed.storage_revision,
+                kernel=deepcopy(sealed.kernel), lobby=deepcopy(sealed.lobby), snapshot_hash=sealed.snapshot_hash,
+                lifecycle='interrupted', interruption={'reason': event_kind, 'actor_account_id': str(actor_account_id) if actor_account_id else None})
+            await repo.sync_public(locked, projection=deepcopy(row.state['public_projection']),
+                phase='interrupted', public_revision=row.revision + 1)
+            await repo.project_deadline(game_id=row.id, due_at=None, timer_seq=0)
+            row.is_current = True
+            return
         if not row.is_current or row.status in {'finished', 'stopped', 'interrupted'}:
             return
         state = deepcopy(row.state or {})
@@ -547,6 +585,8 @@ class GameRepository:
         kind: str, expected_revision: int | None, payload: dict,
     ) -> tuple[bool, dict | None]:
         """Reserve an adapter-neutral command or return its committed result."""
+        if await self.session.scalar(select(Game.mode).where(Game.id == game_id)) == 'night_case':
+            raise ValueError('night_case_use_mode_repository')
         if command_id is None:
             return False, None
         if not isinstance(command_id, str) or not 8 <= len(command_id) <= 64:

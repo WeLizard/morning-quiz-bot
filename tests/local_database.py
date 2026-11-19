@@ -12,13 +12,19 @@ from storage.database import Database, DatabaseSettings
 from storage.models import Base
 
 
-@asynccontextmanager
-async def isolated_database(url):
+def disposable_endpoint_allowed(url):
     parsed = urlsplit(url)
     in_dev_container = os.getenv('MQB_DEV_CONTAINER') == '1' and Path('/.dockerenv').is_file()
     expected_endpoint = ('postgres', 5432) if in_dev_container else ('127.0.0.1', 55433)
-    if ((parsed.hostname, parsed.port) != expected_endpoint
-            or parsed.path != '/morning_quiz_test' or parsed.username != 'mqb_dev'):
+    owned_night = (url == os.getenv('NIGHT_CASE_TEST_DATABASE_URL')
+                   and parsed.hostname in ('127.0.0.1', 'localhost') and parsed.port == 55434)
+    return (((parsed.hostname, parsed.port) == expected_endpoint or owned_night)
+            and parsed.path == '/morning_quiz_test' and parsed.username == 'mqb_dev')
+
+
+@asynccontextmanager
+async def isolated_database(url):
+    if not disposable_endpoint_allowed(url):
         raise RuntimeError(
             'Acceptance tests require morning_quiz_test in the shared local PostgreSQL'
         )

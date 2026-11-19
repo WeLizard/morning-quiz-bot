@@ -535,6 +535,9 @@ def test_room_migration_backfills_games_and_guards_downgrade(pg_env, monkeypatch
                         operations.drop_table('room_transports')
                         operations.drop_table('room_memberships')
                         operations.drop_table('room_invites')
+                        # This synthetic fixture rewinds before 0017; later empty
+                        # dependent tables are absent at that historical revision.
+                        operations.drop_table('night_lobby_commands')
                         operations.drop_table('rooms')
 
                         migration.upgrade()

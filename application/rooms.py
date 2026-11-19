@@ -141,9 +141,11 @@ class RoomApplicationService:
         if not isinstance(membership_version, str) or not 1 <= len(membership_version) <= 64:
             raise ValueError('Обнови список комнат перед выходом.')
         await operation_fence(self.session)
+        from storage.games import night_room_lock
+        await night_room_lock(self.session, room_id)
         games = GameRepository(self.session)
         current_games = [await games.current_in_room(room_id=room_id, mode=mode, lock=True)
-                         for mode in ('classic', 'mafia', 'photo')]
+                         for mode in ('classic', 'mafia', 'photo', 'night_case')]
         room = await self.session.scalar(select(Room).where(
             Room.id == room_id, Room.kind == 'standalone',
         ).with_for_update().execution_options(populate_existing=True))
@@ -160,10 +162,14 @@ class RoomApplicationService:
             raise LookupError('Комната не найдена.')
         if member.updated_at.isoformat() != membership_version:
             raise RuntimeError('Участие в комнате изменилось. Обнови список и повтори выход.')
-        if any(game is not None and game.mode != 'mafia'
+        if any(game is not None and game.mode not in {'mafia', 'night_case'}
                and game.status not in {'finished', 'stopped', 'interrupted'}
                for game in current_games):
             raise RuntimeError('Нельзя выйти, пока в комнате есть незавершённая игра или лобби.')
+        night = next((g for g in current_games if g is not None and g.mode == 'night_case'), None)
+        if night is not None:
+            from application.night_case import check_room_leave
+            await check_room_leave(self.session, night, account_id)
         await room_limits.charge_membership(self.session, account_id)
         table = None
         mafia = next((game for game in current_games if game is not None and game.mode == 'mafia'), None)

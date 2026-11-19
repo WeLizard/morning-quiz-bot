@@ -2,10 +2,13 @@
 import asyncio
 from collections import deque
 from hashlib import sha256
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import ipaddress
 import json
+import hashlib
+import hmac
 import logging
 import os
 import re
@@ -316,24 +319,48 @@ def _night_assets():
     for folder, suffixes in NIGHT_FOLDERS.items():
         for path in (NIGHT_DIR / folder).rglob('*'):
             parts = path.relative_to(NIGHT_DIR / folder).parts
-            if path.is_file() and path.suffix in suffixes and len(parts) <= 2 \
+            public_depth = len(parts) <= 2 or (folder == 'worlds' and len(parts) == 3
+                                              and parts[1] == 'assets' and path.suffix == '.webp')
+            if path.is_file() and path.suffix in suffixes and public_depth \
                     and all(re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]*', part) for part in parts):
                 found.add(f'{folder}/' + '/'.join(parts))
+    for pack in (NIGHT_DIR / 'packs').glob('*'):
+        if not pack.is_dir() or not re.fullmatch('[a-f0-9]{64}', pack.name):
+            continue
+        try:
+            manifest = json.loads((pack / 'assets.json').read_bytes())
+            encoded = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf8')
+            files = manifest['files']
+            if manifest.get('schema') != 'nc-assets/2' or hashlib.sha256(encoded).hexdigest() != pack.name or not isinstance(files, dict):
+                continue
+            if not all(re.fullmatch(r'assets/[a-z0-9_-]+\.webp', name) and re.fullmatch('[a-f0-9]{64}', digest)
+                       and hashlib.sha256((pack / name).read_bytes()).hexdigest() == digest for name, digest in files.items()):
+                continue
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        found.add(f'packs/{pack.name}/assets.json')
+        found.update(f'packs/{pack.name}/{name}' for name in files)
     return frozenset(found)
 
 
 NIGHT_ASSETS = _night_assets()
 NIGHT_ASSET_PATHS = frozenset('/app/night/' + name for name in NIGHT_ASSETS)
 CLIENT_ASSETS = frozenset({'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js', 'rating-ui.js', 'styles.css',
-                           'night-city-ui.js', 'night-city.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'})
+                           'night-city-ui.js', 'night-city.css', 'night-case-ui.js', 'night-case.css', 'host-card.webp', 'mafia-card.webp', 'farm-card-v2.webp'})
 
 
 def create_app(*, database=None, settings=None, membership=None, clock=time.time, allowed_user_ids=None,
                runtime_enabled=None, scoring_rules=None, room_classic_enabled=None,
-               room_photo_enabled=None, dev_guest_access=False):
+               room_photo_enabled=None, dev_guest_access=False,
+               night_case_enabled=None, night_case_service_factory=None, night_case_settings=None, night_case_orchestrator=None):
     settings = settings or MiniAppSettings.from_env()
     # Production factory (uvicorn --factory) has no arguments: game switches come from env.
     flag = lambda name: os.getenv(name, '').strip() == '1'
+    if night_case_settings is None and night_case_service_factory is None:
+        from config.night_case import NightCaseSettings
+        night_case_settings = NightCaseSettings.from_env()
+    if night_case_enabled is None:
+        night_case_enabled = night_case_settings.enabled if night_case_settings is not None else flag('MQB_NIGHT_CASE_ENABLED')
     if runtime_enabled is None:
         runtime_enabled = flag('MINI_APP_RUNTIME_ENABLED')
     if room_classic_enabled is None:
@@ -342,6 +369,12 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         room_photo_enabled = flag('MQB_ROOM_PHOTO_ENABLED')
     owned_db = database is None
     database = database or Database(DatabaseSettings(url=normalize_database_url(os.getenv('MINI_APP_DATABASE_URL', ''))))
+    night_case_health = None
+    if night_case_enabled and night_case_service_factory is None and night_case_settings is not None and night_case_settings.enabled:
+        from application.night_case_runtime import NightCaseServiceFactory, NightRuntimeHealthMonitor
+        utc_clock = lambda: datetime.fromtimestamp(clock(), tz=timezone.utc)
+        night_case_service_factory = NightCaseServiceFactory(night_case_settings, clock=utc_clock)
+        night_case_health = NightRuntimeHealthMonitor(database, night_case_settings, clock=utc_clock)
     # Offline is fail-closed for groups; it never substitutes a permissive verifier.
     verifier = membership if membership is not None else (
         None if settings.offline or not settings.bot_token else TelegramMembership(settings.bot_token, proxy=settings.telegram_proxy))
@@ -391,13 +424,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     @asynccontextmanager
     async def lifespan(app):
         try:
-            await database.check_connection()
-            if owned_db:
-                from storage.startup import require_current_schema
-                await require_current_schema(database)
-            if getattr(app.state, 'farm_shared_rate', None) is not None:
-                await app.state.farm_shared_rate.check_schema()
-            yield
+            async with AsyncExitStack() as lifecycle:
+                await database.check_connection()
+                if owned_db:
+                    from storage.startup import require_current_schema
+                    await require_current_schema(database)
+                if getattr(app.state, 'farm_shared_rate', None) is not None:
+                    await app.state.farm_shared_rate.check_schema()
+                if night_case_health is not None:
+                    await lifecycle.enter_async_context(night_case_health.api_lifecycle())
+                yield
         finally:
             if membership is None and verifier is not None:
                 await verifier.close()
@@ -412,6 +448,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     app.state.password_store = password_store
     app.state.mini_store = store
     app.state.mini_runtime_enabled = runtime_enabled
+    app.state.night_case_service_factory = night_case_service_factory
+    app.state.night_case_health = night_case_health
+    app.state.night_case_settings = night_case_settings
     # Native Telegram chat picker for any game (shareMessage); None offline or without a bot token.
     from web.telegram_share import TelegramShare
     app.state.telegram_share = (None if settings.offline or not settings.bot_token
@@ -439,6 +478,29 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def database_error(request, error):
         return JSONResponse({'detail': 'Хранилище временно недоступно'}, 503)
 
+    def internal_night_readiness(request):
+        if not (night_case_enabled and night_case_settings is not None and night_case_settings.enabled
+                and request.method == 'GET' and request.scope.get('raw_path') == b'/healthz'
+                and not request.scope.get('query_string') and request.scope.get('scheme') == 'http'):
+            return False
+        try:
+            if not ipaddress.ip_address(request.client.host).is_loopback:
+                return False
+        except (ValueError, AttributeError):
+            return False
+        raw_headers = [(key.lower(), value) for key, value in request.scope.get('headers', ())]
+        if any(key == b'forwarded' or key.startswith(b'x-forwarded-') or key == b'x-real-ip'
+               for key, _ in raw_headers):
+            return False
+        hosts = [value.lower() for key, value in raw_headers if key == b'host']
+        tokens = [value for key, value in raw_headers if key == b'x-night-readiness']
+        expected_host = urlsplit(night_case_settings.readiness_url).netloc.encode('ascii').lower()
+        if (len(hosts) != 1 or hosts[0] != expected_host or len(tokens) != 1
+                or re.fullmatch(rb'[0-9a-f]{64}', tokens[0]) is None):
+            return False
+        from infrastructure.night_case_readiness import readiness_token
+        return hmac.compare_digest(tokens[0], readiness_token(night_case_settings.cursor_secret).encode('ascii'))
+
     @app.middleware('http')
     async def boundary(request, call_next):
         static_game_page = request.method in {'GET', 'HEAD'} and request.url.path in {'/app/alchemy'}
@@ -446,17 +508,18 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         public_page = public_page or (request.method in {'GET', 'HEAD'} and
             (request.url.path == '/app/farm' or request.url.path.startswith('/app/farm/assets/')
              or request.url.path in SHELL_ASSET_PATHS or request.url.path in NIGHT_ASSET_PATHS
-             or request.url.path in {'/app/night-city-ui.js', '/app/night-city.css'}))
+             or request.url.path in {'/app/night-city-ui.js', '/app/night-city.css', '/app/night-case-ui.js', '/app/night-case.css'}))
         # Файлы интерфейса — не API: их качает каждый клиент при каждом открытии, и за общим
         # NAT/VPN они съедали лимит API. Персональный /app/alchemy (с гостевым cookie) ходит в БД,
         # его оставляем под лимитом и без кэша.
         static_request = public_page and not (request.url.path == '/app/alchemy' and request.cookies.get('mqb_guest'))
         farm_rate = getattr(app.state, 'farm_shared_rate', None)
         shared_farm_api = farm_rate is not None and request.url.path.startswith('/api/farm/v1/')
-        room_route = request.url.path.startswith('/api/guest/rooms')
+        room_route = request.url.path.startswith(('/api/guest/rooms', '/api/rooms/', '/api/night-case/'))
+        internal_readiness = internal_night_readiness(request)
         origin = f'{request.url.scheme}://{request.url.netloc}'
-        allowed = origin == settings.origin
-        if request.url.scheme != 'https':
+        allowed = internal_readiness or origin == settings.origin
+        if request.url.scheme != 'https' and not internal_readiness:
             try:
                 loopback = ipaddress.ip_address(request.client.host).is_loopback
             except (ValueError, AttributeError):
@@ -481,7 +544,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             response = JSONResponse({'detail': 'Подтверждение origin обязательно'}, 403)
         # Login needs a deliberately tight bucket. Every gameplay read/write is
         # bounded normally; clients poll shared state at a modest interval.
-        elif not static_request and not shared_farm_api and not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
+        elif not internal_readiness and not static_request and not shared_farm_api and not (settings.offline and request.url.path == '/api/dev/session') and not limits.allow(
                 request.client.host if request.client else '', request.url.path in {'/api/mini/session', '/api/mini/session/resume', '/api/guest/start', '/api/guest/resume', '/api/account/register', '/api/account/login', '/api/account/telegram-login/start', '/api/account/telegram-login/complete', '/api/account/password', '/api/account/credentials', '/api/account/telegram-login/merge', '/api/account/telegram-link/merge'},
                 frequent_read=request.url.path.startswith('/api/farm/') and request.method in {'GET', 'HEAD'},
                 farm_write=request.url.path.startswith('/api/farm/') and request.method not in {'GET', 'HEAD'},
@@ -938,6 +1001,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             async with resolve_principal(request, database=database, guest_store=guest_store,
                                          mini_store=store, lock=lock, write=write,
                                          identity=identity) as pair:
+                from web.night_case_routes import night_viewer_matches
+                if not night_viewer_matches(request.headers.get('x-night-expected-viewer'), pair[1].account_id, required=False):
+                    raise MiniAppError(409, 'Профиль изменился. Открой дело заново из главного меню.', code='profile_changed')
                 if not limits.allow_account(pair[1].account_id):
                     raise MiniAppError(429, 'Слишком много запросов')
                 yield pair
@@ -953,6 +1019,11 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             telegram_url = None
         return {'telegram_url': telegram_url, 'startapp_param': param,
                 'web_url': f'{settings.origin}/app#room={invite_code}'}  # fragment: never reaches logs or Referer
+
+    from web.night_case_routes import register_night_case_routes
+    register_night_case_routes(app, principal=room_principal, identity_for=room_identity,
+                               read_body=bounded_request_body, enabled=night_case_enabled,
+                               service_factory=night_case_service_factory,orchestrator=night_case_orchestrator)
 
     @app.post('/api/guest/rooms')
     async def guest_create_room(request: Request, identity: str | None = Query(None)):
@@ -1250,7 +1321,8 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             keys = ({'question_count', 'open_seconds', 'hints_enabled'} if action == 'start'
                     else {'game_id', 'round_id', 'answer'} if action == 'answer'
                     else {'game_id', 'expected_revision'})
-            values = await guest_mafia_json(request, keys=keys)
+            values = await guest_mafia_json(request, keys=keys,
+                optional=frozenset({'answer_policy'}) if action == 'start' else frozenset())
             command_id = guest_mafia_command_id(request, identity)
             if action != 'start' and (not isinstance(values.get('game_id'), str) or not 1 <= len(values['game_id']) <= 64):
                 raise MiniAppError(400, 'Некорректная фото-серия')
@@ -1258,7 +1330,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                     or not 1 <= len(values['round_id']) <= 64 or not isinstance(values['answer'], str)):
                 raise MiniAppError(400, 'Некорректный ответ')
         try:
-            async with room_principal(request, identity, write=True) as (session, who):
+            async with room_principal(request, identity, write=True, lock=False) as (session, who):
                 service = RoomPhotoApplicationService(session)
                 scope = {'room_id': room_id, 'account_id': UUID(who.account_id)}
                 if action == 'current':
@@ -2174,6 +2246,40 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             except ValueError as error:
                 raise MiniAppError(400, str(error)) from None
 
+    async def photo_chat_available(session, user_id, chat_id):
+        # A verified group participant need not have played here before. The
+        # Telegram membership check below grants access, never a launch hint.
+        if chat_id > 0:
+            await store.require_chat(session, user_id, chat_id)
+            return
+        from sqlalchemy import select
+        from storage.models import Chat
+        chat = await session.scalar(select(Chat).where(
+            Chat.id == chat_id, Chat.type.in_(['group', 'supergroup']),
+            Chat.is_active.is_(True), Chat.bot_blocked.is_(False)))
+        if chat is None:
+            raise MiniAppError(404, 'Чат недоступен')
+
+    async def photo_chat_access(request, chat_id):
+        if not -(2**52) < chat_id < 2**52 or chat_id == 0:
+            raise MiniAppError(404, 'Чат недоступен')
+        token = credential(request)
+        async with store.authorized(token) as (session, user):
+            await photo_chat_available(session, user.id, chat_id)
+            uid = user.id
+        if chat_id != uid:
+            if verifier is None:
+                raise MiniAppError(503, 'Проверка Telegram отключена в локальном offline-режиме')
+            try:
+                member = await verifier.allowed(chat_id, uid)
+            except ChatUnavailable as gone:
+                if gone.deactivate:
+                    await retire_chat(chat_id, gone.migrate_to)
+                raise
+            if not member:
+                raise MiniAppError(403, 'Членство в чате не подтверждено')
+        return token
+
     @app.get('/api/mini/photo/chats/{chat_id}/setup')
     async def photo_setup(request: Request, chat_id: int):
         from application.photo import PhotoApplicationService
@@ -2181,9 +2287,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Игры в Mini App сейчас отключены')
         if not -(2**52) < chat_id < 2**52 or chat_id == 0:
             raise MiniAppError(404, 'Чат недоступен')
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             return await PhotoApplicationService(database, session).setup()
 
     @app.post('/api/mini/photo/chats/{chat_id}/start')
@@ -2200,7 +2306,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         try:
             value = json.loads(raw, object_pairs_hook=unique_object)
             if (not isinstance(value, dict) or set(value) - {
-                    'command_id', 'question_count', 'open_seconds', 'hints_enabled'}
+                    'command_id', 'question_count', 'open_seconds', 'hints_enabled', 'answer_policy'}
                     or set(value) < {'command_id'}
                     or not isinstance(value['command_id'], str)
                     or not 8 <= len(value['command_id']) <= 64
@@ -2210,15 +2316,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректные параметры фото-игры') from None
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token, write=True) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             try:
                 return await PhotoApplicationService(database, session).start(
                     chat_id=chat_id, user_id=user.id, display_name=user.display_name,
                     question_count=value.get('question_count', DEFAULT_PHOTO_QUESTION_COUNT),
                     open_seconds=value.get('open_seconds', DEFAULT_PHOTO_OPEN_SECONDS),
                     hints_enabled=value.get('hints_enabled', DEFAULT_PHOTO_HINTS_ENABLED),
+                    answer_policy=value.get('answer_policy', 'group_private_deadline' if chat_id < 0 else 'personal'),
                     command_id=value['command_id'],
                 )
             except PhotoGameConflict as error:
@@ -2233,9 +2340,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         from application.photo import PhotoApplicationService
         if not -(2**52) < chat_id < 2**52 or chat_id == 0:
             raise MiniAppError(404, 'Чат недоступен')
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             service = PhotoApplicationService(database, session)
             current = await service.current(chat_id=chat_id, user_id=user.id)
             if current is None:
@@ -2249,9 +2356,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             raise MiniAppError(409, 'Игры в Mini App сейчас отключены')
         if not -(2**52) < chat_id < 2**52 or chat_id == 0:
             raise MiniAppError(404, 'Чат недоступен')
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token, write=True) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             service = PhotoApplicationService(database, session)
             current = await service.settle_due(chat_id=chat_id, user_id=user.id)
             if current is None:
@@ -2282,9 +2389,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректный ответ') from None
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token, write=True) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             try:
                 return await PhotoApplicationService(database, session).answer(
                     chat_id=chat_id, user_id=user.id, display_name=user.display_name,
@@ -2320,9 +2427,9 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 raise ValueError()
         except (ValueError, UnicodeError, RecursionError):
             raise MiniAppError(400, 'Некорректная команда') from None
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token, write=True) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             try:
                 return await PhotoApplicationService(database, session).stop(
                     chat_id=chat_id, user_id=user.id,
@@ -2343,12 +2450,12 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         from application.photo import PhotoApplicationService
         if not -(2**52) < chat_id < 2**52 or chat_id == 0:
             raise MiniAppError(404, 'Чат недоступен')
-        token = await chat_access(request, chat_id)
+        token = await photo_chat_access(request, chat_id)
         async with store.authorized(token) as (session, user):
-            await store.require_chat(session, user.id, chat_id)
+            await photo_chat_available(session, user.id, chat_id)
             try:
                 path = await PhotoApplicationService(database, session).image(
-                    chat_id=chat_id, user_id=user.id, round_id=request.query_params.get('round_id'))
+                    chat_id=chat_id, user_id=user.id, round_id=request.query_params.get('round_id'), now=clock())
             except LookupError as error:
                 raise MiniAppError(404, str(error)) from None
         return FileResponse(path, media_type='image/webp')

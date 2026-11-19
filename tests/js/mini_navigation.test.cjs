@@ -51,7 +51,7 @@ const findButton = (root, label) => {
 const openGuestSettings = async app => { await openGuestProfile(app); await findButton(app.content, 'Настройки').click(); await flush(); await flush(); };
 async function application(runtime = true, startParam = '', {overrides = {}, manualTimers = false, guestMode = false, savedGuest = false,
     farmEnabled = false, locationSearch = '', sessionValues = {}, miniCookie = false, autoLogin = true,
-    historyThrows = false, replaceAvailable = true, initData = '', offline = true, assignFailures = 0, locationHash = ''} = {}) {
+    historyThrows = false, replaceAvailable = true, initData = '', offline = true, assignFailures = 0, locationHash = '', nightCaseEnabled = false} = {}) {
     const ids = Object.fromEntries(['content', 'navigation', 'feedback', 'environment'].map(id => [id, new Element('div')]));
     for (const page of ['home', 'chats', 'rating', 'profile']) { const b = new Element('button'); b.dataset.page = page; ids.navigation.append(b); }
     // Shell core double: records what app.js asks of QW (back target, mode, menu account) without a real DOM.
@@ -144,13 +144,15 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
     });
     // index.html loads night-city-ui.js before app.js; both share window.
     runInContext(source('night-city-ui.js'), sandbox);
+    const nightCaseMounts = [];
+    if (nightCaseEnabled) sandbox.window.NightCase = {close() {}, open(options) { nightCaseMounts.push(options); }};
     runInContext(source('app.js'), sandbox);
     await flush();
     if (autoLogin && !guestMode && !savedGuest && !miniCookie && ids.content.querySelectorAll('button').some(n => n.textContent === 'Войти как dev-игрок')) {
         await findButton(ids.content, 'Войти как dev-игрок').click(); await flush();
     }
     const tab = page => ids.navigation.children.find(n => n.dataset.page === page);
-    return {...ids, ui, qw, mounts, ratingCalls, tab, timers, requests, assigned, replaced, replacedNavigation, storage, currentLocation, document, windowEvents};
+    return {...ids, ui, qw, mounts, ratingCalls, tab, timers, requests, assigned, replaced, replacedNavigation, storage, currentLocation, document, windowEvents, nightCaseMounts};
 }
 
 const guestPhotoBase = '/api/guest/rooms/room-test/photo';
@@ -166,7 +168,7 @@ const guestPhotoOverrides = extra => ({
     ...extra,
 });
 
-test('standalone Photo personal start, attempt, finish and stop use exact guest command scope', async () => {
+test('standalone room Photo starts with explicit group policy and uses exact guest command scope', async () => {
     let current = null;
     const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestPhotoOverrides({
         [guestPhotoBase + '/current']: () => ({status: 200, body: {current, occupied: false}}),
@@ -183,7 +185,7 @@ test('standalone Photo personal start, attempt, finish and stop use exact guest 
     assert.match(app.content.textContent, /Серия завершена/);
     const writes = app.requests.filter(r => r.path.startsWith(guestPhotoBase) && r.options.method === 'POST');
     assert.deepEqual(writes.map(r => JSON.parse(r.options.body)), [
-        {question_count: 3, open_seconds: 60, hints_enabled: true},
+        {question_count: 3, open_seconds: 60, hints_enabled: true, answer_policy: 'group_private_deadline'},
         {game_id: 'photo-game', round_id: 'photo-round', answer: 'Ответ'},
         {game_id: 'photo-game', expected_revision: 2},
     ]);
@@ -459,6 +461,31 @@ const ncOverrides = (lobby, extra = {}, room = ncRoom()) => ({
 const ncWrites = (app, suffix) => app.requests.filter(r => r.path === ncq(`${NCB}/mafia${suffix}`) && r.options.method === 'POST');
 async function ncEntry(app) { await findButton(app.content, 'Открыть дело').click(); await flush(); await flush(); }
 async function ncTable(app) { await ncEntry(app); await findButton(app.content, 'Открыть').click(); await flush(); await flush(); await flush(); }
+
+test('Case enabled keeps six synthetic classic tables reachable without writing or creating tables', async () => {
+    const rooms = Array.from({length: 6}, (_, i) => ncRoom({id: `retained-${i}`, title: `Сохранённый стол ${i}`}));
+    const overrides = ncOverrides(ncLobby(), {
+        '/api/night-case/bootstrap?identity=guest': {status: 200, body: {enabled: true, capabilities: {legacy_mafia: true}}},
+        [ncq('/api/guest/rooms')]: {status: 200, body: {items: rooms}},
+    });
+    for (const [i, room] of rooms.entries()) {
+        const base = `/api/guest/rooms/${room.id}/mafia`;
+        overrides[ncq(base + '/lobby')] = {status: 200, body: {lobby: ncLobby(i ? {} : {status: 'day', round: 1})}};
+        overrides[ncq(base + '/discussion')] = {status: 200, body: {enabled: true, items: []}};
+        overrides[ncq(base + '/role')] = {status: 200, body: {role: 'citizen', title: 'Мирный житель', alive: true, seat: 'p1', targets: []}};
+    }
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, nightCaseEnabled: true, overrides});
+    await ncEntry(app);
+    assert.equal(app.nightCaseMounts.length, 1);
+    await app.nightCaseMounts[0].openLegacy(); await flush(); await flush();
+    for (const room of rooms) {
+        const card = app.content.querySelectorAll('li').find(node => node.textContent.includes(room.title));
+        assert.ok(card, room.title); await findButton(card, 'Открыть').click(); await flush(); await flush();
+        assert.ok(app.requests.some(row => row.path === ncq(`/api/guest/rooms/${room.id}/mafia/lobby`)));
+        await app.ui.back(); await flush(); await flush();
+    }
+    assert.ok(!app.requests.some(row => row.path.includes('/mafia/') && row.options.method === 'POST'));
+});
 
 test('Night City entry is one screen for Telegram and the browser: company, invitation, rooms, open tables, Telegram group', async () => {
     const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: ncOverrides(ncLobby())});
@@ -877,7 +904,8 @@ test('polling redraws without losing the draft and stops after leaving the game'
 
 test('Telegram: the group table is a secondary path; messages stay text and commands carry the Mini App CSRF', async () => {
     const chat = '-880000000044', base = `/api/mini/mafia/chats/${chat}`;
-    const app = await application(true, '', {overrides: {
+    const app = await application(true, '', {nightCaseEnabled: true, overrides: {
+        '/api/night-case/bootstrap?identity=telegram': {status: 200, body: {enabled: true, capabilities: {legacy_mafia: true}}},
         '/api/mini/chats?limit=50': {status: 200, body: {items: [{chat_id: chat, title: 'Дело', type: 'supergroup', mafia: {status: 'playing', seated: 5, joined: true}}], has_more: false}},
         [ncq('/api/guest/rooms', 'telegram')]: {status: 200, body: {items: []}},
         [ncq('/api/guest/rooms/open', 'telegram')]: {status: 200, body: {items: []}},
@@ -886,6 +914,7 @@ test('Telegram: the group table is a secondary path; messages stay text and comm
         [`${base}/discussion:POST`]: {status: 200, body: {id: 2, accepted: true}},
     }});
     await ncEntry(app);
+    await app.nightCaseMounts[0].openLegacy(); await flush(); await flush();
     assert.match(app.content.textContent, /Играть в Telegram-группе/);
     assert.match(app.content.textContent, /Открытых столов сейчас нет/);
     assert.match(app.content.textContent, /за столом 5 · ты за столом/);
@@ -1636,6 +1665,126 @@ function player() {
     window.QuizPlay.menu = menu;
     return window.QuizPlay;
 }
+
+test('group Photo accepts own answer, waits privately, and polls the next question with settled solvers', async () => {
+    const ui = player(), host = new Element('main');
+    let view = {...guestPhotoGame(), answer_policy: 'group_private_deadline', game: {total: 3}};
+    const api = {
+        kind: 'chat', setup: async () => guestPhotoSetup, current: async () => view,
+        answer: async (kind, params) => {
+            assert.equal(params.questionId, 'photo-round');
+            view = {...view, question: {...view.question, answered: true, attempts: 1, feedback: 'correct'}};
+            return {...view, verdict: 'correct'};
+        }, imageUrl: q => q.image_url,
+    };
+    const options = {host, api, command: '/photo_quiz', media: async () => { throw new Error('skip'); }, selection() {}, onHome() {}, onReplay() {}, onProfile() {}};
+    await ui.mount(options);
+    const input = host.querySelector('input'); input.value = 'Сова'; input.events.input();
+    host.querySelector('form').onsubmit({preventDefault() {}}); await flush(); await flush();
+    assert.match(host.textContent, /Ответ принят, ждём завершения раунда/);
+    assert.equal(host.querySelectorAll('form').length, 0, 'success does not offer repeat answers');
+    assert.doesNotMatch(host.textContent, /Верно ответили|Твои очки|Следующая картинка уже здесь/);
+    view = {...view, question: {...view.question, round_id: 'next-round', answered: false, feedback: null},
+        last_result: {answer: 'Сова', correct: true, points: 16, own_points: 7, own_correct: true, solvers: [{account_id: 'a', name: 'Аня', points: 7}, {account_id: 'b', name: 'Борис', points: 9}]}};
+    await ui.mount(options);
+    assert.match(host.textContent, /Верно ответили: Аня · 7, Борис · 9/);
+    assert.match(host.textContent, /Твои очки: 7/);
+    assert.doesNotMatch(host.textContent, /Твои очки: 16/);
+    assert.ok(host.querySelector('form'), 'new question accepts a new private answer');
+    ui.stop();
+});
+
+test('group Photo final screen uses the viewer totals and never aggregate wins as personal success', async () => {
+    const ui = player(), host = new Element('main');
+    let view = {...guestPhotoGame(), answer_policy: 'group_private_deadline', game: {total: 1}, own_score: '0', own_correct: 0};
+    const api = {kind: 'chat', setup: async () => guestPhotoSetup, current: async () => view,
+        imageUrl: q => q.image_url, answer: async () => {
+            view = {...view, status: 'finished', question: null, score: '17', correct: 2, own_score: '8', own_correct: 1,
+                last_result: {answer: 'Сова', points: 17, own_points: 8, own_correct: true, solvers: [{name: 'Аня', points: 8}, {name: 'Борис', points: 9}]}};
+            return view;
+        }};
+    await ui.mount({host, api, command: '/photo_quiz', media: async () => { throw new Error('skip'); },
+        selection() {}, onHome() {}, onReplay() {}, onProfile() {}});
+    const input = host.querySelector('input'); input.value = 'Сова'; input.events.input();
+    host.querySelector('form').onsubmit({preventDefault() {}}); await flush(); await flush();
+    assert.match(host.textContent, /1 правильных из 1/);
+    assert.doesNotMatch(host.textContent, /2 правильных из 1|Твои очки: 17/);
+    assert.match(host.querySelector('.result-score').textContent, /^8баллов за серию$/);
+    assert.match(host.textContent, /Твои очки: 8/);
+    ui.stop();
+});
+
+test('Telegram room Photo image and retry explicitly select the Telegram identity with dual cookies', async () => {
+    const app = await application(true, '', {manualTimers: true, overrides: {
+        '/api/guest/rooms?identity=telegram': {status: 200, body: {items: [{...guestRoom, role: 'member'}]}},
+        [guestPhotoBase + '/setup?identity=telegram']: {status: 200, body: guestPhotoSetup},
+        [guestPhotoBase + '/current?identity=telegram']: {status: 200, body: {current: {...guestPhotoGame(), answer_policy: 'group_private_deadline'}, occupied: false}},
+    }});
+    await findButton(app.content, 'Фото с друзьями · комнаты').click();
+    assert.equal(app.navigation.hidden, false);
+    assert.equal(app.tab('home').getAttribute('aria-current'), 'page');
+    await findButton(app.content, 'Открыть фото-загадки').click();
+    assert.equal(app.navigation.hidden, false);
+    assert.equal(app.tab('home').getAttribute('aria-current'), 'page');
+    const image = app.content.querySelector('img');
+    const original = new URL(image.src, 'https://qw.example');
+    assert.equal(original.searchParams.get('identity'), 'telegram');
+    assert.equal(original.searchParams.get('game_id'), 'photo-game');
+    assert.equal(original.searchParams.get('round_id'), 'photo-round');
+    image.events.error(); await findButton(app.content, 'Повторить загрузку фото').click();
+    const retry = new URL(image.src, 'https://qw.example');
+    assert.equal(retry.searchParams.get('identity'), 'telegram');
+    assert.equal(retry.searchParams.get('retry'), '1');
+    assert.equal(retry.searchParams.get('game_id'), 'photo-game');
+    assert.equal(retry.searchParams.get('round_id'), 'photo-round');
+    await app.ui.back();
+});
+
+test('group Photo stale deep link requires explicit transition before answering the current round', async () => {
+    const ui = player(), host = new Element('main');
+    const view = {...guestPhotoGame(), answer_policy: 'group_private_deadline', game: {total: 3}};
+    await ui.mount({host, api: {kind: 'chat', setup: async () => guestPhotoSetup, current: async () => view, imageUrl: q => q.image_url},
+        command: '/photo_quiz', photoTarget: {roundId: 'old-round'}, media: async () => { throw new Error('skip'); },
+        selection() {}, onHome() {}, onReplay() {}, onProfile() {}});
+    assert.match(host.textContent, /Раунд из ссылки уже завершён/);
+    assert.equal(host.querySelectorAll('form').length, 0);
+    await findButton(host, 'Открыть текущий раунд').click();
+    assert.ok(host.querySelector('form'));
+    ui.stop();
+});
+
+test('group Photo participant room view shows own waiting and reveals solvers only after settlement', async () => {
+    let current = {...guestPhotoGame(), answer_policy: 'group_private_deadline', question: {...guestPhotoGame().question, answered: true, attempts: 2}};
+    const app = await application(true, '', {savedGuest: true, manualTimers: true, overrides: guestPhotoOverrides({
+        '/api/guest/rooms': {status: 200, body: {items: [{...guestRoom, role: 'member'}]}},
+        [guestPhotoBase + '/current']: () => ({status: 200, body: {current, occupied: false}}),
+    })});
+    await findButton(app.content, 'Открыть фото-загадки').click();
+    assert.equal(app.navigation.hidden, false);
+    assert.equal(app.tab('home').getAttribute('aria-current'), 'page');
+    assert.match(app.content.textContent, /Ответ принят, ждём завершения раунда/);
+    assert.equal(findButton(app.content, 'Ответить').disabled, true);
+    assert.ok(!app.content.querySelectorAll('button').some(b => /Начать|Остановить/.test(b.textContent)));
+    assert.doesNotMatch(app.content.textContent, /Верно ответили/);
+    current = {...current, score: '17', correct: 2, own_score: '8', own_correct: 1,
+        last_result: {answer: 'Сова', correct: true, points: 17, own_points: 8, own_correct: true, solvers: [{name: 'Аня', points: 8}, {name: 'Борис', points: 9}]},
+        question: {...current.question, round_id: 'round-2', answered: false}};
+    await app.timers.find(t => t.delay === 3000).callback();
+    assert.match(app.content.textContent, /Верно ответили: Аня · 8, Борис · 9/);
+    assert.match(app.content.textContent, /Верно: 1\. Очки этой серии: 8/);
+    assert.match(app.content.textContent, /8 твоих очков/);
+    assert.doesNotMatch(app.content.textContent, /17 твоих очков|Верно: 2\. Очки этой серии/);
+    assert.equal(findButton(app.content, 'Ответить').disabled, false);
+    await app.ui.back();
+});
+
+test('Photo launch preserves a group not in the historical chat list and passes the exact round to play', async () => {
+    const roundId = 'a'.repeat(32), app = await application(true, `photo_n100123_${roundId}`);
+    assert.equal(app.mounts.length, 1);
+    assert.equal(app.mounts[0].chatId, '-100123');
+    assert.equal(app.mounts[0].command, '/photo_quiz');
+    assert.equal(app.mounts[0].photoTarget.roundId, roundId);
+});
 test('Classic gameplay reads and answers through shared application API only', async () => {
     const ui = player(), host = new Element('main'), answers = [];
     let shared = {phase: 'active', game: {current: 1, total: 2}, question: {
@@ -2004,7 +2153,7 @@ test('roomApi photo: current handles occupied and 404, bodies carry game_id', as
     await room.start('photo', {question_count: 3, open_seconds: 60, hints_enabled: true}, 'id-photo-start');
     await room.answer('photo', {gameId: 'p1', questionId: 'pr', answer: 'слово'}, 'id-photo-answer');
     const [start, answer] = rec.calls.slice(-2);
-    assert.deepEqual(JSON.parse(start.options.body), {question_count: 3, open_seconds: 60, hints_enabled: true});
+    assert.deepEqual(JSON.parse(start.options.body), {question_count: 3, open_seconds: 60, hints_enabled: true, answer_policy: 'personal'});
     assert.deepEqual(JSON.parse(answer.options.body), {game_id: 'p1', round_id: 'pr', answer: 'слово'});
     assert.equal(answer.options.headers['Idempotency-Key'], 'id-photo-answer');
 });

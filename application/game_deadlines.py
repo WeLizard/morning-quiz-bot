@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class GameDeadlineProcessor:
-    def __init__(self, database):
+    def __init__(self, database, *, night_case_worker=None):
         self.database = database
+        self.night_case_worker = night_case_worker
 
     async def run_once(self, *, now=None) -> dict[str, int]:
         """Apply due transitions; every candidate is rechecked under its game lock."""
@@ -69,6 +70,12 @@ class GameDeadlineProcessor:
                 RoomPhotoApplicationService(session).settle_due_game(game_id=game_id, now=now))
             settled['photo'] += result is not None
 
+        if self.night_case_worker is not None:
+            try:
+                settled['night_case'] = await self.night_case_worker.run_once(now=now)
+            except Exception:
+                logger.warning('Night Case deadline pass deferred: runtime_unavailable')
+                settled['night_case'] = 0
         if any(settled.values()):
             logger.info('Applied game deadlines: %s', settled)
         return settled

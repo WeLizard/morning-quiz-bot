@@ -16,6 +16,8 @@
         // Ссылки вида ?startapp=chat_n100123 и mafia_n100123 несут id группы (со знаком минус).
         const scoped = /^(mafia|chat)_n([1-9][0-9]{0,15})$/.exec(raw);
         if (scoped) return scoped[1] === 'mafia' ? {page: 'mafia', night: {chatId: '-' + scoped[2]}} : {page: scoped[1], chatId: '-' + scoped[2]};
+        const photo = /^photo_n([1-9][0-9]{0,15})_([0-9a-f]{32})$/.exec(raw);
+        if (photo) return {page: 'play', chatId: '-' + photo[1], photo: {roundId: photo[2]}};
         const night = nightLaunch(raw);
         if (night) return {page: 'mafia', night};
         if (raw === 'farm') return {page: 'home', farm: true}; // the farm card in the chat with the bot
@@ -55,7 +57,7 @@
     }
     const launch = launchTarget();
     const state = {authenticated: false, guest: null, demo: false, page: launch?.page || 'home', selected: launch?.chatId || '', nightTarget: launch?.night || null, launchLost: false, me: null, progress: null, chats: [], chatOffset: 0, moreChats: false, botUsername: '', gameModes: []};
-    let generation = 0, playCommand = null, runtimeEnabled = false, guestAllowed = true, roomClassicEnabled = false, roomPhotoEnabled = false;
+    let generation = 0, playCommand = launch?.photo ? '/photo_quiz' : null, photoLaunchTarget = launch?.photo || null, runtimeEnabled = false, guestAllowed = true, roomClassicEnabled = false, roomPhotoEnabled = false;
     let roomPhotoDispose = null, roomPhotoPending = null;
     const stopRoomPhoto = () => { const dispose = roomPhotoDispose; roomPhotoDispose = null; dispose?.(); };
     let roomClassicTimer = null;
@@ -100,7 +102,7 @@
         // Same identity rule as the account API calls: the Telegram session when signed in through it, else the guest cookie; '' = unknown.
         const identity = state.authenticated ? 'telegram' : state.guest ? 'guest' : '';
         QW.configure(game ? {mode: 'game', onHome, screen: 'night-city', identity} : {mode: 'hub', onHome: null, screen: page || 'hub', identity});
-        if (!game) window.NightCity?.close?.();
+        if (!game) { window.NightCity?.close?.(); window.NightCase?.close?.(); }
         QW.menu.register([]);
         setHubTitle(game ? null : title ?? (page ? PAGE_TITLES[page] || null : null));
         const profile = state.authenticated ? state.me : state.guest;
@@ -726,6 +728,13 @@
         if (state.nightTarget) { openNightCity(state.nightTarget); return; }
         if (openSettingsOnLoad) { consumeSettingsHash(); await guestSettings(); return; }
         window.QuizPlay?.stop(); showGuestTab('home'); feedback.textContent = ''; content.replaceChildren(); content.dataset.page = 'guest'; shell(); consumeSettingsHash();
+        if (photoLaunchTarget) {
+            const entry = el('section', undefined, 'card');
+            entry.append(el('h2', 'Ответить на фото группы'));
+            note(entry, 'Чтобы проверить участие в Telegram-группе, войди через Telegram. Ссылка сама по себе не даёт доступ к раунду.');
+            if (tg?.initData) entry.append(button('Войти через Telegram', guestSignInViaTelegram, 'primary'));
+            content.append(entry);
+        }
         // Same hero and game cards as the Telegram home, limited to modes a guest can play.
         const hero = el('section', undefined, 'hero home-hero'), heroCopy = el('div', undefined, 'hero-copy');
         heroCopy.append(el('span', 'Филиныч на связи', 'eyebrow'));
@@ -743,7 +752,7 @@
         guestMain.append(guestCards);
         const rooms = el('section', undefined, 'card guest-rooms');
         rooms.append(el('span', 'Играть вместе', 'eyebrow'), el('h2', 'Твои комнаты'));
-        note(rooms, 'Создавай закрытые комнаты, приглашай друзей и играйте в Ночной город.');
+        note(rooms, 'Создавай закрытые комнаты, приглашай друзей и играйте в Ночной город или фото-загадки. В общей фото-серии ответы скрыты до конца раунда.');
         const title = el('input'); title.type = 'text'; title.maxLength = 80;
         title.placeholder = 'Например, «Вечерняя компания»'; title.setAttribute('aria-label', 'Название комнаты');
         const secureIds = typeof globalThis.crypto?.randomUUID === 'function';
@@ -1209,7 +1218,7 @@
             window.QW?.prefs?.applyAccount(me); // the Account's «Контрастный режим» wins over this device's cache
             if (resumeFarmInvite('telegram')) return;
             if (openFarmLaunch()) return;
-            if (state.selected && !state.chats.some(c => c.chat_id === state.selected)) {
+            if (state.selected && !photoLaunchTarget && !state.chats.some(c => c.chat_id === state.selected)) {
                 state.launchLost = true;      // чат из ссылки недоступен: не подменяем молча
                 state.selected = '';
             }
@@ -1365,7 +1374,7 @@
             const target = {...room, role: 'owner', title: room.title || SOLO_ROOM_TITLE};
             soloOpening = false;
             if (SOLO_FULL_PLAY_UI && window.QuizPlay?.roomApi) await mountSoloPlay(kind, target);
-            else await (kind === 'photo' ? openGuestPhoto(target, {autostart: true}) : openGuestClassic(target, {autostart: true}));
+            else await (kind === 'photo' ? openGuestPhoto(target, {autostart: true, answerPolicy: 'personal'}) : openGuestClassic(target, {autostart: true}));
         } catch (error) { feedback.textContent = error.message; }
         finally { soloOpening = false; }
     }
@@ -1417,6 +1426,7 @@
             choices.append(homeGameCard({...actual, title: mode.title, status: mode.status}));
         });
         content.append(choices);
+        content.append(button('Фото с друзьями · комнаты', openPhotoRooms, 'secondary'));
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
             // Сбой одного чата не должен ломать главную: недоступный чат тихо скрываем,
@@ -1475,17 +1485,65 @@
         profileCard.append(button('Мой профиль', () => navigate('profile'), 'quiet'));
         content.append(profileCard);
     }
-    async function openGuestPhoto(room, {autostart = false} = {}) {
+    async function openPhotoRooms() {
+        stopRoomClassic(); window.QuizPlay?.stop();
+        const version = ++generation, identity = state.authenticated ? 'telegram' : 'guest';
+        state.page = 'photo-rooms'; showGuestTab('home'); content.replaceChildren();
+        shell({back: () => state.authenticated ? navigate('home') : guestHome(), title: 'Фото с друзьями'});
+        const call = (path, method = 'GET', body = null, id = null) => guestRequest(`/api/guest/rooms${path}?identity=${identity}`, method,
+            body ? {headers: {'Content-Type': 'application/json', ...(id ? {'Idempotency-Key': id} : {})}, body: JSON.stringify(body)} : {});
+        const card = el('section', undefined, 'card'), actions = el('div', undefined, 'qw-btn-stack');
+        card.append(el('h1', 'Фото с друзьями'));
+        note(card, 'Пригласи друзей в комнату. Каждый отвечает в своей форме, результаты открываются одновременно по таймеру.');
+        const title = el('input'); title.placeholder = 'Название новой комнаты'; title.maxLength = 80; title.setAttribute('aria-label', 'Название комнаты');
+        const invite = el('input'); invite.placeholder = 'Код приглашения'; invite.maxLength = 64; invite.setAttribute('aria-label', 'Код приглашения');
+        const createId = crypto.randomUUID(); let createTitle = null;
+        const write = async (button, task) => {
+            button.disabled = true;
+            try { await task(); if (version === generation) await openPhotoRooms(); }
+            catch (error) { if (version === generation) feedback.textContent = error.message; button.disabled = false; }
+        };
+        actions.append(title, button('Создать комнату для фото', event => write(event.currentTarget, () => {
+            if (createTitle === null) createTitle = title.value;
+            return call('', 'POST', {request_id: createId, title: createTitle});
+        }), 'primary'), invite, button('Войти по коду', event => write(event.currentTarget,
+            () => call('/join', 'POST', {invite_code: invite.value.trim()})), 'secondary'));
+        card.append(actions); content.append(card);
+        try {
+            const data = await call('');
+            if (version !== generation) return;
+            for (const room of data.items || []) {
+                const item = el('article', undefined, 'card'), row = el('div', undefined, 'qw-btn-stack');
+                item.append(el('h2', room.title));
+                row.append(button('Открыть фото-загадки', () => openGuestPhoto(room), 'primary'));
+                if (room.role === 'owner') {
+                    const inviteId = crypto.randomUUID();
+                    row.append(button('Пригласить друзей', async event => {
+                        event.currentTarget.disabled = true;
+                        try {
+                            const result = await call(`/${encodeURIComponent(room.id)}/invites`, 'POST', {expires_in_seconds: 86400, max_uses: 20}, inviteId);
+                            if (version !== generation) return;
+                            note(item, `Код приглашения: ${result.invite_code}`);
+                            const code = el('input'); code.readOnly = true; code.value = result.invite_code; code.setAttribute('aria-label', 'Код для друзей'); item.append(code);
+                        } catch (error) { if (version === generation) feedback.textContent = error.message; event.currentTarget.disabled = false; }
+                    }, 'secondary'));
+                }
+                item.append(row); content.append(item);
+            }
+        } catch (error) { if (version === generation) { note(content, error.message, 'error'); content.append(button('Повторить', openPhotoRooms)); } }
+    }
+    async function openGuestPhoto(room, {autostart = false, answerPolicy = 'group_private_deadline'} = {}) {
         stopRoomClassic(); generation++; window.QuizPlay?.stop();
         const version = generation, base = `/api/guest/rooms/${encodeURIComponent(room.id)}/photo`;
         const key = `${state.guest?.account_id}:${room.id}`, lifetime = new AbortController();
         let timer = null, submitting = false, refreshing = false, startNow = false, rendered, draft = '', roundKey = '', setup, setupError;
         const clearTimer = () => { clearTimeout(timer); timer = null; };
         roomPhotoDispose = () => { clearTimer(); lifetime.abort(); };
-        state.page = 'guest-photo'; nav.hidden = true; feedback.textContent = '';
-        shell({back: () => guestHome(), title: 'Фото-загадки'});
+        state.page = 'guest-photo'; showGuestTab('home'); feedback.textContent = '';
+        shell({back: () => state.authenticated ? openPhotoRooms() : guestHome(), title: 'Фото-загадки'});
         const active = () => !lifetime.signal.aborted && version === generation && state.page === 'guest-photo';
-        const call = (path, method = 'GET', options = {}) => guestRequest(base + path, method, {...options, signal: lifetime.signal});
+        const mediaIdentity = state.authenticated ? 'telegram' : 'guest';
+        const call = (path, method = 'GET', options = {}) => guestRequest(base + path + (state.authenticated ? '?identity=telegram' : ''), method, {...options, signal: lifetime.signal});
         const pending = () => roomPhotoPending?.key === key ? roomPhotoPending : null;
         const command = async (action, body) => {
             if (submitting || !active()) return;
@@ -1528,7 +1586,10 @@
                     content.replaceChildren();
                     const box = el('section', undefined, 'card'); content.append(box);
                     box.append(el('h1', room.title), el('h2', 'Фото-загадки'));
-                    note(box, 'Личная серия владельца комнаты.');
+                    const group = (current?.answer_policy || answerPolicy) === 'group_private_deadline';
+                    const ownScore = group ? current?.own_score ?? 0 : current?.score;
+                    const ownCorrect = group ? current?.own_correct ?? 0 : current?.correct;
+                    note(box, group ? 'Общая серия. Каждый отвечает лично; результаты откроются по дедлайну.' : 'Личная серия владельца комнаты.');
                     if (setupError && room.role === 'owner' && roomPhotoEnabled) {
                         note(box, setupError, 'error');
                         box.append(button('Повторить каталог', () => { rendered = undefined; return refresh(); }, 'quiet'));
@@ -1539,41 +1600,47 @@
                     } else if (data.occupied) {
                         note(box, 'Фото-серия занята другим игроком.');
                     } else if (!current || ['finished', 'stopped', 'interrupted'].includes(current.status)) {
-                        note(box, current ? `Серия завершена. Верно: ${current.correct}. Очки: ${format(current.score)}.` : 'Фото-серия ещё не началась.');
+                        note(box, current ? `Серия завершена. Верно: ${ownCorrect}. Очки: ${format(ownScore)}.` : 'Фото-серия ещё не началась.');
                         if (room.role === 'owner' && roomPhotoEnabled && setup) {
                             note(box, `${setup.question_count} картинки · ${setup.open_seconds} секунд · ${setup.hints_enabled ? 'с подсказками' : 'без подсказок'}`);
-                            const start = button('Начать фото-серию', () => command('start', {question_count: setup.question_count, open_seconds: setup.open_seconds, hints_enabled: setup.hints_enabled}), 'primary');
+                            const start = button('Начать фото-серию', () => command('start', {question_count: setup.question_count, open_seconds: setup.open_seconds, hints_enabled: setup.hints_enabled, answer_policy: answerPolicy}), 'primary');
                             start.disabled = !setup.can_start; box.append(start);
                             if (!setup.can_start) note(box, 'В каталоге пока нет доступных фото-загадок.');
                         }
                     } else if (q) {
                         note(box, `Фото ${q.question_number}/${q.question_count} · до ${new Date(q.ends_at * 1000).toLocaleTimeString('ru-RU')}`);
                         const image = el('img'); image.alt = 'Что изображено на фото?'; image.className = 'play-photo';
+                        const imageUrl = `${q.image_url}${q.image_url.includes('?') ? '&' : '?'}identity=${mediaIdentity}`;
                         const imageStatus = el('p'); let imageRetry = 0;
                         const retryImage = button('Повторить загрузку фото', () => {
                             retryImage.hidden = true; imageStatus.textContent = 'Загружаю фото…';
-                            image.src = `${q.image_url}&retry=${++imageRetry}`;
+                            image.src = `${imageUrl}&retry=${++imageRetry}`;
                         }, 'quiet'); retryImage.hidden = true;
                         image.addEventListener('error', () => {
                             if (!active()) return;
                             imageStatus.textContent = 'Фото не загрузилось. Повтори загрузку.'; retryImage.hidden = false;
                         });
                         image.addEventListener('load', () => { imageStatus.textContent = ''; retryImage.hidden = true; });
-                        image.src = q.image_url; box.append(image, imageStatus, retryImage);
+                        image.src = imageUrl; box.append(image, imageStatus, retryImage);
                         if (q.mask) note(box, q.mask, 'photo-mask');
                         if (q.feedback === 'almost') note(box, 'Очень близко — собери точное слово.');
                         else if (q.feedback === 'wrong') note(box, 'Пока мимо. Попробуй ещё.');
                         const form = el('form'), input = el('input'); input.type = 'text'; input.value = draft; input.maxLength = 300;
-                        input.setAttribute('aria-label', 'Твой ответ на фото'); input.autocomplete = 'off'; input.disabled = q.closed;
+                        const answered = group && q.answered;
+                        input.setAttribute('aria-label', 'Твой ответ на фото'); input.autocomplete = 'off'; input.disabled = q.closed || answered;
                         input.addEventListener('input', () => { draft = input.value; });
-                        const answer = button('Ответить', () => command('answer', {game_id: current.game_id, round_id: q.round_id, answer: input.value}), 'primary'); answer.type = 'button'; answer.disabled = q.closed;
-                        form.addEventListener('submit', event => { event.preventDefault(); if (!q.closed) command('answer', {game_id: current.game_id, round_id: q.round_id, answer: input.value}); });
+                        const answer = button('Ответить', () => command('answer', {game_id: current.game_id, round_id: q.round_id, answer: input.value}), 'primary'); answer.type = 'button'; answer.disabled = q.closed || answered;
+                        form.addEventListener('submit', event => { event.preventDefault(); if (!q.closed && !answered) command('answer', {game_id: current.game_id, round_id: q.round_id, answer: input.value}); });
                         form.append(input, answer); box.append(form);
+                        if (answered) note(box, 'Ответ принят, ждём завершения раунда');
                         if (focused) { input.focus?.(); if (selection) input.setSelectionRange?.(...selection); }
-                        if (room.role === 'owner') box.append(button('Остановить фото-серию', () => command('stop', {game_id: current.game_id, expected_revision: current.revision}), 'quiet'));
-                        note(box, `Верно: ${current.correct}. Очки этой серии: ${format(current.score)}.`);
+                        if (current.stop_requested) note(box, 'Серия остановится после текущего раунда.');
+                        else if (room.role === 'owner') box.append(button('Остановить фото-серию', () => command('stop', {game_id: current.game_id, expected_revision: current.revision}), 'quiet'));
+                        note(box, `Верно: ${ownCorrect}. Очки этой серии: ${format(ownScore)}.`);
                     }
-                    if (current?.last_result) note(box, `${current.last_result.correct ? 'Верно!' : 'Раунд завершён.'} ${current.last_result.answer} · ${format(current.last_result.points)} очков.`);
+                    if (current?.last_result) note(box, `${(group ? current.last_result.own_correct : current.last_result.correct) ? 'Верно!' : 'Раунд завершён.'} ${current.last_result.answer} · ${format(group ? current.last_result.own_points ?? 0 : current.last_result.points)} твоих очков.`);
+                    if (current?.last_result?.solvers) note(box, current.last_result.solvers.length
+                        ? `Верно ответили: ${current.last_result.solvers.map(s => `${s.name} · ${format(s.points)}`).join(', ')}` : 'Правильных ответов нет.');
                 }
                 if (active() && !pending()) timer = setTimeout(refresh, 3000);
             } catch (error) {
@@ -1588,7 +1655,7 @@
             await refreshOnce();
             if (startNow && active()) {
                 startNow = false;
-                await command('start', {question_count: setup.question_count, open_seconds: setup.open_seconds, hints_enabled: setup.hints_enabled});
+                await command('start', {question_count: setup.question_count, open_seconds: setup.open_seconds, hints_enabled: setup.hints_enabled, answer_policy: answerPolicy});
             }
         };
         // Catalog failure must not prevent continuing a persisted series.
@@ -1741,7 +1808,7 @@
 
     // «Ночной город» (night-city-ui.js): one entry for Telegram and browser players. The rooms API serves both channels;
     // with both cookies the channel is explicit (?identity=). Telegram groups with /mafia stay a secondary path.
-    function openNightCity(target = null) {
+    async function openNightCity(target = null) {
         stopRoomClassic(); window.QuizPlay?.stop();
         const version = ++generation;
         if (target && target === state.nightTarget) { consumeNightLaunch(target); state.nightTarget = null; }
@@ -1749,6 +1816,51 @@
         const identity = state.authenticated ? 'telegram' : 'guest';
         shell({game: true, onHome: () => { if (state.authenticated) navigate('home'); else guestHome(); }});
         if (!window.NightCity) { note(content, 'Ночной город не загрузился. Обнови приложение.', 'error'); return; }
+        // Chat ids name an existing classic table. A Room/invite alone does not
+        // identify a game mode; choosing a mode never grants access to its table.
+        const legacy = target?.chatId || target?.mode === 'legacy_mafia';
+        if (window.NightCase && !legacy) {
+            try {
+                const bootstrap = await guestRequest(`/api/night-case/bootstrap?identity=${identity}`);
+                if (version !== generation) return;
+                if (bootstrap.enabled === true) {
+                    window.NightCity.close();
+                    const openLegacy = bootstrap.capabilities?.legacy_mafia === true
+                        ? () => openNightCity({...target, mode: 'legacy_mafia'}) : null;
+                    if (openLegacy && target && !target.mode && (target.room || target.roomId || target.code || target.short)) {
+                        window.NightCase.close();
+                        const kit = window.NightCity.kit, header = kit.header();
+                        document.documentElement.classList.add('nc');
+                        kit.loadShell(); kit.useWorld(null);
+                        header.set({eyebrow: 'Ночной город', title: 'Выбери режим'});
+                        const main = el('div', undefined, 'nc-main');
+                        main.append(kit.panel({title: 'Какой стол открыть?'},
+                            kit.note('Комната и приглашение общие. Выбери игру, к которой хочешь вернуться.'),
+                            kit.stack(
+                                kit.button('Недельное расследование', () => openNightCity({...target, mode: 'night_case'}), {kind: 'primary'}),
+                                kit.button('Классическая Мафия', openLegacy, {kind: 'secondary'}))));
+                        content.append(header.node, main);
+                        return;
+                    }
+                    window.NightCase.open({host: content, target, identity, bootstrap,
+                        openLegacy: openLegacy ? () => openNightCity({mode: 'legacy_mafia'}) : null,
+                        isCurrent: () => version === generation});
+                    return;
+                }
+                window.NightCase.close();
+            } catch {
+                if (version === generation) note(content, 'Не удалось открыть дело. Проверь связь и открой Ночной город снова.', 'error');
+                return;
+            }
+        }
+        window.NightCase?.close();
+        // Deep links use `code` for both formats. Legacy's launch boundary uses
+        // `code` only for the 43-character token; Room short codes are eight
+        // symbols from room_limits.SHORT_CODE_ALPHABET (optionally 4-4).
+        if (/^(?:[ABCDEFGHJKMNPQRSTVWXYZ23456789]{8}|[ABCDEFGHJKMNPQRSTVWXYZ23456789]{4}-[ABCDEFGHJKMNPQRSTVWXYZ23456789]{4})$/i.test(target?.code || '')) {
+            const {code, ...rest} = target;
+            target = {...rest, short: code};
+        }
         window.NightCity.open({host: content, target, identity, gm, botUsername: state.botUsername,
             isCurrent: () => version === generation,
             groups: state.authenticated ? state.chats.filter(chat => ['group', 'supergroup'].includes(chat.type)) : [],
@@ -2165,7 +2277,8 @@
                     throw new Error('Для этого игрового режима ещё нет прямого подключения. Выбери квиз, фото-загадки или Ночной город.');
                 }
                 if (!window.QuizPlay) throw new Error('Игровой экран не загрузился. Обнови приложение.');
-                await window.QuizPlay.mount({host: content, request, command, chatId: state.selected, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => openChatSettings(), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
+                const photoTarget = photoLaunchTarget; photoLaunchTarget = null;
+                await window.QuizPlay.mount({host: content, request, command, chatId: state.selected, photoTarget, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => openChatSettings(), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
                     const response = await fetch(path, {credentials: 'same-origin'});
                     if (!response.ok) throw new Error('Фото недоступно'); return response.blob();
                 }});

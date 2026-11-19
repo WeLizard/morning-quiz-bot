@@ -919,8 +919,9 @@ def test_photo_image_url_changes_with_round_and_rejects_stale_round(pg_env, tmp_
 
 def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_path, monkeypatch):
     async def run():
+        from application.game_deadlines import GameDeadlineProcessor
         from storage.photos import PhotoCatalog
-        from storage.models import GameCommand, GameEvent, NotificationOutbox
+        from storage.models import GameCommand, GameEvent, NotificationOutbox, ScoreEvent
 
         root = tmp_path.resolve()
         (root / 'Сова.webp').write_bytes(b'RIFF-direct-photo-WEBP')
@@ -940,12 +941,16 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
                 json={'command_id': str(uuid4()), 'question_count': 1,
                       'open_seconds': 60, 'hints_enabled': True})
             assert started.status_code == 200, started.text
+            assert started.json()['answer_policy'] == 'group_private_deadline'
             question = started.json()['question']
             synced = await env.client.post(base + '/sync', headers=headers, json={})
             assert synced.status_code == 200 and synced.json()['question']['round_id'] == question['round_id']
             current = await env.client.get(base + '/current', headers=headers)
             assert current.status_code == 200 and current.json()['question']['round_id'] == question['round_id']
             assert (await env.client.get(question['image_url'], headers=headers)).content == (root / 'Сова.webp').read_bytes()
+            async with env.db.transaction() as session:
+                before_scores = ((await session.get(User, USER)).global_score,
+                                 (await session.get(ChatMember, (CHAT, USER))).score)
             wrong_id = str(uuid4())
             wrong = await env.client.post(base + '/answer', headers=headers,
                 json={'command_id': wrong_id, 'round_id': question['round_id'], 'answer': 'ворона'})
@@ -955,7 +960,12 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
             assert duplicate.json() == wrong.json()
             final_payload = {'command_id': str(uuid4()), 'round_id': question['round_id'], 'answer': 'сова'}
             won = await env.client.post(base + '/answer', headers=headers, json=final_payload)
-            assert won.status_code == 200 and won.json()['status'] == 'finished'
+            assert won.status_code == 200, won.text
+            accepted = won.json()
+            assert accepted['status'] == 'active' and accepted['verdict'] == 'correct'
+            assert accepted['question']['round_id'] == question['round_id']
+            assert accepted['question']['answered'] is True
+            assert float(accepted['score']) == 0 and accepted['last_result'] is None
             game_id = won.json()['game_id']
 
             async def snapshot():
@@ -973,9 +983,35 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
                             NotificationOutbox.game_id == game_id)),
                         await session.scalar(select(func.count()).select_from(GameCommand).where(
                             GameCommand.game_id == game_id)),
+                        await session.scalar(select(func.count()).select_from(ScoreEvent).where(
+                            ScoreEvent.game_id == game_id)),
                     )
 
+            pending_snapshot = await snapshot()
+            assert pending_snapshot[2:4] == before_scores
+            assert pending_snapshot[4] == 0 and pending_snapshot[8] == 0
+            pending_replay = await env.client.post(base + '/answer', headers=headers, json=final_payload)
+            assert pending_replay.status_code == 200 and pending_replay.json() == accepted
+            assert await snapshot() == pending_snapshot
+            # The independent deadline processor settles the accepted answer;
+            # neither the successful command nor a replay may award early.
+            deadline = question['ends_at']
+            await GameDeadlineProcessor(env.db).run_once(now=deadline)
+            finished = await env.client.get(base + '/current', headers=headers)
+            assert finished.status_code == 200, finished.text
+            result = finished.json()
+            assert result['status'] == 'finished' and result['question'] is None
+            assert result['last_result']['answer'] == 'Сова'
+            assert len(result['last_result']['solvers']) == 1
+            points = Decimal(str(result['last_result']['own_points']))
+            assert points > 0 and Decimal(result['own_score']) == points
+            assert result['own_correct'] == 1
             finished_snapshot = await snapshot()
+            assert finished_snapshot[2] == before_scores[0] + points
+            assert finished_snapshot[3] == before_scores[1] + points
+            assert finished_snapshot[8] == 1
+            await GameDeadlineProcessor(env.db).run_once(now=deadline + 1)
+            assert await snapshot() == finished_snapshot
             replay = await env.client.post(base + '/answer', headers=headers, json=final_payload)
             assert replay.status_code == 200 and replay.json() == won.json()
             assert await snapshot() == finished_snapshot
@@ -1000,8 +1036,16 @@ def test_photo_can_start_answer_and_stop_without_telegram_bridge(pg_env, tmp_pat
             stopped = await env.client.post(base + '/stop', headers=headers,
                 json={'command_id': str(uuid4()),
                       'expected_revision': restarted.json()['revision']})
-            assert stopped.status_code == 200 and stopped.json()['status'] == 'stopped'
+            assert stopped.status_code == 200, stopped.text
+            assert stopped.json()['status'] == 'active' and stopped.json()['stop_requested']
+            assert stopped.json()['last_result'] is None
+            await GameDeadlineProcessor(env.db).run_once(now=restarted.json()['question']['ends_at'])
+            stopped_current = await env.client.get(base + '/current', headers=headers)
+            assert stopped_current.json()['status'] == 'stopped'
+            assert stopped_current.json()['last_result']['solvers'] == []
             async with env.db.transaction() as session:
+                assert (await session.get(User, USER)).global_score == finished_snapshot[2]
+                assert (await session.get(ChatMember, (CHAT, USER))).score == finished_snapshot[3]
                 assert await session.scalar(select(func.count()).select_from(QuizSession).where(
                     QuizSession.kind == 'photo')) == 0
     asyncio.run(run())

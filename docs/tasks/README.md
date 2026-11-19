@@ -19,7 +19,7 @@
 | QW-2026-10-08 | [QuizzyWizzy audit remediation](QUIZZYWIZZY-2026-10-08.md) | `in_progress` | critical | 2026-10-09 |
 | MQB-007 | [Приёмка и dev-интеграция Farm 0.2.0](MQB-007-farm-020-integration.md) | `in_progress` | high | 2026-10-09 |
 | MQB-009 | [Завершение платформы и новый «Ночной город»](MQB-009-platform-and-night-city.md) | `proposed` | critical | 2026-10-12 |
-| MQB-010 | [«Ночной город»: недельный режим, этапы](MQB-010-night-city-weekly-stages.md) (дизайн: [NIGHT_CITY_WEEKLY_DESIGN](NIGHT_CITY_WEEKLY_DESIGN.md)) | `proposed` | high | 2026-10-15 |
+| MQB-010 | [«Ночной город»: недельный режим, этапы](MQB-010-night-city-weekly-stages.md) (дизайн: [NIGHT_CITY_WEEKLY_DESIGN](NIGHT_CITY_WEEKLY_DESIGN.md)) | `in_progress` | high | 2026-11-16 |
 | NC-OPEN | [«Ночной город»: открытые комнаты](NIGHT_CITY_OPEN_ROOMS.md) | `queued` | medium | 2026-10-28 |
 | MQB-011 | [Форма обращения к игроку (он / она / не указывать)](MQB-011-address-form.md) | `in_progress` | medium | 2026-10-15 |
 
@@ -40,7 +40,7 @@ MQB автоматически: перед изменением сверяй д�
 | Ферма: поле, этап 2A | [FARM_FIELD_TURN_PER_CELL](FARM_FIELD_TURN_PER_CELL.md) | Поворот `2×1↔1×2` и per-cell посев; сохраняется для открытых заходов `rules=2` |
 | Ферма: поле, этапы 2B/2C | [FARM_FIELD_SPRAY_AND_TRANSFER](FARM_FIELD_SPRAY_AND_TRANSFER.md) | Опрыскиватель, урон/ремонт, экономика 85–125/90, частичная перекачка для новых заходов `rules=3`; chain не включён |
 | Привязка и перенос аккаунтов | [ACCOUNT_LINKING_PLAN](ACCOUNT_LINKING_PLAN.md), [ACCOUNT_FIRST_MIGRATION](ACCOUNT_FIRST_MIGRATION.md) | Живая проверка Telegram и миграции на целевых базах |
-| «Ночной город»: дизайн и черновики | [MQB-010](MQB-010-night-city-weekly-stages.md), [черновики дел](night_city/drafts/README.md) | Черновики — только документация; кода режима нет |
+| «Ночной город»: первая обкатка и AI | [MQB-010](MQB-010-night-city-weekly-stages.md), [runbook](night_city/NIGHT_CASE_REHEARSAL_RUNBOOK.md), [AI-контракт](night_city/NIGHT_CASE_AI_ACCESS.md) | Авторское дело в rehearsal, первый HTTPS-цикл четырёх игроков проверен; человеческая неделя и подключение моделей остаются в работе |
 | Текущий локальный срез | [FARM_FEEDBACK_2026-10-21](FARM_FEEDBACK_2026-10-21.md), [MQB-011](MQB-011-address-form.md) | `git status`: E1/E8/контрастный режим ещё не закоммичены |
 
 ## Известные расхождения статусов

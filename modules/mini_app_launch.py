@@ -40,6 +40,17 @@ def direct_mafia_link(bot_username, chat_id):
     return deep_link(bot_username, 'mafia', chat_id)
 
 
+def direct_photo_link(bot_username, chat_id, round_id):
+    """Open the private answer form for one group Photo round, never grant access."""
+    if not configured_url():
+        return None
+    if type(chat_id) is not int or not -(2**52) < chat_id < 0:
+        raise ValueError('Фото-ссылка требует отрицательный id группы')
+    if not isinstance(round_id, str) or not re.fullmatch(r'[0-9a-f]{32}', round_id):
+        raise ValueError('Некорректный фото-раунд')
+    return startapp_url(bot_username, f'photo_n{abs(chat_id)}_{round_id}', short_name_from_env())
+
+
 # Страницы Mini App, на которые можно вести ссылкой (?startapp=<страница>).
 LAUNCH_PAGES = ('home', 'chats', 'rating', 'profile', 'achievements', 'history')
 

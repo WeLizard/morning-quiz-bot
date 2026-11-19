@@ -47,6 +47,10 @@ class _ExistingCommandSession:
         self.scalar_calls = 0
 
     async def scalar(self, _statement):
+        # The generic command guard reads the mode before reserving a receipt.
+        if getattr(_statement, 'is_select', False) and any(
+                column.get('name') == 'mode' for column in _statement.column_descriptions):
+            return 'mafia'
         self.scalar_calls += 1
         # PostgreSQL INSERT ... ON CONFLICT DO NOTHING returns no inserted ID,
         # then the repository loads the previously committed receipt.

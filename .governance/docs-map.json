@@ -1,0 +1,8 @@
+{
+  "constitution": "AGENTS.md",
+  "map": "docs/INDEX.md",
+  "status": "docs/STATUS.md",
+  "history": "docs/CHANGELOG.md",
+  "adr_dir": "docs/decisions",
+  "adr_index": "docs/decisions/README.md"
+}

@@ -36,12 +36,12 @@
             imageUrl: question => question.image_url,
         };
     }
-    function roomApi(roomId, request, {accountId = null} = {}) {
+    function roomApi(roomId, request, {accountId = null, answerPolicy = 'personal'} = {}) {
         if (!roomId) throw new Error('Выбери комнату перед запуском.');
         const base = kind => `/api/guest/rooms/${encodeURIComponent(roomId)}/${kind}`;
         const post = (path, body, id) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': id}, body: JSON.stringify(body)});
         return {
-            kind: 'room', accountId,
+            kind: 'room', accountId, answerPolicy,
             async setup(kind) {
                 return request(`${base(kind)}/setup`);
             },
@@ -59,7 +59,8 @@
                 return post(`${base(kind)}/start`, kind === 'classic'
                     ? {count: params.count, open_seconds: params.open_seconds, interval_seconds: params.interval_seconds,
                         ...(params.category_mode ? {category_mode: params.category_mode, categories: params.categories || [], random_categories: params.random_categories} : {})}
-                    : {question_count: params.question_count, open_seconds: params.open_seconds, hints_enabled: params.hints_enabled}, id);
+                    : {question_count: params.question_count, open_seconds: params.open_seconds, hints_enabled: params.hints_enabled,
+                        answer_policy: answerPolicy}, id);
             },
             answer(kind, params, id) {
                 return post(`${base(kind)}/answer`, kind === 'classic'
@@ -73,12 +74,13 @@
     window.QuizPlay = {
         chatApi, roomApi,
         stop() { dispose(); dispose = () => {}; },
-        async mount({host, request, media, command, chatId, api: adapter, selection, onHome, onReplay, onProfile, onSettings}) {
+        async mount({host, request, media, command, chatId, api: adapter, selection, onHome, onReplay, onProfile, onSettings, photoTarget = null}) {
             window.QuizPlay.stop();
             if (!(adapter || chatId) || ![null, undefined, '/quiz', '/photo_quiz'].includes(command)) {
                 throw new Error('Выбери чат и игровой режим перед запуском.');
             }
             const api = adapter || chatApi(chatId, request), room = api.kind === 'room';
+            let targetChecked = !photoTarget, stalePhotoTarget = false;
             document.body?.classList.add('is-playing');
             let active = true, timer, ticker, direct, directPhoto, classicSetup = null, classicChoice = null, photoSetup = null, photoOccupied = false, lastAccepted = null, skipGame = null, setupError = null, busy = false, pendingCommand = null, lastHash = '', chosen = null, questionKey = '', draft = '', starting = false;
             let preferred = command === '/photo_quiz' ? 'photo' : command === '/quiz' ? 'classic' : null;
@@ -106,7 +108,8 @@
                 const stop = shown === 'photo' ? stopPhotoDirect : stopDirect;
                 const row = el('div', undefined, 'qw-btn-row');
                 row.append(button('Отмена', closeExit, 'qw-btn secondary'), button('Да, завершить', () => { closeExit(); stop(); }, 'qw-btn danger'));
-                exitBox.replaceChildren(el('h3', 'Завершить раунд?'), el('p', 'Уже полученные баллы сохранятся.', 'muted'), row);
+                exitBox.replaceChildren(el('h3', 'Завершить раунд?'), el('p', directPhoto?.answer_policy === 'group_private_deadline'
+                    ? 'Текущий раунд идёт до дедлайна. После него серия остановится, и ответы откроются.' : 'Уже полученные баллы сохранятся.', 'muted'), row);
                 exitBox.hidden = false;
                 exitBox.scrollIntoView?.({block: 'nearest'});
             }
@@ -340,7 +343,8 @@
             }
             function sharedPhoto(view) {
                 const question = view.question;
-                stats({current: question.question_number, total: question.question_count, points: view.score});
+                stats({current: question.question_number, total: question.question_count,
+                    points: view.answer_policy === 'group_private_deadline' ? view.own_score ?? 0 : view.score});
                 const head = el('div', undefined, 'question-top');
                 head.append(el('span', 'УЗНАЁШЬ?', 'eyebrow'), countdown(seconds(question.ends_at), question.closed)); stage.append(head);
                 stage.append(el('h1', 'Что скрывается\nна картинке?', 'play-question'), picture(question));
@@ -364,24 +368,39 @@
                     });
                     stage.append(mask);
                 }
-                if (view.last_result) {
+                if (view.last_result && view.answer_policy !== 'group_private_deadline') {
                     const result = view.last_result, verdict = el('section', undefined, `play-verdict ${result.correct ? 'is-correct' : ''}`);
                     verdict.append(el('strong', result.correct ? 'Верно! Следующая картинка уже здесь.' : 'Время вышло. Идём дальше.'),
                         el('span', result.correct ? `+${number(result.points)} баллов` : `Ответ: ${result.answer}`)); stage.append(verdict);
                 }
                 if (question.feedback === 'almost') stage.append(el('p', 'Очень близко — образ верный, собери точное слово.', 'photo-hint'));
                 else if (question.feedback === 'wrong') stage.append(el('p', 'Пока мимо. Посмотри, какие два образа соединяются.', 'photo-hint'));
-                if (!question.closed) inputForm('Твой ответ', question.round_id, false, true);
+                if (view.answer_policy === 'group_private_deadline') {
+                    photoRoundResult(view.last_result);
+                    if (view.stop_requested) stage.append(hostLine('Серия остановится после этого раунда.'));
+                }
+                if (question.answered && view.answer_policy === 'group_private_deadline') stage.append(hostLine('Ответ принят, ждём завершения раунда'));
+                else if (!question.closed) inputForm('Твой ответ', question.round_id, false, true);
                 else stage.append(hostLine('Этот фото-вопрос уже закрыт. Готовим следующий.'));
                 stage.append(el('p', room ? 'Картинка загружена из текущей серии.' : 'Картинка загружена из общей игровой сессии, без копии сообщения Telegram.', 'play-footnote'));
             }
+            function photoRoundResult(result) {
+                if (!result) return;
+                const box = el('section', undefined, 'play-verdict');
+                box.append(el('strong', `Раунд завершён. Ответ: ${result.answer}`), el('span', `Твои очки: ${number(result.own_points ?? 0)}`));
+                const solvers = result.solvers || [];
+                box.append(el('p', solvers.length ? `Верно ответили: ${solvers.map(s => `${s.name} · ${number(s.points)}`).join(', ')}` : 'Правильных ответов нет.'));
+                stage.append(box);
+            }
             function sharedPhotoResult(view) {
                 const complete = view.status === 'finished';
+                const group = view.answer_policy === 'group_private_deadline';
                 stage.append(el('span', complete ? 'ФОТО-СЕРИЯ ЗАВЕРШЕНА' : 'ФОТО-СЕРИЯ ОСТАНОВЛЕНА', 'eyebrow'),
                     el('h1', complete ? 'Образы сложились.' : 'Продолжим в другой раз.', 'result-title'));
-                const score = el('div', undefined, 'result-score'); score.append(el('strong', number(view.score)), el('span', 'баллов за серию')); stage.append(score);
-                stage.append(el('p', `${view.correct} правильных из ${view.game.total}`, 'previous-answer'));
+                const score = el('div', undefined, 'result-score'); score.append(el('strong', number(group ? view.own_score ?? 0 : view.score)), el('span', 'баллов за серию')); stage.append(score);
+                stage.append(el('p', `${group ? view.own_correct ?? 0 : view.correct} правильных из ${view.game.total}`, 'previous-answer'));
                 if (view.last_result?.answer) stage.append(hostLine(`Последний ответ: ${view.last_result.answer}`));
+                if (view.answer_policy === 'group_private_deadline') photoRoundResult(view.last_result);
                 actionStack(button('Сыграть ещё', () => room ? replay('photo') : onReplay('/photo_quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
             }
             function render() {
@@ -395,6 +414,11 @@
                 renderView(); syncMenu();
             }
             function renderView() {
+                if (stalePhotoTarget) {
+                    stage.replaceChildren(hostLine('Раунд из ссылки уже завершён. Ответить в него больше нельзя.'),
+                        button('Открыть текущий раунд', () => { stalePhotoTarget = false; lastHash = ''; render(); }, 'primary play-primary'));
+                    return;
+                }
                 if (starting) { stage.replaceChildren(hostLine('Готовлю твою игру. Сейчас начнём.')); return; }
                 if (directPhoto?.question) {
                     const hash = JSON.stringify([directPhoto, busy]); if (hash === lastHash) return;
@@ -444,6 +468,10 @@
                     if (!active) return;
                     if (firstLoad) { firstLoad = false; [shared, sharedPhotoView].forEach(view => { if (view?.finished_view && view.game_id) staleGames.add(view.game_id); }); }
                     photoOccupied = !!sharedPhotoView?.occupied;
+                    if (!targetChecked) {
+                        targetChecked = true;
+                        stalePhotoTarget = sharedPhotoView?.question?.round_id !== photoTarget.roundId;
+                    }
                     direct = fresh(hidden(shared)); directPhoto = photoOccupied ? null : fresh(hidden(sharedPhotoView)); status.textContent = '';
                     if (renderPage) render();
                 } catch (error) { if (active) { status.textContent = error.message; stage.querySelectorAll('button').forEach(b => { b.disabled = true; }); lastHash = ''; } }
@@ -508,12 +536,14 @@
                 selection();
                 const params = {gameId: directPhoto?.game_id || null, questionId: roundId, answer};
                 const result = await runCommand('photo.answer', params, id => api.answer('photo', params, id), 'Проверяю ответ…', () => sendPhotoDirect(roundId, answer));
-                if (result) { directPhoto = result; draft = ''; notice.textContent = result.verdict === 'correct' ? 'Есть! Ответ сохранён.' : ''; await refresh(); }
+                if (result) { directPhoto = result; draft = ''; notice.textContent = result.verdict === 'correct'
+                    ? result.answer_policy === 'group_private_deadline' ? 'Ответ принят, ждём завершения раунда' : 'Есть! Ответ сохранён.' : ''; await refresh(); }
             }
             async function startPhotoDirect() {
                 if (!active || busy) return;
                 starting = true; render();
-                const params = {question_count: photoSetup.question_count, open_seconds: photoSetup.open_seconds, hints_enabled: photoSetup.hints_enabled};
+                const params = {question_count: photoSetup.question_count, open_seconds: photoSetup.open_seconds, hints_enabled: photoSetup.hints_enabled,
+                    answer_policy: room ? api.answerPolicy : String(chatId).startsWith('-') ? 'group_private_deadline' : 'personal'};
                 const result = await runCommand('photo.start', params, id => api.start('photo', params, id), 'Раскладываю фото-загадки…', () => startPhotoDirect());
                 starting = false;
                 if (result) { skipGame = null; directPhoto = result; await refresh(); }
@@ -523,7 +553,7 @@
                 if (!active || busy || directPhoto?.revision === undefined) return;
                 const params = {gameId: directPhoto.game_id || null, revision: directPhoto.revision};
                 const result = await runCommand('photo.stop', params, id => api.stop('photo', params, id), 'Завершаю фото-серию…', () => stopPhotoDirect());
-                if (result) { directPhoto = result; notice.textContent = 'Серия завершена. Баллы сохранены.'; render(); }
+                if (result) { directPhoto = result; notice.textContent = result.stop_requested ? 'Серия остановится после текущего раунда.' : 'Серия завершена. Баллы сохранены.'; render(); }
             }
             stage.append(hostLine('Филиныч раскладывает карточки…'));
             if (preferred) {

@@ -28,7 +28,10 @@ async def main() -> None:
         format='%(asctime)s %(levelname)s %(name)s %(message)s',
     )
     logger = logging.getLogger('mqb.game_worker')
-    interval = _interval()
+    from config.night_case import NightCaseSettings
+    from application.night_case_runtime import NightCaseDeadlineWorker
+    night_settings = NightCaseSettings.from_env()
+    interval = night_settings.poll_seconds if night_settings.enabled else _interval()
     database = Database(DatabaseSettings.from_env())
     stopping = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -41,7 +44,8 @@ async def main() -> None:
     try:
         await database.check_connection()
         logger.info('Game deadline worker started; interval=%.2fs', interval)
-        processor = GameDeadlineProcessor(database)
+        night_worker = NightCaseDeadlineWorker(database, night_settings) if night_settings.enabled else None
+        processor = GameDeadlineProcessor(database, night_case_worker=night_worker)
         while not stopping.is_set():
             try:
                 await processor.run_once()

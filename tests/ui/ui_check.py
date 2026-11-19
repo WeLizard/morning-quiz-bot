@@ -11,6 +11,7 @@ Prints "SKIP: ..." and exits 0 when no browser is available (Playwright Chromium
 Wrapped by tests/js/ui_layout.test.cjs so it runs with the common `node --test tests/js/*.test.cjs` set.
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -39,6 +40,21 @@ SCANNER = r"""
   const all = [...document.querySelectorAll('button, a.btn, a.qw-btn, [role="button"], input[type="submit"]')].filter(visible);
   const free = all.filter(el => !el.parentElement?.closest(grouped));
   const issues = [];
+  // Measure a pair's exposed facing edges. A sticky header can cover the raw
+  // edge of a scrolling control; controls that really touch remain a failure.
+  const exposedEdge = (el, side, cross) => {
+    const r = el.getBoundingClientRect(), vertical = side === 'top' || side === 'bottom';
+    const start = r[side], direction = side === 'top' || side === 'left' ? 1 : -1;
+    const extent = vertical ? r.height : r.width;
+    for (let travel = .25; travel < extent / 2; travel += .5) {
+      const along = start + direction * travel;
+      const x = vertical ? cross : along, y = vertical ? along : cross;
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+      const hit = document.elementFromPoint(x, y);
+      if (hit && el.contains(hit)) return travel === .25 ? start : along;
+    }
+    return start; // No confirmed exposed edge: never suppress the raw finding.
+  };
   for (let i = 0; i < free.length; i++) {
     for (let j = i + 1; j < free.length; j++) {
       const a = free[i], b = free[j];
@@ -47,10 +63,20 @@ SCANNER = r"""
       const hOverlap = Math.min(ar.right, br.right) - Math.max(ar.left, br.left);
       const vOverlap = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top);
       if (hOverlap > 8) {
-        const gap = Math.max(br.top - ar.bottom, ar.top - br.bottom);
+        let gap = Math.max(br.top - ar.bottom, ar.top - br.bottom);
+        if (gap > -2 && gap < minGap - .5) {
+          const cross = (Math.max(ar.left, br.left) + Math.min(ar.right, br.right)) / 2;
+          gap = br.top >= ar.top ? exposedEdge(b, 'top', cross) - exposedEdge(a, 'bottom', cross)
+                                : exposedEdge(a, 'top', cross) - exposedEdge(b, 'bottom', cross);
+        }
         if (gap > -2 && gap < minGap - 0.5) issues.push({kind: 'gap', gap: Math.round(gap * 10) / 10, a: name(a), b: name(b)});
       } else if (vOverlap > 8) {
-        const gap = Math.max(br.left - ar.right, ar.left - br.right);
+        let gap = Math.max(br.left - ar.right, ar.left - br.right);
+        if (gap > -2 && gap < minGap - .5) {
+          const cross = (Math.max(ar.top, br.top) + Math.min(ar.bottom, br.bottom)) / 2;
+          gap = br.left >= ar.left ? exposedEdge(b, 'left', cross) - exposedEdge(a, 'right', cross)
+                                 : exposedEdge(a, 'left', cross) - exposedEdge(b, 'right', cross);
+        }
         if (gap > -2 && gap < minGap - 0.5) issues.push({kind: 'gap', gap: Math.round(gap * 10) / 10, a: name(a), b: name(b)});
       }
     }
@@ -154,7 +180,9 @@ ZONE_SCANNER = r"""
 
 def browser(playwright):
     errors = []
-    for options in ({}, {'channel': 'msedge'}, {'channel': 'chrome'}):
+    executable = os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH')
+    candidates = ([{'executable_path': executable}] if executable else [])
+    for options in [*candidates, {}, {'channel': 'msedge'}, {'channel': 'chrome'}]:
         try:
             return playwright.chromium.launch(**options)
         except Exception as error:  # noqa: BLE001 - try the next installed browser
@@ -374,6 +402,16 @@ def run_gaps_selftest(pw_browser):
     c.ok(len(rounded) == 1 and 'Мне пишут' in rounded[0]['a'] + rounded[0]['b'], f'rounded buttons touching inside a group are caught, got {rounded}')
     uneven = [issue for issue in result['issues'] if issue['kind'] == 'uneven']
     c.ok(len(uneven) == 1 and 'Выше' in uneven[0]['b'], f'buttons of one row with different heights are caught, got {uneven}')
+    page.evaluate("""() => { document.getElementById('main').innerHTML = `
+      <div style="position:fixed;left:0;top:0;width:200px;height:60px;background:#111;z-index:50">
+        <button style="position:absolute;left:20px;top:0;width:160px;height:44px;min-height:44px;margin:0;padding:0">Clipped header</button>
+      </div>
+      <button style="position:absolute;left:20px;top:46px;width:160px;height:80px;margin:0;padding:0">Clipped edge body</button>
+      <button style="position:fixed;left:210px;top:0;width:160px;height:44px;min-height:44px;margin:0;padding:0;z-index:50">Floating real</button>
+      <button style="position:absolute;left:210px;top:44px;width:160px;height:80px;margin:0;padding:0">Floating body</button>`; }""")
+    result = page.evaluate(SCANNER, [MIN_GAP, MIN_TAP])
+    c.ok(not any('Clipped' in issue['a'] + issue.get('b', '') for issue in result['issues']), 'an occluded raw edge uses the exposed edge without a false sticky gap')
+    c.ok(any(issue['kind'] == 'gap' and 'Floating real' in issue['a'] + issue['b'] for issue in result['issues']), 'an actual zero gap beside a floating control still fails')
     page.evaluate("""() => { document.getElementById('main').innerHTML = `
       <div style="position:fixed;left:0;top:600px;width:180px;height:152px;overflow:auto">
         <button style="margin-top:180px;height:44px">Clipped overflow child</button>

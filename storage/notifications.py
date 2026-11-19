@@ -63,6 +63,12 @@ class NotificationQueue:
             filters = [
                 NotificationOutbox.status == 'pending',
                 NotificationOutbox.available_at <= current,
+                # AI control pointers have dedicated authorized consumers. Deny
+                # their whole kind/subject namespaces before SELECT/row locks,
+                # including poisoned or future unknown kind/scope combinations.
+                ~NotificationOutbox.kind.startswith('night_ai_', autoescape=True),
+                ~func.coalesce(NotificationOutbox.payload['scope'].as_string(), '').startswith('admin:', autoescape=True),
+                ~func.coalesce(NotificationOutbox.payload['scope'].as_string(), '').startswith('system:', autoescape=True),
             ]
             if kinds is not None:
                 filters.append(NotificationOutbox.kind.in_(kinds))

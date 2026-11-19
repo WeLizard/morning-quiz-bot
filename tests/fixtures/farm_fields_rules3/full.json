@@ -1269,6 +1269,374 @@
     "h": 8,
     "w": 8
    },
+   "name": "sow w2 reach0 lane",
+   "path": "DDDDDDD",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach0 turn-down",
+   "path": "TDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach0 turn-down-up",
+   "path": "TDDDDDDUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach0 rocks reference",
+   "path": "DDDDDDDRRRUUUUUUURRRDLDDRDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 800
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     23,
+     37
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach1 lane",
+   "path": "DDDDDDD",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach1 turn-down",
+   "path": "TDDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach1 turn-down-up",
+   "path": "TDDDDDDUUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w2 reach1 rocks reference",
+   "path": "DDDDDDDRRRUUUUUUURRRDLDDRDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 806
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     23,
+     37
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 2
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach0 lane",
+   "path": "DDDDDDD",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach0 turn-down",
+   "path": "TDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach0 turn-down-up",
+   "path": "TDDDDDUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach0 rocks reference",
+   "path": "DDDDDDDRRRRUUUURUULU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 616
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     20,
+     47
+    ],
+    "rules": 3,
+    "sow_reach": false,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach1 lane",
+   "path": "DDDDDDD",
+   "result": null,
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach1 turn-down",
+   "path": "TDDDDD",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach1 turn-down-up",
+   "path": "TDDDDDUUUUU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 0
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     25
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
+   "name": "sow w3 reach1 rocks reference",
+   "path": "DDDDDDDRRRRUUUURUULU",
+   "result": {
+    "condition": 100,
+    "hits": 0,
+    "repair": 0,
+    "score": 636
+   },
+   "run": {
+    "op": "sow",
+    "rocks": [
+     20,
+     47
+    ],
+    "rules": 3,
+    "sow_reach": true,
+    "weeds": [],
+    "width": 3
+   }
+  },
+  {
+   "field": {
+    "h": 8,
+    "w": 8
+   },
    "name": "harvest w1 z0 none",
    "path": "",
    "result": {

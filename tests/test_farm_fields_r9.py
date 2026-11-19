@@ -385,6 +385,8 @@ def test_start_pays_seeds_for_the_sowing():
     coins = f['coins']
     run = start(f, 'sow', t + 5, 'saffron')
     assert f['coins'] == coins - FIELD_FUEL - CROPS['saffron']['cost'] * FIELD_SEED_MULT and run['crop'] == 'saffron'
+    assert run['sow_reach'] is True
+    assert run['sow_reach'] is True and fld(f).get('run', run).get('sow_reach', True)
 
 
 def test_start_validations():
@@ -933,6 +935,13 @@ def test_rules3_spray_completes_the_crop_and_boosts_the_harvest_yield():
     assert f['inventory']['saffron'] == qty and qty == 108
 
 
+def test_sow_reach_counts_a_lane_cell_beside_a_rock():
+    rocks = frozenset([3 * 8 + 1])                                   # rock at (1, 3): its lane partner (0, 3) has no horizontal anchor
+    assert 3 * 8 not in fields._rules2_sowable(8, 8, 2, rocks)
+    assert fields._rules3_sowable(8, 8, 2, rocks) == fields._rules2_sowable(8, 8, 2, rocks) | {3 * 8}
+    assert fields._rules3_sowable(8, 8, 2, frozenset()) == fields._rules2_sowable(8, 8, 2, frozenset())   # no rocks: nothing changes
+
+
 # ---------------------------------------------------------------------------------------------- rules=3 fixture (server <-> JS)
 RULES3 = Path(__file__).resolve().parent / 'fixtures' / 'farm_fields_rules3' / 'full.json'
 
@@ -957,6 +966,15 @@ def build_rules3_cases():
             rocks, weeds = fields.make_obstacles(f'r3-{op}-{width}', op, 8, 8, 1)
             rocky = dict(run, rocks=rocks, weeds=weeds)
             rows.append(rules3_case(field, rocky, fields.reference_path(field, rocky), f'{op} w{width} rocks reference'))
+    for width in (2, 3):                                    # sow_reach: the turned seeder sows a lane cell beside a rock
+        field = dict(w=8, h=8)
+        for reach in (False, True):
+            run = dict(op='sow', width=width, rocks=[3 * 8 + 1], weeds=[], sow_reach=reach)
+            for label, path in (('lane', 'D' * 7), ('turn-down', 'T' + 'D' * (8 - width)), ('turn-down-up', 'T' + 'D' * (8 - width) + 'U' * (8 - width))):
+                rows.append(rules3_case(field, run, path, f'sow w{width} reach{int(reach)} {label}'))
+            rocks, weeds = fields.make_obstacles(f'r3-sow-reach-{width}', 'sow', 8, 8, 1)
+            rocky = dict(run, rocks=rocks, weeds=weeds)
+            rows.append(rules3_case(field, rocky, fields.reference_path(field, rocky), f'sow w{width} reach{int(reach)} rocks reference'))
     for width in (1, 2, 3):
         field = dict(w=8, h=8)
         for zoned in (False, True):

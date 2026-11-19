@@ -113,7 +113,8 @@ export class Run{
   this.cells=this.fullRules?reachableOrientCells(this.W,this.H,this.width,this.rocks):cellsOfAnchors(this.anchors,this.W,this.width);
   if(this.op==='sow'){
    const lanes=[...this.anchors].filter(k=>(k%this.W)%(this.width+1)===0);
-   this.sowable=cellsOfAnchors(lanes,this.W,this.width);
+   // sow_reach (fields._rules3_sowable): every reachable lane cell counts, so the turned seeder sows a lane cell beside a rock
+   this.sowable=this.fullRules&&run.sow_reach?new Set([...this.cells].filter(c=>(c%this.W)%(this.width+1)<this.width)):cellsOfAnchors(lanes,this.W,this.width);
    this.lanes=lanes;
   }
   this.total=0;

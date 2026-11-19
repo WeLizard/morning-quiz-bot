@@ -38,7 +38,7 @@ deadline.  Cultivation only moves time: growth lasts ``base * (1950 - q_cult) / 
 
 RULES VERSIONS.  A run without ``run['rules']`` is the legacy one above.  ``rules == 2`` adds ``T`` (the implement turns in place)
 and per-cell sowing at the lane anchors under the same economy.  ``rules >= FIELD_RULES`` (= 3) is the full test economy: both
-orientations are workable, a lowercase ``u/d/l/r`` is a bump against a rock or the field edge (-3 condition, 15 coins of repair
+orientations are workable (sow runs with ``sow_reach`` count every reachable lane cell as sowable), a lowercase ``u/d/l/r`` is a bump against a rock or the field edge (-3 condition, 15 coins of repair
 per hit, 4 permille of quality per missing condition point), the fourth operation ``spray`` fills the tank at the tanker and drifts
 with the wind, and ``X`` transfers a quarter of the hopper/tank at a time.  Its manual quality is
 ``850 + 400 * score // 1000`` (0.85 .. 1.25) with the autopilot 900, the same timed melt (``timed_quality_full``) and condition 0
@@ -440,9 +440,15 @@ def simulate_cultivate_v3(field, run, path):
     return _v3_result(score, condition, hits)
 
 
+def _rules3_sowable(W, H, width, rocks):
+    """Runs with ``sow_reach``: every reachable lane cell (both orientations), so a lane cell beside a rock that only the turned
+    implement can enter counts and gets sown.  Older runs keep the lane anchors of the horizontal bar (``_rules2_sowable``)."""
+    return {c for c in _rules3_cells(W, H, width, rocks) if (c % W) % (width + 1) < width}
+
+
 def simulate_sow_v3(field, run, path):
     W, H, width, rocks = _geometry(field, run)
-    sowable = _rules2_sowable(W, H, width, rocks)
+    sowable = _rules3_sowable(W, H, width, rocks) if run.get('sow_reach') else _rules2_sowable(W, H, width, rocks)
     sown, doubles, condition, hits = set(), 0, 100, 0
     for item in _walk_v3(W, H, width, rocks, path):
         if item is None:
@@ -845,7 +851,7 @@ def _start(farm, data, now, speed, lv):
     rocks, weeds = make_obstacles(seed, op, f['w'], f['h'], f['ha'])
     f['run'] = dict(id=f'run_{f["seq"]}', op=op, status='open', crop=crop_id, started_at=now, expires_at=now + FIELD_RUN_TTL,
                     width=machine['tier'], seed=seed, rocks=rocks, weeds=weeds, speed=speed, qrule=QRULE_TIMED,
-                    rules=FIELD_RULES, unload_zone=(op in {'harvest', 'spray'}),
+                    rules=FIELD_RULES, unload_zone=(op in {'harvest', 'spray'}), sow_reach=(op == 'sow'),
                     tank=(FIELD_TANK * f['ha'] if op == 'spray' else 0), wind=(1 if int(seed[-1], 16) % 2 else -1) if op == 'spray' else 0)
     if op == 'sow':      # E27 F4: what the sowing took, so that undoing it gives exactly this back
         f['run'].update(cost=seeds, fuel=fuel, gift=gift)
@@ -1004,6 +1010,7 @@ def validate(farm):
                  and isinstance(run.get('rocks'), list) and isinstance(run.get('weeds'), list)
                  and run.get('rules') in (None, 2, 3)
                  and (run.get('unload_zone') is None or type(run['unload_zone']) is bool)
+                 and (run.get('sow_reach') is None or type(run['sow_reach']) is bool)
                  and (run['op'] != 'spray' or (type(run.get('tank')) is int and run['tank'] > 0 and run.get('wind') in (-1, 1)))
                  and (run['status'] != 'auto' or type(run.get('done_at')) is int), 'invalid_field', 'Некорректная работа на поле.', 500)
         for key, lo, hi in (('last_hits', 0, 10 ** 6), ('last_repair', 0, 10 ** 9), ('last_condition', 0, 100)):

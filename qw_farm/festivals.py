@@ -269,7 +269,7 @@ CONTENT['new_year'] = dict(
     goods=[
         _g('fest_ny_fir', 'Ёлочка в кадке', 'tree_decor', 'farm1', 8, 120, note='декор, вне лимита сада'),
         _g('fest_ny_snowman', 'Снеговик', 'decor', 'farm1', 5, 80),
-        _g('fest_ny_sleigh', 'Сани с подарками', 'decor_big', 'farm2', 20, 600, note='2×2, верхние уровни'),
+        _g('fest_ny_sleigh', 'Сани с подарками', 'decor', 'farm1', 10, 150),
         _g('fest_ny_icicles', 'Гирлянда-сосульки', 'wall', 'fence', 5, 40),
         _g('fest_ny_lights', 'Фонарики вдоль дорожки', 'path', 'path', 8, 90),
         _g('fest_ny_toy', 'Именная ёлочная игрушка', 'village', 'village', 5, 60, note='ячейка площади, на большой ёлке'),
@@ -290,8 +290,8 @@ CONTENT['new_year'] = dict(
         # earned by the first win of each «Битва с Сантой» battle (application/farm_santa_battle.py), not sold
         _g('fest_ny_krampus_bell', 'Колокольчик Крампуса', 'decor', 'farm1', 5, 60, source='battle:1'),
         _g('fest_ny_santa_sack', 'Мешок Санты', 'decor', 'farm1', 5, 60, source='battle:2'),
-        _g('fest_ny_santa_visit', 'Санта и Крампус в гостях', 'decor', 'farm1', 5, 60, source='battle:3',
-           note='оба пьют чай у ёлки на ферме'),
+        _g('fest_ny_santa_visit', 'Санта и Крампус в гостях', 'decor_big', 'farm2', 5, 60, source='battle:3',
+           note='2×2: оба пьют чай у ёлки на ферме'),
         # the memorable item of the year: every task, never sold, never returns (one per year: «Ёлочная игрушка 2027» and so on)
         _g('fest_ny_year_toy', 'Ёлочная игрушка года', 'keepsake', 'farm1', 8, 0, source='keepsake'),
     ])

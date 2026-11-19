@@ -385,9 +385,9 @@ def _telegram_update(chat_id, chat_type, user_id, text, update_id, name='Player'
     )
 
 
-def test_telegram_photo_group_any_member_answers_private_only_player(pg_env, tmp_path, monkeypatch):
-    """Owner rule (AUD-019): group answers by anyone, points to the answerer;
-    private chat is personal; a blocked answerer is ignored."""
+def test_legacy_telegram_photo_group_any_member_answers_private_only_player(pg_env, tmp_path, monkeypatch):
+    """Persisted legacy group games retain first-solver behavior; new explicit
+    personal games remain creator-only and blocked answerers are ignored."""
     from handlers.photo_quiz_handlers import PhotoQuizHandlers
     from application.photo import PhotoApplicationService
     from storage.repositories import OperationalRepository
@@ -403,10 +403,16 @@ def test_telegram_photo_group_any_member_answers_private_only_player(pg_env, tmp
 
             async def start(chat_id):
                 async with db.transaction() as session:
-                    await PhotoApplicationService(db, session).start(
+                    started = await PhotoApplicationService(db, session).start(
                         chat_id=chat_id, user_id=starter, display_name='Starter', question_count=1,
                         open_seconds=600, hints_enabled=False, questions=questions,
                         command_id=str(uuid4()))
+                    if chat_id == CHAT:
+                        # Fixture represents a pre-policy persisted game, not a new personal series.
+                        game = await session.get(Game, started['game_id'])
+                        legacy = deepcopy(game.state)
+                        legacy['config'].pop('answer_policy')
+                        game.state = legacy
 
             async def score(chat_id, user_id):
                 async with db.transaction() as session:

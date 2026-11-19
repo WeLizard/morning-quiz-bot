@@ -16,6 +16,13 @@ from uuid import uuid4
 
 
 PHOTO_STATUSES = {"active", "finished", "stopped", "interrupted"}
+PHOTO_ANSWER_POLICIES = {"personal", "group_private_deadline"}
+
+
+def is_group_photo(state):
+    return state.get("config", {}).get("answer_policy") == "group_private_deadline"
+
+
 PHOTO_PHASES = {"question_open", "finished"}
 
 
@@ -104,6 +111,8 @@ def normalize_photo(value: object, *, chat_id: int | None = None, room_id: str |
         or type(config.get("hints_enabled")) is not bool
     ):
         return None
+    if 'answer_policy' in config and config['answer_policy'] not in PHOTO_ANSWER_POLICIES:
+        return None
     seen: set[str] = set()
     clean_rounds = []
     for index, item in enumerate(rounds):
@@ -132,6 +141,17 @@ def normalize_photo(value: object, *, chat_id: int | None = None, room_id: str |
         hints_at = item.get("hints_at")
         if not isinstance(hints_at, list) or any(type(entry) not in {int, float} for entry in hints_at):
             return None
+        responses = item.get('responses', {})
+        if not isinstance(responses, dict):
+            return None
+        for actor, response in responses.items():
+            if (not isinstance(actor, str) or not actor or not isinstance(response, dict)
+                    or type(response.get('attempts')) is not int or response['attempts'] < 0
+                    or type(response.get('answered')) is not bool
+                    or response.get('feedback') not in {None, 'correct', 'almost', 'wrong'}
+                    or type(response.get('points')) not in {int, float}
+                    or not 0 <= response['points'] <= 6):
+                return None
         seen.add(round_id)
         clean_rounds.append(deepcopy(item))
     current = value.get("current_round_id")
@@ -161,8 +181,10 @@ def prepare_photo(
     room_id: str | None = None, creator_account_id: str | None = None,
     questions: Sequence[dict[str, Any]],
     open_seconds: int = 60, hints_enabled: bool = True, now=None,
-    round_id_factory=None,
+    round_id_factory=None, answer_policy="personal",
 ) -> dict[str, Any]:
+    if answer_policy not in PHOTO_ANSWER_POLICIES:
+        raise ValueError("Некорректная политика ответов.")
     standalone = chat_id is None and creator_id is None
     if standalone:
         if not isinstance(room_id, str) or not room_id or not isinstance(creator_account_id, str) or not creator_account_id:
@@ -204,7 +226,7 @@ def prepare_photo(
         "mode": "photo", "status": "active", "phase": "question_open",
         "revision": 0, "chat_id": chat_id, "creator_id": creator_id,
         "config": {"question_count": len(rounds), "open_seconds": open_seconds,
-                   "hints_enabled": hints_enabled},
+                   "hints_enabled": hints_enabled, "answer_policy": answer_policy},
         "rounds": rounds, "current_round_id": None, "started_at": timestamp,
         "finished_at": None, "finish_reason": None,
         "total_correct": 0, "total_score": 0.0, "last_result": None,
@@ -235,7 +257,8 @@ def classify_answer(user_answer: str, correct_answer: str) -> str:
     return "wrong"
 
 
-def record_attempt(value: object, *, round_id: str, answer: str, now=None) -> tuple[dict[str, Any], str]:
+def record_attempt(value: object, *, round_id: str, answer: str, now=None,
+                   account_id=None, display_name=None) -> tuple[dict[str, Any], str]:
     state = normalize_photo(value)
     if state is None:
         raise ValueError("Состояние фото-загадки повреждено.")
@@ -243,8 +266,26 @@ def record_attempt(value: object, *, round_id: str, answer: str, now=None) -> tu
     timestamp = _timestamp(now)
     if state["status"] != "active" or state["current_round_id"] != round_id or item["status"] != "open":
         raise RuntimeError("Этот фото-вопрос уже завершён.")
-    if timestamp > item["closes_at"]:
+    if timestamp < item['opened_at'] or (timestamp >= item["closes_at"] if is_group_photo(state) else timestamp > item["closes_at"]):
         raise RuntimeError("Время ответа истекло.")
+    if is_group_photo(state):
+        if not account_id:
+            raise ValueError("Нужен аккаунт отвечающего.")
+        response = item.setdefault('responses', {}).setdefault(str(account_id), {
+            'attempts': 0, 'feedback': None, 'answered': False,
+            'name': display_name or 'Игрок', 'points': 0.0,
+        })
+        if response['answered']:
+            return state, 'correct'
+        verdict = classify_answer(answer, item['normalized_answer'])
+        response['feedback'] = verdict
+        if verdict == 'correct':
+            response.update(answered=True, answered_at=timestamp,
+                points=photo_points({**item, 'attempts': response['attempts']}, now=timestamp))
+        else:
+            response['attempts'] += 1
+        state['revision'] += 1
+        return state, verdict
     verdict = classify_answer(answer, item["normalized_answer"])
     if verdict != "correct":
         item["attempts"] += 1
@@ -260,6 +301,8 @@ def complete_round(
     state = normalize_photo(value)
     if state is None:
         raise ValueError("Состояние фото-загадки повреждено.")
+    if is_group_photo(state):
+        raise ValueError('Групповой вопрос завершается только по дедлайну.')
     item = _round(state, round_id)
     if state["status"] != "active" or state["current_round_id"] != round_id or item["status"] != "open":
         raise RuntimeError("Этот фото-вопрос уже завершён.")
@@ -312,6 +355,10 @@ def stop_photo(value: object, *, expected_revision: object, reason: str = "stopp
         raise ValueError("Некорректная причина завершения.")
     if state["status"] in {"finished", "stopped", "interrupted"}:
         return state
+    if is_group_photo(state) and reason == 'stopped':
+        state['stop_requested'] = True
+        state['revision'] += 1
+        return state
     current = _round(state, state["current_round_id"])
     current["status"] = "closed"
     state["last_result"] = {
@@ -336,27 +383,75 @@ def photo_deadlines(value: object) -> dict[str, float]:
     return result
 
 
-def project_photo(value: object, *, image_url: str | None = None, now=None) -> dict[str, Any]:
+def project_photo(value: object, *, image_url: str | None = None, now=None, viewer_account_id=None, viewer_account_ids=None) -> dict[str, Any]:
     state = normalize_photo(value)
     if state is None:
         raise ValueError("Состояние фото-загадки повреждено.")
+    viewer_ids = {str(key) for key in (viewer_account_ids or [])}
+    if viewer_account_id is not None:
+        viewer_ids.add(str(viewer_account_id))
+    def own_points(solvers):
+        return max((float(solver['points']) for solver in solvers if str(solver['account_id']) in viewer_ids), default=0.0)
     question = None
     if state["current_round_id"]:
         item = _round(state, state["current_round_id"])
+        responses = [response for actor, response in item.get('responses', {}).items() if actor in viewer_ids]
+        response = max(responses, key=lambda r: (r.get('answered', False), r.get('points', 0), r.get('attempts', 0)), default={}) if is_group_photo(state) else item
         key = ("initial", "first_letters", "partial")[item["hint_level"]]
         question = {
             "round_id": item["round_id"], "question_number": item["index"] + 1,
             "question_count": len(state["rounds"]),
-            "ends_at": item["closes_at"], "closed": item["status"] != "open" or _timestamp(now) > item["closes_at"],
+            "ends_at": item["closes_at"], "closed": item["status"] != "open" or (_timestamp(now) >= item["closes_at"] if is_group_photo(state) else _timestamp(now) > item["closes_at"]),
             "mask": item["masks"][key] if state["config"]["hints_enabled"] else None,
-            "hint_level": item["hint_level"], "feedback": item.get("feedback"),
+            "hint_level": item["hint_level"], "feedback": response.get("feedback"),
+            "attempts": response.get('attempts', 0), "answered": response.get('answered', False),
             "image_url": image_url,
         }
+    last_result = deepcopy(state.get('last_result'))
+    score, correct = state['total_score'], state['total_correct']
+    if is_group_photo(state):
+        earned = [own_points(item.get('solvers', [])) for item in state['rounds'] if item['status'] == 'closed']
+        score, correct = sum(earned), sum(points > 0 for points in earned)
+        if last_result is not None:
+            last_result['own_points'] = own_points(last_result.get('solvers', []))
+            last_result['own_correct'] = last_result['own_points'] > 0
     return {
+        "own_score": str(float(score)), "own_correct": correct,
+        "answer_policy": state['config'].get('answer_policy', 'legacy'),
+        "stop_requested": state.get('stop_requested', False),
         "game_id": None, "revision": state["revision"], "status": state["status"],
         "phase": state["phase"], "question": question,
         "game": {"current": question["question_number"] if question else len(state["rounds"]),
                  "total": len(state["rounds"])},
-        "score": str(state["total_score"]), "correct": state["total_correct"],
-        "last_result": deepcopy(state.get("last_result")),
+        "score": str(float(score)), "correct": correct,
+        "last_result": last_result,
     }
+
+
+def complete_group_round(value, *, round_id, solvers, now=None):
+    """Close a private round at deadline; caller persists awards atomically."""
+    state = normalize_photo(value)
+    if state is None or not is_group_photo(state):
+        raise ValueError("Нужна групповая фото-серия.")
+    item = _round(state, round_id)
+    timestamp = _timestamp(now)
+    if item["status"] != "open" or state["current_round_id"] != round_id:
+        raise RuntimeError("Этот фото-вопрос уже завершён.")
+    if timestamp < item["closes_at"]:
+        raise RuntimeError("Время ответа ещё не истекло.")
+    item["status"] = "closed"
+    item["solvers"] = deepcopy(solvers)
+    state["total_correct"] += len(solvers)
+    points = sum(float(solver["points"]) for solver in solvers)
+    state["total_score"] += points
+    state["last_result"] = {"round_id": round_id, "question_number": item["index"] + 1,
+        "correct": bool(solvers), "reason": "deadline", "answer": item["display_answer"],
+        "points": points, "solvers": deepcopy(solvers)}
+    if state.get("stop_requested") or item["index"] + 1 == len(state["rounds"]):
+        reason = "stopped" if state.get("stop_requested") else "completed"
+        state.update(status="stopped" if reason == "stopped" else "finished", phase="finished",
+                     current_round_id=None, finished_at=timestamp, finish_reason=reason)
+    else:
+        _open(state, state["rounds"][item["index"] + 1], timestamp)
+    state["revision"] += 1
+    return state

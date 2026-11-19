@@ -144,11 +144,13 @@ class PhotoQuizHandlers:
                 )
                 if current is None or current.get('status') != 'active':
                     raise LookupError('В этом чате нет активной фото-викторины.')
-                await service.stop(
+                result = await service.stop(
                     chat_id=update.effective_chat.id, user_id=update.effective_user.id,
                     expected_revision=current['revision'],
                     command_id=self._command_id('stop', update.update_id),
                 )
+            if result.get('stop_requested') and update.message:
+                await update.message.reply_text('Серия завершится после текущего раунда по таймеру.')
         except (LookupError, PermissionError, RuntimeError, ValueError) as e:
             if update.message:
                 await update.message.reply_text(str(e))
@@ -178,6 +180,7 @@ class PhotoQuizHandlers:
                 f"2\\. {escape_markdown_v2('Выберите время ответа и нажмите «Запустить фото-викторину»')}\n"
                 f"3\\. {escape_markdown_v2('Угадайте слово по изображению до окончания таймера')}\n"
                 f"4\\. {escape_markdown_v2('Подсказки появятся автоматически, если это потребуется')}\n\n"
+                f"{escape_markdown_v2('В группе: нажми «Ответить лично» под фото. Обычные сообщения не считаются ответами. Очки получит каждый правильно ответивший; результаты откроются по таймеру.')}\n\n"
                 f"{escape_markdown_v2('Очки:')}\n"
                 f"• {escape_markdown_v2('Правильный ответ: 5 очков')}\n"
                 f"• {escape_markdown_v2('Быстрый ответ (до первой подсказки): +1 очко')}\n"
@@ -214,12 +217,18 @@ class PhotoQuizHandlers:
                 return False
             if update.effective_user.is_bot:
                 return False
-            # Group: any member answers and is credited; private chat: only the player.
+            # New group games accept only the private Mini App command. Public
+            # messages are not secrets; legacy games retain their old adapter.
             shared = self._is_group(update)
             from application.photo import PhotoApplicationService
             from storage.admin_actions import BotAccessBlocked
             async with self.database.transaction() as session:
                 service = PhotoApplicationService(self.database, session)
+                if shared:
+                    visible = await service.current(
+                        chat_id=chat_id, user_id=update.effective_user.id, shared=True)
+                    if visible and visible.get('answer_policy') == 'group_private_deadline':
+                        return False
                 current = await service.settle_due(
                     chat_id=chat_id, user_id=update.effective_user.id, shared=shared)
                 if current is None or not current.get('question'):
@@ -334,12 +343,17 @@ class PhotoQuizHandlers:
 
             from application.photo import PhotoApplicationService, PhotoGameConflict
             try:
+                if self._is_group(update):
+                    from modules.mini_app_launch import configured_url
+                    if not configured_url():
+                        raise ValueError('Для группового Photo сначала настрой личную форму Mini App.')
                 async with self.database.transaction() as session:
                     await PhotoApplicationService(self.database, session).start(
                         chat_id=chat_id, user_id=user_id,
                         display_name=update.effective_user.full_name if update.effective_user else None,
                         open_seconds=time_limit, question_count=question_count,
                         hints_enabled=hints_enabled,
+                        answer_policy=('group_private_deadline' if self._is_group(update) else 'personal'),
                         command_id=self._command_id('start', query.id),
                     )
             except (PhotoGameConflict, LookupError, ValueError) as error:

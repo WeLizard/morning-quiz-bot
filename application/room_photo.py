@@ -16,10 +16,12 @@ from application.photo_selection import available_photo_questions, select_photo_
 from application.room_classic import RoomClassicApplicationService
 from domain.photo import (complete_round, normalize_photo, photo_deadlines, photo_points,
                           prepare_photo, project_photo, record_attempt, reveal_hint, stop_photo)
+from application.photo_rounds import settle_group_round, canonical_account, viewer_aliases
+from domain.photo import is_group_photo
 from storage.admin_actions import operation_fence
 from storage.games import GameRepository
 from storage.score_ledger import RewardLedger
-from storage.models import Game, GameCommand, GameDeadline
+from storage.models import Account, Game, GameCommand, GameDeadline
 from storage.photo_media import images_root, verified_image_path
 
 
@@ -42,13 +44,13 @@ class RoomPhotoApplicationService:
             raise ValueError('Состояние фото-серии повреждено.')
         return state
 
-    def _projection(self, game, *, now=None):
+    async def _projection(self, game, *, now=None, account_id=None):
         state = self._state(game)
         url = None
         if state['current_round_id']:
             url = (f'/api/guest/rooms/{quote(game.room_id, safe="")}/photo/current/image'
                    f'?game_id={quote(game.id, safe="")}&round_id={quote(state["current_round_id"], safe="")}')
-        result = project_photo(state, image_url=url, now=now)
+        result = project_photo(state, image_url=url, now=now, viewer_account_id=account_id, viewer_account_ids=await viewer_aliases(self.session, account_id) if is_group_photo(state) else None)
         result['game_id'] = game.id
         return result
 
@@ -78,8 +80,9 @@ class RoomPhotoApplicationService:
                 event = 'photo_hint_revealed'
             else:
                 _, round_id = kind.split(':', 1)
-                state = complete_round(state, round_id=round_id, correct=False,
-                                       reason='timeout', now=timestamp)
+                state = (await settle_group_round(self.session, game, state, round_id=round_id, now=timestamp)
+                         if is_group_photo(state) else complete_round(state, round_id=round_id, correct=False,
+                                       reason='timeout', now=timestamp))
                 event = 'photo_timed_out'
             await self.games.sync_state(game, state, event_kind=event, deadlines=photo_deadlines(state))
 
@@ -89,10 +92,10 @@ class RoomPhotoApplicationService:
         if game is None:
             return None
         state = self._state(game)
-        if state['creator_account_id'] != str(account_id):
+        if not is_group_photo(state) and state['creator_account_id'] != str(account_id):
             return {'occupied': game.status == 'active'}
         await self._settle(game, now=now)
-        return self._projection(game, now=now)
+        return await self._projection(game, now=now, account_id=account_id)
 
     async def start(self, **kwargs):
         async with self.session.begin_nested():
@@ -101,7 +104,7 @@ class RoomPhotoApplicationService:
     async def _start(self, *, room_id, account_id, command_id,
                      question_count=DEFAULT_PHOTO_QUESTION_COUNT,
                      open_seconds=DEFAULT_PHOTO_OPEN_SECONDS,
-                     hints_enabled=DEFAULT_PHOTO_HINTS_ENABLED, now=None, enabled=True):
+                     hints_enabled=DEFAULT_PHOTO_HINTS_ENABLED, now=None, enabled=True, answer_policy='personal'):
         await self.access(room_id=room_id, account_id=account_id, owner=True)
         if type(question_count) is not int or not 1 <= question_count <= 10:
             raise ValueError('Количество фото-вопросов должно быть от 1 до 10.')
@@ -110,7 +113,7 @@ class RoomPhotoApplicationService:
         if type(hints_enabled) is not bool:
             raise ValueError('Некорректная настройка подсказок.')
         payload = {'room_id': room_id, 'question_count': question_count,
-                   'open_seconds': open_seconds, 'hints_enabled': hints_enabled}
+                   'open_seconds': open_seconds, 'hints_enabled': hints_enabled, 'answer_policy': answer_policy}
         current = await self.games.current_in_room(room_id=room_id, mode='photo', lock=True)
         await self.session.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))'),
                                    {'key': f'command:{command_id}'})
@@ -132,12 +135,12 @@ class RoomPhotoApplicationService:
                 raise RuntimeError('В комнате уже идёт твоя фото-серия.')
         questions = await select_photo_questions(self.session, question_count)
         state = prepare_photo(room_id=room_id, creator_account_id=str(account_id),
-            questions=questions, open_seconds=open_seconds, hints_enabled=hints_enabled, now=now)
+            questions=questions, open_seconds=open_seconds, hints_enabled=hints_enabled, now=_moment(now), answer_policy=answer_policy)
         game = await self.games.replace_current(current, state=state, deadlines=photo_deadlines(state)) if current else await self.games.create_room_current(
             room_id=room_id, mode='photo', state=state, deadlines=photo_deadlines(state), actor_account_id=account_id)
         await self.games.reserve_command(command_id=command_id, game_id=game.id,
             actor_account_id=account_id, kind='room_photo.start', expected_revision=None, payload=payload)
-        result = self._projection(game, now=now)
+        result = await self._projection(game, now=now, account_id=account_id)
         await self.games.complete_command(command_id, result)
         return result
 
@@ -153,21 +156,26 @@ class RoomPhotoApplicationService:
         if game is None or game.room_id != room_id or game.mode != 'photo' or game.chat_id is not None:
             raise LookupError('Фото-серия не найдена.')
         state = self._state(game)
-        if state['creator_account_id'] != str(account_id):
+        if not is_group_photo(state) and state['creator_account_id'] != str(account_id):
             raise PermissionError('Эта фото-серия принадлежит другому игроку.')
+        now = _moment(now)
+        await self.access(room_id=room_id, account_id=account_id, owner=kind == 'stop')
+        if is_group_photo(state):
+            account_id = await canonical_account(self.session, account_id)
         if kind not in {'answer', 'stop'}:
             raise ValueError('Неизвестная команда.')
         payload = {'room_id': room_id, 'round_id': round_id, 'answer': answer}
         cached, result = await self.games.reserve_command(command_id=command_id,
             game_id=game.id, actor_account_id=account_id, kind=f'room_photo.{kind}',
-            expected_revision=expected_revision, payload=payload)
+            expected_revision=None if is_group_photo(state) and kind == 'answer' else expected_revision, payload=payload)
         if cached:
             return result
         if current is None or current.id != game.id or game.status != 'active':
             raise RuntimeError('Эта фото-серия уже завершена.')
         if kind == 'answer':
-            state, verdict = record_attempt(state, round_id=round_id, answer=answer, now=now)
-            if verdict == 'correct':
+            display_name = (await self.session.scalar(select(Account.display_name).where(Account.id == account_id))) if is_group_photo(state) else None
+            state, verdict = record_attempt(state, round_id=round_id, answer=answer, now=now, account_id=account_id, display_name=display_name)
+            if verdict == 'correct' and not is_group_photo(state):
                 item = next(item for item in state['rounds'] if item['round_id'] == round_id)
                 points = photo_points(item, now=now)
                 if not await RewardLedger.award(
@@ -176,13 +184,13 @@ class RoomPhotoApplicationService:
                     raise RuntimeError('Очки за этот ответ уже записаны')
                 state = complete_round(state, round_id=round_id, correct=True,
                     points=points, reason='answer', now=now)
-            event = 'photo_answered' if verdict == 'correct' else 'photo_attempted'
+            event = 'photo_private_response' if is_group_photo(state) else ('photo_answered' if verdict == 'correct' else 'photo_attempted')
         else:
             state = stop_photo(state, expected_revision=expected_revision, now=now)
             event = 'photo_stopped'
         await self.games.sync_state(game, state, actor_account_id=account_id,
                                    event_kind=event, deadlines=photo_deadlines(state))
-        result = self._projection(game, now=now)
+        result = await self._projection(game, now=now, account_id=account_id)
         if kind == 'answer':
             result.update(applied=True, verdict=verdict)
         await self.games.complete_command(command_id, result)
@@ -194,10 +202,10 @@ class RoomPhotoApplicationService:
         if game is None or game.id != game_id or game.status != 'active':
             raise LookupError('Активный фото-вопрос не найден.')
         state = self._state(game)
-        if state['creator_account_id'] != str(account_id) or round_id != state['current_round_id']:
+        if (not is_group_photo(state) and state['creator_account_id'] != str(account_id)) or round_id != state['current_round_id']:
             raise LookupError('Активный фото-вопрос не найден.')
         item = next(item for item in state['rounds'] if item['round_id'] == round_id)
-        if item['status'] != 'open' or _moment(now) > item['closes_at']:
+        if item['status'] != 'open' or (_moment(now) >= item['closes_at'] if is_group_photo(state) else _moment(now) > item['closes_at']):
             raise LookupError('Активный фото-вопрос не найден.')
         path = await asyncio.to_thread(
             verified_image_path, images_root(), item['media']['media_key'], item['media'])

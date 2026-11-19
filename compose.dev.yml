@@ -30,6 +30,10 @@ x-app-service: &app-service
     - ./data/images:/app/data/images:ro
     - ./data/questions:/app/data/questions:ro
     - ./domain:/app/domain:ro
+    - ./infrastructure:/app/infrastructure:ro
+    # Night Case loads its cases from content/ and its schemas from docs/tasks/night_city/.
+    - ./content:/app/content:ro
+    - ./docs:/app/docs:ro
     - ./handlers:/app/handlers:ro
     - ./modules:/app/modules:ro
     - ./scripts:/app/scripts:ro

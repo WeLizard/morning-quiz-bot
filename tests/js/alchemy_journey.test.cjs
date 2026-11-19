@@ -159,3 +159,55 @@ test('подсказка импортированной полной колле�
     assert.ok(env.BASE.includes(env.hint.recipe.b));
     assert.ok(!env.BASE.includes(env.hint.recipe.result));
 });
+
+const dyers = DATA.campaigns.find(c => c.id === 'paths_camp_dyers');
+const riddleAnswers = dyers.stages.flatMap(s => s.riddle);
+
+test('записки красильщика: у каждой загадки есть стих и рецепт ответа, подсказок нет', () => {
+    assert.deepEqual(riddleAnswers, ['mordant', 'indigo', 'madder', 'saffron']);
+    for (const s of dyers.stages) {
+        assert.equal(s.brief.split('\n').length, 4, `${s.id}: стих в четыре строки`);
+        assert.equal(s.clue, undefined, `${s.id}: без подсказки`);
+        assert.ok(s.brief.split('\n').every(line => line.length <= 38), `${s.id}: строки влезают в телефон`);
+        for (const id of s.riddle) {
+            assert.ok(s.goals.includes(id) && s.craft.includes(id), `${s.id}: ответ ${id} — цель и эксперимент`);
+            assert.ok(DATA.recipes.some(r => r.result === id), `${id}: есть рецепт`);
+        }
+    }
+});
+
+test('записки красильщика: неразгаданный ответ не виден ни в текущем, ни в следующих этапах', () => {
+    const {env, rendered} = engine();
+    env.found = new Set(DATA.elements.map(e => e.id).filter(id => !riddleAnswers.includes(id)));
+    env.serverJourney.verifiedDiscovered = [...env.found];
+    env.showCampaignDetail(dyers);
+    const html = rendered.at(-1)[2];
+    for (const id of riddleAnswers) assert.ok(!html.includes(`data-goal="${id}"`), `${id} спрятан`);
+    assert.ok(html.includes('stage-goal riddle'));
+    assert.ok(html.includes('class="riddle-verse"'));
+    assert.ok(html.includes('получить разгадку'));
+    assert.ok(!html.includes('«mordant»'));
+    assert.ok(!html.includes('Подсказка к этапу'), 'у загадки нет кнопки подсказки');
+    env.found.add('mordant');
+    env.serverJourney.verifiedDiscovered = [...env.found];
+    env.showCampaignDetail(dyers);
+    assert.ok(rendered.at(-1)[2].includes('data-goal="mordant"'), 'разгаданный ответ показывается как обычная цель');
+});
+
+test('записки красильщика: подсказка не раскрывает ответ загадки', () => {
+    const {env, notices} = engine();
+    env.serverJourney.status = 'ready';
+    env.serverJourney.verifiedDiscovered = [...env.BASE, 'fabric', 'acid', 'clay'];
+    env.investigateCampaign(dyers.id);
+    assert.equal(env.hint, null, 'рецепт ответа не подсказан');
+    assert.equal(notices.at(-1)[0], 'Подсказок у записки нет');
+});
+
+test('случайная подсказка лаборатории не выдаёт ответы загадок', () => {
+    const {env} = engine();
+    env.found = new Set(DATA.elements.map(e => e.id).filter(id => !riddleAnswers.includes(id)));
+    for (let i = 0; i < 20; i++) {
+        const info = env.findHint(null, env.found, env.knownRecipes);
+        assert.ok(!info || !riddleAnswers.includes(info.target));
+    }
+});

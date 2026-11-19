@@ -333,6 +333,7 @@ A['starbloom']=group(flower('#d8b6d8'),'translate(0 4) scale(.93)')+star(35,27,5
 A['skyport']=group(A['city'],'translate(-4 18) scale(.55)')+group(A['stargate'],'translate(40 14) scale(.48)')+group(A['worldship'],'translate(40 60) scale(.42)')+line('M21 96H99','#c7c69e',4)+circle(28,92,5,'url(#gold)')+circle(92,92,5,'url(#gold)')
 exec((ROOT/'detail_art.py').read_text(encoding='utf-8'),globals())
 exec((ROOT/'pathways_art.py').read_text(encoding='utf-8'),globals())
+exec((ROOT/'dyers_art.py').read_text(encoding='utf-8'),globals())
 data=json.loads((ROOT/'data.json').read_text(encoding='utf-8'))
 missing=[e['id'] for e in data['elements'] if not A.get(e['id'])]
 assert not missing,missing
@@ -348,7 +349,8 @@ gradients={
  'rose':['#e6b4a2','#c88f88','#9c6b70'],'skin':['#e8cfaa','#c6a77e','#b08b65'],
  'glass':['#e1ead6','#adccc7','#74a3ac'],'metal':['#d1d7b9','#9bae9a','#6c8877'],
  'coal':['#7d8e80','#526d5d','#2d473b'],'copper':['#dfba95','#bc8c69','#956b51'],
- 'night':['#777c9c','#455976','#253e50'],'bread':['#e5c798','#c49f6a','#a77e4e']}
+ 'night':['#777c9c','#455976','#253e50'],'bread':['#e5c798','#c49f6a','#a77e4e'],
+ 'indigo':['#9fb2d8','#56709f','#2f4470'],'madder':['#e7a58f','#c4614f','#8e3f3a'],'saffron':['#f8d98a','#eea45a','#d56b3c']}
 for k,cols in gradients.items():
  DEFS+=f'<linearGradient id="{k}" x1=".12" y1="0" x2=".83" y2="1">'+''.join(f'<stop offset="{i/2}" stop-color="{c}"/>' for i,c in enumerate(cols))+'</linearGradient>'
 DEFS+='<filter id="artShadow" x="-30%" y="-25%" width="160%" height="165%"><feDropShadow dx="0" dy="3" stdDeviation="2.8" flood-color="#071e11" flood-opacity=".2"/></filter></defs>'

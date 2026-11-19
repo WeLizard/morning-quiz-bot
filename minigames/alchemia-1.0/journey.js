@@ -9,6 +9,11 @@ function stageEligible(step){
 }
 function claimAvailable(step){return stageEligible(step)||(serverMode()&&window.MQBAlchemySync?.hasPendingClaim(step.id));}
 function claimPending(step){return serverMode()&&window.MQBAlchemySync?.hasPendingClaim(step.id);}
+let riddleStages=null;
+function riddleStage(id){if(!riddleStages){riddleStages=new Map();for(const c of DATA.campaigns||[])for(const step of c.stages)for(const x of step.riddle||[])riddleStages.set(x,step);}return riddleStages.get(id)||null;}
+function riddleSecret(_step,id){return !!riddleStage(id)&&!stageOpened().has(id);}
+function riddleLocked(id){if(!riddleSecret(null,id))return false;showToast('Подсказок у записки нет','Ответ спрятан в её строках.',null,'normal');return true;}
+function stageTarget(step){const opened=stageOpened(),recipes=stageRecipes();return step.goals.find(id=>!opened.has(id))||(step.craft||[]).find(id=>!DATA.recipes.some(r=>r.result===id&&recipes.has(r.key)))||null;}
 function campaignCurrent(c){return c.stages.find(step=>!journeyClaims().includes(step.id))||null;}
 function rewardPoints(){return serverMode()?serverJourney.points:(DATA.campaigns||[]).flatMap(c=>c.stages).filter(s=>journeyClaims().includes(s.id)).reduce((n,s)=>n+s.reward.points,0);}
 function journeyNotice(){
@@ -77,7 +82,7 @@ function showCampaign(id=null){
 }
 function showCampaignDetail(c){
  const current=campaignCurrent(c);const allDone=!current;
- const content=tabs('campaign')+`<p class="page-lead">${journeyNotice()}</p><div class="epoch-hero">${epochScene(c.world)}<div><span class="eyebrow">Экспедиция · 4 этапа</span><h3>${escapeHTML(c.title)}</h3><p>${escapeHTML(c.description)}</p></div></div><div class="button-row"><button class="primary" data-track="${c.id}">${icon('target')} ${state.activeCampaign===c.id?'Продолжить исследование':'Следить за экспедицией'}</button><button class="secondary" data-action="campaign">Все экспедиции</button></div><div class="stages">${c.stages.map((s,index)=>{const claimed=journeyClaims().includes(s.id),active=current===s,eligible=claimAvailable(s),status=claimed?(serverMode()?'Подтверждено сервером':'Локальная печать'):active?eligible?(claimPending(s)?'Ожидает подтверждения':'Готово к завершению'):'Текущий этап':'Следующий этап';return `<section class="stage ${claimed?'claimed':active?'current':'upcoming'}"><div class="stage-number">${claimed?icon('check'):String(index+1).padStart(2,'0')}</div><div class="stage-content"><span class="eyebrow">${status} · ${s.reward.points} очков</span><h3>${escapeHTML(s.title)}</h3><p>${escapeHTML(claimed?s.ending:s.brief)}</p>${claimed?'':`<div class="stage-goals">${s.goals.map(id=>`<button data-goal="${id}" class="stage-goal ${stageOpened().has(id)?'complete':''}">${art(id)}<span>${escapeHTML(name(id))}</span>${icon(stageOpened().has(id)?'check':'target')}</button>`).join('')}</div><p class="craft-condition">${(s.craft||[]).map(id=>{const done=DATA.recipes.some(r=>r.result===id&&stageRecipes().has(r.key));return `${done?'✓':'○'} Эксперимент: получить «${escapeHTML(name(id))}» любым рецептом.`;}).join('<br>')}</p>`}${active?`<div class="button-row">${eligible?`<button class="primary" data-claim="${s.id}">${icon('star')} ${claimPending(s)?'Повторить подтверждение':'Завершить этап'}</button>`:`<button class="secondary" data-investigate="${c.id}">${icon('hint')} Подсказка к этапу</button>`}</div>`:''}</div></section>`;}).join('')}</div>${allDone?`<div class="completion-card">${art('philosopher')}<h3>Экспедиция завершена</h3><p>Четыре печати уже в твоём архиве. Все открытия остаются доступны для новых историй.</p><button class="primary" data-action="campaign">Выбрать следующее путешествие</button></div>`:''}`;
+ const content=tabs('campaign')+`<p class="page-lead">${journeyNotice()}</p><div class="epoch-hero">${epochScene(c.world)}<div><span class="eyebrow">Экспедиция · 4 этапа</span><h3>${escapeHTML(c.title)}</h3><p>${escapeHTML(c.description)}</p></div></div><div class="button-row"><button class="primary" data-track="${c.id}">${icon('target')} ${state.activeCampaign===c.id?'Продолжить исследование':'Следить за экспедицией'}</button><button class="secondary" data-action="campaign">Все экспедиции</button></div><div class="stages">${c.stages.map((s,index)=>{const claimed=journeyClaims().includes(s.id),active=current===s,eligible=claimAvailable(s),status=claimed?(serverMode()?'Подтверждено сервером':'Локальная печать'):active?eligible?(claimPending(s)?'Ожидает подтверждения':'Готово к завершению'):'Текущий этап':'Следующий этап';return `<section class="stage ${claimed?'claimed':active?'current':'upcoming'}"><div class="stage-number">${claimed?icon('check'):String(index+1).padStart(2,'0')}</div><div class="stage-content"><span class="eyebrow">${status} · ${s.reward.points} очков</span><h3>${escapeHTML(s.title)}</h3><p${!claimed&&s.riddle?' class="riddle-verse"':''}>${escapeHTML(claimed?s.ending:s.brief)}</p>${claimed?'':`<div class="stage-goals">${s.goals.map(id=>riddleSecret(s,id)?`<span class="stage-goal riddle">${art('question')}<span>Загадка</span></span>`:`<button data-goal="${id}" class="stage-goal ${stageOpened().has(id)?'complete':''}">${art(id)}<span>${escapeHTML(name(id))}</span>${icon(stageOpened().has(id)?'check':'target')}</button>`).join('')}</div><p class="craft-condition">${(s.craft||[]).map(id=>{const done=DATA.recipes.some(r=>r.result===id&&stageRecipes().has(r.key));return `${done?'✓':'○'} Эксперимент: получить ${riddleSecret(s,id)?'разгадку':`«${escapeHTML(name(id))}»`} любым рецептом.`;}).join('<br>')}</p>`}${active?`<div class="button-row">${eligible?`<button class="primary" data-claim="${s.id}">${icon('star')} ${claimPending(s)?'Повторить подтверждение':'Завершить этап'}</button>`:riddleSecret(s,stageTarget(s))?'':`<button class="secondary" data-investigate="${c.id}">${icon('hint')} Подсказка к этапу</button>`}</div>`:''}</div></section>`;}).join('')}</div>${allDone?`<div class="completion-card">${art('philosopher')}<h3>Экспедиция завершена</h3><p>Четыре печати уже в твоём архиве. Все открытия остаются доступны для новых историй.</p><button class="primary" data-action="campaign">Выбрать следующее путешествие</button></div>`:''}`;
  openModal(c.title,`${c.stages.filter(s=>journeyClaims().includes(s.id)).length}/4 этапа завершено`,content,'campaign-detail',c.id);
 }
 async function claimStage(id){
@@ -102,6 +107,7 @@ function investigateCampaign(id){
   const opened=stageOpened(),recipes=stageRecipes();
   const target=s.goals.find(id=>!opened.has(id))||(s.craft||[]).find(id=>!DATA.recipes.some(r=>r.result===id&&recipes.has(r.key)));
   if(target){
+   if(riddleLocked(target))return;
    const direct=DATA.recipes.find(r=>r.result===target&&opened.has(r.a)&&opened.has(r.b));
    const info=direct?{recipe:direct,target}:findHint(target,opened,recipes);
    if(info){state.pinned=null;hint={...info,alternative:true,verified:true,stage:1};persist();showHint();return;}
@@ -110,6 +116,7 @@ function investigateCampaign(id){
   showCampaign(c.id);return;
  }
  const missing=s.goals.find(x=>!found.has(x));
+ if(missing&&riddleLocked(missing))return;
  if(missing){pinGoal(missing);return;}
  const craft=(s.craft||[]).find(id=>!DATA.recipes.some(r=>r.result===id&&knownRecipes.has(r.key)));
  if(craft){

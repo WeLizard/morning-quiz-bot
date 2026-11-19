@@ -558,7 +558,7 @@ function findHint(target=null,opened=found,recipes=knownRecipes){
  if(target&&!opened.has(target)){const recipe=nextNeeded(target);if(recipe)return {recipe,target};}
  const goals=currentChapter().goals.filter(id=>!opened.has(id)).sort((a,b)=>cost.get(a)-cost.get(b));
  for(const id of goals){const recipe=nextNeeded(id);if(recipe)return {recipe,target:id};}
- const frontier=DATA.recipes.filter(r=>opened.has(r.a)&&opened.has(r.b)&&!opened.has(r.result));
+ const frontier=DATA.recipes.filter(r=>opened.has(r.a)&&opened.has(r.b)&&!opened.has(r.result)&&!riddleStage(r.result));
  if(frontier.length){const recipe=frontier[Math.floor(Math.random()*Math.min(frontier.length,14))];return {recipe,target:recipe.result};}
  const alternative=DATA.recipes.find(r=>opened.has(r.a)&&opened.has(r.b)&&!recipes.has(r.key));
  return alternative?{recipe:alternative,target:alternative.result,alternative:true}:null;

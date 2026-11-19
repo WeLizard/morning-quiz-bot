@@ -1,18 +1,22 @@
 {
-  "elements": 895,
-  "recipes": 3115,
-  "reachable": 895,
+  "elements": 899,
+  "recipes": 3123,
+  "reachable": 899,
   "chapters": 57,
   "worlds": 5,
-  "campaigns": 31,
-  "stages": 124,
-  "achievements": 71,
-  "terminals": [],
+  "campaigns": 32,
+  "stages": 128,
+  "achievements": 72,
+  "terminals": [
+    "indigo",
+    "madder",
+    "saffron"
+  ],
   "single_recipe_elements": [
     "air"
   ],
-  "illustration_symbols": 895,
-  "distinct_svg_bodies": 895,
+  "illustration_symbols": 899,
+  "distinct_svg_bodies": 899,
   "art_hashes": {
     "water": "14f57df66c983201fde2027cb9ec2ef5fb1b43734bee960d34357d7365af5a75",
     "earth": "bce6068625bf08356bbad18f3a87c804206ae6165c56abd8b6d054f7e94b3177",
@@ -908,7 +912,11 @@
     "foam": "1f8e9e7bf579d7d2ce6e4cf80b874f1da10a0b72e5bb98f1db6abfb77e886014",
     "pickles": "0f64780ee246f68f71b1dfb28188a9170ed5f18046f47aef62732cd7407517c1",
     "cocoa": "785499dbd382d95efc0a76be119654a9d3839377c934911e17f40235f1301c4b",
-    "jackolantern": "c6b9b477e8a272d61d62a6dde911961753b568939258dcfec11712628f7b4ae5"
+    "jackolantern": "c6b9b477e8a272d61d62a6dde911961753b568939258dcfec11712628f7b4ae5",
+    "mordant": "75aae16d976b465b2099f0476f775fba44b0144c031d1196546bfa34cacd670c",
+    "indigo": "f01ffe661d1e09956e45cecf5b4d6f5784fce02e80b87f7378ca1626b5205353",
+    "madder": "0f009ebc86b769a4a3b473319c43c55691a5690bc6e3028ccae6e27b420a7dfa",
+    "saffron": "8ff3e7cec99bf5719f384d4623c275bdbabb79f5f9179447e9cdc5a95357f290"
   },
-  "html_sha256": "000077d2d2a9090bc807d7d2a1a49e963c0b85396c357713d70b3dc816cadf08"
+  "html_sha256": "ca9109001d08e36427126946008edec844286557715f36b48c9bc6856a91ccd3"
 }

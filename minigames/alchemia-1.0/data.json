@@ -8055,6 +8055,42 @@
       "description": "Тыква получила огонёк и загадочную праздничную улыбку.",
       "tier": 6,
       "terminal": false
+    },
+    {
+      "id": "mordant",
+      "name": "Протрава",
+      "category": "materials",
+      "art": "mordant",
+      "tier": 5,
+      "terminal": false,
+      "description": "Квасцы держат цвет за руку, чтобы он не сбежал при первой стирке."
+    },
+    {
+      "id": "indigo",
+      "name": "Индиго",
+      "category": "materials",
+      "art": "indigo",
+      "tier": 5,
+      "terminal": true,
+      "description": "Синий, который лист вайды прятал под зелёным."
+    },
+    {
+      "id": "madder",
+      "name": "Марена",
+      "category": "materials",
+      "art": "madder",
+      "tier": 8,
+      "terminal": true,
+      "description": "Корень с румянцем: без протравы краснеет, с протравой краснеет навсегда."
+    },
+    {
+      "id": "saffron",
+      "name": "Шафран",
+      "category": "materials",
+      "art": "saffron",
+      "tier": 6,
+      "terminal": true,
+      "description": "Три рыжие нити из сердца крокуса. Ткань после них светится, как полдень."
     }
   ],
   "recipes": [
@@ -26747,6 +26783,54 @@
       "b": "mud",
       "result": "footprint",
       "key": "boots+mud"
+    },
+    {
+      "a": "acid",
+      "b": "clay",
+      "result": "mordant",
+      "key": "acid+clay"
+    },
+    {
+      "a": "acid",
+      "b": "mineral",
+      "result": "mordant",
+      "key": "acid+mineral"
+    },
+    {
+      "a": "bacteria",
+      "b": "leaf",
+      "result": "indigo",
+      "key": "bacteria+leaf"
+    },
+    {
+      "a": "dye",
+      "b": "night",
+      "result": "indigo",
+      "key": "dye+night"
+    },
+    {
+      "a": "mordant",
+      "b": "root",
+      "result": "madder",
+      "key": "mordant+root"
+    },
+    {
+      "a": "dye",
+      "b": "root",
+      "result": "madder",
+      "key": "dye+root"
+    },
+    {
+      "a": "flower",
+      "b": "sun",
+      "result": "saffron",
+      "key": "flower+sun"
+    },
+    {
+      "a": "dye",
+      "b": "gold",
+      "result": "saffron",
+      "key": "dye+gold"
     }
   ],
   "categories": [
@@ -28411,6 +28495,20 @@
         "atlasheart"
       ],
       "art": "atlasheart"
+    },
+    {
+      "id": "paths_badge_dyers",
+      "name": "Записки красильщика",
+      "text": "Разгадать все четыре записки красильщика.",
+      "desc": "Разгадать все четыре записки красильщика.",
+      "type": "elements",
+      "elements": [
+        "mordant",
+        "indigo",
+        "madder",
+        "saffron"
+      ],
+      "art": "dye"
     },
     {
       "id": "paths_recipes_1500",
@@ -31092,6 +31190,95 @@
           "reward": {
             "points": 10,
             "seal": "Сердце атласа"
+          }
+        }
+      ]
+    },
+    {
+      "id": "paths_camp_dyers",
+      "title": "Записки красильщика",
+      "world": "makers",
+      "description": "Старый красильщик оставил четыре записки. В каждой — загадка о краске, которой нет в лавке. Разгаданная записка откроет рецепт и на ферме.",
+      "stages": [
+        {
+          "id": "dyers_1",
+          "title": "Записка первая. Замок для цвета",
+          "brief": "Гончарный ком и едкий сок\nСведи, чтоб вышла соль-замок:\nОна без цвета, но крепка —\nУдержит краску на века.",
+          "goals": [
+            "fabric",
+            "mordant"
+          ],
+          "craft": [
+            "mordant"
+          ],
+          "riddle": [
+            "mordant"
+          ],
+          "ending": "Протрава готова. Теперь любая краска ляжет ровно и не смоется водой.",
+          "reward": {
+            "points": 10,
+            "seal": "Замок для цвета"
+          }
+        },
+        {
+          "id": "dyers_2",
+          "title": "Записка вторая. Синий на ветру",
+          "brief": "Наряд ветвей в кадушке скрыт,\nНезримый рой над ним кипит.\nТкань выйдет жёлтой поутру,\nНо станет синей на ветру.",
+          "goals": [
+            "dye",
+            "indigo"
+          ],
+          "craft": [
+            "indigo"
+          ],
+          "riddle": [
+            "indigo"
+          ],
+          "ending": "Ткань вынырнула из чана жёлто-зелёной и на глазах посинела. Индиго найден!",
+          "reward": {
+            "points": 10,
+            "seal": "Синий на ветру"
+          }
+        },
+        {
+          "id": "dyers_3",
+          "title": "Записка третья. Красный под землёй",
+          "brief": "Ищи не ветви, а опоры,\nЧто прячет кустик под землёй.\nСмешай с тем, чем творят узоры, —\nИ алый вспыхнет, как живой.",
+          "goals": [
+            "mordant",
+            "madder"
+          ],
+          "craft": [
+            "madder"
+          ],
+          "riddle": [
+            "madder"
+          ],
+          "ending": "Корень марены отдал свой румянец. Этот алый держится на ткани крепко.",
+          "reward": {
+            "points": 10,
+            "seal": "Красный под землёй"
+          }
+        },
+        {
+          "id": "dyers_4",
+          "title": "Записка четвёртая. Нити полудня",
+          "brief": "Лиловый венчик расцветает,\nА в нём три нити — рыжий мёд.\nДобавь, что в небе днём сияет, —\nИ полдень на холсте взойдёт.",
+          "goals": [
+            "indigo",
+            "madder",
+            "saffron"
+          ],
+          "craft": [
+            "saffron"
+          ],
+          "riddle": [
+            "saffron"
+          ],
+          "ending": "Три рыжие нити окрасили полотно в цвет полудня. Все записки красильщика разгаданы!",
+          "reward": {
+            "points": 10,
+            "seal": "Нити полудня"
           }
         }
       ]

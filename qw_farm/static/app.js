@@ -2073,6 +2073,13 @@ async function renewPlatformSession(){
 let polling=false;
 async function poll(){if(document.hidden||!S.me||S.busy||polling)return;polling=true;try{const identity=S.me.id;if(Date.now()-lastSessionRenewal>=RENEW_AFTER)await renewPlatformSession();if(S.me?.id!==identity||!await refresh({render:false})||S.me?.id!==identity)return;if(S.tab==='neighbors'&&own())await updateNeighbors();else if(panelRenderSignature!==panelSnapshot()&&!['settings','neighbors','catalog'].includes(S.tab)&&!$('dialog').open&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.placing&&!S.fieldGame)renderPanel();}catch(e){if(e.sessionEnded)return;connection(e.rateBucket?'Можно повторить обновление':'Нет связи с сервером',true);if(e.rateBucket)scheduleRateRecovery();}finally{polling=false;}}
 let readyTimer=null,pollTimer=null;
+// Performance debugger (docs/FARM_PERF_DEBUG.md): only with ?debug=perf or localStorage qw-farm-perf=1. Otherwise nothing is
+// downloaded or wrapped. It must wrap the timers before syncUITimers() hands them to setInterval
+// (and stays outside the slices of app.js that farm_sharing/farm_lighting_ui tests evaluate).
+if(/[?&]debug=[^&]*perf/.test(location.search)||(()=>{try{return localStorage.getItem('qw-farm-perf')==='1';}catch{return false;}})()){
+ try{const PERF=await import('./perf_debug.js');updateReady=PERF.timed('updateReady',updateReady);poll=PERF.timed('poll',poll);refresh=PERF.timed('refresh',refresh);PERF.mountPerfDebug(scene);}
+ catch(e){console.warn('perf debug',e);}
+}
 function syncUITimers(){
  clearInterval(readyTimer);clearInterval(pollTimer);clearInterval(lightingTimer);readyTimer=pollTimer=lightingTimer=null;
  updateFarmLighting();

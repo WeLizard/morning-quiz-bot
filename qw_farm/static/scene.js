@@ -413,11 +413,10 @@ export class FarmScene {
   c.setTransform(this.dpr,0,0,this.dpr,0,0);c.translate(origin.x,origin.y);c.scale(this.scale,this.scale);
   this.paintLanternLights();
   if(markers)for(const marker of markers){if(marker.kind==='label')this.label(marker.x,marker.y,marker.text,marker.ready);else if(marker.kind==='fn')marker.fn();else this.ready(marker.x,marker.y)}
-  if(this.placement){let cell=this.placement.cell||this.hover;if(cell){let spec=this.placement.spec,obj={...cell,w:spec.w,h:spec.h};let busy=this.farm.objects.some(o=>o.id!==this.placement.ignore&&o.x<obj.x+obj.w&&o.x+o.w>obj.x&&o.y<obj.y+obj.h&&o.y+o.h>obj.y);let valid=obj.x>=0&&obj.y>=0&&obj.x+obj.w<=area&&obj.y+obj.h<=area&&!busy;this.footprint(obj,valid?'#f9f8d076':'#e3857570',valid?'#fff8c4':'#c96c5e');}}
-  else if(this.hover&&!this.hoverId&&this.hover.x>=0&&this.hover.y>=0&&this.hover.x<area&&this.hover.y<area)this.tile(this.hover.x,this.hover.y,'#fffbe124','#faf7cb99',2);
-  if(this.particles.length){let live=0;for(let particle of this.particles){particle.x+=particle.dx;particle.y+=particle.dy;particle.dy+=.08;particle.age++;c.globalAlpha=Math.max(0,1-particle.age/22);this.ellipse(particle.x,particle.y,2,3,particle.color);if(particle.age<22)this.particles[live++]=particle}this.particles.length=live;c.globalAlpha=1}
+  this.paintHover(area);
+  if(this.particles.length)this.paintParticles(c);
   // Ambient petals, subtle rather than a full-screen particle storm.
-  if(this.motion)for(let i=0;i<6;i++){let x=-330+((t*6+i*123)%700),y=130+Math.sin(t*.7+i)*15+i*41;this.ellipse(x,y,1.5,1,(this.lighting?.darkness||0)>.5?'#e3c98580':'#fff9d380')}
+  if(this.motion)this.paintPetals(t);
   this.mini?.update(now);this.cb.frame?.();
  }
  // Everything that moves or changes with the farm: haze, objects (depth-sorted, culled), the goose and the team.
@@ -435,7 +434,7 @@ export class FarmScene {
   const list=entries.filter(e=>visible(e.bounds)),moving=teamSprites(this),slots=spriteSlots(list,moving);
   // Buildings, animals, fence and moving sprites keep their existing depth/parent constraints.
   for(let i=0;i<=list.length;i++){
-   for(const sp of slots[i])sp.draw();
+   for(const sp of slots[i])this.drawSprite(sp);
    if(i===list.length)break;
    const e=list[i];
    if(e.object){if(lit&&e.object.id===lit)this.drawLit(e.object);else this.drawObject(e.object);drawnObjects.add(e.object.id)}
@@ -449,6 +448,14 @@ export class FarmScene {
   this.paintTrees(this.layout.after,view); // trees in front of the fenced square stand over whatever is behind them
   this.skyFlock(view);
  }
+ // Small passes of draw() kept as methods so the profiler (scene_profiler.js, ?debug=perf) can time them apart.
+ drawSprite(sp){sp.draw()}
+ paintHover(area){
+  if(this.placement){let cell=this.placement.cell||this.hover;if(cell){let spec=this.placement.spec,obj={...cell,w:spec.w,h:spec.h};let busy=this.farm.objects.some(o=>o.id!==this.placement.ignore&&o.x<obj.x+obj.w&&o.x+o.w>obj.x&&o.y<obj.y+obj.h&&o.y+o.h>obj.y);let valid=obj.x>=0&&obj.y>=0&&obj.x+obj.w<=area&&obj.y+obj.h<=area&&!busy;this.footprint(obj,valid?'#f9f8d076':'#e3857570',valid?'#fff8c4':'#c96c5e');}}
+  else if(this.hover&&!this.hoverId&&this.hover.x>=0&&this.hover.y>=0&&this.hover.x<area&&this.hover.y<area)this.tile(this.hover.x,this.hover.y,'#fffbe124','#faf7cb99',2);
+ }
+ paintParticles(c){let live=0;for(let particle of this.particles){particle.x+=particle.dx;particle.y+=particle.dy;particle.dy+=.08;particle.age++;c.globalAlpha=Math.max(0,1-particle.age/22);this.ellipse(particle.x,particle.y,2,3,particle.color);if(particle.age<22)this.particles[live++]=particle}this.particles.length=live;c.globalAlpha=1}
+ paintPetals(t){for(let i=0;i<6;i++){let x=-330+((t*6+i*123)%700),y=130+Math.sin(t*.7+i)*15+i*41;this.ellipse(x,y,1.5,1,(this.lighting?.darkness||0)>.5?'#e3c98580':'#fff9d380')}}
  // Mouse hover: the object itself is lightened and gets a soft pale outline (drawn into a scratch canvas, then filtered once).
  // The same filter is the CSS token --farm-lit (style.css) used by the village sign and residents: keep the two in step.
  drawLit(o){

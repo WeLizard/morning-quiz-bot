@@ -57,6 +57,7 @@
 - [Аудит и последовательное устранение 28 находок (2026-10-08)](tasks/QUIZZYWIZZY-2026-10-08.md)
 - [Farm 0.2.0: dev-интеграция и приёмочные ворота](tasks/MQB-007-farm-020-integration.md)
 - [Farm: контракт с платформой и локальная эксплуатация](FARM_INTEGRATION.md)
+- [Ферма: отладчик производительности (?debug=perf) и бюджет отрисовки в CI](FARM_PERF_DEBUG.md)
 - [Безопасный read-only аудит банка вопросов](engineering/QUESTION_BANK_AUDIT.md)
 - [Безопасный read-only аудит очереди уведомлений](engineering/NOTIFICATION_OUTBOX_AUDIT.md)
 - [Временный HTTPS-тест Mini App и безопасная остановка](TELEGRAM_MINI_APP_TEST.md)

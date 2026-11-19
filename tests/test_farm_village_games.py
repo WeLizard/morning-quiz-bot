@@ -130,7 +130,7 @@ def test_owner_allowlist_guest_privacy_and_unknown_version_preserved():
     f['village_games']['future'] = {'secret':'answer'}
     f['village_games'][GAME]['private'] = 'secret'
     view = project(f,f,NOW)['village_games']
-    assert set(view) == {GAME, 'agata_pie'} and 'private' not in view[GAME] and 'private' not in view['agata_pie']
+    assert set(view) == {GAME, 'agata_pie', 'santa_battle'} and 'private' not in view[GAME] and 'private' not in view['agata_pie']
     assert view[GAME]['active']['plan'] == run['plan']
     other = farm()
     f['settings']['visibility'] = 'public'

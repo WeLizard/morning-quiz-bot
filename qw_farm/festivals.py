@@ -287,6 +287,11 @@ CONTENT['new_year'] = dict(
         _g('fest_ny_mitten_garland', 'Гирлянда из варежек', 'wall', 'fence', 7, 60, source='task:warm'),
         _g('fest_ny_plaid', 'Плед на скамейку у ёлки', 'village', 'village', 8, 60, source='task:plaid'),
         _g('fest_ny_sign', 'Снеговик с табличкой фермы', 'village', 'village', 7, 60, source='task:ginger', note='общий ряд на площади'),
+        # earned by the first win of each «Битва с Сантой» battle (application/farm_santa_battle.py), not sold
+        _g('fest_ny_krampus_bell', 'Колокольчик Крампуса', 'decor', 'farm1', 5, 60, source='battle:1'),
+        _g('fest_ny_santa_sack', 'Мешок Санты', 'decor', 'farm1', 5, 60, source='battle:2'),
+        _g('fest_ny_santa_visit', 'Санта и Крампус в гостях', 'decor', 'farm1', 5, 60, source='battle:3',
+           note='оба пьют чай у ёлки на ферме'),
         # the memorable item of the year: every task, never sold, never returns (one per year: «Ёлочная игрушка 2027» and so on)
         _g('fest_ny_year_toy', 'Ёлочная игрушка года', 'keepsake', 'farm1', 8, 0, source='keepsake'),
     ])
@@ -371,7 +376,7 @@ def validate_content():
         assert len(ids) == len(set(ids))
         for g in c['goods']:
             assert g['kind'] in KINDS and g['place'] in PLACES and g['limit'] >= 1 and g['seller'] in ('agata', 'sonya', 'magpie', 'host')
-            assert g['source'] in ('fair', 'keepsake', 'tower') or g['source'].startswith('task:')
+            assert g['source'] in ('fair', 'keepsake', 'tower') or g['source'].startswith(('task:', 'battle:'))
             assert g['source'] == 'keepsake' or g['k'] > 0
             assert not g['ref'] or (g['orchard'] and g['ref'] in ITEMS)
         tids = [t['id'] for t in c['tasks']]
@@ -468,7 +473,7 @@ def validate(farm):
             for k, q in e[part].items():
                 g = goods.get(k)
                 ok = g is not None and type(q) is int and 0 < q and (
-                    g['source'] in source if source else g['source'].startswith('task:') or g['source'] == 'tower')
+                    g['source'] in source if source else g['source'].startswith(('task:', 'battle:')) or g['source'] == 'tower')
                 need(ok, 'invalid_festivals', 'Некорректное состояние праздников.', 500)
         for k in {*e['bought'], *e['rewards']}:
             need(owned(e, k) <= goods[k]['limit'], 'invalid_festivals', 'Некорректное состояние праздников.', 500)

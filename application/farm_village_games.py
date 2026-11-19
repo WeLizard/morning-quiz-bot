@@ -3,7 +3,7 @@ from copy import deepcopy
 from secrets import token_hex
 from uuid import uuid4
 
-from application import farm_pie_game
+from application import farm_pie_game, farm_santa_battle
 from domain import farm_ballista as ballista
 from domain.farm_village_games import GAMES, stars, reward_total
 from qw_farm import progression
@@ -40,10 +40,15 @@ def _expire(state, now):
 
 
 def command(farm, kind, data, now):
-    game, spec = _game(data, {'game'} if kind == 'vgame_start' else {'game', 'run_id', 'log'})
+    fields = {'game'} if kind == 'vgame_start' else {'game', 'run_id', 'log'}
+    if kind == 'vgame_start' and type(data) is dict and data.get('game') == farm_santa_battle.GAME:
+        fields = {'game', 'battle'}
+    game, spec = _game(data, fields)
     need(level(farm['xp']) >= spec.min_level, 'locked', 'Игра пока не открыта.')
     if game == farm_pie_game.GAME:
         return farm_pie_game.command(farm, kind, data, now)
+    if game == farm_santa_battle.GAME:
+        return farm_santa_battle.command(farm, kind, data, now)
     games = farm.setdefault('village_games', {})
     need(type(games) is dict, 'invalid_state', 'Некорректное состояние игр.', 500)
     state = games.setdefault(game, _blank(progression.moscow_day(now)))
@@ -115,6 +120,10 @@ def public(farm, now):
         if game == farm_pie_game.GAME:
             result[game] = farm_pie_game.public(farm, now)
             continue
+        if game == farm_santa_battle.GAME:
+            result[game] = dict(farm_santa_battle.public(farm, now), min_level=spec.min_level,
+                                locked=level(farm['xp']) < spec.min_level)
+            continue
         state = games.get(game)
         if state is not None and not _supported(state):
             continue
@@ -152,6 +161,9 @@ def validate(farm):
             continue  # A rollback must preserve future games/versions without executing them.
         if game == farm_pie_game.GAME:
             farm_pie_game.validate(farm)
+            continue
+        if game == farm_santa_battle.GAME:
+            farm_santa_battle.validate(farm)
             continue
         need(all(type(state.get(k)) is int and state[k] >= 0 for k in
                  ('day','attempts','best_stars','practice','reward_base','paid'))

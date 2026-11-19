@@ -8,6 +8,8 @@ const SELLER_ORDER=['agata','sonya','magpie','host'];
 // Icons of festival items. An item without its own symbol in icons.svg borrows a neutral symbol of the same kind from the first
 // festival (nothing renders blank). When the artist draws icons.svg#<id>, delete the line here (tests/js/farm_festivals.test.cjs checks it).
 export const ICON_FALLBACK={
+ // «Битва с Сантой» rewards: their own icons come with the battle screen (docs/tasks/FARM_SANTA_BATTLE.md §9 step 4)
+ fest_ny_krampus_bell:'fest_posid_lantern',fest_ny_santa_sack:'fest_posid_basket',fest_ny_santa_visit:'fest_posid_snowman',
 };
 export function iconId(id){return Object.prototype.hasOwnProperty.call(ICON_FALLBACK,id)?ICON_FALLBACK[id]:id;}
 

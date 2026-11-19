@@ -572,6 +572,10 @@ class FarmService:
             if data['game']=='agata_pie':
                 ledger_key='vgame:'+outcome['run_id']
                 record_kind='vgame_pie'
+            elif data['game']=='santa_battle':
+                # A festival item and the eaten «Корзинка» goods: one receipt per battle.
+                ledger_key='vgame:'+outcome['run_id']
+                record_kind='vgame_santa'
             else:
                 ledger_key='vgame:'+outcome['run_id']+':'+str(outcome['stars'])
                 # M2 is a future bonus pool, never an XP award. Keep its actual delta explicit.

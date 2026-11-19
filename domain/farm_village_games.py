@@ -1,6 +1,6 @@
 """Transport independent village game registry and reward arithmetic."""
 from dataclasses import dataclass
-from . import farm_ballista, farm_pie
+from . import farm_ballista, farm_pie, farm_santa_battle
 
 
 @dataclass(frozen=True)
@@ -14,7 +14,8 @@ class Spec:
 
 
 GAMES = {'pukh_ballista': Spec('pukh', 1, farm_ballista.TTL, 'replay', 'vigour', 1),
-         'agata_pie': Spec('agata', 1, farm_pie.TTL, 'replay', 'festival', 1)}
+         'agata_pie': Spec('agata', 1, farm_pie.TTL, 'replay', 'festival', 1),
+         'santa_battle': Spec('ded_moroz', 5, farm_santa_battle.TTL, 'replay', 'festival', 1)}
 
 
 def stars(score):

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -31,6 +32,7 @@ CREAM, CREAM_SHADE, BLUE, BLUE_DARK, LILAC, PINK = '#f4ede0', '#e2d7bd', '#7fa3c
 WOOD, WOOD_LIGHT, WOOD_DARK, INK, STEEL, STEEL_LIGHT = '#b48f66', '#c9a57a', '#7a5a3e', '#3f3428', '#9aa1a8', '#c9ced4'
 COPPER, COPPER_DARK = '#c98a3e', '#8f5a24'
 GLASS, GLASS_SHADE, STRAW, STRAW_SHADE, BURLAP = '#d6e8ee', '#b5d0da', '#e3c27a', '#c9a24f', '#d8bb84'
+NIGHT, NIGHT_DARK, NIGHT_LIGHT, STAR_PALE = '#3e5578', '#2c3e5c', '#5a759c', '#fff3b0'
 
 
 def star(x, y, r, fill):
@@ -38,6 +40,16 @@ def star(x, y, r, fill):
     k = r * .28
     return (f'<path d="M{x} {y - r}L{x + k} {y - k}L{x + r} {y}L{x + k} {y + k}L{x} {y + r}L{x - k} {y + k}L{x - r} {y}L{x - k} {y - k}Z" '
             f'fill="{fill}"/>')
+
+
+def star5(x, y, r, fill, inner=.45):
+    """A five-point star centred at (x, y), one point up."""
+    pts = []
+    for i in range(10):
+        a = -math.pi / 2 + i * math.pi / 5
+        rr = r if i % 2 == 0 else r * inner
+        pts.append(f'{x + rr * math.cos(a):.1f} {y + rr * math.sin(a):.1f}')
+    return f'<path d="M{"L".join(pts)}Z" fill="{fill}"/>'
 
 
 def party_hat(x, y, h, w, tilt, base=RED, stripe=MUSTARD, pom=CREAM):
@@ -175,6 +187,122 @@ FESTIVALS = {
             f'<path d="M24 34l-7-3.4v7ZM24 34l7-3.4v7Z" fill="{RED}"/><circle cx="24" cy="34" r="1.8" fill="{RED_SHADE}"/>'
         ),
     },
+    # «День космонавтики» (9.2 item 13): Крот's rocket from a barrel, Пух the first cosmonaut, the constellation map over the plaza
+    'cosmonautics': {
+        # Ракета из бочки: an upright barrel with hoops and rivets, a tin nose cone, fins, a porthole and a ladder
+        'fest_cosm_rocket': (
+            f'<path d="M16 32L7 44h10ZM32 32l9 12H31Z" fill="{RED}"/><path d="M32 32l9 12h-4Z" fill="{RED_SHADE}"/>'
+            f'<path d="M16.4 15q-2.4 13 0 29h15.2q2.4-16 0-29Z" fill="{WOOD}"/>'
+            f'<path d="M27 15h4.6q2.4 13 0 29H27Z" fill="#a07c55"/>'
+            f'<path d="M20.4 15.4v28.4M24 15v29M27.6 15.4v28.4" stroke="{WOOD_DARK}" stroke-width="1" opacity=".55"/>'
+            f'<path d="M15.6 19.6h16.8M15.4 39.4h17.2" stroke="{STEEL}" stroke-width="2.8"/>'
+            f'<path d="M15.6 18.6h16.8" stroke="{STEEL_LIGHT}" stroke-width="1"/>'
+            f'<path d="M15.4 16L24 2l8.6 14Z" fill="{STEEL_LIGHT}"/><path d="M24 2l8.6 14H24Z" fill="{STEEL}"/>'
+            f'<path d="M19.6 9.2h8.8L24 2Z" fill="{RED}"/>'
+            f'<circle cx="24" cy="28.4" r="5" fill="{STEEL}"/><circle cx="24" cy="28.4" r="3.4" fill="{GLASS}"/>'
+            f'<path d="M22.2 27.2q.8-1.6 2.6-1.6" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" fill="none"/>'
+            f'<circle cx="18.4" cy="19.6" r=".8" fill="{INK}"/><circle cx="22" cy="19.6" r=".8" fill="{INK}"/><circle cx="26" cy="19.6" r=".8" fill="{INK}"/>'
+            f'<circle cx="29.6" cy="19.6" r=".8" fill="{INK}"/><circle cx="18.4" cy="39.4" r=".8" fill="{INK}"/><circle cx="22" cy="39.4" r=".8" fill="{INK}"/>'
+            f'<circle cx="26" cy="39.4" r=".8" fill="{INK}"/><circle cx="29.6" cy="39.4" r=".8" fill="{INK}"/>'
+            f'<path d="M37 44L42 18M43.6 44l4-26" stroke="{WOOD_DARK}" stroke-width="1.6"/>'
+            f'<path d="M38 39h4.8M39 33.6h4.8M40 28.2h4.8M41 22.8h4.8" stroke="{WOOD_DARK}" stroke-width="1.4"/>'
+        ),
+        # Запчасти для ракеты: a crate of spare parts, a tin cone sticking out, a cog leaning on it
+        'fest_cosm_parts': (
+            f'<path d="M9 30L16 8l7 22Z" fill="{STEEL_LIGHT}"/><path d="M16 8l7 22h-7Z" fill="{STEEL}"/><path d="M12.8 18.6h6.4L16 8Z" fill="{RED}"/>'
+            f'<rect x="4" y="27" width="28" height="17" rx="1" fill="{WOOD}"/>'
+            f'<path d="M4 32.6h28M4 38.2h28" stroke="{WOOD_DARK}" stroke-width="1.2"/><rect x="4" y="27" width="28" height="2.4" fill="{WOOD_LIGHT}"/>'
+            f'<circle cx="6.6" cy="30" r=".9" fill="{INK}"/><circle cx="29.4" cy="30" r=".9" fill="{INK}"/><circle cx="6.6" cy="41.4" r=".9" fill="{INK}"/>'
+            f'<circle cx="29.4" cy="41.4" r=".9" fill="{INK}"/>'
+            f'<circle cx="35" cy="32" r="10" fill="none" stroke="{STEEL}" stroke-width="4" stroke-dasharray="3.4 2.9"/>'
+            f'<circle cx="35" cy="32" r="8.6" fill="{STEEL}"/><circle cx="35" cy="32" r="3.4" fill="#6f767d"/>'
+            f'<path d="M29 28q2-3.6 6-4" stroke="{STEEL_LIGHT}" stroke-width="1.6" stroke-linecap="round" fill="none"/>'
+            f'<path d="M24 24l3-3.4 3.6 1.2" stroke="{COPPER}" stroke-width="2" stroke-linecap="round" fill="none"/>'
+        ),
+        # Звёздочки вдоль дорожки: star-shaped stepping tiles running up a sandy path
+        'fest_cosm_path': (
+            f'<path d="M0 41L27 6h17L17 48H0Z" fill="#e2d0a8"/><path d="M0 41L27 6h3L3 44Z" fill="#cdb98c"/>'
+            f'<path d="M3 30q3-4 4 0M38 30q3-4 4 0M8 20q2-3 3 0" stroke="{SAGE}" stroke-width="1.8" stroke-linecap="round" fill="none"/>'
+            + star5(13, 37, 8.4, MUSTARD_SHADE) + star5(13, 36, 7.6, MUSTARD)
+            + star5(25.6, 22, 6.6, MUSTARD_SHADE) + star5(25.6, 21.2, 6, MUSTARD)
+            + star5(35.6, 10, 5, MUSTARD_SHADE) + star5(35.6, 9.4, 4.4, MUSTARD)
+        ),
+        # Свиток «Космический энергетос»: Пух's recipe, a fizzy bottle with a star on the label
+        'fest_cosm_scroll': (
+            f'<path d="M12 9h25v27q0 4-4 4H10q4 0 4-4V13q0-4-2-4Z" fill="#f1e6c9"/>'
+            f'<path d="M10 40q-4 0-4-4v-2h8v2q0 4-4 4Z" fill="#e3d3ac"/><path d="M12 9q-4 0-4 4h8q0-4-4-4Z" fill="#e3d3ac"/>'
+            f'<path d="M18 14h13" stroke="#b9a578" stroke-width="1.5" stroke-linecap="round"/>'
+            f'<rect x="20.4" y="17" width="4.4" height="3" rx="1" fill="{WOOD}"/><rect x="20.8" y="19.6" width="3.6" height="4" fill="{NIGHT_LIGHT}"/>'
+            f'<path d="M18.2 23.6h8.8q1.6 0 1.6 1.6v9.2q0 2.4-2.4 2.4h-7.2q-2.4 0-2.4-2.4v-9.2q0-1.6 1.6-1.6Z" fill="{NIGHT}"/>'
+            + star5(22.6, 30, 3.8, MUSTARD)
+            + f'<circle cx="30.4" cy="19.6" r="1.4" fill="{BLUE}"/><circle cx="32.4" cy="24.4" r="1" fill="{BLUE}"/><circle cx="29.6" cy="15.6" r=".9" fill="{BLUE}"/>'
+            f'<path d="M33 33l6 3-2 7-3-3-3 2Z" fill="{BLUE}"/><circle cx="34" cy="34" r="4.2" fill="#c9604f"/><circle cx="34" cy="34" r="2" fill="#e08a7a"/>'
+        ),
+        # Заморский метеорит: a dark pitted stone with glowing cracks on Сорока's velvet cushion
+        'fest_cosm_meteor': (
+            f'<path d="M6 38q0-5 6-5h24q6 0 6 5 0 6-18 6T6 38Z" fill="{RED_SHADE}"/><path d="M8 37q0-3 5-3h22q5 0 5 3-2 3-16 3T8 37Z" fill="{RED}"/>'
+            f'<path d="M11 31q-3-9 3-15 5-6 12-5 8-1 11 6 3 8-2 14-5 4-14 3-8 0-10-3Z" fill="#6b6460"/>'
+            f'<path d="M14 16q5-6 12-5 8-1 11 6-6-3-12-2-6 0-11 1Z" fill="#8a837d"/>'
+            f'<ellipse cx="18" cy="24" rx="3.2" ry="2.4" fill="#4e4844"/><ellipse cx="29" cy="27" rx="2.6" ry="2" fill="#4e4844"/>'
+            f'<ellipse cx="27" cy="19" rx="1.8" ry="1.4" fill="#4e4844"/>'
+            f'<path d="M21 31l2-4 3 1 2-3M33 22l-2 2" stroke="#f0a64a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+            + star(40, 9, 4.6, MUSTARD) + star(7, 12, 3.4, MUSTARD) + star(43, 25, 2.6, MUSTARD_SHADE)
+        ),
+        # Звёздные флажки на забор: dark blue pennants with yellow stars on a cord between two fence posts
+        'fest_cosm_flags': (
+            f'<rect x="3" y="4" width="6" height="42" fill="{WOOD}"/><rect x="39" y="4" width="6" height="42" fill="{WOOD}"/>'
+            f'<path d="M3 4l3-2.4 3 2.4M39 4l3-2.4 3 2.4" fill="{WOOD}"/>'
+            f'<rect x="2" y="34" width="44" height="4" rx="1" fill="{WOOD_DARK}"/>'
+            f'<path d="M7 10q17 9 34 0" fill="none" stroke="{WOOD_DARK}" stroke-width="1.4"/>'
+            f'<path d="M10 11.4l7 2.8-4.4 9.4Z" fill="{NIGHT}"/><path d="M19.4 14.6h9.2L24 25Z" fill="{NIGHT_LIGHT}"/>'
+            f'<path d="M31 14.2l7-2.8-2.6 12.2Z" fill="{NIGHT}"/>'
+            + star5(13.6, 15.6, 2.6, MUSTARD) + star5(24, 17.8, 2.6, MUSTARD) + star5(34.6, 15.4, 2.6, MUSTARD)
+        ),
+        # Ракета-скворечник у сарая: a painted rocket on a post, the round door of the starlings and a perch
+        'fest_cosm_birdhouse': (
+            f'<path d="M24 36v10" stroke="{WOOD_DARK}" stroke-width="3.4"/>'
+            f'<path d="M16 28l-6 9h6ZM32 28l6 9h-6Z" fill="{RED}"/>'
+            f'<path d="M16 14q8-12 16 0v21H16Z" fill="{CREAM}"/><path d="M27 8q3 2 5 6v21h-5Z" fill="{CREAM_SHADE}"/>'
+            f'<path d="M17.6 11.4q6.4-9.4 12.8 0Z" fill="{RED}"/>'
+            f'<path d="M16 31h16" stroke="{BLUE}" stroke-width="2.4"/>'
+            f'<circle cx="24" cy="21" r="3.6" fill="{INK}"/><path d="M24 26.4v2.2M20.4 27.6h7.2" stroke="{WOOD_DARK}" stroke-width="1.6" stroke-linecap="round"/>'
+            f'<path d="M16 35h16" stroke="{STEEL}" stroke-width="2"/>'
+        ),
+        # Карта созвездий над площадью: a night-blue banner between two poles, the Big Dipper drawn in stars and lines
+        'fest_cosm_stars': (
+            f'<path d="M6 46V4M42 46V4" stroke="{WOOD_DARK}" stroke-width="2.6" stroke-linecap="round"/>'
+            f'<path d="M7 6h34v26l-5.6-3-5.8 3-5.6-3-5.8 3-5.6-3L7 32Z" fill="{NIGHT}"/>'
+            f'<path d="M7 6h34v3H7Z" fill="{NIGHT_DARK}"/>'
+            f'<path d="M11 14l7 2 6 4 5 1 1 6 7 1 2-6Z" fill="none" stroke="{STAR_PALE}" stroke-width=".9" opacity=".7" stroke-linejoin="round"/>'
+            + star5(11, 14, 2.4, STAR_PALE) + star5(18, 16, 2.4, STAR_PALE) + star5(24, 20, 2.4, STAR_PALE) + star5(29, 21, 2.6, MUSTARD)
+            + star5(30, 27, 2.6, MUSTARD) + star5(37, 28, 2.6, MUSTARD) + star5(39, 22, 2.6, MUSTARD)
+            + f'<circle cx="15" cy="25" r=".8" fill="{STAR_PALE}"/><circle cx="35" cy="12" r=".8" fill="{STAR_PALE}"/>'
+        ),
+        # Значок космонавта года (the keepsake): a round badge, a rocket on a night disc, two ribbon tails
+        'fest_cosm_badge': (
+            f'<path d="M17 30l-5 15 5-2.4 3 4 4-13Z" fill="{BLUE}"/><path d="M31 30l5 15-5-2.4-3 4-4-13Z" fill="{RED}"/>'
+            f'<circle cx="24" cy="22" r="16" fill="{MUSTARD_SHADE}"/><circle cx="24" cy="22" r="14.4" fill="{MUSTARD}"/>'
+            f'<circle cx="24" cy="22" r="11" fill="{NIGHT}"/>'
+            f'<path d="M21 26l-4 5h4ZM27 26l4 5h-4Z" fill="{RED}"/>'
+            f'<path d="M21 16q3-6 6 0v14h-6Z" fill="{CREAM}"/><path d="M21.6 14.4q2.4-4.4 4.8 0Z" fill="{RED}"/>'
+            f'<circle cx="24" cy="21" r="1.6" fill="{BLUE}"/>'
+            f'<path d="M22.6 31q1.4 3 2.8 0" fill="#f0a64a"/>'
+            + star5(15.6, 16, 1.8, STAR_PALE) + star5(32.6, 15, 1.4, STAR_PALE) + star5(31.6, 27, 1.6, STAR_PALE)
+        ),
+        # Прививка «Звёздная груша»: a pear twig on its night-blue binding, a pear, pale stars among the leaves and a crescent
+        'fest_cosm_graft': (
+            f'<path d="M18 44q2-14 2-30" stroke="#8a6a45" stroke-width="3.4" stroke-linecap="round" fill="none"/>'
+            f'<path d="M20 20q7-5 13-7" stroke="#8a6a45" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+            f'<path d="M20 14q-6-6-10-2 4 5 10 2Z" fill="#7f9c6c"/><path d="M33 13q5-5 10-1-5 4-10 1Z" fill="#7f9c6c"/>'
+            f'<rect x="16.5" y="25" width="7" height="8" rx="2" fill="{NIGHT}"/><path d="M16.5 28h7M16.5 31h7" stroke="{NIGHT_LIGHT}" stroke-width="1.2"/>'
+            f'<path d="M33 14v4" stroke="#7e6044" stroke-width="1.2"/>'
+            f'<ellipse cx="33" cy="28" rx="7.4" ry="7.2" fill="#d4cd4c"/><ellipse cx="33" cy="22" rx="4.4" ry="4.4" fill="#d4cd4c"/>'
+            f'<path d="M29.4 24q.8-2.8 3.6-3" stroke="#f7f0b6" stroke-width="1.4" fill="none" stroke-linecap="round"/>'
+            f'<circle cx="36.4" cy="31" r="1" fill="#b0a85a"/>'
+            f'<path d="M9 3a6.4 6.4 0 1 0 6.4 9.4A5 5 0 1 1 9 3Z" fill="{NIGHT_LIGHT}"/>'
+            + star(26, 8, 2.6, MUSTARD) + star(39, 6, 3.2, MUSTARD) + star(8, 24, 2.6, MUSTARD) + star(42, 22, 2.2, MUSTARD_SHADE)
+        ),
+    },
 }
 
 NAMES = {
@@ -182,6 +310,10 @@ NAMES = {
     'fest_fool_cake': 'Торт-обманка', 'fest_fool_mirror': 'Кривое зеркало на площади', 'fest_fool_stripes': 'Полосатые носки на забор',
     'fest_fool_whistle': 'Свистулька-пищалка', 'fest_fool_cap': 'Колпак на флюгере', 'fest_fool_signs': 'Табличка «Почта» на мельнице',
     'fest_fool_geese': 'Гуси в колпаках', 'fest_fool_scarecrow': 'Пугало-шутник',
+    'fest_cosm_rocket': 'Ракета из бочки', 'fest_cosm_parts': 'Запчасти для ракеты', 'fest_cosm_path': 'Звёздочки вдоль дорожки',
+    'fest_cosm_scroll': 'Свиток «Космический энергетос»', 'fest_cosm_meteor': 'Заморский метеорит', 'fest_cosm_flags': 'Звёздные флажки',
+    'fest_cosm_birdhouse': 'Ракета-скворечник', 'fest_cosm_stars': 'Карта созвездий', 'fest_cosm_badge': 'Значок космонавта года',
+    'fest_cosm_graft': 'Прививка «Звёздная груша»',
 }
 NEIGHBOURS = ['fest_mas_effigy', 'fest_flw_pots', 'fest_posid_lantern']
 

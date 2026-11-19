@@ -1395,6 +1395,7 @@ def register_graft(item_id, species, look, name, level=16):
 # Festival grafts (qw_farm/festivals.py lots with the same ids): the look names are the drawing slots of the artist.
 for _gid, _gname, _glook in [('fest_posid_graft', 'Яблоня в уютном чехле', 'cozy'), ('fest_ny_graft', 'Яблоня в инее', 'frost'), ('fest_flw_graft', 'Яблоня в цвету', 'bloom')]:
     register_graft(_gid, 'apple', _glook, _gname)
+register_graft('fest_cosm_graft', 'pear', 'starry', 'Звёздная груша')   # День космонавтики: light specks in the leaves at night
 
 ITEMS['rejuvenating_apple'] = dict(id='rejuvenating_apple', name='Молодильное яблочко', price=500, color='#e8c04a', kind='product')
 BUILDINGS['dryer'] = dict(id='dryer', name='Сушильня', cost=6000, level=20, w=2, h=2, decor=False)

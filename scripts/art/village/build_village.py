@@ -136,7 +136,7 @@ def manifest(meta: dict) -> dict:
 
 
 INPUTS = ("scripts/art/village/residents.js", "scripts/art/village/crew-residents.js",
-          "scripts/art/village/host-residents.js", "scripts/art/village/trickster-residents.js", "scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/fest_fools.js", "scripts/art/village/build.js", "scripts/art/village/crew.js", "scripts/art/village/merchant.js", "scripts/art/village/contrast_paths.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
+          "scripts/art/village/host-residents.js", "scripts/art/village/trickster-residents.js", "scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/fest_fools.js", "scripts/art/village/fest_cosmos.js", "scripts/art/village/build.js", "scripts/art/village/crew.js", "scripts/art/village/merchant.js", "scripts/art/village/contrast_paths.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
 

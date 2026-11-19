@@ -43,7 +43,8 @@ const LOOK={
  bergamot:{fruit:'bergamot',crown:[[0,-56,23,24,0],[-13,-46,12,11,0],[13,-48,12,11,0],[-7,-60,15,17,1],[8,-54,14,15,1],[0,-72,12,9,1],[-8,-67,9,9,2],[1,-76,6,5,2],[-10,-69,4,4,3]]},
  cozy:{cozy:true},
  frost:{leaf:['#96b2b6','#adc6c8','#c8dadb','#eaf3f3'],frost:true},
- bloom:{always:true,bloom:['#fde6ee','#ef9fb8']}
+ bloom:{always:true,bloom:['#fde6ee','#ef9fb8']},
+ starry:{leaf:['#5f7f6a','#6f8f78','#86a288','#a3b89c'],starry:true}
 };
 const STAGE={sapling:.58,young:.76,adult:.92,elder:1.02,century:1.06};
 const WIDE={elder:1.08,century:1.12};
@@ -154,6 +155,14 @@ function cozyDress(s,kit,w){const h=Math.max(10,kit.trunk*.7),c=['#c75a5a','#f1e
  s.line(-w*.62,-h-2,w*.62,-h-1.4,'#a8473f',1.2)}
 function pompoms(s){const pts=[[-20,-46],[-8,-42],[5,-43],[18,-47]];s.c.save();s.c.beginPath();s.c.moveTo(-24,-50);s.c.quadraticCurveTo(0,-36,22,-51);s.c.strokeStyle='#c9b48a';s.c.lineWidth=.8;s.c.stroke();s.c.restore();
  pts.forEach(([x,y],i)=>{s.ellipse(x,y,2.4,2.4,['#c75a5a','#e3b04a','#8fb4c8','#f1e6cf'][i]);s.ellipse(x-.7,y-.7,.8,.8,'rgba(255,255,255,.55)')})}
+// «Звёздная груша» (День космонавтики): pale specks in the leaves by day; after dusk they stay lit above the darkness and twinkle.
+const STARRY='#fff3b0';
+function starSpecks(s,spots){for(let i=1;i<spots.length;i+=2){const [x,y]=spots[i];s.ellipse(x,y,1,1,'#eef0d2')}}
+function starGlow(s,pts,dark,T,seed){const c=s.c;c.save();
+ for(let i=0;i<pts.length;i++){const {x,y}=pts[i],tw=.55+.45*Math.sin(T*2.2+i*1.9+seed),a=dark*tw;if(a<.08)continue;
+  c.globalAlpha=a*.35;s.ellipse(x,y,3.2,3.2,STARRY);c.globalAlpha=a;s.ellipse(x,y,1.1,1.1,'#ffffff');
+  if(i%3===0){const r=2.6*tw;s.line(x-r,y,x+r,y,STARRY,.7);s.line(x,y-r,x,y+r,STARRY,.7)}}
+ c.restore()}
 function rime(s,spots){for(let i=0;i<spots.length;i+=2){const [x,y]=spots[i];s.ellipse(x,y,1.2,1,'#ffffff')}}
 function goldenFruit(s,x,y){s.ellipse(x,y,3.9,3.9,'#f2c84a');s.ellipse(x+1,y+.9,2,1.8,'#e0a83a');s.ellipse(x-1.2,y-1.3,1.3,1.1,'#fff3b0');s.line(x,y-3.9,x+.9,y-5.6,'#7c6849',.7)}
 function goldenSparkle(s,x,y,t){const a=s.motion?.65+.35*Math.sin(t*3.1):1,r=2.2+a*1.6;
@@ -180,6 +189,7 @@ export function drawTree(s,o,p,catalog,t){
  const n=COUNT[stage],spots=kit.spots,ripe=L.phase==='ripe',lod=(s.scale||1)<.45;let golden=null;
  if(!winter&&(L.phase==='bloom'||look?.always)){const all=bloomSpots(o.species,kit),m=look?.always?all.length:Math.ceil(Math.min(all.length,n*1.7)*(.45+.55*Math.min(1,L.k)));for(let i=0;i<m;i+=lod?2:1)blossom(s,all[i][0]*wide,all[i][1],2.3,bloomCol)}
  if(look?.frost&&!winter)rime(s,bloomSpots(o.species,kit));
+ if(look?.starry&&!winter)starSpecks(s,bloomSpots(o.species,kit));
  if(L.phase==='set'||L.phase==='fill'||ripe){
   // how ripe: set .12-.30, fill on to .85 without a step back, ripe 1 (fruit() keeps the ripe colour, cheek and gloss for k=1 only)
   const kk=L.phase==='set'?.12+.18*L.k:L.phase==='fill'?.3+L.k*.55:1,gold=ripe&&mine&&f?.golden;
@@ -192,6 +202,11 @@ export function drawTree(s,o,p,catalog,t){
  c.restore();
  // The glint of the golden fruit stays bright above the night tint (with the ready badges); the fruit itself keeps its depth.
  if(golden){const [X,Y]=golden,paint=()=>goldenSparkle(s,X,Y,s.time||0);if(s.lightMarkers)s.lightMarkers.push({kind:'fn',fn:paint});else paint()}
+ // The starry pear's lights: darkness and time are read when the marker paints (a tree sprite keeps its markers across the dusk).
+ if(look?.starry&&!winter){
+  const spots=bloomSpots(o.species,kit),pts=[];for(let i=1;i<spots.length;i+=2)pts.push({x:p.x+(spots[i][0]*wide+sway)*k,y:p.y+spots[i][1]*k});
+  const paint=()=>{const dark=s.lighting?.darkness||0;if(dark>.15)starGlow(s,pts,dark,s.time||0,o.x*1.3+o.y)};
+  if(s.lightMarkers)s.lightMarkers.push({kind:'fn',fn:paint});else paint()}
  // Care marks: owner only (a guest's snapshot has no pest, prune or golden fields at all).
  if(mine&&f){
   const at=([x,y])=>({x:p.x+(x*wide+sway)*k,y:p.y+y*k}),T=s.time||0;

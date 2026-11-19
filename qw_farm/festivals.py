@@ -388,6 +388,7 @@ CONTENT['cosmonautics'] = dict(
         _g('fest_cosm_scroll', 'Свиток «Космический энергетос»', 'scroll', 'none', 11, 25,
            note='рецепт Пуха для бодрильни; откроется, когда его подключат'),
         _g('fest_cosm_meteor', 'Заморский метеорит', 'curio', 'farm1', 10, 250, seller='magpie', note='диковинка Сороки'),
+        _g('fest_cosm_graft', 'Прививка «Звёздная груша»', 'graft', 'orchard', 16, 10, note='облик груши; ждёт сад', wired=ORCHARD_WIRED),
         _g('fest_cosm_flags', 'Звёздные флажки на забор', 'wall', 'fence', 2, 60, source='task:barrel'),
         _g('fest_cosm_birdhouse', 'Ракета-скворечник у сарая', 'decor', 'farm1', 5, 60, source='task:fuel'),
         _g('fest_cosm_stars', 'Карта созвездий над площадью', 'village', 'village', 5, 60, source='task:ration', note='ячейка площади'),

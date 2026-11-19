@@ -76,9 +76,71 @@ function farmer(s, pose = 'stand') {
   s.ellipse(.8, hy - 3.8, 7, 1.8, FM.fur);
 }
 
+// ---------- the player, the other look: a slim farmer woman (address form «она», owner's decision 2026-11-19) -----------
+// The same moves and hand positions as the farmer: a fitted green coat with fur trim and a red sash, a red shawl with
+// little flowers tied under the chin, a braid at the back, felt boots and red mittens.
+const FW = {skin: '#f5d6b6', cheek: '#f0a99a', nose: '#efc09e', eye: '#2f3338', lash: '#2f3338', lips: '#c0605a',
+  hair: '#9a5a36', hairShade: '#7e4529', coat: '#3f7a64', coatShade: '#346a56', fur: '#f1e4cc', furShade: '#ddcdb0',
+  shawl: '#c9473f', shawlShade: '#a93a33', flower: '#f6e7c8', flowerHeart: '#f2c94c', boot: '#8a8f96', bootSole: '#5c6168',
+  mitten: '#c9473f', shadow: '#41623530'};
+
+function farmerWoman(s, pose = 'stand') {
+  const q = FARMER_POSE[pose], [bx, fx, bl, fl] = q.legs, y = -q.bob;
+  const poly = (pts, col) => s.poly(pts.map(([a, b]) => ({x: a, y: b})), col);
+  const leg = (hx, footX, lift) => {
+    s.line(hx, y - 7, footX * .8, -2 - lift, FW.boot, 3);
+    s.ellipse(footX * .8 + .6, -1.5 - lift, 2.6, 1.8, FW.boot); s.ellipse(footX * .8 + .8, -.4 - lift, 2.8, .85, FW.bootSole);
+  };
+  const hand = ([hx, hy], sleeve) => {
+    s.line(sleeve === FW.coat ? 4.4 : -4.4, y - 25.4, hx, y + hy, sleeve, 3.2);
+    s.ellipse(hx - (hx > 0 ? 1 : -1) * 1.6, y + hy + .8, 1.6, 1.1, FW.fur);          // fur cuff
+    s.ellipse(hx, y + hy, 1.9, 1.9, FW.mitten);
+  };
+  const hy = y - 33.4;
+  s.ellipse(1.2, .6, 9.4, 2.8, FW.shadow);
+  // the braid comes out under the shawl at the back and hangs down to the waist
+  for (let k = 0; k < 6; k++) s.ellipse(-4.6 - k * .25, hy + 6.2 + k * 2.1, 1.35, 1.2, k % 2 ? FW.hairShade : FW.hair);
+  s.ellipse(-6, hy + 18.6, 1.4, .85, FW.shawl);
+  leg(-1.4, bx, bl); hand(q.back, FW.coatShade);
+  // the coat: a fitted bodice, a red sash at a slim waist, a skirt flaring to a fur hem, a fur band down the front
+  s.ellipse(0, y - 21.8, 5.4, 5.6, FW.coat);
+  poly([[-4.2, y - 17.4], [4.4, y - 17.4], [8.4, y - 5.2], [-8, y - 5.2]], FW.coat);
+  poly([[-7.5, y - 7.6], [7.9, y - 7.6], [8.6, y - 4.6], [-8.2, y - 4.6]], FW.fur);
+  poly([[1, y - 26], [2.4, y - 26], [3.5, y - 7.6], [1.9, y - 7.6]], FW.fur);
+  s.line(-4.2, y - 17.2, 4.4, y - 17.2, FW.shawl, 1.6);
+  s.line(-3.6, y - 17, -6.2, y - 13.6, FW.shawl, 1.1); s.line(-3.2, y - 17, -5, y - 12.8, FW.shawlShade, 1.1);   // sash ends
+  for (const [x, yy] of [[-3.8, -13], [5, -11.6], [-1.6, -21.4]]) s.ellipse(x, y + yy, .7, .7, FW.coatShade);    // little pattern
+  leg(1.4, fx, fl);
+  hand(q.front, FW.coat);
+  if (q.ball) {
+    const [hx, hy2] = q.front;
+    s.ellipse(hx + 1.8, y + hy2 - 2.2, 2.6, 2.6, '#c5d3e3'); s.ellipse(hx + 1.4, y + hy2 - 2.6, 2.2, 2.2, '#fbfcfe');
+  }
+  // the shawl: over the head and down the back, the face framed by it, tied under the chin
+  poly([[-5.6, hy + 1.4], [-.6, hy + 4.8], [-6.6, y - 20.4], [-8, y - 21.6]], FW.shawl);
+  s.ellipse(-.2, hy - .8, 6, 6.4, FW.shawl);
+  for (const [x, yy] of [[-3.6, -3.4], [-1, -5.6], [-4.4, .6], [-6.4, 6.4], [-3.4, 4]]) {          // little flowers
+    s.ellipse(x, hy + yy, .95, .95, FW.flower); s.ellipse(x, hy + yy, .4, .4, FW.flowerHeart);
+  }
+  s.ellipse(1.6, hy + .6, 4.3, 4.7, FW.skin);                              // the face inside the shawl
+  poly([[-1, hy - 3.2], [3.6, hy - 3.6], [4.8, hy - 2], [2, hy - 2.4]], FW.hair);   // a fringe peeking out
+  poly([[5.6, hy - .2], [6.8, hy + 1.4], [5.6, hy + 1.8]], FW.nose);
+  s.ellipse(3, hy + 1.8, 1.2, .75, FW.cheek);
+  eyes(s, [[3.8, hy - .6]], q.mood, {r: .75, col: FW.eye, brow: FW.hair, browY: -1.4});
+  if (q.mood === 'normal' || q.mood === 'fierce') {
+    s.line(4.3, hy - 1.5, 5.3, hy - 2.3, FW.lash, .5); s.line(3.7, hy - 1.7, 4.2, hy - 2.7, FW.lash, .5);
+  }
+  if (q.mood === 'happy') s.ellipse(4.8, hy + 3.2, 1.1, .8, FW.lips);
+  else if (q.mood === 'hurt' || q.mood === 'dizzy') s.ellipse(4.8, hy + 3.2, .6, .7, FW.lips);
+  else s.ellipse(4.8, hy + 3.1, .85, .45, FW.lips);
+  s.line(-2.4, hy - 4.6, 3.2, hy - 4.8, FW.shawlShade, .8);               // the shawl's edge over the brow
+  s.ellipse(2, hy + 5.6, 1.6, 1.2, FW.shawlShade);                         // the knot under the chin and its two ends
+  s.line(2, hy + 6, 3.6, hy + 8.6, FW.shawl, 1.3); s.line(1.6, hy + 6, .8, hy + 8.8, FW.shawl, 1.3);
+}
+
 // ---------- pose wrapper: lean, jump, snowdrift ----------------------------------------------------------------------
-const DRAW = {player: farmer, ded_moroz: dedMoroz, snegurochka, santa, krampus};
-const HEAD = {player: -46, ded_moroz: -46, snegurochka: -40, santa: -38, krampus: -40};   // top of the head (for dizzy stars)
+const DRAW = {player: farmer, player_f: farmerWoman, ded_moroz: dedMoroz, snegurochka, santa, krampus};
+const HEAD = {player: -46, player_f: -44, ded_moroz: -46, snegurochka: -40, santa: -38, krampus: -40};   // top of the head (for dizzy stars)
 
 function star(s, x, y, r, col, points = 5) {
   const pts = [];

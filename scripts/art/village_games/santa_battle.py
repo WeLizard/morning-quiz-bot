@@ -22,7 +22,7 @@ harness.GEN = HERE.parent
 
 EFFECTS = ['snowball', 'hit', 'blizzard', 'icestar', 'coal', 'candy', 'gift', 'chain', 'switch', 'notes', 'heal', 'wall',
            'freeze', 'rage', 'sleigh']
-NAMES = {'player': 'Игрок-фермер', 'ded_moroz': 'Дед Мороз', 'snegurochka': 'Снегурочка', 'santa': 'Санта', 'krampus': 'Крампус'}
+NAMES = {'player': 'Игрок-фермер', 'player_f': 'Игрок-фермерша', 'ded_moroz': 'Дед Мороз', 'snegurochka': 'Снегурочка', 'santa': 'Санта', 'krampus': 'Крампус'}
 POSE_NAMES = {'stand': 'стоит', 'attack': 'удар', 'hurt': 'получил', 'win': 'победа', 'down': 'в сугробе', 'hide': '«В мешок!»'}
 ENEMIES = {'santa', 'krampus'}
 
@@ -83,6 +83,8 @@ def main() -> None:
                + use('krampus', 'down', kx, ky, k, True) + use('santa', 'down', sx, sy, k, True))
         for name, stage in (('lineup', line_up), ('moment', moment), ('end', end)):
             pages[f'{name}-{theme}'] = staged(svg, stage)
+            # the other look of the player (address form «она»): the same moment with the farmer woman
+            pages[f'{name}-f-{theme}'] = staged(svg, stage.replace('#sb-player-', '#sb-player_f-'))
         # 4. sheet of poses and effects (defs from the scene, scene itself hidden)
         if not night:
             cells = []
@@ -99,12 +101,12 @@ def main() -> None:
                      f'<div class="defs">{svg.replace("<svg ", "<svg width=\"0\" height=\"0\" ", 1)}</div>' + ''.join(cells)
                      + f'<h2>Эффекты</h2><div class="row">{fxrow}</div></body></html>')
             (out / 'poses.html').write_text(sheet, encoding='utf-8')
-            harness.screenshot(sheet, out / 'poses.png', (1200, 1760))
+            harness.screenshot(sheet, out / 'poses.png', (1200, 2060))
     for name, svg in pages.items():
         page = f'<html><body style="margin:0;background:#222"><div style="width:100%">{svg.replace("<svg ", "<svg width=\"100%\" ", 1)}</div></body></html>'
         (out / f'{name}.html').write_text(page, encoding='utf-8')
         harness.screenshot(page, out / f'{name}.png', (1000, 600))
-        if name.startswith('moment'):
+        if name.startswith('moment-'):
             harness.screenshot(page, out / f'{name}-390.png', (390, 234))
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'ok -> {out}')

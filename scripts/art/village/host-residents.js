@@ -105,3 +105,4 @@ export function hostResidents() {
   }
   return out;
 }
+export {hedgehog};   // reused by fest_characters.js (the New Year postman)

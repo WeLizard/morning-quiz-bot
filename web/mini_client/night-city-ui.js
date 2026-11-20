@@ -1792,6 +1792,7 @@ function open(options) {
     function renderFinal(lobby, role) {
         ctx.timer?.stop();
         const town = lobby.winner === 'citizens';
+        const abandoned = lobby.abandoned === true;
         const history = lobby.history || [];
         const fate = player => { const event = history.find(item => item.eliminated === player.seat);
             return event ? (event.type === 'night_result' ? `вне игры · ночь ${event.round}` : `вне игры · голосование дня ${event.round}`) : 'в игре до конца'; };
@@ -1805,9 +1806,9 @@ function open(options) {
         const exit = kit.button('Выйти', () => showEntry(), {icon: 'door'});
         const again = lobby.is_host ? kit.button('Сыграть ещё', event => command('/restart', {expected_revision: lobby.revision}, 'Новая партия', event.currentTarget), {kind: 'primary', icon: 'repeat'}) : null;
         frame({eyebrow: 'Ночной город · Дело закрыто', title: tableTitle(), scene: {slot: 'finale'}, net: ctx.net,
-            main: [kit.scene({slot: 'finale', size: 'tall', eyebrow: `Дело закрыто · ${lobby.round || 1} дн.`, title: town ? 'Город победил' : 'Мафия взяла город',
-                    text: town ? 'Вся мафия выведена из игры.' : 'Мафии за столом стало не меньше, чем мирных.'}),
-                put(el('div', 'nc-col'), role ? kit.roleBadge({title: (ROLES[role.role] || ROLES.citizen).you, line: (town ? role.role !== 'mafia' : role.role === 'mafia') ? 'твоя сторона победила' : 'твоя сторона проиграла',
+            main: [kit.scene({slot: 'finale', size: 'tall', eyebrow: `Дело закрыто · ${lobby.round || 1} дн.`, title: abandoned ? 'Стол опустел' : town ? 'Город победил' : 'Мафия взяла город',
+                    text: abandoned ? 'Несколько раундов подряд никто не играл, партия закрыта без победителя.' : town ? 'Вся мафия выведена из игры.' : 'Мафии за столом стало не меньше, чем мирных.'}),
+                put(el('div', 'nc-col'), role ? kit.roleBadge({title: (ROLES[role.role] || ROLES.citizen).you, line: abandoned ? 'партия закрыта без победителя' : (town ? role.role !== 'mafia' : role.role === 'mafia') ? 'твоя сторона победила' : 'твоя сторона проиграла',
                     icon: (ROLES[role.role] || ROLES.citizen).icon, faction: (ROLES[role.role] || ROLES.citizen).faction}) : null,
                     kit.panel({icon: 'seal', title: 'Кто был кем', count: 'роли открыты'}, kit.seats(seats))),
                 put(el('div', 'nc-col'), caseLog(lobby))],

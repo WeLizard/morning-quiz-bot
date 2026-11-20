@@ -15,6 +15,9 @@ MAX_PLAYERS = 12
 NIGHT_SECONDS = 90
 DAY_SECONDS = 180
 VOTING_SECONDS = 90
+# A started table where nobody acted for this many whole rounds (no night choice, no vote, no manual
+# phase change) is closed as abandoned: otherwise phase deadlines cycle it forever.
+IDLE_ROUNDS_LIMIT = 3
 
 # Owner decision 2026-10-28 (recommendation, can be reverted): at an app-room table the host may start
 # the night as soon as at least MIN_PLAYERS seated players are ready; seated players who are not ready do
@@ -253,6 +256,8 @@ def normalized_lobby(value: object, *, chat_id: int | None = None,
             investigations=deepcopy(value.get('investigations') or {}),
             history=deepcopy(value.get('history') or []),
             winner=value.get('winner') if value.get('winner') in {None, 'mafia', 'citizens'} else None,
+            idle_rounds=value['idle_rounds'] if type(value.get('idle_rounds')) is int and value['idle_rounds'] >= 0 else 0,
+            round_active=value.get('round_active') is True,
             phase_deadline=(int(value['phase_deadline'])
                             if type(value.get('phase_deadline')) in {int, float} else None),
         )
@@ -613,6 +618,7 @@ def public_lobby(value: object, *, chat_id: int | None = None,
             if event.get('eliminated') in names:
                 event['eliminated_name'] = names[event['eliminated']]
         result.update(round=lobby['round'], winner=lobby.get('winner'),
+                      abandoned=lobby['status'] == 'finished' and lobby.get('winner') is None,
                       history=history, ends_at=lobby.get('phase_deadline'))
         if lobby['status'] == 'finished':
             # The game is over: roles are public now (never before).
@@ -840,6 +846,7 @@ def night_action(current: object, *, chat_id: int | None = None,
     if role == 'mafia' and lobby['assignments'][str(target)] == 'mafia':
         raise ValueError('Мафия не выбирает своего участника.')
     lobby.setdefault('night_actions', {}).setdefault(role, {})[str(actor_id)] = target
+    lobby['round_active'] = True
     lobby['revision'] += 1
     return lobby
 
@@ -914,6 +921,8 @@ def open_voting(current: object, *, chat_id: int | None = None,
     actor_id = str(UUID(str(account_id))) if account_id is not None else None
     if _host(lobby) != actor_id:
         raise PermissionError('Открыть голосование может только ведущий стола.')
+    if not phase_due(lobby, now=now):
+        lobby['round_active'] = True  # the host opened the vote before the timer: someone is at the table
     lobby['status'], lobby['votes'] = 'voting', {}
     lobby['phase_deadline'] = _deadline(now, VOTING_SECONDS)
     lobby['revision'] += 1
@@ -940,6 +949,7 @@ def cast_vote(current: object, *, chat_id: int | None = None,
     if target not in lobby['alive'] or target == actor_id:
         raise ValueError('Эту цель выбрать нельзя.')
     lobby.setdefault('votes', {})[str(actor_id)] = target
+    lobby['round_active'] = True
     lobby['revision'] += 1
     return lobby
 
@@ -963,9 +973,15 @@ def resolve_vote(current: object, *, chat_id: int | None = None,
     lobby.setdefault('history', []).append({'type': 'vote_result', 'round': lobby['round'],
                                             'eliminated': _seat(lobby, eliminated) if eliminated else None})
     lobby['winner'] = _winner(lobby)
+    lobby['idle_rounds'] = 0 if lobby.get('round_active') or not allow_incomplete else lobby.get('idle_rounds', 0) + 1
+    lobby['round_active'] = False
     if lobby['winner']:
         lobby['status'] = 'finished'
         lobby['phase_deadline'] = None
+    elif lobby['idle_rounds'] >= IDLE_ROUNDS_LIMIT:
+        lobby['status'] = 'finished'
+        lobby['phase_deadline'] = None
+        lobby['history'].append({'type': 'abandoned', 'round': lobby['round']})
     else:
         lobby['round'] += 1
         lobby['status'] = 'night'

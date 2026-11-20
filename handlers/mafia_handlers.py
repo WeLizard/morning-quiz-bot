@@ -112,6 +112,7 @@ def render_lobby(lobby: dict | None, *, mini_url: str | None = None):
                 rows.append([Button('Подвести итоги', callback_data=f'mafia:advance:{revision}', style='success')])
         elif status == 'finished':
             winner = ('Город победил — мафия раскрыта.' if lobby.get('winner') == 'citizens'
+                      else 'Стол опустел: несколько раундов подряд никто не играл.' if lobby.get('abandoned')
                       else 'Мафия подчинила Ночной город.')
             text += f'\n\n<b>Дело закрыто.</b> {winner}'
             rows = ([[Button('Собрать реванш', callback_data=f'mafia:restart:{revision}', style='primary')]]
@@ -183,6 +184,7 @@ def render_private_card(role: dict, lobby: dict, *, group_chat_id: int):
             ))] for target in role.get('targets', [])]
     elif phase == 'finished':
         text += ('\n\nГород победил — мафия раскрыта.' if role.get('winner') == 'citizens'
+                 else '\n\nСтол опустел: несколько раундов подряд никто не играл.' if role.get('winner') is None
                  else '\n\nМафия подчинила Ночной город.')
     investigation = role.get('investigation')
     if investigation:

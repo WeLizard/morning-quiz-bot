@@ -202,3 +202,51 @@ def test_standalone_account_lobby_uses_the_same_rules_without_telegram_ids(monke
     )
     assert lobby['status'] in {'day', 'finished'}
     assert lobby['phase_deadline'] is None or lobby['phase_deadline'] > 1090
+
+
+def _idle_table(monkeypatch, chat_id):
+    monkeypatch.setattr('domain.mafia.secrets.SystemRandom.shuffle', lambda self, values: None)
+    lobby = None
+    for uid in range(1, 5):
+        lobby, _ = join_lobby(lobby, chat_id=chat_id, account_id=_account(uid), name=str(uid))
+        lobby = set_ready(lobby, chat_id=chat_id, account_id=_account(uid), ready=True,
+                          expected_revision=lobby['revision'])
+    return start_lobby(lobby, chat_id=chat_id, account_id=_account(1), expected_revision=lobby['revision'], now=0)
+
+
+def _timed_round(lobby, chat_id, *, act=False):
+    """One round driven only by phase deadlines, as the game worker does; act=True adds one night choice."""
+    if act:
+        lobby = night_action(lobby, chat_id=chat_id, account_id=_account(1), target_seat='p3',
+                             expected_revision=lobby['phase_revision'], now=lobby['phase_deadline'] - 1)
+    for step in (resolve_night, open_voting, resolve_vote):
+        now = lobby['phase_deadline']
+        kwargs = {} if step is open_voting else {'allow_incomplete': True}
+        lobby = step(lobby, chat_id=chat_id, account_id=_account(1), expected_revision=lobby['revision'],
+                     now=now, **kwargs)
+    return lobby
+
+
+def test_table_where_nobody_plays_closes_as_abandoned(monkeypatch):
+    from domain.mafia import IDLE_ROUNDS_LIMIT
+    lobby = _idle_table(monkeypatch, -600)
+    for _ in range(IDLE_ROUNDS_LIMIT - 1):
+        lobby = _timed_round(lobby, -600)
+        assert lobby['status'] == 'night'
+    lobby = _timed_round(lobby, -600)
+    assert lobby['status'] == 'finished' and lobby['winner'] is None and lobby['phase_deadline'] is None
+    assert lobby['history'][-1] == {'type': 'abandoned', 'round': IDLE_ROUNDS_LIMIT}
+    public = public_lobby(lobby, chat_id=-600, viewer_account_id=_account(1))
+    assert public['abandoned'] is True and public['winner'] is None
+
+
+def test_any_action_resets_the_idle_counter(monkeypatch):
+    from domain.mafia import IDLE_ROUNDS_LIMIT
+    lobby = _idle_table(monkeypatch, -700)
+    for _ in range(IDLE_ROUNDS_LIMIT - 1):
+        lobby = _timed_round(lobby, -700)
+    lobby = _timed_round(lobby, -700, act=True)
+    assert lobby['status'] == 'night' and lobby['idle_rounds'] == 0
+    for _ in range(IDLE_ROUNDS_LIMIT - 1):
+        lobby = _timed_round(lobby, -700)
+    assert lobby['status'] == 'night'

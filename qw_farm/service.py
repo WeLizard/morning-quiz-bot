@@ -248,7 +248,21 @@ class FarmService:
         row=await self.u.village_peek(season)
         if row is None:row=dict(season=season,total=0,goal=await self.u.village_goal(now))
         return dict(season=season,total=row['total'],goal=row['goal'],ends_at=economy.season_end(season),
-                    rush_pct=economy.rush_pct(now,row['total'],row['goal']))
+                    rush_pct=economy.rush_pct(now,row['total'],row['goal']),previous=await self._previous_season(farm,season-1))
+
+    async def _previous_season(self, farm, season):
+        """The summary of the season that has just ended, so a contribution does not vanish with the reset:
+        the village result, the player's own part and the farm that gave the most (its public name only)."""
+        row=await self.u.village_peek(season)
+        if row is None or row['total']<=0:
+            return None
+        rec=economy.state(farm)['seasons'].get(str(season)) or {}
+        personal=int(rec.get('personal',0))
+        top=await self.u.village_top(season) if hasattr(self.u,'village_top') else None
+        if top is not None:
+            top=dict(name=top['name'],personal=top['personal'],own=top['id']==farm['id'])
+        return dict(season=season,total=row['total'],goal=row['goal'],reached=row['total']>=row['goal'],
+                    personal=personal,share_pct=min(100,round(personal*100/row['total'])),top=top)
 
     async def _tower_goal(self, cfg, now):
         """The fair starts with the content goal; a completed previous fund season cuts it by 25% (BOOST)."""

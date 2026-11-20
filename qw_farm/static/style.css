@@ -97,6 +97,7 @@ dialog{border:0;border-radius:23px;max-width:440px;width:calc(100vw - 40px);padd
 .find-empty{margin:14px 0}
 .hud .hud-bonus{color:#7a5c14;font-weight:650;font-size:12px;letter-spacing:.02em;white-space:nowrap}
 /* r9 stage 14: upkeep, village fund, decor shop */
+.dye-riddle-verse{font-style:italic;line-height:1.6}
 .upkeep-total{font-size:18px;font-weight:750;margin:2px 0 6px}.debt-note,.feast-note{display:flex;flex-direction:column;gap:3px;margin:8px 0}.debt-note{background:#f6e3d4;border:1px solid #d9a97f}.feast-note{background:#f4ecc7;border:1px solid #d7c47a}
 .fund-tier{display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px dashed var(--line);font-size:12px}.fund-tier span:nth-child(2){flex:1;min-width:0}.fund-tier small{color:var(--muted,#6d7a70);white-space:nowrap}.fund-mark{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;background:#e8e6d5;font-size:12px;font-weight:700;flex-shrink:0}.fund-tier.done .fund-mark{background:#86b363;color:#fff}.fund-tier.done{opacity:.85}
 .fund-goods{max-height:52vh;overflow:auto;padding-right:4px}.tier-title{margin:14px 0 6px;font-size:12px;letter-spacing:.04em;color:var(--green2,#4f7a43)}.hud .hud-debt{cursor:pointer;color:#9a4b2a;font-weight:700}.hud .hud-debt span{white-space:nowrap}

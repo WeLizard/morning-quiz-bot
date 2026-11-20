@@ -280,6 +280,15 @@ class Unit:
         row=(await self.execute(sa.select(t).where(t.c.season==season))).mappings().first()
         return dict(season=row['season'],total=row['total'],goal=row['goal']) if row else None
 
+    async def village_top(self, season):
+        """The farm with the largest personal contribution of a season: {id, name, personal} or None.
+        Reads the per-farm season record kept in the payload (economy.KEEP_SEASONS), so it serves the season just ended."""
+        t=self.t['states']
+        personal=t.c.payload['economy']['seasons'][str(int(season))]['personal'].as_integer()
+        row=(await self.execute(sa.select(t.c.id,t.c.name,personal.label('personal')).where(personal>0)
+             .order_by(personal.desc(),t.c.id).limit(1))).first()
+        return dict(id=str(row[0]),name=row[1],personal=int(row[2])) if row else None
+
     async def village_goal(self, now):
         """Season goal: 3 reference days of income of every ACTIVE farm that can join the fund (never below the floor)."""
         from . import economy

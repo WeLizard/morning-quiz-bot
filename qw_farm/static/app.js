@@ -1684,10 +1684,29 @@ function renderSecrets(p){
 // Bridge from «Алхимия»: the dyer's notes are riddles solved there; the server seals them and the farm learns the dye.
 // The farm never names the Atlas or Alchemy: the player has to make the connection (no hints by design).
 const DYE_ICONS={mordant:'alchemy',indigo:'dye_indigo',madder:'dye_madder',saffron:'dye_saffron'};
+// The hint is cosmetic and device-local: a riddle whose lines show through one per day the player looks in
+// (DYE_RIDDLE.length different days). It never names the Atlas, Alchemy or the elements (owner's decision 2026-11-20).
+const DYE_RIDDLE=['Что с неба течёт и не ранит,','что греет, а в руки нейдёт,','что крылья вращает незримо,','и то, что всех держит, — сведи.'];
+function dyeworksVisitDays(){
+ const key=`qw-farm.dyeworks-days.${S.me?.id||''}`,day=new Date().toISOString().slice(0,10);
+ let days=[];try{days=JSON.parse(localStorage.getItem(key)||'[]');}catch{}
+ if(!Array.isArray(days))days=[];
+ if(!days.includes(day)&&days.length<DYE_RIDDLE.length){days=[...days,day];try{localStorage.setItem(key,JSON.stringify(days));}catch{}}
+ return Math.min(days.length,DYE_RIDDLE.length);
+}
+function dyeworksRiddle(p){
+ const shown=dyeworksVisitDays();if(!shown)return;
+ const box=el('div',null,'dye-riddle');box.append(el('p','На стене над чаном проступают строки:','note'));
+ const verse=el('p',null,'note dye-riddle-verse');
+ DYE_RIDDLE.slice(0,shown).forEach((line,i)=>{if(i)verse.append(el('br'));verse.append(document.createTextNode(line));});
+ if(shown<DYE_RIDDLE.length){verse.append(el('br'));verse.append(document.createTextNode('…'));}
+ box.append(verse);p.append(box);
+}
 function renderDyeworks(p){
  heading('Красильня','ТАЙНА СТАРОГО МАСТЕРА');
  const learned=S.me.dyeworks?.recipes||[];
  note('Котлы остыли, чаны пересохли. Старый мастер ушёл и не оставил ни одного рецепта — только синее пятно на пороге, которое не смывает дождь.',p);
+ if(!learned.length)dyeworksRiddle(p);
  for(const r of learned){
   const c=card(r.name,'рецепт краски',DYE_ICONS[r.recipe]||'alchemy');
   note('Рецепт записан в книгу фермы.',c);
@@ -2226,6 +2245,15 @@ function fundCard(p,e){
  note(`Монеты идут 1:1, товары по цене ×${(eC.markup/100).toFixed(2).replace('.',',')}. Стартовый подарок в фонд не уходит.`,c);
  p.append(c);
 }
+// The season that has just ended: the village result, the player's part and the farm that gave the most.
+// A new season resets the scale; this keeps the last contribution visible instead of letting it vanish.
+function previousSeason(s,c){
+ if(!s)return;
+ const box=el('section',null,'card village-season');box.append(el('strong','Прошлый сезон'));c.append(box);c=box;
+ note(`Деревня собрала ${fmt(s.total)} из ${fmt(s.goal)} мон. — ${s.reached?'цель достигнута':'до цели не дотянули'}.`,c);
+ if(s.personal>0)note(`Твой вклад: ${fmt(s.personal)} мон. — ${s.share_pct}% всего, что собрала деревня.`,c);
+ if(s.top)note(s.top.own?`Опора деревни — твоя ферма: больше всех, ${fmt(s.top.personal)} мон.`:`Опора деревни — «${s.top.name}»: больше всех, ${fmt(s.top.personal)} мон.`,c);
+}
 function decorShop(p,e){
  const eC=ECON();
  p.append(el('h3','Украшения','subheading'));
@@ -2640,7 +2668,7 @@ function renderVillage(p){
  if(villageSheet==='resident'&&villageResident){heading(villageResident,'НА ДЕРЕВЕНСКОЙ ПЛОЩАДИ');renderVillageResident(p);return;}if(villageSheet!=='townhall'){heading('Деревня','ЖИТЕЛИ И ОБЩАЯ ПЛОЩАДЬ');return;}heading('Ратуша','СЕЗОННЫЙ ПРАЗДНИК И ДЕЛА ФЕРМЫ');
  const e=eco();if(!e){note('Данные фонда пока недоступны. Обнови ферму.',p);return;}
  const seasonal=el('section',null,'card village-season');seasonal.append(el('strong','Сезонная подготовка праздника'));note('Помогаем вместе: флажки, цветы и угощения появляются по мере наполнения общего фонда. В новом сезоне подготовка начинается заново.',seasonal);
- const stage=villageStage();if(stage===null)note(e.fund_open?'Данные общего фонда пока недоступны. Обнови ферму.':`Фонд и этапы подготовки откроются с ${ECON().fund_level} уровня.`,seasonal);else{seasonal.append(meter(S.village.total,S.village.goal));note(`${fmt(S.village.total)} / ${fmt(S.village.goal)} мон. · этап ${stage+1} из 4`,seasonal);if(rushNote())note(rushNote(),seasonal);}p.append(seasonal);
+ const stage=villageStage();if(stage===null)note(e.fund_open?'Данные общего фонда пока недоступны. Обнови ферму.':`Фонд и этапы подготовки откроются с ${ECON().fund_level} уровня.`,seasonal);else{seasonal.append(meter(S.village.total,S.village.goal));note(`${fmt(S.village.total)} / ${fmt(S.village.goal)} мон. · этап ${stage+1} из 4`,seasonal);if(rushNote())note(rushNote(),seasonal);}p.append(seasonal);previousSeason(S.village?.previous,p);
  for(const [name,draw] of [['Фонд и праздник',fundCard],['Содержание фермы',upkeepCard],['Украшения фермы',decorShop]]){const details=el('details',null,'village-services');details.dataset.villageService=name;const summary=el('summary',name);summary.dataset.villageFocus=`service:${name}`;details.append(summary);draw(details,e);p.append(details);}
 }
 

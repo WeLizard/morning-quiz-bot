@@ -116,7 +116,9 @@ async def setup():
     runtime = NightCaseSettings(enabled=True, starts_enabled=True, cursor_secret=b'owned-browser-fixture-cursor-secret-01a1dfba')
     factory = NightCaseServiceFactory(runtime)
     document = json.loads(CASE_PATH.read_text(encoding='utf8'))
-    reports = [json.loads(Path(r'F:\Temp', 'mqb-manor-pinned-' + scope + '-20261116.json').read_text(encoding='utf8')) for scope in ['witness', 'smoke']]
+    # Reports of the pinned case hash; a re-pinned case brings its own pair (NIGHT_BROWSER_REPORT_TAG).
+    tag = os.environ.get('NIGHT_BROWSER_REPORT_TAG', '20261116')
+    reports = [json.loads(Path(r'F:\Temp', 'mqb-manor-pinned-' + scope + '-' + tag + '.json').read_text(encoding='utf8')) for scope in ['witness', 'smoke']]
     if not all(r['case_hash'] in runtime.allowed_hashes and r['scope_passed'] for r in reports):
         raise RuntimeError('Pinned validation reports are missing or do not match the registered case')
     database = Database(DatabaseSettings(url=raw))
@@ -606,7 +608,7 @@ async def exercise(port, output, *, with_farm=False, identity_only=False, identi
                 raise AssertionError('Authored action path exceeded its bounded move/window budget')
             # UI menu → persisted proposal → explicit confirmation.
             await page.get_by_role('button', name='Место', exact=True).click()
-            await page.get_by_role('button', name='Осмотреть: Ключ сервисной панели · 1 ОД', exact=True).click()
+            await page.get_by_role('button', name='Ключ сервисной панели', exact=True).click()
             before_action = await req(actor, base + 'view')
             confirm_requests = []
             async def lose_first_confirm(route):

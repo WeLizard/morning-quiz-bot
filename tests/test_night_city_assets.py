@@ -17,7 +17,7 @@ SCHEMA = ROOT / 'scripts/art/night_city/assets_manifest.schema.json'
 IMMUTABLE_SCHEMA = ROOT / 'scripts/art/night_city/immutable_assets_manifest.schema.json'
 CASE = ROOT / 'content/night_city/manor_lake.case.json'
 ART = ROOT / 'docs/tasks/night_city/art_batch2/noir_print_a'
-PINNED_CASE_HASH = '86e2d97d9b92555ef5554f8546f08cb802768b859567513949677fdb834703a7'
+PINNED_CASE_HASH = '44ea4d0771ff8f584b34d4b2386222bc7789c0a5420c27923080baa231ee5106'
 
 
 def case_art_refs():

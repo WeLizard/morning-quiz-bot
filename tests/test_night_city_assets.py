@@ -17,7 +17,7 @@ SCHEMA = ROOT / 'scripts/art/night_city/assets_manifest.schema.json'
 IMMUTABLE_SCHEMA = ROOT / 'scripts/art/night_city/immutable_assets_manifest.schema.json'
 CASE = ROOT / 'content/night_city/manor_lake.case.json'
 ART = ROOT / 'docs/tasks/night_city/art_batch2/noir_print_a'
-PINNED_CASE_HASH = '932a084887f4cdefd3882a1de65cabf0aacc65d59d108f61bc5b5e9faebb0d03'
+PINNED_CASE_HASH = '86e2d97d9b92555ef5554f8546f08cb802768b859567513949677fdb834703a7'
 
 
 def case_art_refs():
@@ -26,9 +26,16 @@ def case_art_refs():
     refs = {}
     for group in ('characters', 'locations'):
         for entry in case[group]:
-            art = entry.get('art') or {}
-            refs[art.get('asset_id')] = {'group': group, 'id': entry.get('id'), 'alt': art.get('alt')}
+            # Appearance looks add portraits; the first look is the top-level art itself.
+            for art in [entry.get('art') or {}] + [look['art'] for look in entry.get('looks', [])[1:]]:
+                refs[art.get('asset_id')] = {'group': group, 'id': entry.get('id'), 'alt': art.get('alt')}
     return refs
+
+
+LOOK_ASSETS = {
+    'manor_char_doctor__f61', 'manor_char_cook__f45', 'manor_char_photographer__f30',
+    'manor_char_investigator__m44', 'manor_char_gardener__m63',
+}
 
 
 class ManorAssetExportTests(unittest.TestCase):
@@ -78,7 +85,8 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(self.manifest['schema'], 'nc-assets/1')
         self.assertEqual(self.manifest['world'], 'manor_lake')
         self.assertEqual(set(self.manifest['assets']), set(refs))
-        self.assertEqual(len(refs), 28)
+        self.assertEqual(len(refs), 33)
+        self.assertLessEqual(LOOK_ASSETS, set(refs))
         for asset_id, value in self.manifest['assets'].items():
             self.assertEqual(value['alt'], refs[asset_id]['alt'])
             self.assertNotIn('.png', value['alt'].lower())
@@ -88,6 +96,21 @@ class ManorAssetExportTests(unittest.TestCase):
             for url in [value['url'], *value.get('variants', {}).values()]:
                 self.assertRegex(url, r'^/app/night/worlds/manor_lake/assets/[a-z0-9_]+\.webp$')
                 self.assertTrue((self.out / 'assets' / url.split('/assets/', 1)[1]).is_file())
+
+    def test_look_portraits_come_from_characters_variants_not_characters(self):
+        self.assertFalse(list((ART / 'characters').glob('*__*.png')), 'look portraits must stay out of characters/')
+        listed = {row['file'] for row in json.loads((ART / 'characters_variants/manifest.json').read_text(encoding='utf-8'))['variants']}
+        refs = case_art_refs()
+        sources = {row['asset_id']: row['source'] for row in self.report['assets'] if row['asset_id']}
+        for asset_id in LOOK_ASSETS:
+            role, look = asset_id.removeprefix('manor_char_').split('__')
+            value = self.manifest['assets'][asset_id]
+            self.assertEqual(value['alt'], refs[asset_id]['alt'])
+            self.assertTrue(value['url'].endswith(f'/character_{role}__{look}.webp'))
+            self.assertNotIn('variants', value)
+            folder, name = sources[asset_id].rsplit('/', 1)
+            self.assertTrue(folder.endswith('characters_variants'), sources[asset_id])
+            self.assertIn(name, listed)
 
     def test_places_have_day_default_and_four_same_world_variants(self):
         refs = case_art_refs()
@@ -100,11 +123,12 @@ class ManorAssetExportTests(unittest.TestCase):
 
     def test_all_source_images_are_accounted_for_and_hashes_match(self):
         records = self.report['assets']
-        self.assertEqual(self.report['manifest_count'], 28)
+        self.assertEqual(self.report['manifest_count'], 33)
         self.assertEqual(self.report['character_count'], 20)
+        self.assertEqual(self.report['look_count'], 5)
         self.assertEqual(self.report['location_variant_count'], 32)
         self.assertEqual(self.report['item_count'], 81)
-        self.assertEqual(len(records), 133)
+        self.assertEqual(len(records), 138)
         self.assertLessEqual(self.report['item_bytes'], 10_000_000)
         self.assertEqual(
             hashlib.sha256((self.out / 'assets.json').read_bytes()).hexdigest(),
@@ -137,7 +161,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(set(self.immutable_manifest['files']), {
             f'assets/{path.name.lower()}' for path in (self.out / 'assets').glob('*.webp')
         })
-        self.assertEqual(len(self.immutable_manifest['files']), 133)
+        self.assertEqual(len(self.immutable_manifest['files']), 138)
         self.assertEqual(set(self.immutable_manifest['assets']), set(case_art_refs()))
         self.assertNotIn(digest, json.dumps(self.immutable_manifest, ensure_ascii=False))
         for relative, expected_hash in self.immutable_manifest['files'].items():

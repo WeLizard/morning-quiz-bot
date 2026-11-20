@@ -19,6 +19,7 @@ from domain.night_case_director import (
 )
 from domain.night_case_projection import MenuChoice, available_actions
 from domain.night_case_state import PlayerActor, event_scope
+from domain.night_case_text import Renderer
 from storage.models import NightEvent, NightRenderJob
 from storage.night_ai_models import (
     NightAIBinding, NightAIGameControl, NightAIJobBinding, NightAIProfile,
@@ -69,13 +70,25 @@ def _check_row(game_id, expected, row):
         raise ValueError('director_source_corrupt')
 
 
-def _event_body(event):
+def _renderer(case_doc, doc, audience_ids=()):
+    """Party looks for authored templates; a single-account audience reads {g:@self|..} for its own hero."""
+    ids=list(audience_ids or ())
+    viewer=next((p['character_id'] for p in doc.get('players',[]) if len(ids)==1 and p['account_id']==ids[0]),None)
+    return Renderer(case_doc,doc,viewer)
+
+
+def _look_title(case_doc, doc, character_id):
+    return _renderer(case_doc,doc).looks[character_id]['title']
+
+
+def _event_body(event, case_doc=None, doc=None):
     kind=event['kind']
     if kind in _BODY_KINDS:
         body=event['payload'].get('body')
         if type(body) is not dict or type(body.get('text')) is not str:
             raise ValueError('director_event_body_corrupt')
-        return body['text']
+        if case_doc is None: return body['text']
+        return _renderer(case_doc,doc,event.get('audience',{}).get('ids')).text(body['text'])
     try: return _EVENT_LABELS[kind]
     except KeyError as exc: raise ValueError('director_event_kind_unhandled') from exc
 
@@ -93,8 +106,9 @@ def _observation_record(case_doc, doc, oid, account_id, parent):
     speaker=None
     if item['kind']=='claim':
         character=next((c for c in case_doc['characters'] if c['id']==item.get('speaker')),None)
-        speaker=character['title'] if character is not None else 'участник'
-    return SafeRecord('observation',oid,item['kind'],item['body']['text'],_scope(parent),
+        speaker=_look_title(case_doc,doc,character['id']) if character is not None else 'участник'
+    text=_renderer(case_doc,doc,[account_id] if account_id else ()).text(item['body']['text'])
+    return SafeRecord('observation',oid,item['kind'],text,_scope(parent),
                       parent['window_idx'],parent['event_id'],speaker)
 
 
@@ -158,7 +172,7 @@ def plan_sources(context, transition, stored_events) -> tuple[DirectorPlan,...]:
             character=next((c for c in case_doc['characters'] if c['id']==target),None)
             if npc is None or character is None or any(p['character_id']==target for p in doc['players']): continue
             source=AuthorizedSource('npc_reply',event['event_id'],audience,event['window_idx'],None,
-                (event['event_id'],),tuple(event['payload']['observation_ids']),_event_body(event),character['title'])
+                (event['event_id'],),tuple(event['payload']['observation_ids']),_event_body(event,case_doc,doc),_look_title(case_doc,doc,target))
             account=context.actor_key
             records=tuple(_observation_record(case_doc,doc,oid,account,event) for oid in source.observation_ids)
             fallback=source.body if len(source.body)<=4000 else 'Ответ персонажа сохранён в точных событиях.'
@@ -166,7 +180,7 @@ def plan_sources(context, transition, stored_events) -> tuple[DirectorPlan,...]:
         elif kind=='scene':
             if audience!='public': raise ValueError('director_scene_audience_corrupt')
             source=AuthorizedSource('scene_narration',event['event_id'],'public',event['window_idx'],None,
-                                    (),(),_event_body(event))
+                                    (),(),_event_body(event,case_doc,doc))
             fallback=source.body if len(source.body)<=4000 else 'Авторская сцена сохранена в точных событиях.'
             candidates=[(source,(),(),fallback)]
         else:
@@ -182,7 +196,7 @@ def plan_sources(context, transition, stored_events) -> tuple[DirectorPlan,...]:
                     raise ValueError('director_digest_foreign_event')
                 resolved.append(old)
             records=[SafeRecord('event',old['event_id'],'scene' if old['kind']=='scene' else 'result',
-                                _event_body(old),_scope(old),old['window_idx']) for old in resolved]
+                                _event_body(old,case_doc,doc),_scope(old),old['window_idx']) for old in resolved]
             account=audience.removeprefix('account:')
             for oid in obs:
                 parent=next((old for old in resolved if _event_observation_link(doc,old,oid)),None)

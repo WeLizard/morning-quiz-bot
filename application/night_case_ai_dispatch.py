@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from application.night_case import NightCaseError, _parse, command_key
 from application.night_case_ai import BindingCaps, byok_audience_allowed, AI_PARTICIPATING_STATUSES
 from application.night_case_orchestrator import CLARIFICATION, NightCaseOrchestrator, _decode
-from application.night_case_director import (stable_job_id, _check_row, _event_body,
+from application.night_case_director import (stable_job_id, _check_row, _event_body, _look_title,
     _event_observation_link, _observation_record)
 from config.night_case_ai import ProfileRevision
 from domain.night_case_director import AuthorizedSource, SafeRecord, SafeOffer, FrozenContext, build_frozen_context, validate_director_result
@@ -310,7 +310,7 @@ class NightCaseAIDispatcher:
         records=[];offers=[]
         if job.kind=='scene_narration':
             if cause['kind']!='scene' or job.audience_key!='public':raise _Unavailable('source_closed')
-            source=AuthorizedSource(job.kind,job.cause_id,'public',window,None,(),(),_event_body(cause))
+            source=AuthorizedSource(job.kind,job.cause_id,'public',window,None,(),(),_event_body(cause,case_doc,doc))
         elif job.kind=='npc_reply':
             if cause['kind']!='action_result' or not job.audience_key.startswith('account:'):raise _Unavailable('source_closed')
             account=UUID(job.audience_key[8:])
@@ -331,7 +331,7 @@ class NightCaseAIDispatcher:
             if any(p['character_id']==target for p in doc['players']):raise _Unavailable('source_closed')
             character=next(c for c in case_doc['characters'] if c['id']==target)
             source=AuthorizedSource(job.kind,job.cause_id,job.audience_key,window,None,(job.cause_id,),
-                tuple(cause['payload']['observation_ids']),_event_body(cause),character['title'])
+                tuple(cause['payload']['observation_ids']),_event_body(cause,case_doc,doc),_look_title(case_doc,doc,character['id']))
             records=[_observation_record(case_doc,doc,oid,str(account),cause) for oid in source.observation_ids]
         else:
             if job.kind not in {'window_digest','story_offer'} or cause['kind']!='window_digest' or not job.audience_key.startswith('account:'):
@@ -345,7 +345,7 @@ class NightCaseAIDispatcher:
                 _check_row(job.game_id,event,await s.get(NightEvent,(job.game_id,eid),populate_existing=True));resolved.append(event)
             source=AuthorizedSource(job.kind,job.cause_id,job.audience_key,window,summarized,refs,observations,'')
             if job.kind=='window_digest':
-                records=[SafeRecord('event',e['event_id'],'scene' if e['kind']=='scene' else 'result',_event_body(e),event_scope(e['audience']),e['window_idx']) for e in resolved]
+                records=[SafeRecord('event',e['event_id'],'scene' if e['kind']=='scene' else 'result',_event_body(e,case_doc,doc),event_scope(e['audience']),e['window_idx']) for e in resolved]
                 for oid in observations:
                     parent=next((e for e in resolved if _event_observation_link(doc,e,oid)),None)
                     if parent is None:raise _Unavailable('source_closed')

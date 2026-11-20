@@ -14,6 +14,7 @@ from .night_case_delivery import make_message, dialogue_topic, resolve_dialogue
 from .night_case_personal import story_index, story_predicate, completed_steps, open_offers, original_state, work_progress, record_story, publication
 from .night_case_state import Clock, KernelState, PlayerActor, SystemActor, canonical_hash, event_id_for, parse_command, engine_build_for
 from .night_case_time import _parse, _stamp, _utc, after_quiet, next_slot, resume_deadline
+from .night_case_text import pick_looks
 
 ENGINE_BUILD = "night-case-core/1"
 
@@ -305,6 +306,8 @@ def _initialize(case, rules, roster, *, game_id, seed, composition_id, selected_
     for hidden in _module(c, "turning_point").get("concealed_npcs", []):
         placement = next(p for p in hidden["placements"] if p["variants"] == "all" or selected_variant_id in p["variants"])
         next(n for n in doc["npcs"] if n["character_id"] == hidden["character"])["location"] = placement["location"]
+    looks = pick_looks(c, _rng(seed, "looks"))
+    if looks: doc["sealed"]["looks"] = looks
     batch = []
     if "communication" in c: doc["communication"] = {"version": 1, "sent": []}
     if "npc_delivery" in c: doc["npc_delivery"] = {"version": 1, "decisions": [], "lines": []}

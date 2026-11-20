@@ -450,6 +450,76 @@
                 "type": "null"
               }
             ]
+          },
+          "looks": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "description": "Облики роли (пол, возраст, типаж). Первый облик — облик по умолчанию и совпадает с верхними полями героя. Облик меняет вид и речь, но не роль, тайны, цели и улики.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "gender",
+                "age",
+                "bio",
+                "art"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/id"
+                },
+                "gender": {
+                  "enum": [
+                    "f",
+                    "m"
+                  ]
+                },
+                "age": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 120
+                },
+                "title": {
+                  "$ref": "#/$defs/label"
+                },
+                "title_forms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "gen",
+                    "dat",
+                    "acc",
+                    "ins",
+                    "prep"
+                  ],
+                  "properties": {
+                    "gen": {
+                      "$ref": "#/$defs/label"
+                    },
+                    "dat": {
+                      "$ref": "#/$defs/label"
+                    },
+                    "acc": {
+                      "$ref": "#/$defs/label"
+                    },
+                    "ins": {
+                      "$ref": "#/$defs/label"
+                    },
+                    "prep": {
+                      "$ref": "#/$defs/label"
+                    }
+                  }
+                },
+                "bio": {
+                  "$ref": "#/$defs/body"
+                },
+                "art": {
+                  "$ref": "#/$defs/art"
+                }
+              }
+            }
           }
         }
       },
@@ -1956,8 +2026,8 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 1200,
-          "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$",
-          "description": "Ссылки на героев: {c:id} — имя (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже. Иных фигурных скобок быть не должно."
+          "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\}|\\{g:(@self|[a-z][a-z0-9_]{1,31})\\|[^{}|]*\\|[^{}|]*\\})[^{}]*)*$",
+          "description": "Ссылки на героев: {c:id} — имя героя в партии (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже, {g:id|мужская форма|женская форма} — согласование с родом облика героя в партии; {g:@self|…|…} — с родом героя игрока, которому адресован текст (только личные тексты). Иных фигурных скобок быть не должно."
         },
         "mentions": {
           "type": "array",
@@ -2370,14 +2440,14 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 1200,
-      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$",
-      "description": "Ссылки на героев: {c:id} — имя (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже. Иных фигурных скобок быть не должно."
+      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\}|\\{g:(@self|[a-z][a-z0-9_]{1,31})\\|[^{}|]*\\|[^{}|]*\\})[^{}]*)*$",
+      "description": "Ссылки на героев: {c:id} — имя героя в партии (только именительный падеж), {t:id} — роль, {t:id|gen|dat|acc|ins|prep} — роль в падеже, {g:id|мужская форма|женская форма} — согласование с родом облика героя в партии; {g:@self|…|…} — с родом героя игрока, которому адресован текст (только личные тексты). Иных фигурных скобок быть не должно."
     },
     "shorttext": {
       "type": "string",
       "minLength": 1,
       "maxLength": 200,
-      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\})[^{}]*)*$"
+      "pattern": "^[^{}]*((\\{c:[a-z][a-z0-9_]{1,31}\\}|\\{t:[a-z][a-z0-9_]{1,31}(\\|(gen|dat|acc|ins|prep))?\\}|\\{g:(@self|[a-z][a-z0-9_]{1,31})\\|[^{}|]*\\|[^{}|]*\\})[^{}]*)*$"
     },
     "core_predicate": {
       "oneOf": [

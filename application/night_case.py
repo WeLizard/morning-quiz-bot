@@ -237,15 +237,15 @@ def _art_binding(report, metadata):
 
 def _public(case, rules, state, art=None):
     raw=project(case,rules,state)
-    allowed=('game_id','case_id','flags','locks','observations','board','chronicle','players','npcs','hearing','final','locations','modules')
+    allowed=('game_id','case_id','flags','locks','observations','board','chronicle','players','npcs','hearing','final','locations','modules','looks')
     result={k:raw[k] for k in allowed if k in raw}
     result['clock']={k:raw['clock'][k] for k in ('timezone','window_idx','window_seq','phase','opened_at','closes_at','freeze_at','forget_at')}
     result['world']=copy.deepcopy(case.document()['meta'].get('world'))
     result['style_pack']=copy.deepcopy(case.document()['meta'].get('style_pack'))
     result['crime_type']=copy.deepcopy(case.document()['meta'].get('crime_type'))
     result['art']=copy.deepcopy(art)
-    titles={c['id']:c['title'] for c in case.document()['characters']}
-    for npc in result['npcs']: npc['title']=titles[npc['character_id']]
+    # Titles follow the party's sealed looks (e.g. «Фотограф-гостья» or «Фотограф-гость»).
+    for npc in result['npcs']: npc['title']=raw['looks'][npc['character_id']]['title']
     return result
 
 
@@ -671,8 +671,6 @@ class NightCaseApplicationService:
             if old.status!='departed' and player['status']=='departed':
                 frozen=project(case,rules,state,PlayerActor(player['account_id']))
                 own=frozen['self']; own.pop('private_events',None); own.pop('receipts',None); own.pop('nearby',None)
-                character=next(c for c in case.document()['characters'] if c['id']==player['character_id'])
-                own['role']={k:copy.deepcopy(character[k]) for k in ('id','title','bio','art')}
                 frozen_public=copy.deepcopy(public); frozen_public.pop('chronicle',None)
                 marker={'version':1,'original_account_id':player['account_id'],
                     'public_seq':len(doc['public']['chronicle']),
@@ -791,7 +789,7 @@ class NightCaseApplicationService:
             and value['frozen_view']['self'].get('account_id')==str(original_id))
         if not valid: raise NightCaseError('game_quarantined',503)
         frozen_public=value['frozen_view']['public']; frozen_self=value['frozen_view']['self']
-        public_fields={'game_id','case_id','clock','flags','locks','observations','board','players','npcs','hearing','final','locations','modules','world','style_pack','crime_type','art'}
+        public_fields={'game_id','case_id','clock','flags','locks','observations','board','players','npcs','hearing','final','locations','modules','world','style_pack','crime_type','art','looks'}
         self_fields={'account_id','character_id','status','location','ap','actor_seq','knowledge_revision','faction','goal','secrets','truth','knowledge','observations','dialogue_cursors','postmortem','modules','communication','personal','role'}
         own_max=sum(e['audience'].get('ids')==[str(original_id)] for e in doc['private_events'])
         if (set(frozen_public)-public_fields or set(frozen_self)-self_fields
@@ -835,9 +833,7 @@ class NightCaseApplicationService:
             raw=project(case,rules,state,PlayerActor(str(original)))
             view={'public':_public(case,rules,state,await self._art(locked.sealed,case)),'self':raw['self']}
             view['self'].pop('receipts',None)
-            character=next(c for c in case.document()['characters'] if c['id']==player['character_id'])
-            view['self']['role']={k:copy.deepcopy(character[k]) for k in ('id','title','bio','art')}
-            titles={c['id']:c['title'] for c in case.document()['characters']}
+            titles={cid:look['title'] for cid,look in raw['looks'].items()}
             for nearby in view['self'].get('nearby',[]):
                 if nearby.get('controller')=='npc': nearby['title']=titles[nearby['character_id']]
             menu=_menu(available_actions(case,rules,state,PlayerActor(str(account.id)),now_utc=now),case) if original==account.id and locked.sealed.lifecycle=='running' else []
@@ -845,7 +841,7 @@ class NightCaseApplicationService:
         result={'game_id':game_id,'mode':'night_case',**view,'menu':menu,'server_now':_stamp(now),
             'runtime_status':locked.sealed.lifecycle,'final_summary':final}
         if locked.sealed.lifecycle in {'finished','stopped'}:
-            titles={c['id']:c['title'] for c in case.document()['characters']}
+            titles={cid:look['title'] for cid,look in project(case,rules,state)['looks'].items()}
             result['history_seats']=[{'original_account_id':p['account_id'],'display_name':p['name'],
                 'role_title':titles[p['character_id']],'status':p['status']} for p in state.players if UUID(p['account_id']) in aliases]
             result['selected_original_account_id']=str(original)

@@ -172,6 +172,8 @@ class ManorSemantics(unittest.TestCase):
             self.assertEqual(alt, f"Портрет: {character['title']}")
             self.assertNotIn('.png', alt.lower())
             self.assertNotIn('noir_print_a', alt.lower())
+            for look in character.get('looks', []):
+                self.assertEqual(look['art']['alt'], f"Портрет: {look.get('title', character['title'])}")
         for location in RAW['locations']:
             alt = location['art']['alt']
             self.assertEqual(alt, location['name'])
@@ -185,9 +187,14 @@ class ManorSemantics(unittest.TestCase):
             if line.startswith('| `') and len(cells) == 11:
                 speeches[cells[0].strip('`')] = cells[9]
         self.assertEqual(len(speeches), 20)
+        # A look of the other gender agrees the speech adjective with it (canon: «Сухой», look: «Сухая»).
+        agreed = {('investigator', 'base'): speeches['investigator'].replace('Сухой.', 'Сухая.', 1)}
         for character in RAW['characters']:
-            self.assertTrue(character['bio']['text'].endswith(' Речь: ' + speeches[character['id']]))
+            self.assertTrue(character['bio']['text'].endswith(' Речь: ' + agreed.get((character['id'], 'base'), speeches[character['id']])))
             self.assertNotIn('.png', character['bio']['text'])
+            for look in character.get('looks', []):
+                speech = agreed.get((character['id'], look['id']), speeches[character['id']])
+                self.assertTrue(look['bio']['text'].endswith(' Речь: ' + speech), (character['id'], look['id']))
 
     def test_cast_truth_compositions_and_immutable_owner(self):
         self.assertEqual(len(RAW["characters"]), 20)

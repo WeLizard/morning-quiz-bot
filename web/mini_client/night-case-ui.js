@@ -423,9 +423,10 @@ function open(options) {
     }
     function role() {
         const own = view.self, data = own.role || {};
+        // Portrait, title and alt follow the look sealed for this party (role.art is the look's art).
         const artwork = assets.get(data.art?.asset_id);
         const portrait = artwork ? el('img', 'ncase-role-portrait') : null;
-        if (portrait) { portrait.src = artwork.url; portrait.alt = artwork.alt || data.title || 'Портрет роли'; }
+        if (portrait) { portrait.src = artwork.url; portrait.alt = text(data.art?.alt).slice(0, 300) || artwork.alt || data.title || 'Портрет роли'; }
         return panel('Твоё досье', kit.roleBadge({title: data.title || 'Твоя роль', faction: own.faction, line: 'Видишь только ты'}),
             portrait,
             p(bodyText(data.bio)), p(bodyText(own.goal?.body)), el('h3', 'nc-h3', 'Как засчитывается цель'), p(bodyText(own.goal?.criteria)),
@@ -446,7 +447,7 @@ function open(options) {
         return [scene,
             panel('Доступные действия', ...(acts.length ? [kit.stack(...acts.map(row => actionButton(row)))] : [p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')])),
             panel('Карта усадьбы', p('Можно перейти только в показанные соседние места.'), kit.row(...moves.map(row => actionButton(row)))),
-            panel('Кто рядом', ...nearby.map(row => p(`${displayName(row)}${row.controller === 'npc' ? ' · собеседник' : ''}`)), ...(nearby.length ? [] : [p('Сейчас ты здесь один.')]), free.node,
+            panel('Кто рядом', ...nearby.map(row => p(`${displayName(row)}${row.controller === 'npc' ? ' · собеседник' : ''}`)), ...(nearby.length ? [] : [p(own.role?.gender === 'f' ? 'Сейчас ты здесь одна.' : 'Сейчас ты здесь один.')]), free.node,
                 kit.stack(button('Предложить действие', async () => {
                     const result = await mutate(api('intent'), {request_id: id(), text: free.input.value, selection_id: null});
                     notice = result?.kind === 'clarification' ? 'Уточни действие: выбери одну из доступных кнопок. Пока ничего не потрачено.' : '';

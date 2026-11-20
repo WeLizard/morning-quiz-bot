@@ -153,18 +153,37 @@ def _variants(value: Any, variants: dict[str, Any], pointer: str) -> set[str]:
     return set(value)
 
 
+# Texts addressed to exactly one player; only they may agree with the reader's own hero via {g:@self|..|..}.
+SELF_TEXT_PREFIXES = ("/personal_tasks/", "/actions/", "/dialogues/", "/npc_delivery/",
+                      "/module_data/archive_requests/")
+
+
+def self_text_allowed(pointer: str) -> bool:
+    import re
+    return pointer.startswith(SELF_TEXT_PREFIXES) or re.match(r"^/characters/\d+/(goal|secrets)/", pointer) is not None
+
+
 def _body(body: dict[str, Any], facts: dict[str, Any], pointer: str,
-          chars: dict[str, Any], locations: dict[str, Any]) -> None:
+          chars: dict[str, Any], locations: dict[str, Any], allow_self: bool = False) -> None:
     _refs(body["mentions"], facts, pointer + "/mentions")
     import re
     text = body["text"]
     for match in re.finditer(r"\{([^{}]*)\}", text):
         token = match.group(1)
         parts = token.split(":", 1)
-        if len(parts) != 2 or parts[0] not in ("c", "t"):
+        if len(parts) != 2 or parts[0] not in ("c", "t", "g"):
             _bad("v2.template", pointer + "/text", "Недопустимая подстановка")
         if parts[0] == "c":
             _ref(parts[1], chars, pointer + "/text")
+        elif parts[0] == "g":
+            target, *forms = parts[1].split("|")
+            if len(forms) != 2:
+                _bad("v2.template", pointer + "/text", "Согласование требует мужскую и женскую форму")
+            if target == "@self":
+                if not allow_self:
+                    _bad("v2.template", pointer + "/text", "@self допустим только в тексте для одного игрока")
+            else:
+                _ref(target, chars, pointer + "/text")
         else:
             target, *form = parts[1].split("|")
             _ref(target, chars, pointer + "/text")
@@ -172,6 +191,32 @@ def _body(body: dict[str, Any], facts: dict[str, Any], pointer: str,
                 _bad("v2.template", pointer + "/text", "Недопустимая форма обращения")
     if text.count("{") != text.count("}") or re.search(r"\{[^{}]*\{", text):
         _bad("v2.template", pointer + "/text", "Незакрытая подстановка")
+
+
+def _compile_looks(d: dict[str, Any]) -> None:
+    """A look changes portrait, title and grammar only; the first look is the authored default."""
+    assets = {}
+    for i, c in enumerate(d["characters"]):
+        art = c.get("art")
+        if art:
+            assets.setdefault(art["asset_id"], _ptr("characters", i, "art"))
+    for i, c in enumerate(d["characters"]):
+        looks = c.get("looks")
+        if looks is None:
+            continue
+        p = _ptr("characters", i, "looks")
+        _unique([look["id"] for look in looks], p)
+        first = looks[0]
+        if (first["gender"] != c["gender"] or first["bio"] != c["bio"] or first["art"] != c.get("art")
+                or first.get("title", c["title"]) != c["title"] or first.get("title_forms", c["title_forms"]) != c["title_forms"]):
+            _bad("v2.looks", p + "/0", "Первый облик должен совпадать с верхними полями героя")
+        for j, look in enumerate(looks):
+            if ("title" in look) != ("title_forms" in look):
+                _bad("v2.looks", p + _ptr(j), "Название облика задаётся вместе с падежными формами")
+            if j and look["art"]["asset_id"] in assets:
+                _bad("v2.looks", p + _ptr(j, "art", "asset_id"), "Портрет облика повторяет чужой asset_id")
+            if j:
+                assets[look["art"]["asset_id"]] = p + _ptr(j)
 
 
 def _compile_modules(d, maps, predicates):
@@ -612,6 +657,7 @@ def compile_v2(case: CaseV2, ruleset_registry: Any = None) -> CompiledCase:
     maps = {name: _ids(d[name], name) for name in
             ("locations", "characters", "facts", "observations", "actions", "dialogues",
              "variants", "compositions", "flags", "events")}
+    _compile_looks(d)
     if "personal_tasks" in d:
         _compile_personal(d, maps)
     loc, chars, facts, obs = (maps[n] for n in ("locations", "characters", "facts", "observations"))
@@ -825,14 +871,14 @@ def compile_v2(case: CaseV2, ruleset_registry: Any = None) -> CompiledCase:
     def walk(value, pointer=""):
         if isinstance(value, dict):
             if set(value) == {"text", "mentions"}:
-                _body(value, facts, pointer, chars, loc)
+                _body(value, facts, pointer, chars, loc, self_text_allowed(pointer))
             for k, child in value.items():
                 walk(child, pointer + _ptr(k))
         elif isinstance(value, list):
             for i, child in enumerate(value):
                 walk(child, pointer + _ptr(i))
         elif isinstance(value, str) and ("{" in value or "}" in value):
-            _body({"text": value, "mentions": []}, facts, pointer, chars, loc)
+            _body({"text": value, "mentions": []}, facts, pointer, chars, loc, self_text_allowed(pointer))
     walk(d)
     materialized = copy.deepcopy(d)
     materialized["meta"].setdefault("modules", [])

@@ -852,10 +852,20 @@ def _validate_state(doc, case, rules):
     action_ids = {row["id"] for row in case_doc["actions"]}
     scene_catalog = case_doc["events"] + modules.get("turning_point", {}).get("scenes", [])
     event_ids = {row["id"] for row in scene_catalog}
-    sealed = _obj(doc["sealed"], {"variant_id", "seed", "composition_id", "assignments"}, "sealed")
+    sealed_fields = {"variant_id", "seed", "composition_id", "assignments"}
+    # night-city-state/1 extension: sealed.looks is optional; states sealed before looks use default looks.
+    sealed = _obj(doc["sealed"], sealed_fields | ({"looks"} if type(doc["sealed"]) is dict and "looks" in doc["sealed"] else set()), "sealed")
     if sealed["variant_id"] not in variant_ids or sealed["composition_id"] not in composition_ids:
         raise ValueError("unknown variant or composition")
     _int(sealed["seed"], "seed")
+    if "looks" in sealed:
+        authored_looks = {row["id"]: {look["id"] for look in row["looks"]} for row in case_doc["characters"] if row.get("looks")}
+        looks = sealed["looks"]
+        if type(looks) is not dict or set(looks) != set(authored_looks) or not looks:
+            raise ValueError("sealed looks must cover exactly the characters with looks")
+        for character_id, look_id in looks.items():
+            if type(look_id) is not str or look_id not in authored_looks[character_id]:
+                raise ValueError("unknown sealed look")
     assignments = _arr(sealed["assignments"], "assignments", 12)
     for row in assignments:
         _obj(row, {"account_id", "character_id"}, "assignment")

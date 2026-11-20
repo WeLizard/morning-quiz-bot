@@ -36,7 +36,10 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = '932a084887f4cdefd3882a1de65cabf0aacc65d59d108f61bc5b5e9faebb0d03'
+MANOR_CASE_CANONICAL_SHA256 = '86e2d97d9b92555ef5554f8546f08cb802768b859567513949677fdb834703a7'
+MANOR_LOOKS = 5                                   # extra appearance portraits from characters_variants/
+MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS             # characters, locations, looks
+MANOR_WEBPS = 20 + 8 * 4 + 81 + MANOR_LOOKS       # portraits, place times, items, looks
 
 BUDGET = {'scene': 150_000, 'back': 90_000, 'frame': 90_000, 'frame_small': 60_000, 'icon': 30_000, 'thumb': 20_000}
 
@@ -558,6 +561,8 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
         entries.append(rec)
         return f'/app/night/worlds/manor_lake/assets/{rel_target}'
 
+    variant_files = manor_look_sources(source)
+    look_count = 0
     for character in case_chars:
         art = character.get('art') or {}
         asset_id, alt = art.get('asset_id'), art.get('alt')
@@ -569,6 +574,25 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
             raise SystemExit(f'duplicate case art asset_id: {asset_id}')
         url = export_one(path, f"character_{character['id']}.webp", 512, 82, asset_id)
         assets[asset_id] = {'url': url, 'alt': alt}
+        # Appearance looks: the first look is the base portrait above; the others come from characters_variants/.
+        for look in (character.get('looks') or [])[1:]:
+            look_art = look.get('art') or {}
+            look_id, look_alt = look_art.get('asset_id'), look_art.get('alt')
+            file_name = f"{hero['file']}__{look['id']}.png"
+            if look_id != f"manor_char_{character['id']}__{look['id']}" or not isinstance(look_alt, str) or not look_alt:
+                raise SystemExit(f"look art must be manor_char_<role>__<look> with alt: {character['id']}/{look['id']}")
+            if variant_files.get(file_name) != f"{hero['file']}.png":
+                raise SystemExit(f'look portrait missing from characters_variants/manifest.json: {file_name}')
+            look_path = source.find(f'characters_variants/{file_name}')
+            if look_path is None:
+                raise SystemExit(f'missing look portrait {file_name}')
+            if look_id in assets:
+                raise SystemExit(f'duplicate case art asset_id: {look_id}')
+            look_url = export_one(look_path, f"character_{character['id']}__{look['id']}.webp", 512, 82, look_id)
+            assets[look_id] = {'url': look_url, 'alt': look_alt}
+            look_count += 1
+    if look_count != MANOR_LOOKS:
+        raise SystemExit(f'manor_lake case must have {MANOR_LOOKS} extra looks, found {look_count}')
 
     for place in case_places:
         art = place.get('art') or {}
@@ -612,7 +636,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
 
     manifest = {'schema': 'nc-assets/1', 'world': 'manor_lake', 'assets': assets}
     (out_dir / 'assets.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(f"manor_lake assets: {len(case_chars)} characters, {len(case_places) * len(TIMES)} place variants, "
+    print(f"manor_lake assets: {len(case_chars)} characters, {look_count} looks, {len(case_places) * len(TIMES)} place variants, "
           f"{len(item_paths)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
     if report_out:
         report = {
@@ -625,7 +649,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
             },
             'manifest_sha256': hashlib.sha256((out_dir / 'assets.json').read_bytes()).hexdigest(),
             'manifest_asset_ids': sorted(assets), 'manifest_count': len(assets),
-            'character_count': len(case_chars), 'location_count': len(case_places),
+            'character_count': len(case_chars), 'look_count': look_count, 'location_count': len(case_places),
             'location_variant_count': len(case_places) * len(TIMES), 'item_count': len(item_paths),
             'item_bytes': item_bytes, 'total_export_bytes': sum(r['bytes'] for r in entries),
             'assets': entries,
@@ -633,6 +657,24 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     return manifest
+
+
+def manor_look_sources(source):
+    """Look portraits listed in characters_variants/manifest.json as {variant file: base file}.
+
+    Variants never live in characters/: plan() treats any c_*.png there as an extra hero."""
+    path = source.dir / 'characters_variants' / 'manifest.json'
+    if not path.is_file():
+        return {}
+    result = {}
+    for row in json.loads(path.read_text(encoding='utf-8')).get('variants', []):
+        name, base = row.get('file'), row.get('base')
+        if not isinstance(name, str) or not isinstance(base, str) or not re.fullmatch(r'c_\d+_[a-z_]+__[a-z0-9]+\.png', name):
+            raise SystemExit(f'invalid characters_variants manifest row: {row!r}')
+        if name.split('__', 1)[0] + '.png' != base or name in result:
+            raise SystemExit(f'characters_variants manifest row does not match its base: {name}')
+        result[name] = base
+    return result
 
 
 def canonical_json_bytes(value):
@@ -649,17 +691,18 @@ def case_art_refs(case_path):
     refs = {}
     for group in ('characters', 'locations'):
         for entry in case.get(group, []):
-            art = entry.get('art') or {}
-            asset_id, alt = art.get('asset_id'), art.get('alt')
-            if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc)_[a-z0-9_]+', asset_id):
-                raise SystemExit(f'missing or invalid public art.asset_id in {group}')
-            if not isinstance(alt, str) or not alt:
-                raise SystemExit(f'missing public art.alt for {asset_id}')
-            if asset_id in refs:
-                raise SystemExit(f'duplicate public art.asset_id: {asset_id}')
-            refs[asset_id] = {'group': group, 'id': entry.get('id'), 'alt': alt}
-    if len(refs) != 28:
-        raise SystemExit(f'pinned Manor Lake case must have 28 art references, found {len(refs)}')
+            arts = [entry.get('art') or {}] + [look.get('art') or {} for look in (entry.get('looks') or [])[1:]]
+            for art in arts:
+                asset_id, alt = art.get('asset_id'), art.get('alt')
+                if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc)_[a-z0-9_]+', asset_id):
+                    raise SystemExit(f'missing or invalid public art.asset_id in {group}')
+                if not isinstance(alt, str) or not alt:
+                    raise SystemExit(f'missing public art.alt for {asset_id}')
+                if asset_id in refs:
+                    raise SystemExit(f'duplicate public art.asset_id: {asset_id}')
+                refs[asset_id] = {'group': group, 'id': entry.get('id'), 'alt': alt}
+    if len(refs) != MANOR_ART_REFS:
+        raise SystemExit(f'pinned Manor Lake case must have {MANOR_ART_REFS} art references, found {len(refs)}')
     return refs, canonical_hash
 
 
@@ -713,10 +756,10 @@ def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_a
             raise SystemExit(f'legacy alt text differs from pinned case for {asset_id}')
 
     source_files = sorted((assets_out / 'assets').glob('*.webp'))
-    if len(source_files) != 133 or any(not re.fullmatch(r'[A-Za-z0-9_]+\.webp', f.name) for f in source_files):
-        raise SystemExit(f'expected 133 flat, safely named WebPs, found {len(source_files)}')
+    if len(source_files) != MANOR_WEBPS or any(not re.fullmatch(r'[A-Za-z0-9_]+\.webp', f.name) for f in source_files):
+        raise SystemExit(f'expected {MANOR_WEBPS} flat, safely named WebPs, found {len(source_files)}')
     source_by_relative = {f'assets/{path.name.lower()}': path for path in source_files}
-    if len(source_by_relative) != 133:
+    if len(source_by_relative) != MANOR_WEBPS:
         raise SystemExit('source WebP names collide after canonical lowercase path mapping')
     files = {rel: hashlib.sha256(path.read_bytes()).hexdigest() for rel, path in source_by_relative.items()}
     if sum(name.rsplit('/', 1)[1].startswith('item_') for name in files) != 81:
@@ -758,8 +801,8 @@ def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_a
     if report.get('manifest_sha256') != hashlib.sha256(legacy_bytes).hexdigest():
         raise SystemExit('private source/hash report does not match the legacy manifest')
     exported = {row.get('export', '').lower(): row.get('export_sha256') for row in report.get('assets', [])}
-    if len(exported) != 133 or any(exported.get(rel) != digest for rel, digest in files.items()):
-        raise SystemExit('private source/hash report does not match all 133 WebPs')
+    if len(exported) != MANOR_WEBPS or any(exported.get(rel) != digest for rel, digest in files.items()):
+        raise SystemExit(f'private source/hash report does not match all {MANOR_WEBPS} WebPs')
     comparison = None
     if compare_assets:
         compare_dir = Path(compare_assets)

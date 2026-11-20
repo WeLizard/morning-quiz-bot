@@ -10,6 +10,7 @@ from .night_case_narrative import LegalAction
 from .night_case_delivery import dialogue_topic, say_audience, sent_count
 from .night_case_personal import story_index, story_predicate, completed_steps, open_offers, step_visible, work_progress
 from .night_case_state import KernelState, PlayerActor, canonical_hash, parse_command
+from .night_case_text import Renderer, public_look
 from .night_case_time import _parse, _utc
 
 
@@ -388,4 +389,10 @@ def project(case, rules, state, viewer=None):
         own = completed_steps(c, doc, player["account_id"])
         char = next(x for x in c["characters"] if x["id"] == player["character_id"])
         result["self"]["personal"] = {"criteria": copy.deepcopy(char["goal"].get("criteria", char["goal"]["body"])), "completed_steps": sorted(own), "pending_returns": sorted(o["offer_event_id"] for o in open_offers(c, doc) if o["recipient_account_id"] == player["account_id"]), "booked_trips": sorted(s["operation"]["trip"] for s in c["personal_tasks"]["steps"] if s["id"] in own and s["operation"]["kind"] == "book_departure"), "work_progress": [{"work": w["id"], "completed_stages": work_progress(c, doc, player["account_id"], w["id"])} for w in sorted(c["personal_tasks"]["works"], key=lambda x: x["id"]) if w["owner"] == player["character_id"]]}
-    return result
+    # Appearance of the party: the kernel keeps raw templates, the projection renders them for these looks.
+    renderer = Renderer(c, doc, player["character_id"] if player else None)
+    result["looks"] = {cid: public_look(look) for cid, look in sorted(renderer.looks.items())}
+    if player:
+        own_look = renderer.looks[player["character_id"]]
+        result["self"]["role"] = {"id": player["character_id"], "look_id": own_look["id"], "title": own_look["title"], "title_forms": copy.deepcopy(own_look["title_forms"]), "gender": own_look["gender"], "age": own_look["age"], "bio": copy.deepcopy(own_look["bio"]), "art": copy.deepcopy(own_look["art"])}
+    return renderer.tree(result)

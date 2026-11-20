@@ -197,6 +197,38 @@ def _validate_member_fields(value: dict[str, Any], path: str, errors: list[str])
                 errors.append(f'{path}.{key}: invalid score')
 
 
+def schedule_rows(chat_id: int, settings: dict[str, Any]) -> list[dict[str, Any]]:
+    """``daily_schedules`` rows of one chat, from its legacy settings (importer and legacy sync)."""
+    rows = []
+    daily_quiz = settings.get("daily_quiz")
+    if isinstance(daily_quiz, dict):
+        run_times = []
+        for value in daily_quiz.get("times_msk", []):
+            if isinstance(value, dict):
+                run_times.append(f"{int(value.get('hour', 0)):02d}:{int(value.get('minute', 0)):02d}")
+            elif value:
+                run_times.append(str(value))
+        rows.append({
+            "chat_id": chat_id,
+            "kind": "quiz",
+            "enabled": bool(daily_quiz.get("enabled")),
+            "timezone": str(daily_quiz.get("timezone") or "Europe/Moscow"),
+            "run_times": run_times,
+            "config": daily_quiz,
+        })
+    daily_wisdom = settings.get("daily_wisdom")
+    if isinstance(daily_wisdom, dict):
+        rows.append({
+            "chat_id": chat_id,
+            "kind": "wisdom",
+            "enabled": bool(daily_wisdom.get("enabled")),
+            "timezone": str(daily_wisdom.get("timezone") or "Europe/Moscow"),
+            "run_times": [str(daily_wisdom.get("time") or "12:00")],
+            "config": daily_wisdom,
+        })
+    return rows
+
+
 @dataclass
 class ChatSnapshot:
     chat_id: int
@@ -615,38 +647,7 @@ class JsonToPostgresImporter:
                         }, ensure=True)
                     member_count += 1
 
-                daily_quiz = chat.settings.get("daily_quiz")
-                if isinstance(daily_quiz, dict):
-                    run_times = []
-                    for value in daily_quiz.get("times_msk", []):
-                        if isinstance(value, dict):
-                            run_times.append(
-                                f"{int(value.get('hour', 0)):02d}:{int(value.get('minute', 0)):02d}"
-                            )
-                        elif value:
-                            run_times.append(str(value))
-                    schedule_values = {
-                            "chat_id": chat.chat_id,
-                            "kind": "quiz",
-                            "enabled": bool(daily_quiz.get("enabled")),
-                            "timezone": str(daily_quiz.get("timezone") or "Europe/Moscow"),
-                            "run_times": run_times,
-                            "config": daily_quiz,
-                        }
-                    await repository.upsert_schedule(schedule_values)
-                    verification.record('daily_schedules', schedule_values)
-                    schedule_count += 1
-
-                daily_wisdom = chat.settings.get("daily_wisdom")
-                if isinstance(daily_wisdom, dict):
-                    schedule_values = {
-                            "chat_id": chat.chat_id,
-                            "kind": "wisdom",
-                            "enabled": bool(daily_wisdom.get("enabled")),
-                            "timezone": str(daily_wisdom.get("timezone") or "Europe/Moscow"),
-                            "run_times": [str(daily_wisdom.get("time") or "12:00")],
-                            "config": daily_wisdom,
-                        }
+                for schedule_values in schedule_rows(chat.chat_id, chat.settings):
                     await repository.upsert_schedule(schedule_values)
                     verification.record('daily_schedules', schedule_values)
                     schedule_count += 1

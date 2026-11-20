@@ -638,8 +638,9 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
 
 def validate_state(farm):
     from .expansion import validate_expansion
-    from . import minigames, oleg, daily_bonus
+    from . import minigames, oleg, daily_bonus, dyeworks
     validate_expansion(farm)
+    dyeworks.validate(farm)
     minigames.validate(farm)
     oleg.validate(farm)
     daily_bonus.validate(farm)
@@ -686,6 +687,8 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
         result=deepcopy(farm)
         from . import daily_bonus
         result['daily_cash_bonus']=daily_bonus.public(farm,now)
+        from . import dyeworks
+        result['dyeworks']=dyeworks.public(farm)
         result.pop('tavern',None)  # exposed only as the current-day village_build projection
         from . import village_quests
         result['village_errands']=village_quests.public(farm,now)

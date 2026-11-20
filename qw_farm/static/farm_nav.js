@@ -7,7 +7,7 @@ import {categoryOf} from './scene_map.js';
 // Menu: sections in a fixed order. `art` items are picture cards (За околицей); `when` hides an item that is not live.
 export const MENU=[
  {id:'farm',title:'Хозяйство',items:[['orders','orders','Заказы'],['inventory','shop','Склад'],['team','tractor','Команда'],['land','home','Участок']]},
- {id:'production',title:'Производство',items:[['production','workshop','Мастерские'],['orchard','orchard','Сад']]},
+ {id:'production',title:'Производство',items:[['production','workshop','Мастерские'],['orchard','orchard','Сад'],['dyeworks','dyed_linen','Красильня','dyeworks']]},
  {id:'outside',title:'За околицей',art:true,items:[['forest','forest','Лес'],['lake','lake','Озеро'],['fields','tractor','Поля'],['plantations','grape','План\u00adтации','plantations']]},
  {id:'village',title:'Деревня и соседи',items:[['village','coin','Деревня'],['neighbors','friends','Соседи'],['festival','coin','Праздник','festival']]},
  {id:'info',title:'Сведения',items:[['secrets','discovery','Находки'],['journal','journal','Журнал']]}
@@ -26,6 +26,7 @@ export function menuSections(f={}){
   land:f.size?`${f.size} × ${f.size}${f.canExpand?' · можно расширить':''}`:'',
   production:f.readyWorkshop?(f.workshopsReady>1?`готово: ${f.workshopsReady}`:`${f.readyWorkshop} · готово`):f.workshopsBusy?`в работе: ${f.workshopsBusy}`:'',
   orchard:f.saplings?(f.saplings===1?'саженец ждёт посадки':`ждут посадки: ${f.saplings}`):f.trees?`${f.trees} ${plural(f.trees,'дерево','дерева','деревьев')}`:'',
+  dyeworks:f.dyeLearned?`${f.dyeLearned} ${plural(f.dyeLearned,'рецепт','рецепта','рецептов')}`:'',
   forest:f.forestReady?'готово':f.forestBusy?'в пути':'',
   lake:f.lakeReady?'улов':f.lakeBusy?'клюёт':'',
   fields:f.fieldsLocked?`С ${f.fieldsLocked} ур.`:'',

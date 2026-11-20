@@ -12,7 +12,7 @@ from .expansion import upgrade_state, settle
 from . import economy, invites, undo, minigames, oleg, progression, trip_games, festivals
 from .sharing import (invite_digest, invite_secret, link_token, new_invite_nonce, MAX_ACTIVE_SHARE_INVITES_PER_FARM,
                       SHARE_INVITE_MAX_USES, SHARE_INVITE_TTL)
-from . import wagers, friend_requests, construction, tavern, daily_bonus
+from . import wagers, friend_requests, construction, tavern, daily_bonus, dyeworks
 from application import farm_village_games
 from .upkeep_config import effective_values as effective_upkeep_config
 
@@ -327,6 +327,7 @@ class FarmService:
         baseline=upgrade_state(deepcopy(before))
         if own:await daily_bonus.bootstrap(self.u,farm,self.clock())
         if own:await construction.tick_account(self.u,farm,self.p.account_id,self.clock())
+        if own:await dyeworks.refresh(self.u,farm,self.p.account_id,self.clock())
         settle(farm,self.clock())
         if own:await self._claim_village(farm,self.clock())
         if own:await self._claim_tower(farm,self.clock())
@@ -336,7 +337,7 @@ class FarmService:
             await self.u.save(farm)
             # Market housekeeping (a caravan arriving, the daily contracts rolling over) changes no balance:
             # it is saved, but only real work leaves a receipt in the economic ledger.
-            quiet={'market','events','revision','economy','village_errands','village_bonus','meadow',daily_bonus.KEY}
+            quiet={'market','events','revision','economy','village_errands','village_bonus','meadow',daily_bonus.KEY,dyeworks.KEY}
             if any(farm.get(k)!=baseline.get(k) for k in set(farm)|set(baseline) if k not in quiet):
                 # Stable per-version economic receipt for automatically completed work.
                 key='auto:'+str(farm['revision'])

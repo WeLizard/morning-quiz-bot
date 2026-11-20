@@ -503,7 +503,8 @@ function navFacts(){
   plantations:!!plantationsLevel,plantationsLocked:plantationsLevel&&me.level<plantationsLevel?plantationsLevel:0,
   plantationHectares:me.plantations?.length||0,
   requests:FRIEND_REQUESTS.count(),festival:festivalTab()?festivalStatus(festivalView()):'',
-  secretsFound:(me.secrets||[]).length,secretsTotal:Object.keys(S.catalog.secrets||{}).length};
+  secretsFound:(me.secrets||[]).length,secretsTotal:Object.keys(S.catalog.secrets||{}).length,
+  dyeworks:!!me.dyeworks,dyeLearned:me.dyeworks?.recipes?.length||0};
 }
 const FOREST_CARD_ART='<circle cx="126" cy="14" r="9" fill="#f7d579" opacity=".8"/><path d="M0 42 30 17l30 28 32-32 41 38 27-19v36H0Z" fill="#94b58b"/><path d="m0 53 34-23 34 28 34-30 58 36v18H0Z" fill="#668e67"/><path d="M77 68c-3-13 8-16 6-25-1-5-8-9-5-16 8 5 13 10 13 17 0 8-8 11-5 24Z" fill="#e6d4a0"/><path d="M77 68c-2-10 7-13 8-18 2 5-3 9-2 18" fill="#f6e7bd"/><g fill="#456d54"><path d="m18 54 13-32 13 32Zm9 8 13-34 14 34Zm78-14 14-34 14 34Zm-8 10 12-30 13 30Zm43 1 10-25 11 25Z"/></g><g fill="#7f9e69"><circle cx="11" cy="57" r="9"/><circle cx="152" cy="49" r="11"/><circle cx="61" cy="47" r="8"/></g><g fill="#f5d889"><circle cx="56" cy="60" r="1.7"/><circle cx="66" cy="55" r="1.4"/><circle cx="20" cy="64" r="1.5"/></g>';
 // E17: owner-approved vector from scripts/art/village/fields_card.js (scene_expansion.vehicle).
@@ -645,7 +646,7 @@ function renderPanel(){
  syncVillageScene();if(typeof syncFestivalWorld==='function')syncFestivalWorld();if(!S.me)return;let p=$('panel-content');const villageFocus=S.tab==='village'?document.activeElement?.dataset?.villageFocus:null;const villageServices=S.tab==='village'?[...p.querySelectorAll('.village-services[open]')].map(n=>n.dataset.villageService):[];const villagePanelKey=S.tab==='village'?JSON.stringify([villageSheet,villageResident]):null;const oldScroll=S.lastRenderedTab===S.tab&&(S.tab!=='village'||S.lastRenderedVillageSheet===villagePanelKey)?p.scrollTop:0;S.lastRenderedTab=S.tab;S.lastRenderedVillageSheet=villagePanelKey;p.replaceChildren();
  if(!own()&&S.tab!=='object'&&S.tab!=='neighbors'){renderVisit(p);panelRenderSignature=panelSnapshot();return;}
  scene.zones=null;scene.areaPreview=null;scene.dirty=true;
- if(S.tab==='lake')renderLake(p);else if(S.tab==='arbor')renderArbor(p);else if(S.tab==='plantations')renderPlantations(p);else{const fn={orders:renderOrders,inventory:renderInventory,land:renderLand,catalog:renderCatalog,production:renderProduction,neighbors:renderNeighbors,journal:renderJournal,settings:renderSettings,object:renderObject,objects:renderObjects,team:renderTeam,forest:renderForest,secrets:renderSecrets,village:renderVillage,fields:renderFields,orchard:typeof renderOrchard==='function'?renderOrchard:undefined,festival:typeof renderFestivalTab==='function'?renderFestivalTab:undefined}[S.tab]||renderOrders;fn(p);}if(S.tab==='orders'&&typeof festivalBanner==='function')festivalBanner(p);for(const n of p.querySelectorAll('.village-services'))n.open=villageServices.includes(n.dataset.villageService);document.body.classList.toggle('catalog-open',S.tab==='catalog');p.scrollTop=oldScroll;if(villageFocus){const target=[...p.querySelectorAll('[data-village-focus]')].find(n=>n.dataset.villageFocus===villageFocus)||p.querySelector('[data-village-focus=resident]');target?.focus({preventScroll:true});}panelRenderSignature=panelSnapshot();
+ if(S.tab==='lake')renderLake(p);else if(S.tab==='arbor')renderArbor(p);else if(S.tab==='plantations')renderPlantations(p);else{const fn={orders:renderOrders,inventory:renderInventory,land:renderLand,catalog:renderCatalog,production:renderProduction,neighbors:renderNeighbors,journal:renderJournal,settings:renderSettings,object:renderObject,objects:renderObjects,team:renderTeam,forest:renderForest,secrets:renderSecrets,village:renderVillage,fields:renderFields,orchard:typeof renderOrchard==='function'?renderOrchard:undefined,dyeworks:typeof renderDyeworks==='function'?renderDyeworks:undefined,festival:typeof renderFestivalTab==='function'?renderFestivalTab:undefined}[S.tab]||renderOrders;fn(p);}if(S.tab==='orders'&&typeof festivalBanner==='function')festivalBanner(p);for(const n of p.querySelectorAll('.village-services'))n.open=villageServices.includes(n.dataset.villageService);document.body.classList.toggle('catalog-open',S.tab==='catalog');p.scrollTop=oldScroll;if(villageFocus){const target=[...p.querySelectorAll('[data-village-focus]')].find(n=>n.dataset.villageFocus===villageFocus)||p.querySelector('[data-village-focus=resident]');target?.focus({preventScroll:true});}panelRenderSignature=panelSnapshot();
 }
 /* ---- building upgrades 1 -> 3: all numbers come from the server catalog (S.catalog.upgrades) ---- */
 const UP=()=>S.catalog.upgrades;
@@ -1679,6 +1680,20 @@ function renderSecrets(p){
   if(secret.id==='detective'&&!found){c.append(goods({bread:2,egg:2}),button('Передать ночной завтрак',()=>command('night_delivery'),'primary wide',S.me.stats.orders<3||!enough({bread:2,egg:2})));}
   p.append(c);
  }
+}
+// Bridge from «Алхимия»: the dyer's notes are riddles solved there; the server seals them and the farm learns the dye.
+// The farm never names the Atlas or Alchemy: the player has to make the connection (no hints by design).
+const DYE_ICONS={mordant:'alchemy',indigo:'dye_indigo',madder:'dye_madder',saffron:'dye_saffron'};
+function renderDyeworks(p){
+ heading('Красильня','ТАЙНА СТАРОГО МАСТЕРА');
+ const learned=S.me.dyeworks?.recipes||[];
+ note('Котлы остыли, чаны пересохли. Старый мастер ушёл и не оставил ни одного рецепта — только синее пятно на пороге, которое не смывает дождь.',p);
+ for(const r of learned){
+  const c=card(r.name,'рецепт краски',DYE_ICONS[r.recipe]||'alchemy');
+  note('Рецепт записан в книгу фермы.',c);
+  p.append(c);
+ }
+ if(learned.length)note('Саму красильню и сырьё из дальних поездок ещё строят. Выученные рецепты не пропадут.',p);
 }
 // Festivals: the server sends the calendar and the fair (S.me.festival); the device only keeps the show/hide switches.
 const festivalView=()=>S.me?.festival||null;

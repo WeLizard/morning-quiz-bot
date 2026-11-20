@@ -28,7 +28,7 @@ const rows=[{id:'apple',name:'Яблоня',sapling:'Саженец яблони
 test('the menu has five sections in the approved order with one entry per place',async()=>{
  const N=await load();
  assert.deepEqual(N.MENU.map(s=>s.title),['Хозяйство','Производство','За околицей','Деревня и соседи','Сведения']);
- assert.deepEqual(N.MENU_TABS,['orders','inventory','team','land','production','orchard','forest','lake','fields','plantations','village','neighbors','festival','secrets','journal']);
+ assert.deepEqual(N.MENU_TABS,['orders','inventory','team','land','production','orchard','dyeworks','forest','lake','fields','plantations','village','neighbors','festival','secrets','journal']);
  assert.equal(new Set(N.MENU_TABS).size,N.MENU_TABS.length,'no place twice');
  for(const gone of ['build','more','settings','objects'])assert.ok(!N.MENU_TABS.includes(gone),`${gone} is not a menu place`);
  const plain=N.menuSections({});assert.ok(!plain.flatMap(s=>s.items).some(i=>i.id==='festival'),'«Праздник» only while a festival runs');

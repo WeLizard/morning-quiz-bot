@@ -747,9 +747,10 @@ async def merge_prepare(unit, main_id, secondary_id, now):
 
 def merge_effect_state(main, secondary, now=None):
     """Merge private quotas and preserve every growing crop with one usable bed."""
-    from . import daily_bonus
+    from . import daily_bonus, dyeworks
     if now is not None:
         daily_bonus.merge(main,secondary,now)
+    dyeworks.merge(main,secondary)
     left, right = main.setdefault('tavern', {}), secondary.get('tavern') or {}
     orders = left.setdefault('orders', {})
     for state in (left, right):

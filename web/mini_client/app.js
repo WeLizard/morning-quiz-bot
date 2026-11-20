@@ -1350,6 +1350,7 @@
         try {
             await window.QuizPlay.mount({host: content, request: roomPlayRequest, api, command, selection: () => {},
                 onHome: () => guestHome(), onReplay: () => openSoloGame(kind), onProfile: () => guestHome(),
+                onFriends: kind === 'photo' ? () => openPhotoRooms() : null,
                 media: async path => {
                     const response = await fetch(path, {credentials: 'same-origin'});
                     if (!response.ok) throw new Error('Фото недоступно'); return response.blob();
@@ -1426,7 +1427,6 @@
             choices.append(homeGameCard({...actual, title: mode.title, status: mode.status}));
         });
         content.append(choices);
-        content.append(button('Фото с друзьями · комнаты', openPhotoRooms, 'secondary'));
         if (!runtimeEnabled) note(content, 'Игровой режим подключается. Профиль и чатовый бот доступны.', 'muted');
         else {
             // Сбой одного чата не должен ломать главную: недоступный чат тихо скрываем,
@@ -2278,7 +2278,7 @@
                 }
                 if (!window.QuizPlay) throw new Error('Игровой экран не загрузился. Обнови приложение.');
                 const photoTarget = photoLaunchTarget; photoLaunchTarget = null;
-                await window.QuizPlay.mount({host: content, request, command, chatId: state.selected, photoTarget, settings: false, onReplay: cmd => play(cmd), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => openChatSettings(), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
+                await window.QuizPlay.mount({host: content, request, command, chatId: state.selected, photoTarget, settings: false, onReplay: cmd => play(cmd), onFriends: () => openPhotoRooms(), onProfile: () => { state.page = 'profile'; load(); }, onSettings: () => openChatSettings(), onHome: () => { state.page = 'home'; load(); }, selection: () => window.QuizTelegram.selection(), media: async path => {
                     const response = await fetch(path, {credentials: 'same-origin'});
                     if (!response.ok) throw new Error('Фото недоступно'); return response.blob();
                 }});

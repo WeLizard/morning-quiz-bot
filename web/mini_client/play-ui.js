@@ -74,7 +74,7 @@
     window.QuizPlay = {
         chatApi, roomApi,
         stop() { dispose(); dispose = () => {}; },
-        async mount({host, request, media, command, chatId, api: adapter, selection, onHome, onReplay, onProfile, onSettings, photoTarget = null}) {
+        async mount({host, request, media, command, chatId, api: adapter, selection, onHome, onReplay, onProfile, onSettings, onFriends = null, photoTarget = null}) {
             window.QuizPlay.stop();
             if (!(adapter || chatId) || ![null, undefined, '/quiz', '/photo_quiz'].includes(command)) {
                 throw new Error('Выбери чат и игровой режим перед запуском.');
@@ -183,15 +183,18 @@
                         el('span', photoSetup.hints_enabled ? 'Подсказки включены' : 'Без подсказок'),
                         el('span', `Записей в каталоге: ${photoSetup.available_questions}`));
                     stage.append(facts);
-                    stage.append(button('Начать фото-серию', startPhotoDirect, 'primary play-primary'));
+                    // Rooms with friends live inside the photo mode, under its main action (not on the home list).
+                    const startPhoto = button('Начать фото-серию', startPhotoDirect, 'primary play-primary');
+                    if (typeof onFriends === 'function') actionStack(startPhoto, button('Играть с друзьями', () => onFriends(), 'quiet play-secondary'));
+                    else stage.append(startPhoto);
                     if (photoSetup.available_questions < photoSetup.question_count) {
                         stage.append(el('p', 'В каталоге пока меньше картинок, чем вопросов в серии — некоторые загадки могут повториться.', 'play-footnote'));
                     }
                     if (photoOccupied) {
-                        stage.querySelector('button')?.setAttribute('disabled', '');
+                        startPhoto.setAttribute('disabled', '');
                         stage.append(el('p', 'Фото-серия занята другим игроком.', 'play-notice'));
                     } else if (!photoSetup.can_start) {
-                        stage.querySelector('button')?.setAttribute('disabled', '');
+                        startPhoto.setAttribute('disabled', '');
                         stage.append(el('p', 'Сейчас в каталоге нет доступных изображений.', 'play-notice'));
                     }
                 } else {
@@ -401,7 +404,9 @@
                 stage.append(el('p', `${group ? view.own_correct ?? 0 : view.correct} правильных из ${view.game.total}`, 'previous-answer'));
                 if (view.last_result?.answer) stage.append(hostLine(`Последний ответ: ${view.last_result.answer}`));
                 if (view.answer_policy === 'group_private_deadline') photoRoundResult(view.last_result);
-                actionStack(button('Сыграть ещё', () => room ? replay('photo') : onReplay('/photo_quiz'), 'primary play-primary'), button('Мой прогресс', onProfile, 'quiet play-secondary'));
+                actionStack(button('Сыграть ещё', () => room ? replay('photo') : onReplay('/photo_quiz'), 'primary play-primary'),
+                    ...(typeof onFriends === 'function' ? [button('Играть с друзьями', () => onFriends(), 'quiet play-secondary')] : []),
+                    button('Мой прогресс', onProfile, 'quiet play-secondary'));
             }
             function render() {
                 if (!active) return;

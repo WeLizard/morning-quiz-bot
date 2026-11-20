@@ -1720,7 +1720,11 @@ test('Telegram room Photo image and retry explicitly select the Telegram identit
         [guestPhotoBase + '/setup?identity=telegram']: {status: 200, body: guestPhotoSetup},
         [guestPhotoBase + '/current?identity=telegram']: {status: 200, body: {current: {...guestPhotoGame(), answer_policy: 'group_private_deadline'}, occupied: false}},
     }});
-    await findButton(app.content, 'Фото с друзьями · комнаты').click();
+    assert.ok(!app.content.querySelectorAll('button').some(b => /друзьями/.test(b.textContent)), 'friends rooms are not a loose button on the home list');
+    const photoCard = app.content.querySelectorAll('article').find(n => n.dataset.gameMode === 'photo');
+    await findButton(photoCard, 'Угадывать фото').click(); await flush();
+    assert.equal(app.mounts.at(-1).command, '/photo_quiz');
+    await app.mounts.at(-1).onFriends(); await flush();
     assert.equal(app.navigation.hidden, false);
     assert.equal(app.tab('home').getAttribute('aria-current'), 'page');
     await findButton(app.content, 'Открыть фото-загадки').click();
@@ -1968,8 +1972,13 @@ test('photo preparation uses the backend setup projection and starts without run
         assert.notEqual(path, '/api/mini/runtime', 'Photo setup/start must not use the synthetic Telegram transcript');
         throw new Error('Unexpected path ' + path);
     };
-    await ui.mount({host, request, chatId: '42', command: '/photo_quiz', selection() {}, onHome() {}, onReplay() {}, onProfile() {}, onSettings() {}, media: async () => new Blob()});
+    let friends = 0;
+    await ui.mount({host, request, chatId: '42', command: '/photo_quiz', selection() {}, onHome() {}, onReplay() {}, onProfile() {}, onSettings() {}, onFriends() { friends += 1; }, media: async () => new Blob()});
     assert.match(host.textContent, /2 картинки.*75 секунд на картинку.*Без подсказок.*Записей в каталоге: 8/);
+    const group = host.querySelectorAll('div').find(n => n.children.includes(findButton(host, 'Начать фото-серию')));
+    assert.match(group.className, /qw-btn-stack/);
+    assert.deepEqual(group.children.map(b => b.textContent), ['Начать фото-серию', 'Играть с друзьями'], 'rooms with friends sit inside the mode, under the main action');
+    findButton(host, 'Играть с друзьями').click(); assert.equal(friends, 1);
     findButton(host, 'Начать фото-серию').click(); await flush(); await flush();
     assert.equal(calls.includes('/api/mini/runtime'), false);
     assert.equal(calls.includes('/api/mini/photo/chats/42/start'), true);

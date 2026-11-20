@@ -11,6 +11,7 @@ from uuid import UUID
 from storage.admin_actions import operation_fence, require_access
 from sqlalchemy import String, cast, select
 from domain.mafia import (
+    LOBBY_IDLE_SECONDS,
     cast_vote,
     discussion_access,
     join_lobby,
@@ -865,6 +866,26 @@ class MafiaApplicationService:
         result = {'lobby': projection}
         await self.games.complete_command(command_id, result)
         return result
+
+    async def stale_lobby_ids(self, *, now=None) -> list[str]:
+        return await self.games.stale_lobby_ids(mode='mafia', idle_seconds=LOBBY_IDLE_SECONDS, now=now)
+
+    async def expire_stale_lobby(self, *, game_id: str, now=None) -> bool:
+        """Close a table that gathered players and then stood still for a day; rechecked under the lock."""
+        await operation_fence(self.session)
+        candidate = await self.session.get(Game, game_id)
+        if candidate is None or not candidate.is_current or candidate.mode != 'mafia':
+            return False
+        if candidate.chat_id is None:
+            row = await self.games.current_in_room(room_id=candidate.room_id, mode='mafia', lock=True)
+        else:
+            row = await self.games.current(chat_id=candidate.chat_id, mode='mafia', lock=True)
+        if row is None or row.id != game_id or row.status != 'lobby':
+            return False
+        if game_id not in await self.stale_lobby_ids(now=now):
+            return False
+        await self.games.interrupt(row, event_kind='lobby_expired')
+        return True
 
     async def advance_due_game(self, *, game_id: str, now=None) -> dict | None:
         """Advance a due Mafia game by platform game identity, not transport ID."""

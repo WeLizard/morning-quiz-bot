@@ -29,6 +29,9 @@ def test_deadline_processor_isolates_failures_and_runs_each_mode(monkeypatch, ca
             assert now is not None
             return ['game-2', 'game-1', 'game-2']
 
+        async def stale_lobby_ids(self, *, now):
+            return []
+
         async def advance_due_game(self, *, game_id, now):
             calls.append(('mafia', game_id, now))
             if game_id == 'game-2':

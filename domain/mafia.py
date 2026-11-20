@@ -18,6 +18,8 @@ VOTING_SECONDS = 90
 # A started table where nobody acted for this many whole rounds (no night choice, no vote, no manual
 # phase change) is closed as abandoned: otherwise phase deadlines cycle it forever.
 IDLE_ROUNDS_LIMIT = 3
+# A table still gathering players with no join, ready mark or chat message for this long is closed.
+LOBBY_IDLE_SECONDS = 24 * 60 * 60
 
 # Owner decision 2026-10-28 (recommendation, can be reverted): at an app-room table the host may start
 # the night as soon as at least MIN_PLAYERS seated players are ready; seated players who are not ready do

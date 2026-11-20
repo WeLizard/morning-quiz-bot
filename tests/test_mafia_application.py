@@ -405,3 +405,34 @@ def test_telegram_adapter_translates_updates_to_shared_commands(pg_env, monkeypa
                 lobby = await MafiaApplicationService(session).lobby(chat_id=CHAT, viewer_id=user.id)
                 assert lobby['players'][0]['ready'] is True and lobby['revision'] == 1
     asyncio.run(run())
+
+
+def test_a_lobby_without_movement_for_a_day_is_closed(pg_env):
+    from domain.mafia import LOBBY_IDLE_SECONDS
+
+    async def run():
+        async with isolated_database(pg_env) as (database, _):
+            async with database.transaction() as session:
+                repository = OperationalRepository(session)
+                await repository.ensure_chat({'id': CHAT, 'type': 'supergroup'})
+                await repository.ensure_user({'id': 820, 'display_name': 'Игрок'})
+                await repository.ensure_member({'chat_id': CHAT, 'user_id': 820})
+            async with database.transaction() as session:
+                await MafiaApplicationService(session).join(chat_id=CHAT, user_id=820, name='Игрок')
+            async with database.transaction() as session:
+                game_id = (await GameRepository(session).current(chat_id=CHAT, mode='mafia')).id
+            fresh = datetime.now(timezone.utc).timestamp()
+            result = await GameDeadlineProcessor(database).run_once(now=fresh + LOBBY_IDLE_SECONDS - 60)
+            assert 'mafia_lobby_expired' not in result
+            async with database.transaction() as session:
+                assert (await session.get(Game, game_id)).is_current
+            result = await GameDeadlineProcessor(database).run_once(now=fresh + LOBBY_IDLE_SECONDS + 60)
+            assert result['mafia_lobby_expired'] == 1
+            async with database.transaction() as session:
+                game = await session.get(Game, game_id)
+                assert not game.is_current and game.status == 'interrupted'
+                kinds = list((await session.scalars(select(GameEvent.kind).where(
+                    GameEvent.game_id == game_id))).all())
+                assert kinds[-1] == 'lobby_expired'
+                assert await GameRepository(session).current(chat_id=CHAT, mode='mafia') is None
+    asyncio.run(run())

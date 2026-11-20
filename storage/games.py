@@ -579,6 +579,22 @@ class GameRepository:
         )
         return list((await self.session.scalars(statement)).all())
 
+    async def stale_lobby_ids(self, *, mode: str, idle_seconds: int, now=None) -> list[str]:
+        """Current games still gathering players with no event (join, ready, chat) for ``idle_seconds``."""
+        current_time = now or datetime.now(timezone.utc)
+        if type(current_time) in {int, float}:
+            current_time = datetime.fromtimestamp(current_time, tz=timezone.utc)
+        cutoff = datetime.fromtimestamp(current_time.timestamp() - idle_seconds, tz=timezone.utc)
+        last_event = (select(func.max(GameEvent.created_at)).where(GameEvent.game_id == Game.id)
+                      .correlate(Game).scalar_subquery())
+        statement = (
+            select(Game.id)
+            .where(Game.mode == mode, Game.is_current.is_(True), Game.status == 'lobby',
+                   Game.updated_at < cutoff, func.coalesce(last_event, Game.updated_at) < cutoff)
+            .order_by(Game.updated_at, Game.id)
+        )
+        return list((await self.session.scalars(statement)).all())
+
     async def reserve_command(
         self, *, command_id: str | None, game_id: str, actor_user_id: int | None = None,
         actor_account_id=None,

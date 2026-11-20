@@ -22,6 +22,7 @@ class GameDeadlineProcessor:
         """Apply due transitions; every candidate is rechecked under its game lock."""
         async with self.database.transaction() as session:
             mafia_due = await MafiaApplicationService(session).due_game_ids(now=now)
+            mafia_stale = await MafiaApplicationService(session).stale_lobby_ids(now=now)
             classic_due = await ClassicApplicationService(self.database, session).due(now=now)
             room_classic_due = await RoomClassicApplicationService(session).due_game_ids(now=now)
             photo_due = await PhotoApplicationService(self.database, session).due(now=now)
@@ -41,6 +42,14 @@ class GameDeadlineProcessor:
                 ),
             )
             settled['mafia'] += result is not None
+
+        for game_id in sorted(set(mafia_stale)):
+            result = await self._apply_one(
+                'mafia', game_id,
+                lambda session: MafiaApplicationService(session).expire_stale_lobby(game_id=game_id, now=now),
+            )
+            if result:
+                settled['mafia_lobby_expired'] = settled.get('mafia_lobby_expired', 0) + 1
 
         for chat_id in candidates['classic']:
             result = await self._apply_one(

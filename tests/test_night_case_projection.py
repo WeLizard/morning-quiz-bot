@@ -210,8 +210,9 @@ class PersonalProjectionTests(unittest.TestCase):
         self.assertEqual(before, after)
         view = project(case, rules, t.state, viewer)
         personal = view["self"]["personal"]
-        self.assertEqual(set(personal), {"criteria", "completed_steps", "pending_returns", "booked_trips", "work_progress"})
+        self.assertEqual(set(personal), {"criteria", "completed_steps", "pending_returns", "booked_trips", "work_progress", "lost_observations"})
         self.assertEqual(personal["completed_steps"], [])
+        self.assertEqual(personal["lost_observations"], [])  # taken, not destroyed
         self.assertNotIn("personal", project(case, rules, t.state))
         self.assertNotIn("personal_story", json.dumps(view))
         self.assertNotIn('"journal"', json.dumps(view))

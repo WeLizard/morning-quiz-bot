@@ -124,7 +124,7 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
                 result = await getattr(service, method)(account_id=UUID(str(who.account_id)), **kwargs)
                 if method == 'list_cases':
                     # Entry availability only; legacy endpoints retain their own ACL.
-                    result = {**result, 'viewer_account_id': viewer, 'capabilities': {'legacy_mafia': True}}
+                    result = {**result, 'viewer_account_id': viewer, 'capabilities': {'legacy_mafia': True, 'free_intent': orchestrator is not None}}
                 return JSONResponse(result, headers={'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization'})
         except (NightCaseError,NightAIControlError) as exc:
             # Neither service internals, provider text nor validation pointers become HTTP errors.

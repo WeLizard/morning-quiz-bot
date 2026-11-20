@@ -25,7 +25,11 @@ class StoryIndex:
 def story_index(case, state):
     case = case.document() if hasattr(case, "document") else case
     state = state.document() if hasattr(state, "document") else state
-    return StoryIndex(json.dumps(case, ensure_ascii=False), json.dumps(state, ensure_ascii=False))
+    # The index reads only the authored steps and the story journal. Freezing the whole case and kernel
+    # on every call dominated menu building (dozens of calls per view).
+    steps = (case.get("personal_tasks") or {}).get("steps", [])
+    journal = {"personal_story": state["personal_story"]} if "personal_story" in state else {}
+    return StoryIndex(json.dumps({"personal_tasks": {"steps": steps}}, ensure_ascii=False), json.dumps(journal, ensure_ascii=False))
 
 
 def validate_story(case, state):

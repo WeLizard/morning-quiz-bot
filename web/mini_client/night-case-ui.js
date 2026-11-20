@@ -13,7 +13,7 @@ const pick = (value, keys) => Object.fromEntries(keys.filter(key => value && Obj
 function playerView(value) {
     const safe = pick(value, ['game_id', 'mode', 'server_now', 'runtime_status', 'final_summary', 'lobby', 'menu', 'history_seats', 'selected_original_account_id']);
     safe.public = pick(value?.public, ['clock', 'world', 'art', 'locations', 'players', 'npcs', 'board', 'observations', 'modules', 'hearing', 'final', 'flags', 'locks']);
-    safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem']) : null;
+    safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem', 'finished_window', 'final_ballot']) : null;
     return safe;
 }
 function artPointer(binding) {
@@ -122,7 +122,7 @@ function open(options) {
     const kit = root.NightCity?.kit, Q = root.QW, host = options.host;
     if (!kit || !Q) throw new Error('night_case_shell_required');
     let alive = true, locked = false, epoch = 0, poll = null, timer = null, reading = false, identityReading = false, commandBusy = false;
-    let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null;
+    let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
     let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null;
     let viewer = boot?.viewer_account_id || null;
     const pages = {public: {items: [], next_cursor: null}, self: {items: [], next_cursor: null}, messages: {items: [], next_cursor: null}};
@@ -151,6 +151,7 @@ function open(options) {
     const el = (tag, cls, value) => { const node = document.createElement(tag); if (cls) node.className = cls; if (value != null) node.textContent = String(value); return node; };
     const put = (node, ...children) => { for (const child of children.flat(Infinity)) if (child != null) node.append(child); return node; };
     const p = value => el('p', 'nc-note', value);
+    const status = value => { const node = el('p', 'nc-note ncase-sending', value); node.setAttribute('role', 'status'); return node; };
     const button = (label, callback, kind = 'secondary') => kit.button(label, () => Promise.resolve(callback()).catch(fail), {kind, disabled: outbox.busy});
     const panel = (title, ...children) => kit.panel({title}, ...children);
     const field = (label, value = '', multi = false) => {
@@ -169,7 +170,17 @@ function open(options) {
         .find(row => row.character_id === char));
     const choiceList = () => arr(view?.menu).filter(row => row.kind === 'choice' && row.quote);
     const formList = () => arr(view?.menu).filter(row => row.kind === 'form');
-    const actionButton = (row, label = row.npc_title ? `${row.label} · ${row.npc_title}` : row.label) => button(`${label}${row.quote.cost ? ` · ${row.quote.cost} ОД` : ''}`, () => selectAction(row));
+    // «Выслушать дворецкого · Дворецкий»: the speaker is appended only when the label does not already name them.
+    const mentions = (label, title) => { const stem = text(title).toLowerCase().slice(0, Math.max(4, text(title).length - 2)); return Boolean(stem) && text(label).toLowerCase().includes(stem); };
+    const actionButton = (row, label = row.npc_title && !mentions(row.label, row.npc_title) ? `${row.label} · ${row.npc_title}` : row.label) => button(`${label}${row.quote.cost ? ` · ${row.quote.cost} ОД` : ''}`, () => selectAction(row, label));
+    const female = () => view?.self?.role?.gender === 'f';
+    const said = (male, fem) => female() ? fem : male;
+    const observationTitle = observationId => [...arr(view?.public?.observations), ...arr(view?.self?.observations)].find(item => item.observation_id === observationId)?.title;
+    // Zero-cost bookkeeping needs no «Стоимость: 0 ОД» step: the proposal is confirmed right away.
+    const instant = new Set(['seen', 'finish_window']);
+    let info = '';
+    const receipts = {claim: 'Версия опубликована на доске.', accuse: 'Обвинение предъявлено: открыто слушание.', vote: 'Твой голос на слушании записан.', final_vote: 'Твой голос записан. Его можно изменить, пока слушание не закрылось.',
+        pin: 'Улика опубликована на доске.', finish_window: 'Окно завершено.', archive_request: 'Запрос отправлен. Ответ придёт в следующем окне — его покажут в хронике и досье.', seen: 'Отмечено: ты за столом.'};
 
     function invalidate() {
         if (locked || !alive) return;
@@ -187,7 +198,7 @@ function open(options) {
     function fail(error) {
         if (!live()) return;
         notice = errorText(error);
-        if (!view && !room) frame([panel('Связь с делом', p(notice), kit.row(button('Повторить', () => viewer ? entry() : initialize())))]);
+        if (!view && !room) frame([panel('Связь с делом', p(notice), kit.row(button('Повторить', () => game ? refresh() : initialize())))]);
         else render();
     }
     function frame(children, title = 'Усадьба') {
@@ -200,7 +211,9 @@ function open(options) {
             serverNow: Date.parse(view.server_now) / 1000, alive: live, onExpire: refresh});
         header.set({eyebrow: 'Ночной город', title, clock: timer?.clock});
         const main = put(el('main', 'nc-main ncase-main'), ...children);
+        if (info && !notice) main.prepend(kit.alert({tone: 'ok', icon: 'check', title: info}));
         if (notice) main.prepend(kit.alert({title: notice}));
+        if (outbox.busy && !proposal?.sending) main.prepend(status(`${sending ? sending + ': ' : ''}отправляем…`));
         if (outbox.pending && !outbox.busy) main.prepend(kit.netBanner({text: 'Запрос ещё не подтверждён сервером', onRetry: () => retry().catch(fail)}));
         host.replaceChildren(header.node, main); host.dataset.page = 'night';
     }
@@ -225,7 +238,7 @@ function open(options) {
     }
     async function mutate(path, payload) {
         if (outbox.pending || outbox.busy) return;
-        notice = ''; render();
+        notice = ''; info = ''; render();
         const result = await outbox.send(path, payload);
         if (!live()) return result;
         if (result?.receipt?.accepted === false) notice = errors[result.receipt.code] || 'Сервер не применил действие. Выбери доступный вариант снова.';
@@ -248,25 +261,41 @@ function open(options) {
         try {
             await request(api('quote'), {method: 'POST', body: {kind, params}});
             const result = await mutate(api('commands'), envelope(view, kind, params));
+            if (result?.receipt?.accepted === true && receipts[kind]) info = receipts[kind];
             await refresh();
             return result;
         } finally { commandBusy = false; }
     }
-    async function selectAction(row) {
+    async function selectAction(row, label = row.label) {
         if (row.quote.kind === 'forfeit') return confirmForfeit();
-        const value = await mutate(api('intent'), {request_id: id(), selection_id: row.quote.selection_id, text: null});
-        if (value?.kind === 'proposal') { proposal = {...value.proposal, label: row.label}; render(); }
+        sending = label; info = '';
+        try {
+            const value = await mutate(api('intent'), {request_id: id(), selection_id: row.quote.selection_id, text: null});
+            if (value?.kind !== 'proposal') return;
+            proposal = {...value.proposal, label, kind: row.quote.kind};
+            if (instant.has(row.quote.kind)) return await confirmProposal();
+        } finally { if (!proposal?.sending) sending = ''; }
+        render();
     }
     async function confirmProposal() {
-        if (!proposal) return;
-        await mutate(api('confirm'), {proposal_id: proposal.proposal_id});
-        proposal = null; await refresh();
+        if (!proposal || proposal.sending) return;
+        const sent = proposal;
+        proposal = {...sent, sending: true}; sending = sent.label || 'Действие';
+        try {
+            const result = await mutate(api('confirm'), {proposal_id: sent.proposal_id});
+            if (result?.receipt?.accepted !== false && receipts[sent.kind]) info = receipts[sent.kind];
+        } finally {
+            // The dialog leaves at once; the fresh view arrives after.
+            proposal = null; sending = ''; render();
+        }
+        await refresh();
     }
     function confirmForfeit() {
         proposal = {forfeit: true, label: 'Покинуть дело?'}; render();
     }
     function confirmation() {
         if (!proposal) return null;
+        if (proposal.sending) return panel(proposal.label || 'Подтвердить действие', status('Отправляем…'));
         return panel(proposal.label || 'Подтвердить действие',
             p(proposal.forfeit ? 'Ты прекратишь участие. Назад в эту партию вернуться нельзя; ранее разрешённая история сохранится.' : `Стоимость: ${Number(proposal.cost) || 0} ОД. До подтверждения действие не применяется.`),
             kit.row(button('Отмена', () => { proposal = null; render(); }), button('Подтвердить', async () => {
@@ -437,24 +466,61 @@ function open(options) {
     }
     function place() {
         const own = view.self, location = arr(view.public.locations).find(item => item.id === own.location);
+        const over = Boolean(view.public.final || view.final_summary);
         const moves = choiceList().filter(row => row.quote.kind === 'move');
         const acts = choiceList().filter(row => ['act', 'talk', 'archive_request', 'story_reply'].includes(row.quote.kind));
         const nearby = arr(own.nearby).filter(row => row.character_id !== own.character_id);
-        const free = field('Что ты хочешь сделать?', '', true);
-        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), p(`Осталось действий: ${own.ap}`)));
+        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), over ? null : p(`Осталось действий: ${own.ap}`)));
         const artwork = assets.get(location?.art?.asset_id);
         scene.style?.setProperty('--img', artwork ? `url(${artwork.variants[sceneTime()] || artwork.url})` : 'none');
+        if (over) return [scene];
+        const waiting = arr(own.modules?.archive_requests?.requests).filter(item => item.status === 'pending');
+        const free = boot?.capabilities?.free_intent === true ? field('Что ты хочешь сделать?', '', true) : null;
         return [scene,
-            panel('Доступные действия', ...(acts.length ? [kit.stack(...acts.map(row => actionButton(row)))] : [p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')])),
-            panel('Карта усадьбы', p('Можно перейти только в показанные соседние места.'), kit.row(...moves.map(row => actionButton(row)))),
-            panel('Кто рядом', ...nearby.map(row => p(`${displayName(row)}${row.controller === 'npc' ? ' · собеседник' : ''}`)), ...(nearby.length ? [] : [p(own.role?.gender === 'f' ? 'Сейчас ты здесь одна.' : 'Сейчас ты здесь один.')]), free.node,
-                kit.stack(button('Предложить действие', async () => {
+            panel('Доступные действия', ...(acts.length ? actionGroups(acts) : [p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')]),
+                ...(waiting.length ? [p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в хронику и досье.`)] : [])),
+            panel('Карта усадьбы', p('Можно перейти только в соседние места.'), ...actionGroups(moves)),
+            panel('Кто рядом', ...nearby.map(row => p(`${displayName(row)}${row.controller === 'npc' ? ' · собеседник' : ''}`)), ...(nearby.length ? [] : [p(own.role?.gender === 'f' ? 'Сейчас ты здесь одна.' : 'Сейчас ты здесь один.')]),
+                ...(free ? [free.node, kit.stack(button('Предложить действие', async () => {
                     const result = await mutate(api('intent'), {request_id: id(), text: free.input.value, selection_id: null});
                     notice = result?.kind === 'clarification' ? 'Уточни действие: выбери одну из доступных кнопок. Пока ничего не потрачено.' : '';
                     if (result?.kind === 'proposal') proposal = {...result.proposal, label: 'Предложенное действие'};
                     render();
-                }))),
-            ...choiceList().filter(row => ['seen', 'finish_window'].includes(row.quote.kind)).map(row => panel(row.label, kit.stack(actionButton(row))))];
+                }))] : [])),
+            ...choiceList().filter(row => row.quote.kind === 'seen').map(row => panel(row.label, kit.stack(actionButton(row))))];
+    }
+    // Shown on every tab: finishing the window, or who is still playing it.
+    // Actions grouped by verb: «Осмотреть · 1 ОД» once, then short buttons with the object only.
+    // The confirmation still names the full action.
+    function actionGroups(rows) {
+        const groups = new Map();
+        for (const row of rows) {
+            const kind = row.quote.kind, full = row.npc_title && !mentions(row.label, row.npc_title) ? `${row.label} · ${row.npc_title}` : row.label;
+            const split = /^([^:]{2,40}):\s*(.+)$/.exec(row.label);
+            const [title, short] = kind === 'move' ? ['Перейти', row.label] : kind === 'archive_request' ? ['Запросить в архиве', row.label]
+                : kind === 'talk' ? ['Поговорить', full]
+                : kind === 'story_reply' ? ['Письмо', row.label]
+                : split ? [split[1], split[2]] : ['Другие действия', row.label];
+            if (!groups.has(title)) groups.set(title, []);
+            groups.get(title).push({row, full, short});
+        }
+        return [...groups].map(([title, items]) => {
+            const costs = new Set(items.map(item => Number(item.row.quote.cost) || 0)), same = costs.size === 1 ? [...costs][0] : null;
+            const buttons = items.map(item => {
+                const node = button(`${item.short}${same == null && item.row.quote.cost ? ` · ${item.row.quote.cost} ОД` : ''}`, () => selectAction(item.row, item.full));
+                node.classList?.add('compact'); return node;
+            });
+            return put(el('section', 'ncase-group'), el('h3', 'nc-h3', `${title}${same ? ` · ${same} ОД` : ''}`), kit.row(...buttons));
+        });
+    }
+    // Shown on every tab. Who else has finished stays private: the kernel keeps it out of the public view.
+    function windowBar() {
+        const own = view.self, pub = view.public, clock = pub.clock || {};
+        if (pub.final || view.final_summary || own.status !== 'active' || !['investigation', 'final_hearing'].includes(clock.phase)) return null;
+        if (own.finished_window) return panel(said('Ты завершил окно', 'Ты завершила окно'),
+            p('Ждём остальных. Новое окно откроется, когда все завершат своё или выйдет время.'));
+        const finish = choiceList().find(row => row.quote.kind === 'finish_window');
+        return finish ? panel('Окно', p(`${said('Сделал', 'Сделала')} всё, что ${said('хотел', 'хотела')}? Заверши окно: когда завершат все, следующее откроется раньше.`), kit.stack(actionButton(finish))) : null;
     }
     function evidenceCard(item, source, actions = []) {
         return panel(item.title || (item.kind === 'claim' ? 'Утверждение' : 'Доказательство'),
@@ -463,40 +529,65 @@ function open(options) {
     }
     function board() {
         const all = [...arr(view.public.observations), ...arr(view.self.observations)], observations = new Map(all.map(item => [item.observation_id, item]));
-        const publicItems = arr(view.public.board).map(row => {
+        const playerName = account => arr(view.public.players).find(row => row.account_id === account)?.name;
+        // One card per published observation: a second publisher is a name on it, not a second copy.
+        const groups = new Map();
+        for (const row of arr(view.public.board)) {
+            const key = row.observation_id ? `obs:${row.observation_id}` : `row:${row.id}`;
+            if (!groups.has(key)) groups.set(key, {row, owners: []});
+            const owner = row.owner_account_id === view.self.account_id ? 'ты' : playerName(row.owner_account_id);
+            if (owner && !groups.get(key).owners.includes(owner)) groups.get(key).owners.push(owner);
+        }
+        const publicItems = [...groups.values()].map(({row, owners}) => {
             const observation = row.observation || observations.get(row.observation_id);
-            return observation ? evidenceCard(observation, 'Опубликовано на доске') : evidenceCard({kind: row.kind, title: row.kind === 'claim' ? 'Версия игрока' : 'Улика', text: row.text}, 'Публичная запись');
+            const by = owners.length ? `Опубликовал${owners.length > 1 ? 'и' : ''}: ${owners.join(', ')}` : 'Опубликовано на доске';
+            return observation ? evidenceCard(observation, by) : evidenceCard({kind: row.kind, title: row.kind === 'claim' ? 'Версия игрока' : 'Улика', text: row.text}, by);
         });
-        const personal = arr(view.self.observations).map(item => evidenceCard(item, 'Твоя находка', choiceList().filter(row => ['pin', 'ghost_share'].includes(row.quote.kind) && row.quote.params.observation_id === item.observation_id).map(row => actionButton(row))));
+        const onBoard = new Set(arr(view.public.board).map(row => row.observation_id).filter(Boolean));
+        const lost = new Set(arr(view.self.personal?.lost_observations));
+        const personal = arr(view.self.observations).map(item => {
+            const actions = choiceList().filter(row => ['pin', 'ghost_share'].includes(row.quote.kind) && row.quote.params.observation_id === item.observation_id)
+                .map(row => actionButton(row, row.quote.kind === 'pin' ? `${onBoard.has(item.observation_id) ? 'Подтвердить от себя' : 'Опубликовать'}: ${item.title || 'улика'}` : `${row.label}: ${item.title || 'воспоминание'}`));
+            const source = lost.has(item.observation_id) ? 'Твоя находка. Оригинала больше нет: от него остался пепел. Записанное тобой — всё, что от него осталось.'
+                : onBoard.has(item.observation_id) ? 'Твоя находка. Эта улика уже на доске.' : 'Твоя находка';
+            return evidenceCard(item, source, actions);
+        });
         const theories = arr(view.public.modules?.version_archive?.theories).map(item => panel(item.title, p(bodyText(item.body)), p(item.state === 'archived' ? 'Версия в архиве; её источники сохранены.' : 'Активная версия'),
-            kit.row(...choiceList().filter(row => row.quote.kind === 'version_mark' && row.quote.params.version_id === item.id).map(row => actionButton(row, item.state === 'archived' ? 'Вернуть версию' : 'В архив')))));
+            kit.row(...choiceList().filter(row => row.quote.kind === 'version_mark' && row.quote.params.version_id === item.id).map(row => actionButton(row, item.state === 'archived' ? `Вернуть версию: ${item.title}` : `В архив: ${item.title}`)))));
         const claimForm = formList().find(row => row.command_kind === 'claim');
         const draft = field('Твоя версия для доски', '', true);
-        return [panel('Доска дела', p('Текст игрока и показания остаются утверждениями. Для обвинения нужны опубликованные доказательства.')),
-            ...publicItems, ...(claimForm ? [panel('Добавить версию', draft.node, kit.row(button('Опубликовать', () => command('claim', {text: draft.input.value}))))] : []),
-            panel('Твои находки', p('Они не становятся известны другим до публикации.')), ...personal, ...theories, ...hearings()];
+        return [...hearings(), panel('Доска дела', p('Текст игрока и показания остаются утверждениями. Для обвинения нужны опубликованные доказательства.')),
+            ...publicItems, ...(claimForm ? [panel('Добавить версию', draft.node, kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value}))))] : []),
+            panel('Твои находки', p('Они не становятся известны другим до публикации.')), ...personal, ...theories];
     }
     function hearings() {
         return formList().filter(row => ['accuse', 'vote', 'final_vote'].includes(row.command_kind)).map(form => {
-            const subjects = choose('Кто вывел и скрывал хозяина? Если он всё сделал сам — выбери его.', [{id: '', label: 'Выбери участника'}, ...arr(form.subject_ids).map(char => ({id: char, label: nameOf(char)}))]);
+            const subjects = choose('Кто вывел и скрывал хозяина? Если он всё сделал сам — выбери его.', [{id: '', label: 'Выбери участника'}, ...arr(form.subject_ids).map(char => ({id: char, label: nameOf(char)})),
+                ...(form.command_kind === 'final_vote' ? [{id: 'abstain', label: 'Воздержаться'}] : [])], form.command_kind === 'final_vote' && view.self.final_ballot ? (view.self.final_ballot.suspect || 'abstain') : '');
             const citations = el('div', 'ncase-citations');
             const picked = new Set();
             for (const entry of arr(view.public.board).filter(item => arr(form.board_ids).includes(item.id))) {
                 const input = el('input'); input.type = 'checkbox'; input.value = entry.id;
                 input.addEventListener('change', () => { if (input.checked && picked.size < 5) picked.add(entry.id); else { picked.delete(entry.id); input.checked = false; } });
                 const obs = entry.observation || [...arr(view.public.observations), ...arr(view.self.observations)].find(item => item.observation_id === entry.observation_id);
-                citations.append(put(el('label', 'ncase-checkbox'), input, el('span', null, `${entry.kind === 'proof' ? 'Доказательство' : 'Утверждение'}: ${obs?.title || entry.text || 'Публичная улика'}`)));
+                const owner = entry.owner_account_id === view.self.account_id ? 'ты' : arr(view.public.players).find(row => row.account_id === entry.owner_account_id)?.name;
+                citations.append(put(el('label', 'ncase-checkbox'), input, el('span', null, `${entry.kind === 'proof' ? 'Доказательство' : 'Утверждение'}: ${obs?.title || entry.text || 'Публичная улика'}${owner ? ` · ${owner}` : ''}`)));
             }
             const send = choice => {
                 const kind = form.command_kind, params = {citations: [...picked]};
                 if (kind === 'vote') Object.assign(params, {hearing_id: form.hearing_id, choice});
-                else params.suspect = subjects.input.value || null;
+                else {
+                    if (!subjects.input.value) { notice = 'Выбери участника в списке.'; render(); return null; }
+                    params.suspect = subjects.input.value === 'abstain' ? null : subjects.input.value;
+                }
                 return command(kind, params);
             };
             return panel(form.command_kind === 'vote' ? 'Идёт слушание' : form.command_kind === 'final_vote' ? 'Итоговое слушание' : 'Предъявить обвинение',
+                ...(form.command_kind === 'final_vote' ? [p('Назови, кто вывел и скрывал хозяина, и приложи улики с доски. Голос можно изменить, пока слушание не закрылось; итог объявят после закрытия.'),
+                    ...(view.self.final_ballot ? [kit.alert({tone: 'ok', icon: 'check', title: `Твой голос записан: ${view.self.final_ballot.suspect ? nameOf(view.self.final_ballot.suspect) : 'без обвинения'}`})] : [])] : []),
                 p('Выбери до пяти источников. Сервер проверит, хватает ли доказательств; утверждения ключами не считаются.'),
                 ...(form.command_kind === 'vote' ? [] : [subjects.node]), citations,
-                kit.row(...(form.command_kind === 'vote' ? [button('Возражаю', () => send('oppose')), button('Поддержать', () => send('support'))] : [button('Подтвердить выбор', () => send())])));
+                kit.row(...(form.command_kind === 'vote' ? [button('Возражаю', () => send('oppose')), button('Поддержать', () => send('support'))] : [button(form.command_kind === 'final_vote' ? (view.self.final_ballot ? 'Изменить голос' : 'Отдать голос') : 'Предъявить обвинение', () => send(), 'primary')])));
         });
     }
     function chat() {
@@ -514,7 +605,8 @@ function open(options) {
         const draft = field('Сообщение', ownDraft, true);
         draft.input.addEventListener('input', () => { ownDraft = draft.input.value; });
         const messages = pages.messages.items.map(row => {
-            const sender = arr(view.public.players).find(p => p.account_id === row.sender_account_id)?.name || 'Участник';
+            const own = row.sender_account_id === view.self.account_id;
+            const sender = `${arr(view.public.players).find(p => p.account_id === row.sender_account_id)?.name || 'Участник'}${own ? ' (ты)' : ''}`;
             return put(el('article', 'ncase-message'), el('strong', null, sender), el('span', 'nc-note', row.channel === 'whisper' ? 'Приватная беседа' : row.channel === 'ghost' ? 'Призраки' : 'Площадь'), p(row.text));
         });
         return [panel('Переписка', p('Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. Призраки разговаривают отдельно.'), ...messages,
@@ -525,11 +617,33 @@ function open(options) {
                     if (result?.receipt?.accepted === true) { ownDraft = ''; render(); }
                 }))] : [p('Сейчас отправка недоступна. Ранее разрешённая переписка сохранена.')]))];
     }
+    function eventText(item) {
+        const payload = item.payload || {}, own = view.self;
+        const player = character => nameOf(character);
+        const boardRow = arr(view.public.board).find(row => row.id === payload.board_id);
+        const who = account => account === own.account_id ? 'Ты' : arr(view.public.players).find(row => row.account_id === account)?.name || 'Участник';
+        if (bodyText(payload.body)) return bodyText(payload.body);
+        switch (item.kind) {
+        case 'window': return payload.phase === 'final_hearing' ? 'Началось итоговое слушание: каждый называет, кто скрывал хозяина.' : payload.phase === 'frozen' ? 'Стол остановился: все пропустили окна.' : `Открылось окно ${payload.window_idx || item.window_idx}.`;
+        case 'board': return boardRow ? `${who(boardRow.owner_account_id)}: на доске ${boardRow.observation_id ? `улика «${observationTitle(boardRow.observation_id) || 'без названия'}»` : 'новая версия'}.` : 'На доске появилась запись.';
+        case 'observation_granted': return `Находка: «${observationTitle(payload.observation_id) || 'запись'}».`;
+        case 'archive_requested': return `Архивный запрос отправлен. Ответ — в окне ${payload.due_window}.`;
+        case 'hearing': return payload.stage === 'opened' ? `Открыто слушание: обвиняют ${player(payload.suspect)}.` : `Слушание закрыто${payload.resolution === 'cancelled' ? ' без решения' : ''}: обвиняли ${player(payload.suspect)}.`;
+        case 'status': return {ghost: `${player(payload.character_id)} теперь наблюдает за делом.`, fog: `${player(payload.character_id)} пропадает из виду.`, removed: `${player(payload.character_id)} покидает дело.`, active: `${player(payload.character_id)} снова за столом.`}[payload.status] || 'Состав стола изменился.';
+        case 'npc_revealed': return 'Хозяин найден.';
+        case 'world_changed': return 'Обстановка в усадьбе изменилась.';
+        case 'version_marked': return `${who(payload.by_account)}: версия ${payload.state === 'archived' ? 'отправлена в архив' : 'возвращена'}.`;
+        case 'final': return 'Дело закрыто.';
+        case 'afk_notice': return `Ты ${said('пропустил', 'пропустила')} окон подряд: ${payload.missed_windows}.`;
+        case 'window_digest': return 'Итог окна записан в хронику.';
+        case 'story_return_closed': return payload.decision === 'accepted' ? 'Письмо передано.' : 'Письмо не передано.';
+        default: return 'Событие дела.';
+        }
+    }
     function history() {
         const eventCards = (stream, title) => panel(title, ...pages[stream].items.map(item => {
             const payload = item.payload || {};
-            return put(el('article', 'ncase-event'), el('strong', null, `Окно ${item.window_idx}`),
-                p(bodyText(payload.body) || ({window: 'Открылось новое игровое окно.', board: 'На доске появилась запись.', npc_revealed: 'Хозяин найден.', world_changed: 'Обстановка изменилась.'}[item.kind] || 'Изменение дела записано.')),
+            return put(el('article', 'ncase-event'), el('strong', null, `Окно ${item.window_idx}`), p(eventText(item)),
                 ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : []));
         }), ...(pages[stream].next_cursor ? [kit.row(button('Ещё записи', async () => { await loadHistory(stream, true); render(); }))] : []));
         return [eventCards('public', 'Общий ход дела'), eventCards('self', 'Твои события')];
@@ -558,7 +672,10 @@ function open(options) {
         const final = own.postmortem;
         const finale = pub.final || view.final_summary ? panel('Дело завершено', p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
             p(final?.goal_results?.find(row => row.account_id === own.account_id)?.met ? 'Твоя личная цель выполнена.' : 'Подробности своей личной цели смотри в итоговом досье.')) : null;
-        const hearingNotice = (pub.hearing || clock.phase === 'final_hearing') && tab !== 'board' ? panel('Идёт слушание', p('Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'), kit.row(button('Открыть слушание', () => showTab('board')))) : null;
+        const finalHearing = clock.phase === 'final_hearing' && !pub.final;
+        const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? panel(finalHearing ? 'Итоговое слушание' : 'Идёт слушание',
+            p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
+            kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
         const current = tab === 'self' ? [role()] : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : place();
         let selector = null;
         if (['finished', 'stopped'].includes(view.runtime_status) && arr(view.history_seats).length > 1) {
@@ -570,7 +687,7 @@ function open(options) {
             });
             selector = panel('Твоя история', choice.node);
         }
-        frame([navigation(), selector, stateNotice, hearingNotice, finale, confirmation(), ...current].filter(Boolean), `Окно ${clock.window_idx || '—'} · ${arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба'}`);
+        frame([navigation(), selector, stateNotice, hearingNotice, finale, confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean), `Окно ${clock.window_idx || '—'} · ${arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба'}`);
     }
     function close() {
         if (!alive) return;

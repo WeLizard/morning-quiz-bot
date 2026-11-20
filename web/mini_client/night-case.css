@@ -14,6 +14,11 @@
 .ncase-field select {background:var(--nc-field,var(--qw-game-surface));padding:var(--qw-s-3)}
 .ncase-checkbox {display:flex;align-items:center;gap:var(--qw-s-3);min-height:var(--qw-btn-h);font-size:var(--qw-fs-body);cursor:pointer}
 .ncase-checkbox input {width:24px;height:24px;flex:none;accent-color:var(--qw-game-accent)}
+.ncase-group {display:flex;flex-direction:column;gap:var(--qw-s-2)}
+.ncase-group + .ncase-group {border-top:var(--qw-outline-w) solid var(--qw-game-line);padding-top:var(--qw-s-3)}
+.ncase-group .nc-h3 {margin:0;font-size:var(--qw-fs-small);letter-spacing:.04em;text-transform:uppercase;color:var(--qw-game-muted)}
+.ncase-group .qw-btn-row {justify-content:flex-start}
+.ncase-group .qw-btn-row .qw-btn {flex:0 1 auto;max-width:100%;text-align:left}
 .ncase-citations,.ncase-recipients {display:flex;flex-direction:column;gap:var(--qw-s-2)}
 .ncase-claim {color:var(--qw-game-muted);font-size:var(--qw-fs-small)}
 .ncase-proof {color:var(--qw-game-accent);font-size:var(--qw-fs-small)}

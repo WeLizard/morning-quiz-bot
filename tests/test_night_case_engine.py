@@ -689,6 +689,11 @@ class PersonalEngineTests(unittest.TestCase):
             t = personal_act(case, rules, t, actors, "person_00", "burn_original")
             pred = case.document()["characters"][0]["goal"]["when"][0]
             self.assertEqual(story_predicate(pred, story_index(case, t.state), actors["person_00"], None), not foreign_first)
+            if foreign_first:  # the reader of the burnt original sees the find as lost
+                from domain.night_case_projection import project
+                from domain.night_case_state import PlayerActor as Viewer
+                lost = project(case, rules, t.state, Viewer(actors["person_02"]))["self"]["personal"]["lost_observations"]
+                self.assertTrue(lost)
             if not foreign_first:
                 t = personal_act(case, rules, t, actors, "person_02", "read_original")
                 self.assertTrue(t.receipt["accepted"])

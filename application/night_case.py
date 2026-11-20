@@ -240,9 +240,10 @@ def _public(case, rules, state, art=None):
     allowed=('game_id','case_id','flags','locks','observations','board','chronicle','players','npcs','hearing','final','locations','modules','looks')
     result={k:raw[k] for k in allowed if k in raw}
     result['clock']={k:raw['clock'][k] for k in ('timezone','window_idx','window_seq','phase','opened_at','closes_at','freeze_at','forget_at')}
-    result['world']=copy.deepcopy(case.document()['meta'].get('world'))
-    result['style_pack']=copy.deepcopy(case.document()['meta'].get('style_pack'))
-    result['crime_type']=copy.deepcopy(case.document()['meta'].get('crime_type'))
+    meta=case.document()['meta']  # a fresh parse of the whole case; once is enough
+    result['world']=copy.deepcopy(meta.get('world'))
+    result['style_pack']=copy.deepcopy(meta.get('style_pack'))
+    result['crime_type']=copy.deepcopy(meta.get('crime_type'))
     result['art']=copy.deepcopy(art)
     # Titles follow the party's sealed looks (e.g. «Фотограф-гостья» or «Фотограф-гость»).
     for npc in result['npcs']: npc['title']=raw['looks'][npc['character_id']]['title']
@@ -790,7 +791,7 @@ class NightCaseApplicationService:
         if not valid: raise NightCaseError('game_quarantined',503)
         frozen_public=value['frozen_view']['public']; frozen_self=value['frozen_view']['self']
         public_fields={'game_id','case_id','clock','flags','locks','observations','board','players','npcs','hearing','final','locations','modules','world','style_pack','crime_type','art','looks'}
-        self_fields={'account_id','character_id','status','location','ap','actor_seq','knowledge_revision','faction','goal','secrets','truth','knowledge','observations','dialogue_cursors','postmortem','modules','communication','personal','role'}
+        self_fields={'account_id','character_id','status','location','ap','actor_seq','knowledge_revision','faction','goal','secrets','truth','knowledge','observations','dialogue_cursors','postmortem','modules','communication','personal','role','finished_window','final_ballot'}
         own_max=sum(e['audience'].get('ids')==[str(original_id)] for e in doc['private_events'])
         if (set(frozen_public)-public_fields or set(frozen_self)-self_fields
                 or frozen_public.get('game_id')!=locked.game.id or frozen_self.get('status')!='departed'

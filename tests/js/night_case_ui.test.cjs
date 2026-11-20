@@ -251,7 +251,7 @@ test('focused same-view probes preserve exact draft nodes on success and 503 but
     let status = 200;
     const fixture = controller(view(), async url => {
         if (url.includes('/view') && status !== 200) { const error = new Error(); error.status = status; throw error; }
-    });
+    }, {bootstrap: {enabled: true, cases: [], viewer_account_id: VIEWER, capabilities: {free_intent: true}}});
     await settle();
     const input = find(fixture.host, node => node.attrs?.['aria-label'] === 'Что ты хочешь сделать?');
     input.value = 'UNSENT_PRIVATE_DRAFT'; fixture.doc.activeElement = {tagName: 'TEXTAREA'};
@@ -326,5 +326,76 @@ test('an overlapping normal view uses one cheap identity probe and rejects its l
     assert.doesNotMatch(fixture.host.textContent, /LATE_PRIVATE_CANARY/);
     assert.match(fixture.host.textContent, /Открой дело заново/);
     assert.equal(fixture.intervals.size, 0);
+    fixture.handle.close();
+});
+
+const button = (host, label) => find(host, node => node.tagName === 'button' && node.textContent === label);
+const choice = (kind, label, params = {}, cost = 0) => ({kind: 'choice', label, quote: {kind, params, selection_id: `sel-${kind}-${label}`, cost}});
+
+test('zero-cost bookkeeping confirms without a cost dialog and the window bar follows every tab', async () => {
+    const state = view();
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active', finished_window: false},
+        {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active', finished_window: false}];
+    state.self.account_id = VIEWER;
+    state.menu.push(choice('finish_window', 'Завершить окно'));
+    let finished = false;
+    const fixture = controller(state, url => {
+        if (url.endsWith('/confirm')) { finished = true; return {receipt: {accepted: true}}; }
+        if (url.includes('/view') && finished) return {...state, self: {...state.self, finished_window: true}, menu: state.menu.slice(0, 1)};
+    });
+    await settle();
+    await button(fixture.host, 'Улики').click(); await settle();
+    const finish = button(fixture.host, 'Завершить окно');
+    assert.ok(finish, 'finish is offered outside the place tab');
+    await finish.click(); await settle();
+    assert.ok(fixture.calls.some(row => row.url.endsWith('/confirm')), 'confirmed without a second press');
+    assert.equal(button(fixture.host, 'Подтвердить'), undefined);
+    assert.match(fixture.host.textContent, /Ты завершил окно/);
+    assert.match(fixture.host.textContent, /Ждём остальных/);
+    fixture.handle.close();
+});
+
+test('the confirm dialog leaves at once and shows sending while the server answers', async () => {
+    let release;
+    const fixture = controller(view(), url => url.endsWith('/confirm') ? new Promise(resolve => { release = () => resolve({receipt: {accepted: true}}); }) : undefined);
+    await settle();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent.includes('Осмотреть стол')).click(); await settle();
+    button(fixture.host, 'Подтвердить').click(); await settle();
+    assert.match(fixture.host.textContent, /Отправляем…/);
+    assert.equal(button(fixture.host, 'Подтвердить'), undefined, 'no second confirm while sending');
+    release(); await settle();
+    assert.doesNotMatch(fixture.host.textContent, /Отправляем…|Стоимость:/);
+    fixture.handle.close();
+});
+
+test('publish buttons name the evidence, a second publication is one card and own chat lines are marked', async () => {
+    const state = view();
+    state.self.account_id = VIEWER;
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active'}, {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}];
+    const note = {observation_id: 'note', kind: 'proof', title: 'Записка у камина', body: {text: 'Текст записки'}};
+    state.self.observations = [note, {observation_id: 'ash', kind: 'proof', title: 'Черновик', body: {text: 'лежит в библиотеке'}}];
+    state.self.personal = {lost_observations: ['ash']};
+    state.public.board = [{id: 'b1', owner_account_id: 'other', kind: 'proof', observation_id: 'note', observation: note}, {id: 'b2', owner_account_id: 'third', kind: 'proof', observation_id: 'note', observation: note}];
+    state.menu.push(choice('pin', 'Опубликовать улику', {observation_id: 'note'}), choice('pin', 'Опубликовать улику', {observation_id: 'ash'}));
+    const fixture = controller(state, url => url.includes('/history?stream=messages') ? {items: [{id: 'm1', sender_account_id: VIEWER, channel: 'square', text: 'Привет'}], next_cursor: null} : undefined);
+    await settle();
+    await button(fixture.host, 'Улики').click(); await settle();
+    assert.ok(button(fixture.host, 'Подтвердить от себя: Записка у камина'));
+    assert.ok(button(fixture.host, 'Опубликовать: Черновик'));
+    assert.equal(button(fixture.host, 'Опубликовать улику'), undefined);
+    assert.equal(fixture.host.textContent.split('Текст записки').length - 1, 2, 'one board card plus the own find');
+    assert.match(fixture.host.textContent, /Оригинала больше нет/);
+    await button(fixture.host, 'Беседа').click(); await settle();
+    assert.match(fixture.host.textContent, /Вера \(ты\)/);
+    fixture.handle.close();
+});
+
+test('after the final the place shows no actions and no free intent box without a host', async () => {
+    const state = view();
+    state.public.final = {code: 'solved', at: '2026-11-20T10:00:00Z'};
+    state.self.postmortem = {ending: {text: 'Финал'}, goal_results: []};
+    const fixture = controller(state); await settle();
+    assert.doesNotMatch(fixture.host.textContent, /Осталось действий|Предложить действие|Осмотреть стол/);
+    assert.match(fixture.host.textContent, /Дело завершено/);
     fixture.handle.close();
 });

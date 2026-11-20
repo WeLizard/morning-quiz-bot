@@ -1684,23 +1684,40 @@ function renderSecrets(p){
 // Bridge from «Алхимия»: the dyer's notes are riddles solved there; the server seals them and the farm learns the dye.
 // The farm never names the Atlas or Alchemy: the player has to make the connection (no hints by design).
 const DYE_ICONS={mordant:'alchemy',indigo:'dye_indigo',madder:'dye_madder',saffron:'dye_saffron'};
-// The hint is cosmetic and device-local: a riddle whose lines show through one per day the player looks in
-// (DYE_RIDDLE.length different days). It never names the Atlas, Alchemy or the elements (owner's decision 2026-11-20).
-const DYE_RIDDLE=['Что с неба течёт и не ранит,','что греет, а в руки нейдёт,','что крылья вращает незримо,','и то, что всех держит, — сведи.'];
-function dyeworksVisitDays(){
- const key=`qw-farm.dyeworks-days.${S.me?.id||''}`,day=new Date().toISOString().slice(0,10);
- let days=[];try{days=JSON.parse(localStorage.getItem(key)||'[]');}catch{}
- if(!Array.isArray(days))days=[];
- if(!days.includes(day)&&days.length<DYE_RIDDLE.length){days=[...days,day];try{localStorage.setItem(key,JSON.stringify(days));}catch{}}
- return Math.min(days.length,DYE_RIDDLE.length);
+// The hint is cosmetic and keeps nothing: on some days one line of the riddle shows through on the wall, on others
+// the wall is blank. Seen it — good; missed it — another day. The pick is fixed per farm and day so a re-render does
+// not flicker. It never names the Atlas, Alchemy or the elements (owner's decision 2026-11-20).
+// Lines of four riddles (written with another model, chosen by the owner 2026-11-20); any line may show on any day.
+const DYE_RIDDLE=[
+ 'Четыре корня мир сплели в одно,',
+ 'В чужой тетради теплится зерно.',
+ 'Где спорят искра, ветер, глубь и пыль —',
+ 'Очнётся цвет, стряхнув былую быль.',
+ 'На старых картах прячется ответ,',
+ 'В пустых котлах не вспыхнет прежний свет.',
+ 'Сложи четыре вздоха в тишине —',
+ 'И краски сами вспомнят о тебе.',
+ 'Мастер унёс секреты за порог,',
+ 'Где бьётся пульс четырёх дорог.',
+ 'Смешай чужое — и в глухой тиши',
+ 'Вернётся цвет в уснувшие ковши.',
+ 'Чужая книга помнит тайный счёт,',
+ 'Где из четырёх зёрен росток взойдёт.',
+ 'Забытый свиток шепчет о былом,',
+ 'И радуга вернётся в старый дом.'
+];
+// The owner's favourite («На старых картах…», lines 4–7) shows twice as often as the other three riddles.
+const DYE_FAVOURITE=[4,5,6,7],DYE_LINES=[...DYE_RIDDLE,...DYE_FAVOURITE.map(i=>DYE_RIDDLE[i])];
+const DYE_LINE_CHANCE=2; // one day in DYE_LINE_CHANCE on average
+function dyeworksLineToday(farmId=S.me?.id||'',day=String(Math.floor((Date.now()/1000+3*3600)/86400))){ // Moscow day, like the game's days
+ let h=2166136261;for(const ch of `${farmId}:${day}`){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}
+ h^=h>>>16;h=Math.imul(h,0x85ebca6b)>>>0;h^=h>>>13;h=Math.imul(h,0xc2b2ae35)>>>0;h=(h^(h>>>16))>>>0; // mix: neighbouring days must not alternate; stay unsigned
+ if(h%DYE_LINE_CHANCE)return null;
+ return DYE_LINES[Math.floor(h/DYE_LINE_CHANCE)%DYE_LINES.length];
 }
 function dyeworksRiddle(p){
- const shown=dyeworksVisitDays();if(!shown)return;
- const box=el('div',null,'dye-riddle');box.append(el('p','На стене над чаном проступают строки:','note'));
- const verse=el('p',null,'note dye-riddle-verse');
- DYE_RIDDLE.slice(0,shown).forEach((line,i)=>{if(i)verse.append(el('br'));verse.append(document.createTextNode(line));});
- if(shown<DYE_RIDDLE.length){verse.append(el('br'));verse.append(document.createTextNode('…'));}
- box.append(verse);p.append(box);
+ const line=dyeworksLineToday();if(!line)return;
+ p.append(el('p','На стене над чаном проступает строка:','note'),el('p',line,'note dye-riddle-verse'));
 }
 function renderDyeworks(p){
  heading('Красильня','ТАЙНА СТАРОГО МАСТЕРА');

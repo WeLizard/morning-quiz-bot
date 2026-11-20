@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
+from .bot_handover import waiting_chats_in
 from .models import Chat, User, SystemState
 from .schedule_plan import build_schedule_plan
 
@@ -27,7 +28,11 @@ class ScheduleSource:
             rows = (await session.execute(statement)).all()
             control = await session.get(SystemState, 'maintenance_status')
             maintenance = bool(control and control.payload.get('maintenance_mode'))
-        return {cid: ScheduleState(deepcopy(values or {}), revision, active and not blocked and not private_blocked and not maintenance)
+            # Chats the old bot still serves: no scheduled pushes from here until they are released.
+            waiting = await waiting_chats_in(session)
+        return {cid: ScheduleState(deepcopy(values or {}), revision,
+                                   active and not blocked and not private_blocked and not maintenance
+                                   and cid not in waiting)
                 for cid, values, revision, active, blocked, private_blocked in rows}
 
     def plan(self, state, kind):

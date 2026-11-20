@@ -465,6 +465,10 @@ async def main() -> None:
         if data_manager.postgres_storage:
             from handlers.moderation import moderation_handler
             application_instance.add_handler(moderation_handler(data_manager.postgres_storage.database), group=-100)
+            # Groups the old bot still serves until the switch day: stay quiet there (storage/bot_handover.py).
+            from handlers.handover_handlers import HandoverHandlers
+            application_instance.add_handler(
+                HandoverHandlers(data_manager.postgres_storage.database).get_handler(), group=-95)
         logger.debug(f"🔧 data_manager добавлен в application.bot_data: {data_manager}")
         logger.debug(f"🔧 Доступные ключи в bot_data: {list(application_instance.bot_data.keys())}")
 

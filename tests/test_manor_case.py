@@ -91,6 +91,12 @@ class Play:
         if publish:
             self.cmd(char, "pin", {"observation_id": obs})
 
+    def find_rights(self):
+        """The daughter has to learn where to look before she can find the original appendix."""
+        for obs in ["official_will_copy", "will_register_copy"]:
+            self.read("daughter", obs)
+        return self.act("daughter", "act_find_rights")
+
     def until(self, window):
         while not self.doc["final"] and self.doc["clock"]["window_idx"] < window:
             self.tick()
@@ -242,7 +248,7 @@ class ManorCommandAcceptance(unittest.TestCase):
             p.act("lawyer", "act_" + action)
         retained = [k for k in p.doc["knowledge"] if k["observation_id"] == "will_original_section"]
         self.assertEqual(len(retained), 1)
-        p.act("daughter", "act_find_rights")
+        p.find_rights()
         self.assertEqual([e["payload"]["disposition"] for e in p.t.events if e["kind"] == "story_result"], ["not_completed"])
         p.collect_a()
         p.hearing()
@@ -268,12 +274,66 @@ class ManorCommandAcceptance(unittest.TestCase):
 
     def test_daughter_original_is_personal_and_competes_with_burn(self):
         p = Play(4)
-        p.act("daughter", "act_find_rights")
+        p.find_rights()
         for action in ["lawyer_read_draft", "lawyer_take_draft", "burn_original"]:
             p.act("lawyer", "act_" + action)
         p.finish()
         self.assertTrue(p.goal("daughter"))
         self.assertFalse(p.goal("lawyer"))
+
+    def test_daughter_needs_both_copies_before_the_original(self):
+        p = Play(4)
+        ids = lambda: {row.quote.target_id for row in available_actions(CASE, RULES, p.t.state, PlayerActor(p.player("daughter")["account_id"]), now_utc=p.now) if row.kind == "choice" and row.quote.kind == "act"}
+        self.assertNotIn("act_find_rights", ids())
+        p.read("daughter", "official_will_copy")
+        self.assertNotIn("act_find_rights", ids())
+        p.read("daughter", "will_register_copy")
+        p.act("daughter", "act_find_rights")
+        p.finish()
+        self.assertTrue(p.goal("daughter"))
+
+    def scenes(self, p):
+        return [e["payload"]["content_event_id"] for e in p.doc["public"]["chronicle"] if e["kind"] == "scene"]
+
+    def test_found_owner_talks_and_silences_the_knock(self):
+        quiet = Play(4)
+        quiet.until(11)
+        self.assertIn("ev_cellar_knock", self.scenes(quiet))
+        p = Play(4)
+        p.act("investigator", "search_cellar")
+        reply = next(e for e in p.t.events if e["kind"] == "action_result")
+        self.assertIn("хозяин усадьбы", reply["payload"]["body"]["text"])
+        p.ap("investigator")
+        talk = {"dialogue_id": "talk_owner", "node_id": "opening", "option_id": "ask_night"}
+        p.cmd("investigator", "talk", talk)
+        self.assertIn("owner_statement", {k["observation_id"] for k in p.doc["knowledge"] if k["account_id"] == p.player("investigator")["account_id"]})
+        p.until(11)
+        self.assertNotIn("ev_cellar_knock", self.scenes(p))
+
+    def test_spent_talk_is_not_offered_again(self):
+        p = Play(4)
+        p.go("investigator", "kitchen_wing")
+        p.ap("investigator")
+        talk = {"dialogue_id": "talk_maid", "node_id": "opening", "option_id": "ask_night"}
+        actor = PlayerActor(p.player("investigator")["account_id"])
+        offered = lambda: [row.label for row in available_actions(CASE, RULES, p.t.state, actor, now_utc=p.now) if row.kind == "choice" and row.quote.kind == "talk" and "горничн" in row.label]
+        self.assertEqual(offered(), ["Выслушать горничную"])
+        p.cmd("investigator", "talk", talk)
+        self.assertEqual(offered(), [])
+        with self.assertRaises(ValueError):
+            quote_action(CASE, RULES, p.t.state, actor, CommandIntent("talk", talk), now_utc=p.now)
+
+    def test_texts_do_not_leak_the_variant_or_the_conclusion(self):
+        titles = {o["id"]: o["title"].lower() for o in RAW["observations"]}
+        for action in RAW["actions"]:
+            for outcome in action.get("outcomes", []):
+                self.assertNotRegex(outcome["body"]["text"], r"^[ABC]:")
+                self.assertNotIn("осмотр завершён", outcome["body"]["text"])
+                for effect in outcome["effects"]:
+                    if action["id"].startswith("compare_") and effect["kind"] == "grant_observation":
+                        self.assertNotEqual(action["label"].lower(), titles[effect["observation"]])
+        labels = [o["label"] for d in RAW["dialogues"] for n in d["nodes"] for o in n["options"]]
+        self.assertEqual(len(labels), len(set(labels)))
 
     def test_doctor_butler_housekeeper_investigator_actual_goals(self):
         p = Play()

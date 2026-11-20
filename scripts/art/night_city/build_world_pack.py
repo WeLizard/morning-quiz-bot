@@ -36,7 +36,7 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = 'e4b63f1810a9de5d9cac061b4dabcccb864b30c53c46e4aa7354be7611804ada'
+MANOR_CASE_CANONICAL_SHA256 = '932a084887f4cdefd3882a1de65cabf0aacc65d59d108f61bc5b5e9faebb0d03'
 
 BUDGET = {'scene': 150_000, 'back': 90_000, 'frame': 90_000, 'frame_small': 60_000, 'icon': 30_000, 'thumb': 20_000}
 

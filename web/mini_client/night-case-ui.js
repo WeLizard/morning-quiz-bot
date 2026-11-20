@@ -477,7 +477,7 @@ function open(options) {
     }
     function hearings() {
         return formList().filter(row => ['accuse', 'vote', 'final_vote'].includes(row.command_kind)).map(form => {
-            const subjects = choose('Кого считаешь организатором?', [{id: '', label: 'Выбери участника'}, ...arr(form.subject_ids).map(char => ({id: char, label: nameOf(char)}))]);
+            const subjects = choose('Кто вывел и скрывал хозяина? Если он всё сделал сам — выбери его.', [{id: '', label: 'Выбери участника'}, ...arr(form.subject_ids).map(char => ({id: char, label: nameOf(char)}))]);
             const citations = el('div', 'ncase-citations');
             const picked = new Set();
             for (const entry of arr(view.public.board).filter(item => arr(form.board_ids).includes(item.id))) {
@@ -536,7 +536,7 @@ function open(options) {
     function rules() {
         return [panel('Как идёт дело', p('Четырнадцать окон на семь дней. Окна открывает сервер; заходи в удобное время. На перемещения и действия тратятся очки действий.'),
             p('Личные находки известны только тебе. Публикуй доказательства на доску, сравнивай документы и проверяй показания. Архивные запросы приходят в следующее окно.'),
-            p('Обвинение обсуждается на слушании. Найти хозяина — ещё не значит доказать организатора. Личная цель указана в твоём досье и засчитывается сервером.'))];
+            p('Обвинение обсуждается на слушании. Найти хозяина — ещё не значит доказать, кто его вывел и скрывал. Личная цель указана в твоём досье и засчитывается сервером.'))];
     }
     function render() {
         if (!live()) return;

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .night_case_narrative import LegalAction
-from .night_case_delivery import say_audience, sent_count
+from .night_case_delivery import dialogue_topic, say_audience, sent_count
 from .night_case_personal import story_index, story_predicate, completed_steps, open_offers, step_visible, work_progress
 from .night_case_state import KernelState, PlayerActor, canonical_hash, parse_command
 from .night_case_time import _parse, _utc
@@ -63,6 +63,16 @@ def _known(doc, account):
 
 def _module(c, name):
     return c.get("module_data", {}).get(name, {})
+
+
+def _talk_exhausted(c, doc, account, params, option):
+    """A talk option that can no longer tell this player anything new is not offered (it would only burn AP)."""
+    grants = {e["observation"] for o in option["outcomes"] for e in o["effects"] if e["kind"] == "grant_observation"}
+    if not grants: return False
+    known = _known(doc, account)
+    topic = dialogue_topic(c, params)
+    if topic is not None and topic["slip"] is not None and topic["slip"]["observation"] not in known: return False
+    return grants <= known
 
 
 def _flag(doc, name):
@@ -160,7 +170,7 @@ def _eligibility(case_doc, doc, actor, kind, params, now_utc):
             cursor = next((c["node_id"] for c in doc["dialogue_cursors"] if c["account_id"] == actor.account_id and c["dialogue_id"] == dialogue["id"]), dialogue["entry_node"])
             node = next((n for n in dialogue["nodes"] if n["id"] == cursor == params["node_id"]), None)
             option = next((o for o in node["options"] if o["id"] == params["option_id"]), None) if node else None
-            if option and _predicates(option["available_when"], doc, player, case_doc): return "accepted", player, option
+            if option and _predicates(option["available_when"], doc, player, case_doc) and not _talk_exhausted(case_doc, doc, actor.account_id, params, option): return "accepted", player, option
     elif kind == "story_reply":
         if "personal_tasks" not in case_doc: return "action_unavailable", player, None
         offer = next((o for o in open_offers(case_doc, doc) if o["offer_event_id"] == params["offer_event_id"] and o["recipient_account_id"] == actor.account_id), None)

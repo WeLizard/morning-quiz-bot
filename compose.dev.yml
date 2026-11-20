@@ -35,6 +35,8 @@ x-app-service: &app-service
     - ./content:/app/content:ro
     - ./docs:/app/docs:ro
     - ./handlers:/app/handlers:ro
+    # «Алхимия»: the server catalog (storage/alchemy.py) and the game page are read from here.
+    - ./minigames:/app/minigames:ro
     - ./modules:/app/modules:ro
     - ./scripts:/app/scripts:ro
     - ./storage:/app/storage:ro

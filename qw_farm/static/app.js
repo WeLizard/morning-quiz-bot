@@ -1708,7 +1708,7 @@ const DYE_RIDDLE=[
 ];
 // The owner's favourite («На старых картах…», lines 4–7) shows twice as often as the other three riddles.
 const DYE_FAVOURITE=[4,5,6,7],DYE_LINES=[...DYE_RIDDLE,...DYE_FAVOURITE.map(i=>DYE_RIDDLE[i])];
-const DYE_LINE_CHANCE=2; // one day in DYE_LINE_CHANCE on average
+const DYE_LINE_CHANCE=1; // a line shows one day in DYE_LINE_CHANCE on average; 1 = every day (owner: this is only the first step of the riddle)
 function dyeworksLineToday(farmId=S.me?.id||'',day=String(Math.floor((Date.now()/1000+3*3600)/86400))){ // Moscow day, like the game's days
  let h=2166136261;for(const ch of `${farmId}:${day}`){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}
  h^=h>>>16;h=Math.imul(h,0x85ebca6b)>>>0;h^=h>>>13;h=Math.imul(h,0xc2b2ae35)>>>0;h=(h^(h>>>16))>>>0; // mix: neighbouring days must not alternate; stay unsigned

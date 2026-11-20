@@ -35,7 +35,7 @@
 
 ## Варианты облика
 
-Лежат в `art_batch2/noir_print_a/characters_variants/` (`manifest.json` с промптами). Сделаны
+Лежат в `art_batch2/noir_print_a/characters_variants/` (`manifest.json` с промптами); сборщик пака публикует их как `manor_char_<role>__<look>`, облик партии выбирается от seed. Сделаны
 по образцу основного портрета и в том же стиле, прозрачный фон, `gpt-image-2.5-sunburst`.
 
 | Роль | Файл | Облик |

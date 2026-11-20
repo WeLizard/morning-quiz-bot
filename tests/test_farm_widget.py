@@ -84,8 +84,8 @@ def test_caption_is_useful_without_widget_support():
 # ---------------------------------------------------------------- handler with a fake farm service
 
 class RecordingRequest(BaseRequest):
-    def __init__(self):
-        self.calls = []
+    def __init__(self, refuse=()):
+        self.calls, self.refuse = [], set(refuse)
 
     @property
     def read_timeout(self):
@@ -101,6 +101,9 @@ class RecordingRequest(BaseRequest):
         endpoint = url.rsplit('/', 1)[-1]
         fields = dict(request_data.json_parameters) if request_data else {}
         self.calls.append((endpoint, fields))
+        if endpoint in self.refuse:
+            return 400, json.dumps({'ok': False, 'error_code': 400,
+                                    'description': 'Bad Request: INPUT_MEDIA_WIDGET_NOT_ALLOWED'}).encode()
         if endpoint == 'getMe':
             result = {'id': 1, 'is_bot': True, 'first_name': 'Bot', 'username': 'QuizzyWizzyBot'}
         elif endpoint in {'sendWidget', 'sendMessage'}:
@@ -149,8 +152,8 @@ def command_update(bot):
         'entities': [{'type': 'bot_command', 'offset': 0, 'length': 5}]}}, bot)
 
 
-def run(handlers, make_update):
-    request = RecordingRequest()
+def run(handlers, make_update, refuse=()):
+    request = RecordingRequest(refuse)
 
     async def scenario():
         bot = ExtBot('123:TEST', request=request, defaults=Defaults(parse_mode=ParseMode.MARKDOWN_V2))
@@ -238,6 +241,15 @@ def test_farm_command_sends_the_widget_with_caption_state_and_queries():
     assert fields['allow_queries'] == 'true' and LINK in fields['html']
     assert 'готово к сбору — 1' in fields['caption']
     assert json.loads(fields['chat_data'])['r'] == value['revision']
+
+
+def test_farm_command_falls_back_to_a_text_card_when_telegram_refuses_the_widget():
+    request = run(handlers_with(FakeService(farm())), command_update, refuse={'sendWidget'})
+    [(name, fields)] = [call for call in request.calls if call[0] == 'sendMessage']
+    assert 'готово к сбору — 1' in fields['text'] and 'обнови Telegram' not in fields['text']
+    assert 'parse_mode' not in fields
+    [[button]] = json.loads(fields['reply_markup'])['inline_keyboard']
+    assert button['text'] == 'Открыть ферму' and button['url'] == LINK
 
 
 def test_farm_command_without_a_farm_explains_what_to_do():

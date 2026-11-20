@@ -14,6 +14,8 @@ import os
 import re
 import time
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 from telegram.ext import CommandHandler, filters
 
 from modules.mini_app_launch import short_name_from_env, startapp_url
@@ -177,9 +179,18 @@ class FarmWidgetHandlers:
             link = startapp_url(context.bot.username, 'farm', short_name_from_env())
         except ValueError:
             link = None
-        await send_widget(context.bot, chat_id=message.chat_id, html=render_html(link),
-                          caption=caption(state, self.clock()), chat_data=pack_state(fit_state(state)),
-                          allow_queries=True)
+        text = caption(state, self.clock())
+        try:
+            await send_widget(context.bot, chat_id=message.chat_id, html=render_html(link),
+                              caption=text, chat_data=pack_state(fit_state(state)), allow_queries=True)
+        except BadRequest as refused:
+            # Telegram may refuse widgets for this bot or chat (e.g. Input_media_widget_not_allowed):
+            # the player still gets the farm summary and a way into the Mini App.
+            logger.warning('sendWidget refused for the farm card: %s', refused.message)
+            markup = (InlineKeyboardMarkup([[InlineKeyboardButton('Открыть ферму', url=link)]])
+                      if link else None)
+            summary = text.split('\n', 1)[0] + '\nСобрать урожай и сдать заказы можно на ферме.'
+            await message.reply_text(summary, parse_mode=None, reply_markup=markup)
 
 
 def fit_state(state):

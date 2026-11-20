@@ -23,7 +23,7 @@ RAW = json.loads(PATH.read_text(encoding="utf8"))
 CASE = compile_v2(load_v2(PATH.read_bytes()))
 RULES = rules_snapshot("Europe/Berlin")
 START = datetime(2026, 11, 15, 10, tzinfo=timezone.utc)
-LOOK_ROLES = {"doctor", "cook", "photographer", "investigator", "gardener"}
+LOOK_ROLES = {c["id"] for c in RAW["characters"]}   # since 2026-11-21 every Manor role has a second look
 
 
 def roster(count=12):
@@ -105,9 +105,13 @@ class FormatTests(unittest.TestCase):
             compile_doc(doc)
         self.assertEqual(caught.exception.code, code, caught.exception.message)
 
-    def test_manor_case_has_five_two_look_roles_with_canon_second_looks(self):
+    def test_every_manor_role_has_two_looks_and_canon_second_looks_stay(self):
         looks = {c["id"]: [(l["id"], l["gender"], l["age"]) for l in c["looks"]] for c in RAW["characters"] if "looks" in c}
         self.assertEqual(set(looks), LOOK_ROLES)
+        self.assertEqual(len(LOOK_ROLES), 20)
+        self.assertEqual({role: len(items) for role, items in looks.items()}, {role: 2 for role in LOOK_ROLES})
+        self.assertEqual(looks["hunter"][1], ("f55", "f", 55))
+        self.assertEqual(looks["chauffeur"][1], ("f28", "f", 28))
         self.assertEqual(looks["doctor"][1], ("f61", "f", 61))
         self.assertEqual(looks["cook"][1], ("f45", "f", 45))
         self.assertEqual(looks["photographer"][1], ("f30", "f", 30))
@@ -225,7 +229,7 @@ class StateTests(unittest.TestCase):
         broken = copy.deepcopy(doc); broken["sealed"]["looks"].pop("cook")
         with self.assertRaises(ValueError):
             KernelState.from_document(broken, CASE, RULES)
-        broken = copy.deepcopy(doc); broken["sealed"]["looks"]["maid"] = "base"
+        broken = copy.deepcopy(doc); broken["sealed"]["looks"]["stranger"] = "base"
         with self.assertRaises(ValueError):
             KernelState.from_document(broken, CASE, RULES)
 
@@ -285,7 +289,8 @@ class ProjectionTests(unittest.TestCase):
 class GenderLintTests(unittest.TestCase):
     """No hard-coded gendered words next to roles whose looks differ in gender."""
 
-    STEMS = {"doctor": r"врач", "cook": r"повар", "photographer": r"фотограф", "investigator": r"следовател"}
+    STEMS = {"doctor": r"врач", "cook": r"повар", "photographer": r"фотограф", "investigator": r"следовател",
+             "hunter": r"охотни[кц]", "chauffeur": r"шофёр"}
     PAST = r"[а-яё]+(?:л|ла|лся|лась)"
 
     def strip(self, text):

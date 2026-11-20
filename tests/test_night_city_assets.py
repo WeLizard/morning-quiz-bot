@@ -17,7 +17,7 @@ SCHEMA = ROOT / 'scripts/art/night_city/assets_manifest.schema.json'
 IMMUTABLE_SCHEMA = ROOT / 'scripts/art/night_city/immutable_assets_manifest.schema.json'
 CASE = ROOT / 'content/night_city/manor_lake.case.json'
 ART = ROOT / 'docs/tasks/night_city/art_batch2/noir_print_a'
-PINNED_CASE_HASH = '44ea4d0771ff8f584b34d4b2386222bc7789c0a5420c27923080baa231ee5106'
+PINNED_CASE_HASH = 'c062098db8c18849c724412f57dd4dab4498cf6fdfe83630ca23ee1201f04e9b'
 
 
 def case_art_refs():
@@ -85,7 +85,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(self.manifest['schema'], 'nc-assets/1')
         self.assertEqual(self.manifest['world'], 'manor_lake')
         self.assertEqual(set(self.manifest['assets']), set(refs))
-        self.assertEqual(len(refs), 33)
+        self.assertEqual(len(refs), 48)
         self.assertLessEqual(LOOK_ASSETS, set(refs))
         for asset_id, value in self.manifest['assets'].items():
             self.assertEqual(value['alt'], refs[asset_id]['alt'])
@@ -123,12 +123,12 @@ class ManorAssetExportTests(unittest.TestCase):
 
     def test_all_source_images_are_accounted_for_and_hashes_match(self):
         records = self.report['assets']
-        self.assertEqual(self.report['manifest_count'], 33)
+        self.assertEqual(self.report['manifest_count'], 48)
         self.assertEqual(self.report['character_count'], 20)
-        self.assertEqual(self.report['look_count'], 5)
+        self.assertEqual(self.report['look_count'], 20)
         self.assertEqual(self.report['location_variant_count'], 32)
         self.assertEqual(self.report['item_count'], 81)
-        self.assertEqual(len(records), 138)
+        self.assertEqual(len(records), 153)
         self.assertLessEqual(self.report['item_bytes'], 10_000_000)
         self.assertEqual(
             hashlib.sha256((self.out / 'assets.json').read_bytes()).hexdigest(),
@@ -161,7 +161,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(set(self.immutable_manifest['files']), {
             f'assets/{path.name.lower()}' for path in (self.out / 'assets').glob('*.webp')
         })
-        self.assertEqual(len(self.immutable_manifest['files']), 138)
+        self.assertEqual(len(self.immutable_manifest['files']), 153)
         self.assertEqual(set(self.immutable_manifest['assets']), set(case_art_refs()))
         self.assertNotIn(digest, json.dumps(self.immutable_manifest, ensure_ascii=False))
         for relative, expected_hash in self.immutable_manifest['files'].items():

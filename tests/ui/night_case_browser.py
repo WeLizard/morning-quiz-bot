@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 DB_NAME = 'morning_quiz_night_browser'
 CASE_PATH = ROOT / 'content/night_city/manor_lake.case.json'
-ART_HASH = 'a640e3af35a3f2166778193d43d73bc874bb563a9c4888bbd2c3a999a5e5ca2f'
+ART_HASH = '0e56e5e8640f81fd69056af17614b1d01d20033924abfe134e482970ca116f73'
 
 
 class FixtureClock:

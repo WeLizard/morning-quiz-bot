@@ -36,8 +36,8 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = '44ea4d0771ff8f584b34d4b2386222bc7789c0a5420c27923080baa231ee5106'
-MANOR_LOOKS = 5                                   # extra appearance portraits from characters_variants/
+MANOR_CASE_CANONICAL_SHA256 = 'c062098db8c18849c724412f57dd4dab4498cf6fdfe83630ca23ee1201f04e9b'
+MANOR_LOOKS = 20                                  # extra appearance portraits from characters_variants/
 MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS             # characters, locations, looks
 MANOR_WEBPS = 20 + 8 * 4 + 81 + MANOR_LOOKS       # portraits, place times, items, looks
 

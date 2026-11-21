@@ -14,6 +14,7 @@
         chats: ['M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z'],
         'photo-quiz': ['M3 3h18v18H3zM3 17l6-6 5 5 3-3 4 4', 'M9 7h.01'],
         analytics: ['M3 3v18h18M7 14l4-4 4 3 6-8'],
+        'night-ai': ['M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'],
         clock: ['M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M12 7v5l3 2'],
         refresh: ['M20 7v5h-5M4 17v-5h5', 'M6.1 7a7 7 0 0 1 11.5-2L20 8M4 16l2.4 3A7 7 0 0 0 18 17'],
         arrow: ['M5 12h14m-5-5 5 5-5 5'],
@@ -1051,8 +1052,8 @@
     window.installPostgresAdmin = () => {
         document.documentElement.dataset.adminTheme = 'night';
         document.body.classList.add('pg-admin');
-        const supported = new Set(['dashboard', 'chats', 'users', 'photo-quiz', 'questions', 'analytics', 'settings', 'bot-metrics', 'claude-ai', 'malformed-questions', 'problem-reports']);
-        const labels = {dashboard: 'Обзор', questions: 'Банк вопросов', 'photo-quiz': 'Фото-квиз', analytics: 'Статистика', users: 'Участники', chats: 'Чаты и расписания', settings: 'Управление', 'bot-metrics': 'Тестовый бот', 'claude-ai': 'AI-помощник', 'malformed-questions': 'Проверка вопросов', 'problem-reports': 'Отчёты'};
+        const supported = new Set(['dashboard', 'chats', 'users', 'photo-quiz', 'questions', 'analytics', 'settings', 'bot-metrics', 'claude-ai', 'malformed-questions', 'problem-reports', 'night-ai']);
+        const labels = {dashboard: 'Обзор', questions: 'Банк вопросов', 'photo-quiz': 'Фото-квиз', analytics: 'Статистика', users: 'Участники', chats: 'Чаты и расписания', settings: 'Управление', 'bot-metrics': 'Тестовый бот', 'claude-ai': 'AI-помощник', 'malformed-questions': 'Проверка вопросов', 'problem-reports': 'Отчёты', 'night-ai': 'Ведущий «Ночного города»'};
         document.querySelectorAll('.nav-item').forEach(nav => {
             nav.hidden = !supported.has(nav.dataset.section);
             if (!nav.hidden) {

@@ -36,7 +36,8 @@ class AIWiringPostgresTests(unittest.IsolatedAsyncioTestCase):
         settings = NightAIRuntimeSettings(enabled=True, external_allowed=True, environment_id='wiring-pg',
             deployment_id='test', manifest_path=Path(tempfile.gettempdir()).resolve() / 'unused.json',
             master_keys=KeyRing('k1', {'k1': b'v' * 32}), receipt_keys=KeyRing('r1', {'r1': b'h' * 32}))
-        self.wiring = NightAIWiring(settings=settings, registry=self.db.registry, clock=lambda: NOW)
+        # narration_ready stands in for the dispatcher; test_status_without_dispatcher covers the default.
+        self.wiring = NightAIWiring(settings=settings, registry=self.db.registry, clock=lambda: NOW, narration_ready=True)
         sessions = self.db.sessions
 
         @asynccontextmanager
@@ -137,6 +138,21 @@ class AIWiringPostgresTests(unittest.IsolatedAsyncioTestCase):
                          {'status': 'authored', 'model_label': None})
         async with self.db.sessions() as session:
             self.assertEqual((await session.scalars(select(NightAIRequest.status))).all(), ['approved'])
+
+    async def test_status_without_dispatcher_is_fallback_not_ai(self):
+        from dataclasses import replace
+        await self.db.running()
+        path = f'/api/night-case/games/{self.db.game}/ai'
+        staged = await self.game.post(path + '/byok', headers=self.as_player(0, write=True), json={
+            'expected_epoch': 0, 'settings': {'preset': 'openai', 'model_id': 'safe-model'},
+            'secret': 'WIRING_SECRET_CANARY', 'client_request_id': uuid4().hex})
+        self.assertEqual(staged.status_code, 200, staged.text)
+        self.assertEqual((await self.game.get(path, headers=self.as_player(1))).json()['status'], 'ai')
+        async with self.db.sessions() as session:
+            plain = replace(self.wiring, narration_ready=False).views(
+                session, NightCaseApplicationService(session, lambda: NOW, None))
+            self.assertEqual(await plain.get_ai_status(self.db.ids[1], self.db.game),
+                             {'status': 'fallback', 'model_label': None})
 
     async def test_admin_revokes_binding(self):
         await self.db.running()

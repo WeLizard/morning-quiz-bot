@@ -61,7 +61,22 @@ const errors = {
     seat_taken: 'Этого героя уже занял другой игрок.',
     seats_unsolvable: 'С такими местами дело не сходится: пусть кто-то сядет за сыщика или выберет «любое свободное».',
     rate_limited: 'Слишком много запросов. Подожди немного.',
+    stale_epoch: 'Настройки ведущего уже изменились. Обнови дело и выбери снова.',
+    request_cooldown: 'Запрос администратору уже отправлен недавно. Подожди немного.',
+    request_limit: 'Лимит запросов к администратору для этой партии исчерпан.',
+    invalid_config: 'Проверь провайдера, модель и ключ.',
+    unsupported_preset: 'Этот провайдер сейчас недоступен.',
+    ai_unavailable: 'ИИ сейчас недоступен — партия идёт на авторском тексте.',
+    credential_unavailable: 'Ключ больше недоступен. Подключи его заново.',
+    game_not_running: 'Партия уже не идёт.',
+    game_not_lobby: 'Сбор уже закончился — обнови дело.',
 };
+/* AI narrator (NIGHT_CASE_AI_ACCESS §7). The host's own key lives only in the password input until submit. */
+const narratorStatus = {authored: 'авторский текст', pending: 'авторский текст, ждём ответа администратора',
+    fallback: 'авторский текст (ИИ сейчас недоступен)'};
+const narratorReasons = {ai_disabled: 'ИИ выключен на сервере.', egress_disabled: 'Сервер сейчас не выходит в облако: свой ключ не подключить.',
+    vault_unavailable: 'Сервер не может безопасно сохранить ключ.', no_presets: 'Администратор не открыл ни одного провайдера.'};
+const narratorFields = {organization_id: 'Organization ID', project_id: 'Project ID', workspace_id: 'Workspace ID', folder_id: 'Folder ID', scope: 'Scope'};
 const errorText = error => error?.network ? 'Нет связи. Повтори тот же запрос — действие не применится дважды.' : errors[error?.code] || 'Действие сейчас недоступно. Обнови дело и попробуй снова.';
 
 async function http(path, {method = 'GET', body, identity = 'guest', signal, expectedViewer} = {}) {
@@ -134,6 +149,8 @@ function open(options) {
     const cursors = new Set(), controller = new AbortController();
     let assets = new Map(), assetWorld = null;
     let selectedOriginal = '';
+    let ai = null, aiAt = 0, aiMode = null, aiPresets = null, aiKeyForm = false;
+    const aiOn = () => boot?.capabilities?.ai_narrator === true;
     const historySelection = () => selectedOriginal ? `&original_account_id=${encodeURIComponent(selectedOriginal)}` : '';
     function clearHistory() { cursors.clear(); for (const page of Object.values(pages)) { page.items.length = 0; page.next_cursor = null; } }
     const live = () => alive && !locked && options.isCurrent?.() !== false;
@@ -192,6 +209,7 @@ function open(options) {
         locked = true; epoch++; controller.abort(); clearInterval(poll); timer?.stop(); timer = null;
         view = proposal = room = game = boot = invitation = viewer = null;
         ownDraft = selectedOriginal = notice = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null;
+        ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null;
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.menu.register([], 'Ночной город');
         const header = kit.header(); header.node.classList.add('ncase-bar');
@@ -233,6 +251,7 @@ function open(options) {
         Q.menu.register([
             {id: 'night-case-rules', label: 'Правила дела', onSelect: () => showTab('rules')},
             {id: 'night-case-refresh', label: 'Обновить связь', onSelect: () => refresh()},
+            ...(view?.self && !view.lobby && ai?.can_configure ? [{id: 'night-case-narrator', label: 'Ведущий партии', onSelect: () => showTab('narrator')}] : []),
             ...(view?.self && choiceList().some(row => row.quote.kind === 'forfeit') ? [{id: 'night-case-leave', label: 'Покинуть дело', danger: true, onSelect: () => confirmForfeit()}] : []),
         ], 'Ночной город');
     }
@@ -342,10 +361,127 @@ function open(options) {
                     } catch { /* Missing export is an image-free view, never a guessed file or hidden case lookup. */ }
                 }
                 if (tab === 'chat') await loadHistory('messages');
+                if (aiOn()) {
+                    await loadAI();
+                    if (!live() || generation !== epoch) return;
+                }
             }
             render();
         } catch (error) { if (!preserveUI) fail(error); }
         finally { reading = false; }
+    }
+    async function loadAI(force = false) {
+        if (!aiOn() || !game) { ai = null; return; }
+        if (!force && ai && Date.now() - aiAt < 20000) return;
+        aiAt = Date.now();
+        try { ai = await request(api('ai')); } catch { ai = null; /* Status is advisory: the game never waits for it. */ }
+    }
+    const aiBody = extra => ({expected_epoch: Number(ai?.epoch) || 0, client_request_id: id(), ...extra});
+    async function aiCommand(path, label) {
+        sending = label;
+        try { const result = await mutate(api(path), aiBody()); if (result) info = label + '.'; }
+        finally { sending = ''; }
+        await loadAI(true); render();
+    }
+    async function sendKey(form) {
+        if (outbox.busy || outbox.pending) return;
+        const settings = {preset: form.preset.input.value, model_id: (form.manual?.input.value.trim() || form.model?.input.value || '').trim()};
+        const project = {};
+        for (const [name, item] of Object.entries(form.extra)) if (item.input.value.trim()) project[name] = item.input.value.trim();
+        if (Object.keys(project).length) settings.project_fields = project;
+        const secret = form.secret.input.value;
+        // Not through the outbox: a lost response must not keep the key in memory for a retry.
+        form.secret.input.value = '';
+        if (!settings.model_id || !secret) { notice = 'Нужны модель и ключ.'; render(); return; }
+        notice = ''; info = '';
+        try {
+            await request(api('ai/byok'), {method: 'POST', body: aiBody({settings, secret})});
+            info = view?.lobby ? 'Ключ сохранён для этой партии. Он сотрётся, когда партия закончится.' : 'Ключ подключён: новые сцены пишет ИИ.';
+            aiKeyForm = false; aiMode = 'byok';
+        } catch (error) { notice = errorText(error); }
+        await loadAI(true); render();
+    }
+    function keyForm() {
+        if (!aiPresets || aiPresets === 'loading') {
+            if (!aiPresets) {
+                aiPresets = 'loading';
+                request('/api/night-case/ai/presets').then(value => { aiPresets = value; render(); }).catch(error => { aiPresets = null; fail(error); });
+            }
+            return [p('Загружаем список провайдеров…')];
+        }
+        if (!aiPresets.byok_ready) return [p(narratorReasons[aiPresets.reason] || 'Свой ключ сейчас подключить нельзя.')];
+        const items = arr(aiPresets.items);
+        const preset = choose('Провайдер', items.map(row => ({id: row.id, label: row.id})), items[0]?.id);
+        const form = {preset, extra: {}};
+        const box = el('div', 'ncase-key-fields');
+        const fill = () => {
+            const row = items.find(item => item.id === preset.input.value) || {};
+            form.model = arr(row.models).length ? choose('Модель', arr(row.models).map(name => ({id: name, label: name}))) : null;
+            form.manual = row.manual_model_id ? field(form.model ? 'Или другая модель (ID у провайдера)' : 'Модель (ID у провайдера)') : null;
+            form.extra = {};
+            for (const name of [...arr(row.required_fields), ...arr(row.optional_fields)]) form.extra[name] = field(narratorFields[name] || name);
+            box.replaceChildren(...[form.model?.node, form.manual?.node, ...Object.values(form.extra).map(item => item.node)].filter(Boolean));
+        };
+        preset.input.addEventListener('change', fill); fill();
+        form.secret = field('Ключ API');
+        Object.assign(form.secret.input, {type: 'password', autocomplete: 'new-password', spellcheck: false, maxLength: 8192});
+        form.secret.input.setAttribute('data-lpignore', 'true'); form.secret.input.setAttribute('data-1p-ignore', '');
+        return [preset.node, box, form.secret.node,
+            p('Ключ видит только сервер, другие игроки его не видят. Оплату за запросы спишет сам провайдер с твоего аккаунта; приложение денег не берёт.'),
+            p('ИИ пишет общие сцены и твои личные; чужие личные сцены идут по авторскому тексту. Когда партия закончится, ключ сотрётся.'),
+            kit.row(...(aiKeyForm ? [button('Отмена', () => { aiKeyForm = false; render(); })] : []),
+                button('Подключить ключ', () => sendKey(form), 'primary'))];
+    }
+    function narratorLine() {
+        if (!aiOn() || !ai) return null;
+        return p(`Ведущий: ${ai.status === 'ai' ? `ИИ${ai.model_label ? ' · ' + ai.model_label : ''}` : narratorStatus[ai.status] || narratorStatus.authored}.`);
+    }
+    const lobbyMode = () => aiMode || (ai?.mode === 'byok' ? 'byok' : 'admin');
+    function narratorLobby() {
+        if (!aiOn() || !ai?.can_configure) return null;
+        const mode = lobbyMode();
+        const options = [['admin', 'У админа'], ['byok', 'Свой ключ'], ['authored', 'Авторский']];
+        const group = put(el('div', 'qw-btn-group ncase-narrator-pick'), ...options.map(([key, label]) => {
+            // Plain segments: the core .qw-btn-group styles them, the noir .qw-btn frame would not glue.
+            const control = el('button', null, label); control.type = 'button';
+            control.addEventListener('click', () => { aiMode = key; aiKeyForm = false; render(); });
+            control.setAttribute('aria-pressed', String(mode === key)); return control;
+        }));
+        group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Кто ведёт партию');
+        const until = ai.expires_at ? ' до ' + new Date(ai.expires_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : '';
+        const body = mode === 'admin' ? [p('Партия сразу начнётся на авторском тексте, а администратор получит запрос. Если одобрит — новые сцены будет писать ИИ.')]
+            : mode === 'authored' ? [p('Сцены и ответы ведёт авторский текст дела. ИИ не подключается.')]
+            : ai.staged_credential_id && !aiKeyForm ? [p(`Ключ сохранён для этой партии${until}. Если не начать дело до этого времени, ключ придётся ввести снова.`),
+                kit.row(button('Заменить ключ', () => { aiKeyForm = true; render(); }))]
+            : keyForm();
+        return panel('Ведущий партии', group, ...body);
+    }
+    function startParams() {
+        if (!aiOn() || !ai?.can_configure) return {};
+        const mode = lobbyMode();
+        if (mode === 'byok' && !ai.staged_credential_id) return null;
+        return {ai: {mode, expected_epoch: Number(ai.epoch) || 0, staged_credential_id: mode === 'byok' ? ai.staged_credential_id : null}};
+    }
+    function startGame() {
+        const params = startParams();
+        if (!params) { notice = 'Сначала подключи свой ключ или выбери другого ведущего.'; render(); return; }
+        aiAt = 0; // the start changes the narrator: the next view reads its fresh status
+        return lobbyCommand('start', params);
+    }
+    function narratorTab() {
+        if (!ai) return [panel('Ведущий партии', p('Статус ведущего пока не загружен.'), kit.row(button('Обновить', async () => { await loadAI(true); render(); })))];
+        const pending = ai.status === 'pending';
+        const actions = ai.can_configure ? [
+            ...(!pending && ai.mode !== 'admin' ? [button('Запросить ИИ у администратора', () => aiCommand('ai/request', 'Запрос администратору отправлен'))] : []),
+            button(ai.mode === 'byok' ? 'Заменить свой ключ' : 'Подключить свой ключ', () => { aiKeyForm = true; render(); }),
+        ] : [];
+        // Leaving AI is set apart from the main actions (UI_RULES §9: danger zone).
+        const off = ai.can_configure && (ai.status !== 'authored' || ai.mode !== 'authored')
+            ? put(el('div', 'qw-danger-zone'), button('Вернуть авторский текст', () => aiCommand('ai/off', 'Партия вернулась к авторскому тексту'), 'danger')) : null;
+        return [panel('Ведущий партии', narratorLine(),
+            pending && ai.expires_at ? p(`Запрос ждёт решения до ${new Date(ai.expires_at).toLocaleString('ru-RU')}. Играть можно уже сейчас.`) : null,
+            ai.mode === 'byok' && ai.status === 'ai' ? p('Работает твой ключ. Чужие личные сцены идут по авторскому тексту.') : null,
+            ...(aiKeyForm ? keyForm() : []), actions.length && !aiKeyForm ? kit.stack(...actions) : null, aiKeyForm ? null : off)];
     }
     async function identityProbe() {
         if (!live() || !viewer || identityReading) return;
@@ -451,12 +587,13 @@ function open(options) {
             : 'Ты на любом свободном месте — героя выберет игра при старте.';
         const buttons = own ? [button(own.ready ? 'Изменить имя и готовность' : 'Я готов', () => lobbyCommand('ready', {name: name.input.value, address_form: address.input.value, ready: !own.ready})),
             ...(own.character_id ? [button('Встать — любое свободное место', () => takeSeat(null))] : []),
-            ...(data.can_start ? [button('Начать дело', () => lobbyCommand('start'), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
+            ...(data.can_start ? [button('Начать дело', () => startGame(), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
         return [kit.scene({slot: 'lobby', title: data.case?.title || 'Собираем стол',
                 text: `За столом ${seats.length}. Играть можно от ${lo} до ${hi}: невзятых героев ведёт игра. Выбери героя или садись на любое свободное место; кто злодей, решит только правда дела.`}),
             ...(picking ? [panel(`Облик: ${picking.title}`, p('Выбери, каким будет этот герой.'), kit.stack(...arr(picking.looks).map(look => button(heroLine({...look, title: look.name || look.title}) || look.id, () => takeSeat(picking.id, look.id))),
                 button('Любой облик', () => takeSeat(picking.id)), button('Отмена', () => { lookPick = null; render(); }, 'text')))] : []),
             panel('Места за столом', heroSeats(data), anyone.length ? p(`На любом свободном месте: ${anyone.map(row => row.seat === data.self_seat ? 'ты' : row.name).join(', ')}.`) : null),
+            narratorLobby(),
             panel('Твоё место', ...(own ? [p(ownLine), name.node, address.node] : []), kit.stack(...buttons)),
             ...(room?.role === 'owner' ? [invitePanel()] : []),
             ...(own ? [panel('Выход', kit.stack(button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')))] : [])];
@@ -467,9 +604,10 @@ function open(options) {
         const name = field('Имя в этой партии', own?.name || '');
         const address = choose('Как обращаться в этой партии', [{id: 'n', label: 'Без рода'}, {id: 'm', label: 'Он'}, {id: 'f', label: 'Она'}], data.self?.address_form || 'n');
         const buttons = data.self_seat ? [button(own?.ready ? 'Изменить имя и готовность' : 'Я готов', () => lobbyCommand('ready', {name: name.input.value, address_form: address.input.value, ready: !own?.ready})),
-            ...(data.can_start ? [button('Начать дело', () => lobbyCommand('start'), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
+            ...(data.can_start ? [button('Начать дело', () => startGame(), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
         return [kit.scene({slot: 'lobby', title: data.case?.title || 'Собираем стол', text: `${data.seats.length} из 12 игроков. Стартуют 4, 5, 8 или 12; каждый подтверждает готовность.`}),
             panel('Стол игроков', kit.seats(arr(data.seats).map(item => ({name: item.name, line: item.ready ? 'Готов' : 'Ещё не готов', me: item.seat === data.self_seat})))),
+            narratorLobby(),
             panel('Твоё место', ...(data.self_seat ? [name.node, address.node] : []), kit.stack(...buttons)),
             ...(room?.role === 'owner' ? [invitePanel()] : []),
             ...(data.self_seat ? [panel('Выход', kit.stack(button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')))] : [])];
@@ -533,7 +671,7 @@ function open(options) {
         const moves = choiceList().filter(row => row.quote.kind === 'move');
         const acts = choiceList().filter(row => ['act', 'talk', 'archive_request', 'story_reply'].includes(row.quote.kind));
         const nearby = arr(own.nearby).filter(row => row.character_id !== own.character_id);
-        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), over ? null : p(`Осталось действий: ${own.ap}`)));
+        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), over ? null : p(`Осталось действий: ${own.ap}`), over ? null : narratorLine()));
         const artwork = assets.get(location?.art?.asset_id);
         scene.style?.setProperty('--img', artwork ? `url(${artwork.variants[sceneTime()] || artwork.url})` : 'none');
         if (over) return [scene];
@@ -743,7 +881,7 @@ function open(options) {
         const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? panel(finalHearing ? 'Итоговое слушание' : 'Идёт слушание',
             p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
             kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
-        const current = tab === 'self' ? [role()] : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : place();
+        const current = tab === 'self' ? [role()] : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
         let selector = null;
         if (['finished', 'stopped'].includes(view.runtime_status) && arr(view.history_seats).length > 1) {
             const choice = choose('Твои завершённые роли', [{id: '', label: 'Все твои роли'}, ...view.history_seats.map(seat => ({id: seat.original_account_id, label: `${seat.display_name} · ${seat.role_title}`}))], selectedOriginal);

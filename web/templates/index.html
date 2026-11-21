@@ -81,6 +81,10 @@
                     <span class="nav-icon">🐞</span>
                     Отчёты
                 </a>
+                <a class="nav-item" data-section="night-ai">
+                    <span class="nav-icon">🌙</span>
+                    Ведущий «Ночного города»
+                </a>
                 <a class="nav-item" data-section="claude-ai">
                     <span class="nav-icon">🤖</span>
                     Claude AI
@@ -530,6 +534,18 @@
                 <div id="problemReportCard"></div>
             </section>
 
+            <!-- Night City narrator access -->
+            <section id="night-ai" class="section">
+                <div class="content-header">
+                    <h1 class="page-title">🌙 Ведущий «Ночного города»</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" id="nightAiRefresh" type="button">Обновить</button>
+                    </div>
+                </div>
+                <div id="nightAiMessage" aria-live="polite"></div>
+                <div id="nightAiContent"><p>Загрузка...</p></div>
+            </section>
+
             <!-- Claude AI Section -->
             <section id="claude-ai" class="section">
                 <div class="content-header">
@@ -815,6 +831,7 @@
     <script src="/static/js/app.js"></script>
     <script src="/static/js/postgres-admin.js"></script>
     <script src="/static/js/problem-reports.js"></script>
+    <script src="/static/js/night-ai-admin.js"></script>
     <script>
         // Инициализация модального окна при загрузке
         document.addEventListener('DOMContentLoaded', () => {

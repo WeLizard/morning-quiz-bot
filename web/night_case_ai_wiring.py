@@ -43,6 +43,9 @@ class NightAIWiring:
     registry: ProfileRegistry
     manifest: RuntimeManifest | None = None
     clock: Callable[[], datetime] = _utc_now
+    # True only once a narration dispatcher (worker) turns bindings into generated text.
+    # Until then an approved binding is reported as a fallback, never as a working AI.
+    narration_ready: bool = False
     vault: SecretVault = field(init=False)
     receipts: ReceiptFingerprinter = field(init=False)
 
@@ -70,7 +73,7 @@ class NightAIWiring:
         """Views over ``app`` (a NightCaseApplicationService) on the very same session."""
         from application.night_case_ai_views import NightCaseAIViews
         ai = self.control(session, original_starter_resolver=app.prove_original_starter)
-        return NightCaseAIViews(session, app, ai, runtime_enabled=self.settings.enabled,
+        return NightCaseAIViews(session, app, ai, runtime_enabled=self.settings.enabled and self.narration_ready,
             external_enabled=self.settings.external_allowed, vault_ready=self.vault_ready)
 
     def admin_catalog(self) -> dict:
@@ -89,6 +92,7 @@ class NightAIWiring:
             'known_models': sorted([preset, model] for preset, model in self.registry.models),
             'external_allowed': self.settings.external_allowed,
             'vault_ready': self.vault_ready,
+            'narration_ready': self.narration_ready,
         }
 
 

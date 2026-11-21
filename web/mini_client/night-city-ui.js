@@ -340,7 +340,10 @@ kit.steps = (list, current) => {
 };
 
 /* --- timer: counts down to a server deadline (epoch seconds) using the server clock offset --- */
-const clockText = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+// A window of the weekly case runs for hours: «13 ч 52 м». Short phases keep minutes and seconds.
+const clockText = seconds => seconds >= 3600 ? `${Math.floor(seconds / 3600)} ч ${Math.floor(seconds % 3600 / 60)} м`
+    : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+kit.clockText = clockText;
 /** {endsAt, serverNow, total, icon, alive(), onExpire} → {clock, bar, remaining(), stop()} */
 kit.timer = ({endsAt, serverNow, total = 0, icon = 'hourglass', alive = () => true, onExpire = null} = {}) => {
     const offset = Number.isFinite(serverNow) ? serverNow - Date.now() / 1000 : 0;

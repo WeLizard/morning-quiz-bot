@@ -155,5 +155,16 @@ class FreeSeatingLobbyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second["self"]["character_id"], "person_01")
 
 
+class LobbyNameTest(unittest.TestCase):
+    """A player without a free display name is «Игрок N» at the table, never the service seat id."""
+
+    def test_empty_or_taken_name_becomes_player_number(self):
+        from application.night_case import _lobby_name
+        self.assertEqual(_lobby_name("  Вера  ", "seat03", set()), "Вера")
+        self.assertEqual(_lobby_name("", "seat02", {"вера"}), "Игрок 2")
+        self.assertEqual(_lobby_name("Вера", "seat02", {"вера"}), "Игрок 2")
+        self.assertEqual(_lobby_name("Вера", "seat02", {"вера", "игрок 2"}), "Игрок 2.2")
+
+
 if __name__ == "__main__":
     unittest.main()

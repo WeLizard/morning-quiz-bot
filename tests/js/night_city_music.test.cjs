@@ -258,3 +258,9 @@ test('shipped music: every world has day / night / finale files, AAC in m4a, dur
     assert.deepEqual(shell.music.map(track => track.file), ['music_shell_1.m4a', 'music_shell_2.m4a']);
     for (const track of shell.music) assert.ok(fs.existsSync(path.join(DIR, 'shell', track.file)));
 });
+
+test('the clock reads hours and minutes for a long window and minutes and seconds for a short phase', () => {
+    assert.equal(kit.clockText(13 * 3600 + 52 * 60 + 5), '13 ч 52 м');
+    assert.equal(kit.clockText(3600), '1 ч 0 м');
+    assert.equal(kit.clockText(125), '2:05');
+});

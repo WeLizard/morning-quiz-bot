@@ -602,3 +602,32 @@ test('a living player asks a removed one from the board for 1 action; a case wit
     assert.match(fixture.host.textContent, /Призраки разговаривают отдельно/);
     fixture.handle.close();
 });
+
+/* Live run of 2026-11-21 against the mockups: findings 1, 8 and 9. */
+test('a frozen table offers «Я здесь» once, in its own notice', async () => {
+    const state = view();
+    state.public.clock.phase = 'frozen';
+    state.menu.push({kind: 'choice', label: 'Я здесь', quote: {kind: 'seen', params: {}, selection_id: 'seen-selection', cost: 0}});
+    const fixture = controller(state); await settle();
+    assert.match(fixture.host.textContent, /Стол ждёт возвращения/);
+    assert.equal((fixture.host.textContent.match(/Я здесь/g) || []).length, 1);
+    fixture.handle.close();
+});
+
+test('an unconfirmed write shows one banner with retry and no second error alert', async () => {
+    const fixture = controller(view(), url => { if (url.endsWith('/intent')) { const error = new Error('offline'); error.network = true; throw error; } });
+    await settle();
+    await byText(fixture.host, 'Осмотреть стол').click(); await settle();
+    assert.match(fixture.host.textContent, /Запрос ещё не подтверждён сервером/);
+    assert.doesNotMatch(fixture.host.textContent, /Нет связи/);
+    fixture.handle.close();
+});
+
+test('a lobby seat stored as a service id is shown as a numbered player', async () => {
+    const state = lobbyView();
+    state.lobby.seats.push({seat: 'seat02', name: 'seat02', ready: false});
+    const fixture = controller(state, undefined, {bootstrap: AI_BOOT}); await settle();
+    assert.match(fixture.host.textContent, /Игрок 2/);
+    assert.doesNotMatch(fixture.host.textContent, /seat02/);
+    fixture.handle.close();
+});

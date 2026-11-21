@@ -102,6 +102,14 @@ class StartRequest:
     options: dict | None
 
 
+def _lobby_name(display_name, seat: str, taken: set[str]) -> str:
+    """A joining player without a free display name sits as «Игрок N» (N is the seat number), never as the seat id."""
+    number=int(seat[4:]); base=normalize_display_name(display_name)[:120]
+    for candidate in (base, f'Игрок {number}', *(f'Игрок {number}.{k}' for k in range(2, 14))):
+        if candidate and candidate.casefold() not in taken: return candidate
+    return seat
+
+
 def parse_start_request(command) -> StartRequest:
     cmd = LobbyCommand.parse(command)
     params = copy.deepcopy(cmd.params)
@@ -618,8 +626,7 @@ class NightCaseApplicationService:
             if own is None:
                 if len(lobby['roster'])>=12: raise NightCaseError('lobby_full')
                 used={r['seat'] for r in lobby['roster']}; seat=next(f'seat{i:02d}' for i in range(1,13) if f'seat{i:02d}' not in used)
-                name=normalize_display_name(account.display_name)[:120] or seat
-                if name.casefold() in {r['name'].casefold() for r in lobby['roster']}: name=seat
+                name=_lobby_name(account.display_name, seat, {r['name'].casefold() for r in lobby['roster']})
                 own={'account_id':str(account.id),'seat':seat,'name':name,'address_form':effective_address_form(account.address_form),'ready':False}
                 if lobby['version']==2: own.update(character_id=None,look_id=None)
                 lobby['roster'].append(own); changed=True

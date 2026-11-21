@@ -193,6 +193,8 @@ function open(options) {
         return {input: select, node: put(el('label', 'ncase-field'), el('span', null, label), select)};
     };
     const displayName = row => row?.title || row?.name || 'Участник';
+    // Older lobbies stored the seat id («seat02») for a player without a free name: show «Игрок 2» instead.
+    const seatName = row => /^seat\d\d$/.test(row?.name || '') ? `Игрок ${Number(row.name.slice(4))}` : row?.name || 'Игрок';
     const nameOf = char => displayName([...arr(view?.public?.players), ...arr(view?.public?.npcs), ...arr(view?.self?.nearby)]
         .find(row => row.character_id === char));
     const choiceList = () => arr(view?.menu).filter(row => row.kind === 'choice' && row.quote);
@@ -256,9 +258,11 @@ function open(options) {
         header.set({eyebrow: 'Ночной город', title, clock: timer?.clock});
         const main = put(el('main', 'nc-main ncase-main'), ...children);
         if (info && !notice) main.prepend(kit.alert({tone: 'ok', icon: 'check', title: info}));
-        if (notice) main.prepend(kit.alert({title: notice}));
+        // An unconfirmed write shows one banner with «Повторить»; its network error is not repeated as a second alert.
+        const unconfirmed = outbox.pending && !outbox.busy;
+        if (notice && !unconfirmed) main.prepend(kit.alert({title: notice}));
         if (outbox.busy && !proposal?.sending) main.prepend(status(`${sending ? sending + ': ' : ''}отправляем…`));
-        if (outbox.pending && !outbox.busy) main.prepend(kit.netBanner({text: 'Запрос ещё не подтверждён сервером', onRetry: () => retry().catch(fail)}));
+        if (unconfirmed) main.prepend(kit.netBanner({text: 'Запрос ещё не подтверждён сервером', onRetry: () => retry().catch(fail)}));
         host.replaceChildren(header.node, main); host.dataset.page = 'night';
     }
     function sceneTime() {
@@ -592,7 +596,7 @@ function open(options) {
         return kit.seats(arr(data.heroes).map(hero => {
             const sitter = seats.find(row => row.character_id === hero.id), mine = sitter && sitter.seat === data.self_seat;
             const look = heroLook(hero, sitter?.look_id), end = [];
-            if (sitter) end.push(kit.tag(mine ? 'ты' : sitter.name, {tone: mine ? 'amber' : ''}));
+            if (sitter) end.push(kit.tag(mine ? 'ты' : seatName(sitter), {tone: mine ? 'amber' : ''}));
             else if (data.self_seat) end.push(kit.button('Сесть', () => Promise.resolve(hero.multiple ? (lookPick = hero.id, render()) : takeSeat(hero.id)).catch(fail), {compact: true, disabled: outbox.busy}));
             const sub = [sitter && !sitter.look_id && hero.multiple ? hero.title : heroLine(look), sitter ? (sitter.ready ? 'готов' : 'ещё не готов') : 'свободно'].filter(Boolean).join(' · ');
             return {name: sitter?.look_id || !hero.multiple ? look.name || hero.title : hero.title, sub, me: mine, end};
@@ -615,7 +619,7 @@ function open(options) {
                 text: `За столом ${seats.length}. Играть можно от ${lo} до ${hi}: невзятых героев ведёт игра. Выбери героя или садись на любое свободное место; кто злодей, решит только правда дела.`}),
             ...(picking ? [panel(`Облик: ${picking.title}`, p('Выбери, каким будет этот герой.'), kit.stack(...arr(picking.looks).map(look => button(heroLine({...look, title: look.name || look.title}) || look.id, () => takeSeat(picking.id, look.id))),
                 button('Любой облик', () => takeSeat(picking.id)), button('Отмена', () => { lookPick = null; render(); }, 'text')))] : []),
-            panel('Места за столом', heroSeats(data), anyone.length ? p(`На любом свободном месте: ${anyone.map(row => row.seat === data.self_seat ? 'ты' : row.name).join(', ')}.`) : null),
+            panel('Места за столом', heroSeats(data), anyone.length ? p(`На любом свободном месте: ${anyone.map(row => row.seat === data.self_seat ? 'ты' : seatName(row)).join(', ')}.`) : null),
             narratorLobby(),
             panel('Твоё место', ...(own ? [p(ownLine), name.node, address.node] : []), kit.stack(...buttons)),
             ...(room?.role === 'owner' ? [invitePanel()] : []),
@@ -629,7 +633,7 @@ function open(options) {
         const buttons = data.self_seat ? [button(own?.ready ? 'Изменить имя и готовность' : 'Я готов', () => lobbyCommand('ready', {name: name.input.value, address_form: address.input.value, ready: !own?.ready})),
             ...(data.can_start ? [button('Начать дело', () => startGame(), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
         return [kit.scene({slot: 'lobby', title: data.case?.title || 'Собираем стол', text: `${data.seats.length} из 12 игроков. Стартуют 4, 5, 8 или 12; каждый подтверждает готовность.`}),
-            panel('Стол игроков', kit.seats(arr(data.seats).map(item => ({name: item.name, line: item.ready ? 'Готов' : 'Ещё не готов', me: item.seat === data.self_seat})))),
+            panel('Стол игроков', kit.seats(arr(data.seats).map(item => ({name: seatName(item), line: item.ready ? 'Готов' : 'Ещё не готов', me: item.seat === data.self_seat})))),
             narratorLobby(),
             panel('Твоё место', ...(data.self_seat ? [name.node, address.node] : []), kit.stack(...buttons)),
             ...(room?.role === 'owner' ? [invitePanel()] : []),
@@ -715,7 +719,8 @@ function open(options) {
                     if (result?.kind === 'proposal') proposal = {...result.proposal, label: 'Предложенное действие'};
                     render();
                 }))] : [])),
-            ...choiceList().filter(row => row.quote.kind === 'seen').map(row => panel(row.label, kit.stack(actionButton(row))))];
+            // A frozen table offers «Я здесь» in its own notice above; the place does not repeat it.
+            ...(view.public.clock?.phase === 'frozen' ? [] : choiceList().filter(row => row.quote.kind === 'seen').map(row => panel(row.label, kit.stack(actionButton(row)))))];
     }
     // A removed player: one free action per window (MANOR_MODULES_V2 §9). Everything offered comes from the menu.
     function removedActions() {

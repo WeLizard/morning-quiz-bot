@@ -1,6 +1,6 @@
 /* Weekly case additions to the approved NightCity kit. Shared controls/gaps remain in qw-shell. */
 .ncase-bar {padding-bottom:var(--qw-s-2)}
-.ncase-main {display:flex;flex-direction:column;gap:var(--qw-s-4);max-width:var(--qw-col-read,760px);margin-inline:auto;padding-bottom:calc(var(--qw-s-7) + var(--qw-safe-bottom))}
+.ncase-main {display:flex;flex-direction:column;align-items:stretch;gap:var(--qw-s-4);max-width:var(--qw-col-read,760px);margin-inline:auto;padding-bottom:calc(var(--qw-s-7) + var(--qw-safe-bottom))}
 .ncase-main > * {min-width:0}
 .ncase-main .nc-card {display:flex;flex-direction:column;gap:var(--qw-s-3)}
 .ncase-main .nc-note {white-space:pre-wrap;overflow-wrap:anywhere;max-width:75ch}

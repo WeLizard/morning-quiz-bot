@@ -359,9 +359,10 @@ class NightCaseAIDispatcher:
                         saved['resource_id'],json.loads(saved['params']),saved['resource_revision'])
                     offers.append(SafeOffer(MenuChoice('choice',quote.selection_id,saved['label'],quote)))
         heroes=(character['id'],) if job.kind=='npc_reply' else ()
-        cast=director_cast(case_doc,doc,heroes=heroes,observation_ids=source.observation_ids) if job.kind in {'npc_reply','window_digest'} else ()
+        # Not named ``cast``: that would shadow sqlalchemy.cast used earlier in this method.
+        scene_cast=director_cast(case_doc,doc,heroes=heroes,observation_ids=source.observation_ids) if job.kind in {'npc_reply','window_digest'} else ()
         expected=build_frozen_context(source,records,offers,case_hash=case.content_hash,
-            ruleset_version='core/'+str(case_doc['ruleset_ref']['version']),fallback=job.fallback,created_at=row.created_at,closes_at=close,cast=cast)
+            ruleset_version='core/'+str(case_doc['ruleset_ref']['version']),fallback=job.fallback,created_at=row.created_at,closes_at=close,cast=scene_cast)
         if expected.input_hash!=job.input_hash or canonical_json(expected.document())!=canonical_json(job.frozen_view):raise _Unavailable('source_closed')
         return FrozenContext.from_document(job.frozen_view,input_hash=job.input_hash,source=source)
 

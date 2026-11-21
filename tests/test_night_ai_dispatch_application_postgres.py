@@ -164,7 +164,8 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
                     else:
                         for block in d['exact_blocks']:
                             if block['kind']=='result':block['speaker_title']='FORGED_PRIVATE_SPEAKER'
-                    d['narrative']['facts']=list(_facts_for(row.kind,d['action_window'],d['summarized_window'],d['exact_blocks'],d['offers']))
+                    d['narrative']['facts']=list(_facts_for(row.kind,d['action_window'],d['summarized_window'],d['exact_blocks'],d['offers'],
+                                                            d.get('cast',[])))
                     raw=copy.deepcopy(d);raw.pop('context_hash');raw['narrative'].pop('knowledge_revision')
                     d['context_hash']=d['narrative']['knowledge_revision']=json_hash(raw)
                     source=AuthorizedSource(row.kind,row.cause_id,row.audience_key,d['action_window'],None,(row.cause_id,),

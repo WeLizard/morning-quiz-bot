@@ -308,6 +308,8 @@ SHELL_ASSET_PATHS = frozenset('/app/shell/' + name for name in SHELL_ASSETS)
 #   night/worlds/index.json           the list of world packs
 #   night/worlds/<id>/pack.json, *.webp, music_*.m4a   one world pack (the music: AAC in MP4, audio/mp4)
 #   night/shell/music_shell_<n>.m4a   the shell themes
+#   night/sealed/<sha256>.webp        pictures withheld until a game's final (a case's per-variant finales);
+#                                     named by their own hash, listed nowhere public, only bytes that match
 # Only files that exist at start-up are served, and only from this fixed list of folders and suffixes.
 NIGHT_DIR = Path(__file__).parent / 'mini_client' / 'night'
 NIGHT_FOLDERS = {'shell': frozenset({'.svg', '.webp', '.woff2', '.json', '.m4a'}), 'worlds': frozenset({'.json', '.webp', '.m4a'})}
@@ -340,6 +342,12 @@ def _night_assets():
             continue
         found.add(f'packs/{pack.name}/assets.json')
         found.update(f'packs/{pack.name}/{name}' for name in files)
+    for path in (NIGHT_DIR / 'sealed').glob('*.webp'):
+        try:
+            if re.fullmatch('[a-f0-9]{64}', path.stem) and path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == path.stem:
+                found.add('sealed/' + path.name)
+        except OSError:
+            continue
     return frozenset(found)
 
 

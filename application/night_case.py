@@ -256,14 +256,36 @@ def _art_binding(report, metadata):
     if art is None:
         if 'art' in report: raise NightCaseError('invalid_art_binding',422)
         return None
-    if (type(art) is not dict or set(art)!={'schema','world','style_pack','manifest_sha256'}
+    if (type(art) is not dict or set(art)-{'sealed'}!={'schema','world','style_pack','manifest_sha256'}
             or art['schema']!='night-art-binding/1' or art['world']!=metadata.get('world')
             or art['style_pack']!=metadata.get('style_pack')
             or any(type(art[k]) is not str or re.fullmatch('[a-z][a-z0-9_]{1,63}',art[k]) is None for k in ('world','style_pack'))
             or type(art['manifest_sha256']) is not str or re.fullmatch('[0-9a-f]{64}',art['manifest_sha256']) is None):
         raise NightCaseError('invalid_art_binding',422)
+    _sealed_binding(art)
     return {'manifest_sha256':art['manifest_sha256'],
             'manifest_url':'/app/night/packs/'+art['manifest_sha256']+'/assets.json'}
+
+
+def _sealed_binding(art):
+    """Pictures kept out of the public pack until the game ends: {asset_id: sha256 of the WebP}.
+
+    The address is the file's own hash, so it cannot be guessed from anything players see
+    before the final; the server serves /app/night/sealed/<sha256>.webp only for matching bytes."""
+    sealed=(art or {}).get('sealed',{})
+    if (type(sealed) is not dict or len(sealed)>64
+            or any(type(k) is not str or re.fullmatch('[a-z][a-z0-9_]{1,95}',k) is None
+                   or type(v) is not str or re.fullmatch('[0-9a-f]{64}',v) is None for k,v in sealed.items())):
+        raise NightCaseError('invalid_art_binding',422)
+    return dict(sealed)
+
+
+def _reveal_finale(own,sealed):
+    """After the final only: the played variant's picture gets its sealed address."""
+    art=(own.get('postmortem') or {}).get('variant_art')
+    if type(art) is not dict: return
+    digest=sealed.get(art.get('asset_id'))
+    own['postmortem']['variant_art']={**art,'url':'/app/night/sealed/'+digest+'.webp'} if digest else None
 
 
 def _public(case, rules, state, art=None):
@@ -359,10 +381,13 @@ class NightCaseApplicationService:
         if rules.rules_hash!=sealed.rules_hash: raise NightCaseError('game_quarantined',503)
         return case,rules
 
-    async def _art(self,sealed,case):
+    async def _art(self,sealed,case,*,with_sealed=False):
         registered=await self.repo.case_pin(sealed.case_id,sealed.version)
         if registered is None or registered.content_hash!=sealed.content_hash: raise NightCaseError('game_quarantined',503)
-        try: return _art_binding(registered.validation_report,case.readonly()['meta'])
+        try:
+            binding=_art_binding(registered.validation_report,case.readonly()['meta'])
+            if not with_sealed: return binding
+            return binding,_sealed_binding(registered.validation_report.get('art'))
         except NightCaseError as exc: raise NightCaseError('game_quarantined',503) from exc
 
     async def _runtime(self,locked):
@@ -897,8 +922,10 @@ class NightCaseApplicationService:
             final=None if state.final is None else {k:state.final[k] for k in ('code','at')}
         else:
             raw=_projection(case,rules,state,str(original))
-            view={'public':_public(case,rules,state,await self._art(locked.sealed,case)),'self':raw['self']}
+            art,sealed=await self._art(locked.sealed,case,with_sealed=True)
+            view={'public':_public(case,rules,state,art),'self':raw['self']}
             view['self'].pop('receipts',None)
+            _reveal_finale(view['self'],sealed)
             titles={cid:look['title'] for cid,look in raw['looks'].items()}
             for nearby in view['self'].get('nearby',[]):
                 if nearby.get('controller')=='npc': nearby['title']=titles[nearby['character_id']]

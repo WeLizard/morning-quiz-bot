@@ -4,6 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
+from application.night_case import NightCaseError, _art_binding, _reveal_finale, _sealed_binding
 from domain.night_case_projection import project
 from domain.night_case_simulation import DEFAULT_START, SearchBudget, _Runner
 from domain.night_case_state import PlayerActor, rules_snapshot
@@ -96,3 +97,36 @@ class SceneArtProjectionTests(unittest.TestCase):
         view = project(CASE, RULES, state, PlayerActor(account))
         self.assertNotIn('postmortem', view['self'])
         self.assertNotIn('manor_scene_variant', json.dumps(view, ensure_ascii=False))
+
+
+class SealedFinaleBindingTests(unittest.TestCase):
+    META = {'world': 'manor_lake', 'style_pack': 'noir_print_a'}
+    BASE = {'schema': 'night-art-binding/1', 'world': 'manor_lake', 'style_pack': 'noir_print_a', 'manifest_sha256': 'a' * 64}
+
+    def test_sealed_map_is_optional_strict_and_never_public(self):
+        self.assertEqual(_sealed_binding(self.BASE), {})
+        sealed = {'manor_scene_variant_b': 'b' * 64}
+        report = {'art': {**self.BASE, 'sealed': sealed}}
+        public = _art_binding(report, self.META)
+        self.assertEqual(set(public), {'manifest_sha256', 'manifest_url'})
+        self.assertNotIn('b' * 64, json.dumps(public))
+        self.assertEqual(_sealed_binding(report['art']), sealed)
+        for bad in ([], {'manor_scene_variant_b': 'B' * 64}, {'Bad': 'b' * 64}, {'manor_scene_variant_b': 'b' * 63},
+                    {f'manor_scene_{i}': 'b' * 64 for i in range(65)}):
+            with self.assertRaises(NightCaseError):
+                _art_binding({'art': {**self.BASE, 'sealed': bad}}, self.META)
+        with self.assertRaises(NightCaseError):
+            _art_binding({'art': {**self.BASE, 'extra': {}}}, self.META)
+
+    def test_only_a_revealed_postmortem_gets_the_sealed_address(self):
+        sealed = {'manor_scene_variant_b': 'b' * 64}
+        own = {'postmortem': {'variant_art': {'asset_id': 'manor_scene_variant_b', 'alt': 'x'}}}
+        _reveal_finale(own, sealed)
+        self.assertEqual(own['postmortem']['variant_art'], {'asset_id': 'manor_scene_variant_b', 'alt': 'x', 'url': f"/app/night/sealed/{'b' * 64}.webp"})
+        unknown = {'postmortem': {'variant_art': {'asset_id': 'manor_scene_variant_c', 'alt': 'x'}}}
+        _reveal_finale(unknown, sealed)
+        self.assertIsNone(unknown['postmortem']['variant_art'])
+        for own in ({}, {'postmortem': {'variant_art': None}}):
+            before = copy.deepcopy(own)
+            _reveal_finale(own, sealed)
+            self.assertEqual(own, before)

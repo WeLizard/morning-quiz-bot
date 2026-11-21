@@ -400,13 +400,13 @@ test('after the final the place shows no actions and no free intent box without 
     fixture.handle.close();
 });
 
-test('shared scenes and the played finale show only pictures of the verified pack', async () => {
+test('shared scenes come from the verified pack, the played finale only from its sealed address', async () => {
     const crypto = require('node:crypto');
     const sort = value => Array.isArray(value) ? value.map(sort) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sort(value[key])])) : value;
-    const manifest = {schema: 'nc-assets/2', world: 'manor_lake', files: {'assets/scene_ev_blizzard.webp': 'a'.repeat(64), 'assets/scene_final_variant_b.webp': 'b'.repeat(64)}, assets: {
+    const manifest = {schema: 'nc-assets/2', world: 'manor_lake', files: {'assets/scene_ev_blizzard.webp': 'a'.repeat(64)}, assets: {
         manor_scene_ev_blizzard: {url: 'assets/scene_ev_blizzard.webp', alt: 'Метель'},
-        manor_scene_variant_b: {url: 'assets/scene_final_variant_b.webp', alt: 'Лодочный сарай'},
     }};
+    const sealedUrl = `/app/night/sealed/${'c'.repeat(64)}.webp`;
     const digest = crypto.createHash('sha256').update(JSON.stringify(sort(manifest))).digest('hex');
     const pointer = `/app/night/packs/${digest}/assets.json`;
     const state = view();
@@ -429,18 +429,22 @@ test('shared scenes and the played finale show only pictures of the verified pac
 
     const over = view();
     Object.assign(over.public, {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer}, final: {code: 'unresolved', at: '2026-11-20T10:00:00Z'}});
-    over.self.postmortem = {ending: {text: 'Финал'}, variant_final_text: {text: 'Разгадка'}, variant_art: {asset_id: 'manor_scene_variant_b', alt: 'След по льду'}, goal_results: []};
+    over.self.postmortem = {ending: {text: 'Финал'}, variant_final_text: {text: 'Разгадка'}, variant_art: {asset_id: 'manor_scene_variant_b', alt: 'След по льду', url: sealedUrl}, goal_results: []};
     const done = controller(over, hook); await settle();
     const finale = images(done.host).find(node => node.className === 'ncase-scene-art');
-    assert.equal(finale.src, `/app/night/packs/${digest}/assets/scene_final_variant_b.webp`);
+    assert.equal(finale.src, sealedUrl);
     assert.equal(finale.alt, 'След по льду');
     done.handle.close();
 
     const unknown = view();
     Object.assign(unknown.public, {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer}});
     unknown.public.final = {code: 'unresolved', at: '2026-11-20T10:00:00Z'};
-    unknown.self.postmortem = {ending: {text: 'Финал'}, variant_art: {asset_id: 'manor_scene_variant_c', alt: 'Нет в паке'}, goal_results: []};
-    const missing = controller(unknown, hook); await settle();
-    assert.equal(images(missing.host).filter(node => node.className === 'ncase-scene-art').length, 0);
-    missing.handle.close();
+    // No sealed address, a pack id or a foreign address: no finale picture.
+    for (const art of [{asset_id: 'manor_scene_ev_blizzard', alt: 'Из пака'}, {asset_id: 'manor_scene_variant_c', alt: 'x', url: 'https://example.com/a.webp'},
+                       {asset_id: 'manor_scene_variant_c', alt: 'x', url: `/app/night/packs/${digest}/assets/scene_ev_blizzard.webp`}]) {
+        unknown.self.postmortem = {ending: {text: 'Финал'}, variant_art: art, goal_results: []};
+        const missing = controller(unknown, hook); await settle();
+        assert.equal(images(missing.host).filter(node => node.className === 'ncase-scene-art').length, 0);
+        missing.handle.close();
+    }
 });

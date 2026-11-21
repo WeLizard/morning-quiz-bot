@@ -364,6 +364,22 @@ def test_content_addressed_pack_only_serves_matching_manifest_and_known_file_byt
     assert not any(name.startswith('packs/') for name in mini_app._night_assets())
 
 
+def test_sealed_pictures_are_served_only_under_their_own_hash(monkeypatch, tmp_path):
+    import hashlib
+    from web import mini_app
+    sealed = tmp_path / 'sealed'
+    sealed.mkdir()
+    payload = b'finale-webp'
+    digest = hashlib.sha256(payload).hexdigest()
+    (sealed / f'{digest}.webp').write_bytes(payload)
+    (sealed / f'{"0" * 64}.webp').write_bytes(b'WRONG BYTES')
+    (sealed / 'scene_final_variant_a.webp').write_bytes(payload)
+    (sealed / f'{digest}.json').write_bytes(payload)
+    (sealed / '.manor_scene_variant_a.tmp.webp').write_bytes(payload)
+    monkeypatch.setattr(mini_app, 'NIGHT_DIR', tmp_path)
+    assert {name for name in mini_app._night_assets() if name.startswith('sealed/')} == {f'sealed/{digest}.webp'}
+
+
 @pytest.mark.parametrize('identity', ['guest', 'telegram'])
 def test_new_prefixes_use_existing_room_nat_bucket_but_not_for_anonymous_calls(monkeypatch, identity):
     async def run():

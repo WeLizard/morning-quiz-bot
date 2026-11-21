@@ -471,8 +471,17 @@ function open(options) {
     function sceneArt(art, fallback) {
         const artwork = assets.get(art?.asset_id);
         if (!artwork) return null;
+        return sceneImage(artwork.url, text(art?.alt).slice(0, 300) || artwork.alt || fallback);
+    }
+    // The played variant's finale is not in the public pack: after the final the server gives
+    // its sealed address (named by the file's sha256). Nothing else is accepted.
+    function sealedArt(art, fallback) {
+        const url = typeof art?.url === 'string' && /^\/app\/night\/sealed\/[a-f0-9]{64}\.webp$/.test(art.url) ? art.url : null;
+        return url ? sceneImage(url, text(art?.alt).slice(0, 300) || fallback) : null;
+    }
+    function sceneImage(url, alt) {
         const image = el('img', 'ncase-scene-art');
-        image.src = artwork.url; image.alt = text(art?.alt).slice(0, 300) || artwork.alt || fallback;
+        image.src = url; image.alt = alt;
         image.loading = 'lazy';
         return image;
     }
@@ -687,7 +696,7 @@ function open(options) {
         const stateNotice = clock.phase === 'frozen' ? panel('Стол ждёт возвращения', p('Общий простой остановил окна. Отметь возвращение, чтобы продолжить.'),
             kit.row(...choiceList().filter(row => row.quote.kind === 'seen').map(row => actionButton(row)))) : own.status === 'departed' ? panel('Участие завершено', p('Тебе доступна собственная разрешённая история до выхода и итог дела.')) : own.status === 'ghost' ? panel('Ты наблюдаешь за делом', p('Обычные действия недоступны. Переписка призраков и разрешённые воспоминания остаются отдельными.')) : null;
         const final = own.postmortem;
-        const finale = pub.final || view.final_summary ? panel('Дело завершено', sceneArt(final?.variant_art, 'Развязка дела'), p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
+        const finale = pub.final || view.final_summary ? panel('Дело завершено', sealedArt(final?.variant_art, 'Развязка дела'), p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
             p(final?.goal_results?.find(row => row.account_id === own.account_id)?.met ? 'Твоя личная цель выполнена.' : 'Подробности своей личной цели смотри в итоговом досье.')) : null;
         const finalHearing = clock.phase === 'final_hearing' && !pub.final;
         const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? panel(finalHearing ? 'Итоговое слушание' : 'Идёт слушание',

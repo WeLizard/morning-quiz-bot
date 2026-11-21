@@ -187,7 +187,8 @@ class RecoveryPostgresTests(unittest.IsolatedAsyncioTestCase):
         (manifest.parent/'assets/fixture.txt').write_bytes(fixture_bytes)
         manifest.write_bytes(original_bytes)
         self.assertEqual(hashlib.sha256(original_bytes).hexdigest(),digest)
-        report={'scope':'synthetic_fixture','art':{'schema':'night-art-binding/1','world':'manor_lake','style_pack':'noir_print_a','manifest_sha256':digest}}
+        report={'scope':'synthetic_fixture','art':{'schema':'night-art-binding/1','world':'manor_lake','style_pack':'noir_print_a','manifest_sha256':digest,
+            'sealed':{'fixture_finale':'c'*64}}}
         async with self.db.transaction() as session:
             await self.service(session).register_case(operator=self.operator,content=document,validation_report=report,admission='rehearsal')
         self.ref=ref
@@ -196,6 +197,7 @@ class RecoveryPostgresTests(unittest.IsolatedAsyncioTestCase):
             first=await self.service(session).get_view(account_id=self.owner,game_id=game)
             room=await session.get(Room,self.room); room.world='other-world'
         self.assertEqual(first['public']['art'],{'manifest_sha256':digest,'manifest_url':'/app/night/packs/'+digest+'/assets.json'})
+        self.assertNotIn('c'*64,json.dumps(first))  # sealed pictures never reach a running game's view
         async with self.db.transaction() as session:
             second=await self.service(session).get_view(account_id=self.owner,game_id=game)
             self.assertEqual(first['public']['art'],second['public']['art'])

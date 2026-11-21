@@ -38,10 +38,13 @@ PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
 MANOR_CASE_CANONICAL_SHA256 = '2e24c6891922e6c6b31b529c7c7142ef929cdc465f5e4d7b1c280c94feb7aae9'
 MANOR_LOOKS = 20                                  # extra appearance portraits from characters_variants/
-MANOR_SCENES = 6 + 3                              # event scenes and per-variant finales from scenes_events/
+MANOR_SCENES = 6                                  # public event scenes from scenes_events/
+MANOR_SEALED = 3                                  # per-variant finales: withheld from the pack until the final
 MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS + MANOR_SCENES              # characters, locations, looks, scenes
 MANOR_WEBPS = 20 + 8 * 4 + 81 + MANOR_LOOKS + MANOR_SCENES        # portraits, place times, items, looks, scenes
-SCENE_GROUPS = {'events': 'scene_', 'variants': 'scene_final_'}  # case group -> source file prefix
+SCENE_GROUPS = {'events': 'scene_'}               # public case group -> source file prefix
+SEALED_GROUPS = {'variants': 'scene_final_'}      # sealed case group -> source file prefix
+SEALED_DIR = ROOT / 'web/mini_client/night/sealed'  # served as /app/night/sealed/<sha256>.webp, listed nowhere
 
 BUDGET = {'scene': 150_000, 'back': 90_000, 'frame': 90_000, 'frame_small': 60_000, 'icon': 30_000, 'thumb': 20_000}
 
@@ -507,11 +510,14 @@ def encode_asset(path, target, width, quality):
         return list(encoded.size), 'A' in encoded.getbands(), target.stat().st_size
 
 
-def build_manor_assets(world, defaults, out_dir, report_out=None):
+def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEALED_DIR):
     """Build the public H asset manifest and compact raster exports for Manor Lake only.
 
     The public manifest contains only art.asset_id and art.alt from the authored case.
     Source paths and hashes go to the optional private report, never to assets.json.
+    Per-variant finales would spoil the answer, so they stay out of the public folder and
+    manifest: each goes to sealed_out as <sha256>.webp, and the {asset_id: sha256} map
+    (the 'sealed' part of the case's art binding) goes to the private report only.
     """
     case_path = ROOT / 'content/night_city/manor_lake.case.json'
     case_bytes = case_path.read_bytes()
@@ -628,6 +634,35 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
     if scene_count != MANOR_SCENES:
         raise SystemExit(f'manor_lake case must have {MANOR_SCENES} scene pictures, found {scene_count}')
 
+    sealed_dir = Path(sealed_out)
+    sealed_dir.mkdir(parents=True, exist_ok=True)
+    sealed, sealed_entries = {}, []
+    for group, prefix in SEALED_GROUPS.items():
+        for entry in case.get(group, []):
+            art = entry.get('art') or {}
+            asset_id, alt = art.get('asset_id'), art.get('alt')
+            if asset_id != f"manor_scene_{entry['id']}" or not isinstance(alt, str) or not alt:
+                raise SystemExit(f"scene art must be manor_scene_<id> with alt: {group}/{entry['id']}")
+            path = source.find(f"scenes_events/{prefix}{entry['id']}.png")
+            if path is None:
+                raise SystemExit(f"missing scene image {prefix}{entry['id']}.png")
+            if asset_id in assets or asset_id in sealed:
+                raise SystemExit(f'duplicate case art asset_id: {asset_id}')
+            stale = assets_dir / f"{prefix}{entry['id']}.webp"
+            if stale.exists():  # an older build published it; a finale must never stay public
+                stale.unlink()
+            temporary = sealed_dir / f'.{asset_id}.tmp.webp'
+            size, alpha, byte_count = encode_asset(path, temporary, 600, 78)
+            digest = hashlib.sha256(temporary.read_bytes()).hexdigest()
+            os.replace(temporary, sealed_dir / f'{digest}.webp')
+            sealed[asset_id] = digest
+            sealed_entries.append({'asset_id': asset_id, 'source': source.rel(path),
+                                   'source_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                                   'export': f'/app/night/sealed/{digest}.webp', 'export_dimensions': size,
+                                   'export_alpha': alpha, 'export_sha256': digest, 'quality': 78, 'bytes': byte_count})
+    if len(sealed) != MANOR_SEALED:
+        raise SystemExit(f'manor_lake case must have {MANOR_SEALED} sealed finale pictures, found {len(sealed)}')
+
     item_paths = sorted((source.dir / 'items').glob('i_*.png'))
     if len(item_paths) != 81:
         raise SystemExit(f'expected 81 individual Manor item PNGs, found {len(item_paths)}')
@@ -657,6 +692,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
     (out_dir / 'assets.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f"manor_lake assets: {len(case_chars)} characters, {look_count} looks, {len(case_places) * len(TIMES)} place variants, {scene_count} scenes, "
           f"{len(item_paths)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
+    print(f"sealed finales (art binding 'sealed'): {json.dumps(sealed, sort_keys=True)}")
     if report_out:
         report = {
             'schema': 'nc-assets-build-report/1', 'world': 'manor_lake',
@@ -671,7 +707,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
             'character_count': len(case_chars), 'look_count': look_count, 'location_count': len(case_places),
             'location_variant_count': len(case_places) * len(TIMES), 'scene_count': scene_count, 'item_count': len(item_paths),
             'item_bytes': item_bytes, 'total_export_bytes': sum(r['bytes'] for r in entries),
-            'assets': entries,
+            'assets': entries, 'sealed': sealed, 'sealed_assets': sealed_entries,
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -929,6 +965,7 @@ def main():
     parser.add_argument('--immutable-out', default=str(ROOT / 'web/mini_client/night/packs'))
     parser.add_argument('--compare-assets', help='optional legacy WebP directory for a private byte comparison')
     parser.add_argument('--report-out', help='optional private inventory/hash report; not copied to the web asset folder')
+    parser.add_argument('--sealed-out', default=str(SEALED_DIR), help='folder for pictures withheld until the final (<sha256>.webp)')
     args = parser.parse_args()
     config = json.loads((HERE / 'worlds.json').read_text(encoding='utf-8'))
     out_root = Path(args.out)
@@ -943,7 +980,7 @@ def main():
         if args.worlds or args.all or args.inventory or args.places:
             parser.error('--assets-only is a standalone Manor Lake export; do not combine it with world-pack options')
         manor = next(w for w in config['worlds'] if w['id'] == 'manor_lake')
-        build_manor_assets(manor, config['defaults'], args.assets_out, args.report_out)
+        build_manor_assets(manor, config['defaults'], args.assets_out, args.report_out, args.sealed_out)
         return
     if args.report_out or args.compare_assets:
         parser.error('--report-out and --compare-assets are only valid with --assets-only or --immutable-only')

@@ -53,9 +53,21 @@ python web/run_web.py              # админка на 0.0.0.0:8000
 
 ```powershell
 python -m pytest -q                                    # без БД: часть тестов пропускается
-$env:TEST_DATABASE_URL = 'postgresql+asyncpg://mqb_dev:ПАРОЛЬ@127.0.0.1:55433/morning_quiz_test'
-DATABASE_URL=$env:TEST_DATABASE_URL python -m alembic upgrade head   # БД тестов тоже нужно мигрировать
-python -m pytest -q                                    # полный гейт
+.\scripts\Test-LocalMilestone.ps1                      # полный гейт в тестовом контейнере
+```
+
+Полный гейт — `Test-LocalMilestone.ps1`: он пересоздаёт `morning_quiz_test` и задаёт
+тестам все адреса БД. PG-тесты с хоста запускаются так же, как в CI
+(`.github/workflows/ci.yml`): три адреса совпадают, иначе тесты Ночного дела
+пропускаются или падают на защите.
+
+```powershell
+$url = 'postgresql+asyncpg://mqb_dev:local-development-only@127.0.0.1:55433/morning_quiz_test'
+$env:TEST_DATABASE_URL = $url
+$env:NIGHT_CASE_TEST_DATABASE_URL = $url
+$env:MQB_CI_POSTGRES_SERVICE = '1'
+$env:DATABASE_URL = $url; python -m alembic upgrade head   # БД тестов тоже нужно мигрировать
+python -m pytest -q tests/test_night_case_ai_wiring_postgres.py
 ```
 
 ## Production

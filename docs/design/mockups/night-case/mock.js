@@ -484,6 +484,252 @@ ${castRow('nephew_gambler', '', 'Племянник-игрок', 'Лёша', 'in
 ${dock('', btn('Выйти') + btn('Новое дело', 'primary'))}`;
 }
 
+/* ---------- states of the case: new pictures ----------
+   Objects for these screens come as one transparent 3x3 sheet in the manor style (owner's batch, 2026-11-21).
+   NEW_ART lists the files that exist (mock/art/<key>.webp); a missing one is drawn as a dashed slot that says
+   what goes there, or as a stand-in item of the pack. */
+const NEW_ART = {clock: 1, phone: 1, bell: 1, drawer: 1, versions: 1, salver: 1, chair: 1, pen: 1, candle: 1};
+const NEW_ART_NOTE = {phone: 'телефон с оборванным шнуром', chair: 'пустой стул, отодвинутый от стола', clock: 'остановившиеся каминные часы',
+    bell: 'настольный звонок', drawer: 'ящик архивной картотеки', salver: 'письмо на серебряном подносе', versions: 'две редакции завещания',
+    pen: 'перо над раскрытым блокнотом', candle: 'догоревшая свеча'};
+function obj(key, {stand = null, cls = 'obj'} = {}) {
+    if (NEW_ART[key]) return `<img class="${cls}" src="/mock/art/${key}.webp" alt="">`;
+    if (stand) return `<img class="${cls}" src="${item(stand)}" alt="">`;
+    return `<span class="${cls} ncase-slot" role="img" aria-label="Место для картинки: ${NEW_ART_NOTE[key]}">${ic('papers')}<span>${NEW_ART_NOTE[key]}</span></span>`;
+}
+function heroObj({img, pos = '50% 40%', eyebrow, title, text, cls = '', key, stand = null}) {
+    return `<section class="nc-hero ncase-objhero ${cls}" style="--img:url('${img}');--pos:${pos}">${obj(key, {stand, cls: 'ncase-hero-obj'})}<div class="copy">
+<span class="nc-eyebrow">${eyebrow}</span><h2>${title}</h2>${text ? `<p>${text}</p>` : ''}</div></section>`;
+}
+const alertBox = (icon, title, text, tone = '') => `<div class="nc-alert ${tone}" role="status">${ic(icon)}<div><strong>${title}</strong>${text ? `<p>${text}</p>` : ''}</div></div>`;
+const can = (on, text) => `<li class="${on ? 'on' : 'off'}">${ic(on ? 'check' : 'lock')}<span>${text}</span></li>`;
+
+/* ---------- 15 removed by a wrong accusation (status «ghost» in the rules; no mysticism in this world) ---------- */
+function removed() {
+    return `${header({eyebrow: 'Окно 6 · отстранён', title: 'Хозяин исчез', clock: {icon: 'hourglass', text: '3 ч 15 м', title: 'До конца окна 6'}})}
+${tabs('place', {feed: 2})}
+<main class="nc-main has-dock">
+<section class="nc-hero ncase-out nc-span" style="--img:url('${place('main_hall', 'night')}');--pos:50% 40%"><img class="ncase-out-face" src="${face('gardener')}" alt="Портрет: Садовник, приглушённый">
+<div class="copy"><span class="nc-eyebrow">Слушание закрыто · окно 6</span><h2>Стол отстранил Садовника</h2>
+<p>Обвинение поддержали, но ты не виновен. Ходить, говорить и голосовать ты больше не можешь. Дело ты видишь до развязки.</p></div></section>
+<div class="nc-col">
+${card(`${head('eye', 'Что тебе осталось')}
+<ul class="ncase-can">${can(true, 'Одно действие за окно — ниже')}${can(true, 'Читать Гостиную у камина')}${can(true, 'Смотреть доску улик')}${can(true, 'Своё досье и находки')}${can(true, 'Переписка отстранённых')}${can(true, 'Развязка и итог дела')}
+${can(false, 'Ходить, говорить, обвинять, голосовать')}</ul>`)}
+${card(`${head('share', 'Раз в окно', '1 из 1')}
+<p class="nc-muted">Выбери одно. Что можно передать, заранее решает дело; ты отдаёшь только то, что знал твой персонаж.</p>
+<div class="ncase-acts">
+${actTile(item('s1_06_tagged_key'), 'Воспоминание на доску', {pressed: true, sub: 'увидят все'})}
+${actTile(item('s2_03_sealed_envelope'), 'Записка живому', {sub: 'одному игроку'})}
+${actTile('/mock/art/candle.webp', 'Знак в месте', {sub: 'найдут при осмотре'})}
+${actTile(item('s2_04_telegram_strip'), 'Да или нет', {sub: 'ответ на вопрос'})}
+</div>
+<p class="ncase-mocknote">Сейчас в игре есть только «Воспоминание на доску». Остальные три — из дизайна недели (§3.2), ещё не сделаны. В «Усадьбе» воспоминаний для передачи пока нет ни у одного персонажа.</p>
+${evidence('s1_06_tagged_key', 'Ключ сервисной панели', {by: 'твоя находка · окно 5 · пример', text: 'На запасном ключе бирка старой мастерской: сервисная панель библиотеки.'})}`)}
+</div>
+<div class="nc-col">
+${card(`${head('talk', 'Отстранённые')}
+<div class="nc-chat">
+<span class="nc-sys">${ic('eye')}Садовник теперь наблюдает за делом</span>
+<div class="ncase-free ncase-empty">${obj('chair')}<p class="nc-muted">Пока здесь только ты. Сюда пишут те, кого стол отстранил; за столом этого не видят.</p></div>
+</div>
+<div class="nc-compose"><textarea class="nc-field" rows="1" placeholder="Реплика отстранённым"></textarea>${btn('Сказать')}</div>`)}
+</div>
+</main>
+${dock('Воспоминание на доску: Ключ сервисной панели', btn('Отмена') + btn('Поделиться', 'primary'))}`;
+}
+
+/* ---------- 16 the table stopped: six windows in a row nobody came ---------- */
+function frozen() {
+    const seats = [['gardener', 'Садовник', 'ты'], ['housekeeper', 'Экономка', 'Вера'], ['lawyer', 'Адвокат', 'Олег'], ['maid', 'Горничная', 'Кира'],
+        ['nephew_gambler', 'Племянник-игрок', 'Лёша'], ['investigator', 'Следователь', 'Саша', 'm44']];
+    return `${header({eyebrow: 'Окно 9 из 14 · стол стоит', title: 'Хозяин исчез', clock: {icon: 'hourglass', text: 'стоит', title: 'Окна остановлены'}})}
+<main class="nc-main has-dock">
+${heroObj({img: `${WORLD}scene_lobby_evening.webp`, pos: '50% 55%', cls: 'tall nc-span', key: 'clock',
+        eyebrow: 'Стол ждёт возвращения', title: 'Окна остановились',
+        text: 'Шесть окон подряд никто не заходил. Всё сохранено: места, находки, записки. Окно 9 откроется, когда кто-нибудь вернётся.'})}
+<div class="nc-col">
+${card(`${head('calendar', 'Что будет дальше')}
+<div class="ncase-free">${obj('bell')}<p class="nc-muted">Стол не потерял ничего. Чтобы продолжить, хватит одного человека.</p></div>
+<ol class="ncase-next"><li>Первый, кто нажмёт «Я здесь», откроет окно 9. Действия за это не тратятся.</li>
+<li>Окно продлится не меньше 30 минут.</li>
+<li>Остальные успеют вернуться в этом же окне. Кто не вернётся, того персонажа со временем поведёт игра.</li></ol>`)}
+</div>
+<div class="nc-col">
+${card(`${head('people', 'За столом', '6 мест')}
+<ul class="ncase-people">${seats.map(([id, title, player, look]) => `<li class="ncase-person away">${faceImg(id, look || '')}<span class="nm">${title}</span>${plate(player)}</li>`).join('')}</ul>`)}
+</div>
+</main>
+${dock('Первый вернувшийся открывает окно 9', btn('Я здесь', 'primary'))}`;
+}
+
+/* ---------- 17 the answer did not come back: the same request is repeated, never applied twice ---------- */
+function netLost() {
+    return `${caseHeader('Главный зал')}
+${tabs('place', {feed: 3, board: 2})}
+<div class="nc-net" role="status">${ic('alert')}<span>Запрос ещё не подтверждён сервером</span>${btn('Повторить', 'compact')}</div>
+<main class="nc-main has-dock">
+${alertBox('alert', 'Нет связи', 'Повтори тот же запрос — действие не применится дважды.', 'warn')}
+${hero({img: place('main_hall', 'evening'), cls: 'short nc-span ncase-place', eyebrow: 'Вечер · ты здесь', title: 'Главный зал',
+        extra: `<div class="ncase-hero-row">${ap(3, 4)}</div>`})}
+<div class="nc-col">
+${card(`${head('lens', 'Осмотреть', '1 действие')}
+<div class="ncase-acts">${actTile(item('s1_06_tagged_key'), 'Ключ сервисной панели', {pressed: true, sub: 'ответ не дошёл'})}${actTile(item('s1_05_door_lock'), 'Осмотр библиотеки')}</div>`)}
+</div>
+<div class="nc-col">
+${card(`${head('papers', 'Что сохранено')}
+<p class="nc-muted">Всё, что сервер уже подтвердил, сохранено. Действие спишется только один раз, даже если нажать «Повторить» несколько раз.</p>`)}
+</div>
+</main>
+${dock('Осмотреть: Ключ сервисной панели — ответ не дошёл', btn('Отмена') + btn('Повторить', 'primary'))}`;
+}
+
+/* ---------- 18 the case does not open at all ---------- */
+function netDown() {
+    return `${header({eyebrow: 'Ночной город', title: 'Нет связи'})}
+<main class="nc-main has-dock">
+${heroObj({img: place('main_hall', 'night'), pos: '50% 40%', cls: 'tall nc-span', key: 'phone',
+        eyebrow: 'Нет связи со столом', title: 'Линия молчит',
+        text: 'Не удалось открыть дело. Проверь связь и открой Ночной город снова.'})}
+<div class="nc-col">
+${card(`${head('papers', 'Что сохранено')}
+<p class="nc-muted">Твои ходы, которые сервер подтвердил, сохранены. Неподтверждённый запрос можно повторить: дважды он не применится.</p>`)}
+</div>
+</main>
+${dock('', btn('В главное меню') + btn('Повторить', 'primary'))}`;
+}
+
+/* ---------- 19 the ⚙ menu (QW.menu, UI_RULES §5): account, the game block (up to 6), the core block ---------- */
+const mi = (icon, label, {hint = '', value = '', sw = null, danger = false} = {}) =>
+    `<button class="qw-menu-item${danger ? ' qw-danger' : ''}" type="button" ${sw !== null ? `role="switch" aria-checked="${sw}"` : ''}><svg viewBox="0 0 24 24"><use href="${SPRITE}#nc-i-${icon}"/></svg>
+<span class="qw-grow">${label}${hint ? `<small>${hint}</small>` : ''}</span>${sw !== null ? `<span class="qw-switch" data-on="${sw}"></span>` : value ? `<span class="qw-value">${value}</span>` : ''}</button>`;
+function menuScreen() {
+    return `${caseHeader('Главный зал')}
+${tabs('place', {feed: 3, board: 2})}
+<main class="nc-main">
+${hero({img: place('main_hall', 'evening'), cls: 'nc-span ncase-place', eyebrow: 'Вечер · ты здесь', title: 'Главный зал',
+        text: 'Двусветный зал с камином, портретами предков и длинным обеденным столом.'})}
+</main>
+<div class="qw-menu-scrim qw-open"></div>
+<div class="qw-menu qw-open ncase-menu" role="dialog" aria-label="Меню"><div class="qw-menu-handle"></div>
+<button class="qw-menu-item qw-menu-account" type="button"><span class="qw-avatar">С</span><span class="qw-grow">Твой профиль<small>Профиль и настройки</small></span><svg viewBox="0 0 24 24"><use href="${SPRITE}#nc-i-back"/></svg></button>
+<div class="qw-menu-section">Ночной город</div>
+${mi('story', 'Правила дела')}
+${mi('vial', 'Ведущий партии', {value: 'ИИ'})}
+${mi('music', 'Музыка', {sw: false})}
+${mi('eye', 'Контрастный режим', {sw: false})}
+${mi('repeat', 'Обновить связь')}
+${mi('door', 'Покинуть дело', {hint: 'Твоего персонажа дальше поведёт игра', danger: true})}
+<div class="qw-menu-section">QuizzyWizzy</div>
+${mi('home', 'Главное меню')}
+${mi('full', 'Во весь экран')}
+${mi('bug', 'Сообщить о проблеме')}
+</div>`;
+}
+
+/* ---------- 20 a free action in own words (with the AI narrator): the narrator maps it to an existing choice ---------- */
+function freeAction() {
+    return `${caseHeader('Главный зал')}
+${tabs('place', {feed: 3, board: 2})}
+<main class="nc-main has-dock">
+${hero({img: place('main_hall', 'evening'), cls: 'short nc-span ncase-place', eyebrow: 'Вечер · ты здесь', title: 'Главный зал',
+        extra: `<div class="ncase-hero-row">${ap(3, 4)}<span class="ncase-narr">${ic('vial')}Ведущий: ИИ</span></div>`})}
+<div class="nc-col">
+${card(`${head('story', 'Своими словами')}
+<div class="ncase-free">${obj('pen', {stand: 's5_05_notebook'})}<p class="nc-muted">Опиши, что хочешь сделать. Ведущий подберёт подходящее действие из доступных. Пока ты не подтвердишь, ничего не тратится.</p></div>
+<textarea class="nc-field ncase-draft" rows="3" aria-label="Что ты хочешь сделать?">Посмотреть, нет ли на подоконнике в библиотеке следов воска</textarea>
+<div class="qw-btn-row ncase-left">${btn('Предложить действие')}</div>`)}
+</div>
+<div class="nc-col">
+${card(`${head('vial', 'Ведущий понял так')}
+<div class="ncase-acts one">${actTile(item('s1_05_door_lock'), 'Осмотр библиотеки', {pressed: true, sub: '1 действие'})}</div>
+<p class="nc-muted">Если ведущий не поймёт, он скажет: «Уточни действие: выбери одну из доступных кнопок. Пока ничего не потрачено».</p>`)}
+</div>
+</main>
+${dock('Предложенное действие: Осмотр библиотеки · 1 из 3 действий', btn('Отмена') + btn('Подтвердить', 'primary'))}`;
+}
+
+/* ---------- 21 archive requests: paid now, the answer comes in the next window ---------- */
+function archive() {
+    return `${caseHeader('Главный зал')}
+${tabs('place', {feed: 3, board: 2})}
+<main class="nc-main has-dock">
+${heroObj({img: place('main_hall', 'evening'), cls: 'short nc-span', key: 'drawer', stand: 's2_06_ledger_page',
+        eyebrow: 'Архивный фонд усадьбы', title: 'Запросить копию',
+        text: 'Копии привезли в усадьбу заранее, телефон для этого не нужен. Ответ придёт в следующем окне — в хронику и досье.'})}
+<div class="nc-col">
+${card(`${head('papers', 'Запросить в архиве', '1 действие')}
+<div class="ncase-acts">
+${actTile(item('s2_06_ledger_page'), 'Копия реестра завещаний', {pressed: true})}
+${actTile(item('s2_07_ticket'), 'Копия журнала приглашений')}
+</div>
+<p class="nc-muted">Каждую копию можно запросить один раз за дело.</p>`)}
+${card(`${head('hourglass', 'Запросы', '2')}
+<ul class="ncase-chron">
+${chron(item('s2_02_folded_letter'), 'В пути · ответ в окне 6', 'Копия переписки хозяина', {obj: true})}
+${chron(item('s5_05_notebook'), 'Получено · окно 5', 'Копия журнала обходов', {obj: true})}
+</ul>`)}
+</div>
+<div class="nc-col">
+${card(`${head('envelope', 'Ответ архива', 'окно 5')}
+<p class="nc-lead">Получена копия из заранее доставленного в усадьбу архивного фонда; телефонная линия для этого не требуется.</p>
+${evidence('s5_05_notebook', 'Лист обхода', {by: 'архив · окно 5 · видишь только ты', text: 'Копия расписания обходов содержит два прохода сторожа к лодочному и контрольный оттиск его подбитой подошвы.',
+        action: `<div class="qw-btn-row ncase-left">${btn('Опубликовать', 'compact')}</div>`})}`)}
+</div>
+</main>
+${dock('Запросить: Копия реестра завещаний · 1 из 3 действий', btn('Отмена') + btn('Запросить', 'primary'))}`;
+}
+
+/* ---------- 22 versions: documents of one paper side by side, public theories in the archive ---------- */
+function theory(title, body, state, links) {
+    const archived = state === 'archived';
+    return `<article class="ncase-theory${archived ? ' archived' : ''}"><div class="top"><strong>${title}</strong><span class="nc-tag">${archived ? 'в архиве' : 'активная'}</span></div>
+<p class="nc-muted">${body}</p>${links.map(([pic, name, rel]) => `<span class="ncase-link ${rel}"><img src="${item(pic)}" alt="">${rel === 'supports' ? 'подтверждает' : 'противоречит'}: ${name}</span>`).join('')}
+<div class="qw-btn-row ncase-left">${btn(archived ? 'Вернуть версию' : 'В архив', 'compact')}</div></article>`;
+}
+function versions() {
+    return `${caseHeader('Улики')}
+${tabs('board', {feed: 3})}
+<main class="nc-main">
+<div class="nc-col">
+${card(`${head('papers', 'Редакции завещания', 'видишь только ты')}
+<div class="ncase-revs">${obj('versions', {stand: 'c1_01_rolled_will'})}
+<ul><li><b>Редакция 1</b> Копия черновика</li><li><b>Редакция 2</b> Официальная папка</li></ul></div>
+<p class="nc-muted">Обе бумаги у тебя. Сравнить их можно действием в месте, где лежат оригиналы, — это обычный осмотр за 1 действие.</p>`)}
+</div>
+<div class="nc-col">
+${card(`${head('story', 'Версии стола', '3')}
+<p class="nc-muted">Версия — общая догадка, не улика. Связь с уликой видна, когда улику опубликовали. Архив не значит «опровергнута»: версию можно вернуть.</p>
+${theory('Уход через озеро', 'Проверим версию ухода из усадьбы.', 'archived', [['s3_06_bootprint', 'Следы на льду', 'contradicts']])}
+${theory('Укрытие внутри дома', 'Проверим служебный маршрут и двери.', 'active', [])}
+${theory('Добровольная проверка', 'Проверим документы о намерениях.', 'active', [])}
+<span class="nc-sys">${ic('repeat')}Вера: версия «Уход через озеро» отправлена в архив</span>`)}
+</div>
+</main>`;
+}
+
+/* ---------- 23 a letter is offered: the butler returns a closed letter (the viewer here plays the daughter) ---------- */
+function letter() {
+    return `${header({eyebrow: 'Окно 7 из 14 · день 4, утро', title: 'Библиотека', clock: {icon: 'hourglass', text: '4 ч 05 м', title: 'До конца окна 7'}})}
+${tabs('place', {feed: 1})}
+<main class="nc-main has-dock">
+${hero({img: place('library', 'morning'), cls: 'short nc-span ncase-place', eyebrow: 'Утро · ты здесь', title: 'Библиотека',
+        extra: `<div class="ncase-hero-row">${ap(4, 4)}</div>`})}
+<div class="nc-col">
+${card(`${head('envelope', 'Письмо', '0 действий')}
+<div class="ncase-letter">${obj('salver', {stand: 's2_03_sealed_envelope'})}
+<div class="from">${faceImg('butler', '', 'ncase-face sm')}${who('Дворецкий', 'игра')}</div>
+<p class="nc-lead">Дворецкий оставил тебе закрытое письмо. Принять или отказаться?</p></div>
+<p class="nc-muted">Что в письме, узнаешь, только если примешь. Откажешься — письмо останется лежать, и больше его не предложат.</p>`, '')}
+</div>
+<div class="nc-col">
+${card(`<div class="ncase-me">${faceImg('daughter', '', 'ncase-face lg')}<div><span class="nc-eyebrow">Ты в этом деле</span><strong>Дочь от первого брака</strong>
+<span class="nc-muted">Пример экрана другого игрока: письмо адресовано Дочери.</span></div></div>`)}
+</div>
+</main>
+${dock('Решение только твоё · действий не тратит', btn('Отклонить письмо') + btn('Принять письмо', 'primary'))}`;
+}
+
 const SCREENS = [
     ['01_root', '1 Ночной город', root, null],
     ['02_worlds', '2 Новое дело · миры', worlds, null],
@@ -499,6 +745,15 @@ const SCREENS = [
     ['12_hearing', '12 Слушание', hearing, 'scene_vote'],
     ['13_final_hearing', '13 Итоговое слушание', finalHearing, 'scene_vote'],
     ['14_final', '14 Дело закрыто', finale, 'scene_finale'],
+    ['15_removed', '15 Отстранён', removed, null],
+    ['16_frozen', '16 Стол на паузе', frozen, 'scene_lobby_evening'],
+    ['17_net_lost', '17 Ответ не дошёл', netLost, null],
+    ['18_net_down', '18 Дело не открылось', netDown, null],
+    ['19_menu', '19 Меню ⚙', menuScreen, null],
+    ['20_free', '20 Своими словами', freeAction, null],
+    ['21_archive', '21 Запрос в архив', archive, null],
+    ['22_versions', '22 Архив версий', versions, null],
+    ['23_letter', '23 Письмо', letter, null],
 ];
 
 async function applyPalette(contrast) {

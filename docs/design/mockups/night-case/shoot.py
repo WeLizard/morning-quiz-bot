@@ -20,11 +20,15 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import serve  # noqa: E402
 
-SCREENS = ['01_root', '02_worlds', '03_case', '04_lobby', '05_pick', '06_role', '07_place', '08_talk', '09_feed', '10_board', '11_dossier', '12_hearing', '13_final_hearing', '14_final']
+PATH_SCREENS = ['01_root', '02_worlds', '03_case', '04_lobby', '05_pick', '06_role', '07_place', '08_talk', '09_feed', '10_board', '11_dossier', '12_hearing', '13_final_hearing', '14_final']
+STATE_SCREENS = ['15_removed', '16_frozen', '17_net_lost', '18_net_down', '19_menu', '20_free', '21_archive', '22_versions', '23_letter']
+SCREENS = PATH_SCREENS + STATE_SCREENS
 LABELS = {'01_root': '1 Ночной город', '02_worlds': '2 Новое дело · миры', '03_case': '3 Дело мира', '04_lobby': '4 Сбор',
           '05_pick': '5 Выбор персонажа', '06_role': '6 Твоя роль', '07_place': '7 Место', '08_talk': '8 Разговор',
           '09_feed': '9 Гостиная у камина', '10_board': '10 Улики', '11_dossier': '11 Досье', '12_hearing': '12 Слушание',
-          '13_final_hearing': '13 Итоговое слушание', '14_final': '14 Дело закрыто'}
+          '13_final_hearing': '13 Итоговое слушание', '14_final': '14 Дело закрыто',
+          '15_removed': '15 Отстранён', '16_frozen': '16 Стол на паузе', '17_net_lost': '17 Ответ не дошёл', '18_net_down': '18 Дело не открылось',
+          '19_menu': '19 Меню настроек', '20_free': '20 Своими словами', '21_archive': '21 Запрос в архив', '22_versions': '22 Архив версий', '23_letter': '23 Письмо'}
 VIEWPORTS = {
     'tg390': dict(w=390, h=700, q='', full=True),
     'web360': dict(w=360, h=780, q='', full=False),
@@ -42,7 +46,7 @@ CHECK_JS = r"""
   const btns = [...document.querySelectorAll('button')].filter(vis);
   for (const b of btns) { const r = b.getBoundingClientRect();
     if (r.height < 43.5 || r.width < 43.5) issues.push(`small-tap ${Math.round(r.width)}x${Math.round(r.height)} "${b.textContent.trim().slice(0,30)}"`); }
-  const grouped = b => b.closest('.qw-btn-group, nav, [role=tablist], [data-qw-group]');
+  const grouped = b => b.closest('.qw-btn-group, nav, .qw-menu, [role=tablist], [data-qw-group]');
   const drawn = btns.filter(b => !grouped(b));
   const layer = b => b.closest('.nc-dock') ? 'dock' : b.closest('.nc-bar') ? 'bar' : 'page';
   for (let i = 0; i < drawn.length; i++) for (let j = i + 1; j < drawn.length; j++) {
@@ -100,8 +104,8 @@ def font(size):
     return ImageFont.load_default()
 
 
-def sheet(frames, folder, out, cols, scale, title, max_h=None):
-    files = [frames / folder / f'{s}.png' for s in SCREENS if (frames / folder / f'{s}.png').exists()]
+def sheet(frames, folder, out, cols, scale, title, max_h=None, screens=PATH_SCREENS):
+    files = [frames / folder / f'{s}.png' for s in screens if (frames / folder / f'{s}.png').exists()]
     if not files:
         return
     ims = []
@@ -167,6 +171,9 @@ def main(frames: Path):
     sheet(frames, 'tg390', HERE / 'overview_phone_390_screen.webp', 6, .62, 'Дело недели · телефон 390 (первый экран, как в Telegram)')
     sheet(frames, 'pc1280', HERE / 'overview_pc_1280.webp', 3, .5, 'Дело недели · ПК 1280 (первый экран)')
     sheet(frames, 'contrast390', HERE / 'overview_contrast_390.webp', 6, .62, 'Дело недели · контрастный режим, телефон 390')
+    sheet(frames, 'tg390-full', HERE / 'overview_states_phone_390.webp', 5, .62, 'Дело недели · состояния, телефон 390 (вся страница)', max_h=2300, screens=STATE_SCREENS)
+    sheet(frames, 'pc1280', HERE / 'overview_states_pc_1280.webp', 3, .5, 'Дело недели · состояния, ПК 1280 (первый экран)', screens=STATE_SCREENS)
+    sheet(frames, 'contrast390', HERE / 'overview_states_contrast_390.webp', 5, .62, 'Дело недели · состояния, контраст, телефон 390', screens=STATE_SCREENS)
 
 
 if __name__ == '__main__':

@@ -198,7 +198,7 @@ def test_identity_and_command_envelope_are_delegated_without_client_principal(mo
                                      cookies={'mqb_mini' if identity == 'telegram' else 'mqb_guest': 's' * 43}) as client:
             root = f'/api/night-case/games/{GAME}'
             bootstrap = await client.get('/api/night-case/bootstrap', params={'identity': identity})
-            assert bootstrap.json()['capabilities'] == {'legacy_mafia': True, 'free_intent': False}
+            assert bootstrap.json()['capabilities'] == {'legacy_mafia': True, 'free_intent': False, 'ai_narrator': False}
             view = await client.get(root + '/view', params={'identity': identity})
             assert view.status_code == 200
             assert 'no-store' in view.headers['cache-control']

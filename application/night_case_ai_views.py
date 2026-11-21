@@ -64,8 +64,16 @@ class NightCaseAIViews:
         """Authenticated public BYOK catalog; never endpoint or admin model IDs."""
         await operation_fence(self.session)
         await self.ai._account(account_id)
-        enabled = {preset for preset, _ in self.ai.registry.models}
-        return {'items': [row for row in self.ai.registry.byok_catalog() if row['id'] in enabled]}
+        registry = self.ai.registry
+        enabled = {preset for preset, _ in registry.models} | set(registry.manual_presets)
+        items = [row for row in registry.byok_catalog() if row['id'] in enabled]
+        for row in items:
+            row['models'] = sorted(model for preset, model in registry.models if preset == row['id'])
+            row['manual_model_id'] = row['id'] in registry.manual_presets
+        # Readiness is reported before the form is submitted (§4): BYOK keys are cloud-only.
+        reason = ('ai_disabled' if not self.runtime_enabled else 'egress_disabled' if not self.external_enabled
+                  else 'vault_unavailable' if not self.vault_ready else 'no_presets' if not items else None)
+        return {'items': items, 'byok_ready': reason is None, 'reason': reason}
 
     async def _credential_meta(self, credential_id: UUID | None):
         if credential_id is None:
@@ -184,6 +192,8 @@ class NightCaseAIViews:
         result.update({'mode': mode, 'epoch': epoch, 'request_id': str(request.id) if request else None,
             'request_status': request.status if request else None, 'expires_at': _iso(expires_at),
             'credential_configured': staged is not None or (binding is not None and binding.mode == 'byok' and active),
+            # Own staged reference only; the start command must name it explicitly.
+            'staged_credential_id': str(staged.id) if lobby and staged is not None else None,
             'can_configure': can_configure, 'reason': reason or (request.reason if request else None)})
         return result
 

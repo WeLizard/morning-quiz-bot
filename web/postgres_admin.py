@@ -99,6 +99,27 @@ class ResetSettingsRequest(BaseModel):
     confirmation: str = Field(max_length=20)
 
 
+def make_night_ai_admin_router(env=None, wiring=None):
+    """Night Case narrator section: profiles, inbox and bindings; 404 while NIGHT_NARRATOR_ENABLED is off."""
+    from web.night_case_ai_admin import make_night_case_ai_admin_router
+    if wiring is None:
+        from web.night_case_ai_wiring import load_night_ai_wiring
+        wiring = load_night_ai_wiring(os.environ if env is None else env)
+    if not wiring:
+        return make_night_case_ai_admin_router(deployment_id='disabled', enabled=False)
+
+    def control(session):
+        return wiring.control(session)
+
+    def views(session):
+        from application.night_case import NightCaseApplicationService
+        # Admin views read only AI tables; the case registry is not needed here.
+        return wiring.views(session, NightCaseApplicationService(session, wiring.clock, None))
+
+    return make_night_case_ai_admin_router(service_factory=control, views_factory=views,
+        deployment_id=wiring.deployment_id, enabled=True, catalog=wiring.admin_catalog)
+
+
 def default_settings():
     # Read only the static quiz defaults; do not instantiate AppConfig/load .env.
     path = Path(__file__).resolve().parents[1] / 'config' / 'quiz_config.json'
@@ -523,6 +544,7 @@ def install_postgres_admin(app: FastAPI) -> None:
     router.include_router(make_notifications_router())
     from web.problem_reports_admin import make_problem_reports_router
     router.include_router(make_problem_reports_router())
+    router.include_router(make_night_ai_admin_router())
     app.include_router(router)
     pg_endpoints = {route.endpoint for route in router.routes}
 

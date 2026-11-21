@@ -360,7 +360,8 @@ CLIENT_ASSETS = frozenset({'app.js', 'address.js', 'telegram-ui.js', 'play-ui.js
 def create_app(*, database=None, settings=None, membership=None, clock=time.time, allowed_user_ids=None,
                runtime_enabled=None, scoring_rules=None, room_classic_enabled=None,
                room_photo_enabled=None, dev_guest_access=False,
-               night_case_enabled=None, night_case_service_factory=None, night_case_settings=None, night_case_orchestrator=None):
+               night_case_enabled=None, night_case_service_factory=None, night_case_settings=None, night_case_orchestrator=None,
+               night_ai_wiring=None):
     settings = settings or MiniAppSettings.from_env()
     # Production factory (uvicorn --factory) has no arguments: game switches come from env.
     flag = lambda name: os.getenv(name, '').strip() == '1'
@@ -383,6 +384,24 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         utc_clock = lambda: datetime.fromtimestamp(clock(), tz=timezone.utc)
         night_case_service_factory = NightCaseServiceFactory(night_case_settings, clock=utc_clock)
         night_case_health = NightRuntimeHealthMonitor(database, night_case_settings, clock=utc_clock)
+    # AI narrator access (NIGHT_CASE_AI_ACCESS §4/§7): default off; False forces it off in tests.
+    if night_ai_wiring is None and night_case_enabled and night_case_service_factory is not None:
+        from web.night_case_ai_wiring import load_night_ai_wiring
+        night_ai_wiring = load_night_ai_wiring(os.environ)
+    night_ai = night_ai_wiring if night_ai_wiring and night_case_enabled and night_case_service_factory is not None else None
+
+    def night_ai_factory(session):
+        resolver = night_case_service_factory(session).prove_original_starter
+        return night_ai.control(session, original_starter_resolver=resolver)
+
+    def night_ai_views_factory(session):
+        return night_ai.views(session, night_case_service_factory(session))
+
+    if night_ai is not None and night_case_orchestrator is None:
+        # The orchestrator carries the starter's AI choice into the start transaction;
+        # without an intent transport it never offers free-text intent.
+        from application.night_case_orchestrator import NightCaseOrchestrator
+        night_case_orchestrator = NightCaseOrchestrator(database, night_case_service_factory, night_ai_factory)
     # Offline is fail-closed for groups; it never substitutes a permissive verifier.
     verifier = membership if membership is not None else (
         None if settings.offline or not settings.bot_token else TelegramMembership(settings.bot_token, proxy=settings.telegram_proxy))
@@ -459,6 +478,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     app.state.night_case_service_factory = night_case_service_factory
     app.state.night_case_health = night_case_health
     app.state.night_case_settings = night_case_settings
+    app.state.night_ai_wiring = night_ai
     # Native Telegram chat picker for any game (shareMessage); None offline or without a bot token.
     from web.telegram_share import TelegramShare
     app.state.telegram_share = (None if settings.offline or not settings.bot_token
@@ -1031,7 +1051,13 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     from web.night_case_routes import register_night_case_routes
     register_night_case_routes(app, principal=room_principal, identity_for=room_identity,
                                read_body=bounded_request_body, enabled=night_case_enabled,
-                               service_factory=night_case_service_factory,orchestrator=night_case_orchestrator)
+                               service_factory=night_case_service_factory,orchestrator=night_case_orchestrator,
+                               ai_enabled=night_ai is not None)
+    from web.night_case_ai_routes import register_night_case_ai_routes
+    register_night_case_ai_routes(app, principal=room_principal, identity_for=room_identity,
+                                  read_body=bounded_request_body, enabled=night_ai is not None,
+                                  service_factory=night_ai_factory if night_ai is not None else None,
+                                  views_factory=night_ai_views_factory if night_ai is not None else None)
 
     @app.post('/api/guest/rooms')
     async def guest_create_room(request: Request, identity: str | None = Query(None)):

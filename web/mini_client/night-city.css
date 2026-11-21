@@ -379,6 +379,8 @@
   --nc-mafia:var(--nc-shadow);--nc-town:var(--nc-invest);
   background:var(--nc-page);color:var(--nc-text)}
 :root.nc body{background:var(--nc-page);color:var(--nc-text)}
+/* wide screens: the body stays see-through, or it hides the page art behind the column (body::before, top of this file) */
+@media (min-width:768px){:root.nc body{background:transparent}}
 :root.nc.qw-mode-game[data-qw-contrast="1"]{
   --qw-game-line:var(--nc-line-hc);--qw-game-text:#fff;--qw-game-muted:var(--nc-muted-hc);
   --qw-game-accent:var(--nc-accent-text-hc);--qw-game-accent-fill:var(--nc-accent);--qw-game-accent-ink:var(--nc-accent-ink);

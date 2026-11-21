@@ -115,7 +115,7 @@ class SealedFinaleBindingTests(unittest.TestCase):
 
     def test_game_finds_pack_and_sealed_pictures_by_itself(self):
         case_hash, manifest = 'c' * 64, 'a' * 64
-        with tempfile.TemporaryDirectory(dir=r'F:\Temp') as raw:
+        with tempfile.TemporaryDirectory(dir=r'F:\Temp' if Path(r'F:\Temp').is_dir() else None) as raw:
             root = Path(raw)
             self.assertIsNone(night_art.binding_for_case(self.META, case_hash, root))
             payload = b'finale'

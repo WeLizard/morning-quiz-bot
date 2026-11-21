@@ -188,7 +188,8 @@ class ManorSemantics(unittest.TestCase):
                 speeches[cells[0].strip('`')] = cells[9]
         self.assertEqual(len(speeches), 20)
         # A look of the other gender agrees the speech adjective with it (canon: «Сухой», look: «Сухая»).
-        agreed = {('investigator', 'base'): speeches['investigator'].replace('Сухой.', 'Сухая.', 1)}
+        agreed = {('investigator', 'base'): speeches['investigator'].replace('Сухой.', 'Сухая.', 1),
+                  ('chauffeur', 'f28'): speeches['chauffeur'].replace('Короткий.', 'Короткая.', 1)}
         for character in RAW['characters']:
             self.assertTrue(character['bio']['text'].endswith(' Речь: ' + agreed.get((character['id'], 'base'), speeches[character['id']])))
             self.assertNotIn('.png', character['bio']['text'])

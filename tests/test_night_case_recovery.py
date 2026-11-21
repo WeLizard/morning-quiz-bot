@@ -173,7 +173,7 @@ class RecoveryPostgresTests(unittest.IsolatedAsyncioTestCase):
         content_hash=canonical_content_hash(document)
         ref=FrozenCaseRef(document['meta']['id'],document['meta']['version'],content_hash)
         self.registry=NightCaseRegistry(frozenset({ref}),self.registry.allowed_timezones,self.registry.cursor_secret)
-        temporary=TemporaryDirectory(prefix='mqb-art-auto-',dir=r'F:\Temp'); self.addCleanup(temporary.cleanup)
+        temporary=TemporaryDirectory(prefix='mqb-art-auto-',dir=r'F:\Temp' if Path(r'F:\Temp').is_dir() else None); self.addCleanup(temporary.cleanup)
         root=Path(temporary.name); manifest='a'*64; payload=b'sealed finale'; digest=hashlib.sha256(payload).hexdigest()
         (root/f'{digest}.webp').write_bytes(payload)
         (root/f'case-{content_hash}.json').write_text(json.dumps({'schema':'nc-case-art/1','world':'manor_lake',

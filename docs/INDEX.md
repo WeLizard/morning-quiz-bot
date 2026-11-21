@@ -27,7 +27,7 @@
 | Найти написанное, но не подключённое | [аудит 2026-11-21](audits/2026-11-21/UNWIRED_CODE_AUDIT.md) |
 | Проверить критерии выпуска | [RELEASE_CRITERIA](engineering/RELEASE_CRITERIA.md) |
 | Заняться фермой | [FARM_FEEDBACK_2026-10-21](tasks/FARM_FEEDBACK_2026-10-21.md), [FARM_GROWTH_PLAN](tasks/FARM_GROWTH_PLAN.md), [FARM_ECONOMY_AUDIT](tasks/FARM_ECONOMY_AUDIT.md) |
-| Заняться «Ночным городом» | [MQB-010](tasks/MQB-010-night-city-weekly-stages.md), [дизайн](tasks/NIGHT_CITY_WEEKLY_DESIGN.md), [черновики дел](tasks/night_city/drafts/README.md), [обкатка «Усадьбы»](tasks/night_city/NIGHT_CASE_REHEARSAL_RUNBOOK.md), [AI-доступ](tasks/night_city/NIGHT_CASE_AI_ACCESS.md), [транспорт T](tasks/night_city/NIGHT_CASE_TRANSPORT_DRAFT.md), [рассказчик N](tasks/night_city/NIGHT_CASE_DIRECTOR_DRAFT.md) |
+| Заняться «Ночным городом» | [план полного выпуска MQB-012](tasks/MQB-012-night-city-full-release.md), [MQB-010](tasks/MQB-010-night-city-weekly-stages.md), [дизайн](tasks/NIGHT_CITY_WEEKLY_DESIGN.md), [черновики дел](tasks/night_city/drafts/README.md), [обкатка «Усадьбы»](tasks/night_city/NIGHT_CASE_REHEARSAL_RUNBOOK.md), [AI-доступ](tasks/night_city/NIGHT_CASE_AI_ACCESS.md), [транспорт T](tasks/night_city/NIGHT_CASE_TRANSPORT_DRAFT.md), [рассказчик N](tasks/night_city/NIGHT_CASE_DIRECTOR_DRAFT.md) |
 | Понять UI-правила | [UI_RULES](design/UI_RULES.md) |
 
 ## Быстрый вход

@@ -4,7 +4,7 @@
 - **Приоритет:** high
 - **Создана:** 2026-10-15
 - **Обновлена:** 2026-11-16
-- **Ответственный:** не назначен
+- **Ответственный:** сессия `nc-release` — вместе с полным выпуском [MQB-012](MQB-012-night-city-full-release.md)
 - **Связанные ADR:** [ADR-010](../decisions/ADR-010-application-core-and-adapters.md), [ADR-011](../decisions/ADR-011-game-substrate.md); после этапа 1 — новый ADR о режиме `night_case`
 - **Среда:** локальная dev-копия; production только по отдельному решению владельца проекта
 - **Родитель:** [MQB-009](MQB-009-platform-and-night-city.md), часть B. Дизайн: [NIGHT_CITY_WEEKLY_DESIGN](NIGHT_CITY_WEEKLY_DESIGN.md)

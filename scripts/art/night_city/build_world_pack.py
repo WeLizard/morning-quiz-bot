@@ -36,7 +36,7 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = '2e24c6891922e6c6b31b529c7c7142ef929cdc465f5e4d7b1c280c94feb7aae9'
+MANOR_CASE_CANONICAL_SHA256 = 'fd59988e06724893d8f519eeabd211834bb3cf055d19d8fa22c07e82109fd489'
 MANOR_LOOKS = 20                                  # extra appearance portraits from characters_variants/
 MANOR_SCENES = 6                                  # public event scenes from scenes_events/
 MANOR_SEALED = 3                                  # per-variant finales: withheld from the pack until the final
@@ -741,8 +741,8 @@ def case_art_refs(case_path):
     raw = Path(case_path).read_bytes()
     case = json.loads(raw.decode('utf-8'))
     canonical_hash = hashlib.sha256(canonical_json_bytes(case)).hexdigest()
-    if case.get('meta', {}).get('version') != 2 or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
-        raise SystemExit('manor_lake case does not match the pinned v2 art source')
+    if case.get('meta', {}).get('version') != 3 or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
+        raise SystemExit('manor_lake case does not match the pinned art source')
     refs = {}
     for group in ('characters', 'locations', *SCENE_GROUPS):
         for entry in case.get(group, []):

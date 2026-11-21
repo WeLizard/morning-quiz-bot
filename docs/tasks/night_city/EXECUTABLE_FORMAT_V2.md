@@ -80,7 +80,7 @@ ID/Label/Body.text и формы героя повторяют ограниче�
 ```text
 schema, meta, ruleset_ref, setting, locations[], characters[], facts[],
 observations[], actions[], dialogues[], variants[], compositions[],
-flags[], initial, events[], endings, victory, episode_refs[]
+flags[], initial, events[], endings, victory, episode_refs[], items[]?
 ```
 
 `setting={blurb:Body, crime:Body, days:7}`. `flags[]={id:ID, initial:bool}` — максимум 64,
@@ -95,10 +95,11 @@ flags[], initial, events[], endings, victory, episode_refs[]
 | Узел | Поля и смысл |
 | --- | --- |
 | `locations[]` | `{id, name:Label, body:Body, connects:LocationId[], art?}`. Граф симметричный, связный, без self-loop. Все связи публичны; тайные проходы в core не поддержаны. |
-| `characters[]` | `{id, title:Label, title_forms:{gen,dat,acc,ins,prep}:Label, gender:"f"\|"m", bio:Body, can_be_player:bool, faction:"investigation"\|"shadow"\|"independent", home:LocationId, schedule:[{windows:Window[],location:LocationId}], secrets:[{variants:VariantSet,body:Body}], goal:{id,body:Body,when:VisiblePredicate[]}, ghost_memories:ObservationId[], art?}`. Нет имён игроков в контенте. |
+| `characters[]` | `{id, title:Label, title_forms:{gen,dat,acc,ins,prep}:Label, gender:"f"\|"m", bio:Body, can_be_player:bool, faction:"investigation"\|"shadow"\|"independent", home:LocationId, schedule:[{windows:Window[],location:LocationId}], secrets:[{variants:VariantSet,body:Body}], goal:{id,body:Body,when:VisiblePredicate[]}, ghost_memories:ObservationId[], art?, name?:Label, public?:Body, looks?}`. Нет имён игроков в контенте. `name` — имя героя по канону мира (правило П6), `public` — что о нём знают все; то же у каждого облика в `looks[]`, первый облик повторяет верхние поля. Имя носит один герой дела: любые облики могут встретиться в одной партии. `{c:id}` в тексте — имя облика партии, подпись игрока туда не попадает; персонаж игры носит имя облика, пул `npc_name_era` — запасной для дел без имён. |
 | `facts[]` | `{id, body:Body, true_in:VariantSet\|"none", at?:{character:CharacterId,location:LocationId,window:0}}`. Пропозиции о мире; полный truth-set никогда не является клиентским полем. |
-| proof в `observations[]` | `{id,kind:"proof",title:Label,body:Body,proves:FactId[],exists_in:VariantSet}`. `proves` непустой; каждый факт истинен во всех вариантах существования proof. |
-| claim в `observations[]` | `{id,kind:"claim",title:Label,body:Body,asserts:FactId[],speaker:CharacterId\|null,exists_in:VariantSet}`. `asserts` может быть пустым; содержание не обязано быть истинным. |
+| `items[]` | `{id, title:Label, body:Body, location:LocationId\|null, art?}`. Ключевые предметы дела (правило П7): одно описание для ведущего, картинки и карточки улики. `location` — где предмет в начале, `null` — у героя или не на месте. |
+| proof в `observations[]` | `{id,kind:"proof",title:Label,body:Body,proves:FactId[],exists_in:VariantSet,subject?}`. `subject` — ровно одно из `{item}`, `{location}`, `{character}`: о чём улика. `proves` непустой; каждый факт истинен во всех вариантах существования proof. |
+| claim в `observations[]` | `{id,kind:"claim",title:Label,body:Body,asserts:FactId[],speaker:CharacterId\|null,exists_in:VariantSet,subject?}`. `asserts` может быть пустым; содержание не обязано быть истинным. |
 | `compositions[]` | `{id,players:4\|5\|8\|12,player_characters:CharacterId[]}`. Ровно N различных `can_be_player` героев; все остальные герои являются NPC. В первом мини-деле ровно одна composition на каждое N. |
 | `variants[]` | `{id,culprit:CharacterId,accomplices:CharacterId[],motive:Body,method:Body,key_proofs:ObservationId[],min_key:int[1..8],composition_ids:CompositionId[],final_text:Body}`. Ключи — proof, не claim; `min_key<=len(key_proofs)`. |
 
@@ -121,6 +122,24 @@ flags[], initial, events[], endings, victory, episode_refs[]
 утверждение «подпись настоящая» остаётся claim, пока другое proof его не подтвердило.
 Запись знания хранит observation ID и происхождение, а не автоматически присваивает
 истинность всем `mentions/asserts`. V6 не запрещает ложные показания `exists_in=all`.
+
+### Правила дизайна П1–П9
+
+Компилятор принимает любое правильно собранное дело. Соблюдает ли оно правила дизайна для всех
+миров ([проект меню §2.1](NIGHT_CITY_MENU_DESIGN.md)), показывает отдельный отчёт:
+`scripts/validate_night_case_v2.py <дело> --scope rules` (`domain/night_case_rules.py`).
+У каждого правила статус `passed`, `failed` со списком мест в деле или `not_checked`:
+
+- П2 — у каждого игрового героя есть диалог;
+- П4 — у игрового героя нет постоянной стороны `shadow`, и он не в Тени во всех вариантах;
+- П5 — не меньше 5 вариантов правды, у каждого картинка финала;
+- П6 — у каждого облика каждого героя есть имя, «что знают все» и возраст;
+- П7 — в деле есть предметы, и каждая ключевая улика ссылается на предмет, место или героя;
+- П1, П3 — `not_checked`, пока движок играет только составы 4/5/8/12;
+- П8 (канон мира) и П9 (контекст ведущего) — не поле дела; проверяются ревью канона и тестами кода.
+
+Отчёт `passed` только когда все девять правил `passed`. Пока этот отчёт не входит в условие
+регистрации дела: регистрация потребует его, когда первое дело будет доведено до правил.
 
 ### Действия и диалоги
 

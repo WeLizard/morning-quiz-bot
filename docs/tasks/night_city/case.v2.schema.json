@@ -517,9 +517,25 @@
                 },
                 "art": {
                   "$ref": "#/$defs/art"
+                },
+                "name": {
+                  "$ref": "#/$defs/label",
+                  "description": "Имя героя в этом облике (правило П6): по канону мира, видно на карточке места и в текстах через {c:id}."
+                },
+                "public": {
+                  "$ref": "#/$defs/body",
+                  "description": "Что о герое в этом облике знают все (правило П6): открытая строка карточки места до старта."
                 }
               }
             }
+          },
+          "name": {
+            "$ref": "#/$defs/label",
+            "description": "Имя героя в этом облике (правило П6): по канону мира, видно на карточке места и в текстах через {c:id}."
+          },
+          "public": {
+            "$ref": "#/$defs/body",
+            "description": "Что о герое в этом облике знают все (правило П6): открытая строка карточки места до старта."
           }
         }
       },
@@ -617,6 +633,47 @@
               },
               "exists_in": {
                 "$ref": "#/$defs/variant_set"
+              },
+              "subject": {
+                "description": "О какой вещи, месте или герое эта улика (правило П7).",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "item"
+                    ],
+                    "properties": {
+                      "item": {
+                        "$ref": "#/$defs/id"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "location"
+                    ],
+                    "properties": {
+                      "location": {
+                        "$ref": "#/$defs/id"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "character"
+                    ],
+                    "properties": {
+                      "character": {
+                        "$ref": "#/$defs/id"
+                      }
+                    }
+                  }
+                ]
               }
             }
           },
@@ -666,6 +723,47 @@
               },
               "exists_in": {
                 "$ref": "#/$defs/variant_set"
+              },
+              "subject": {
+                "description": "О какой вещи, месте или герое эта улика (правило П7).",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "item"
+                    ],
+                    "properties": {
+                      "item": {
+                        "$ref": "#/$defs/id"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "location"
+                    ],
+                    "properties": {
+                      "location": {
+                        "$ref": "#/$defs/id"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "character"
+                    ],
+                    "properties": {
+                      "character": {
+                        "$ref": "#/$defs/id"
+                      }
+                    }
+                  }
+                ]
               }
             }
           }
@@ -2005,6 +2103,46 @@
           },
           "minItems": 1,
           "maxItems": 32
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 200,
+      "description": "Ключевые предметы дела (правило П7): как выглядят, где лежат. Одно описание идёт в текст ведущего, в картинку и в карточку улики.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "body",
+          "location"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "title": {
+            "$ref": "#/$defs/label"
+          },
+          "body": {
+            "$ref": "#/$defs/body"
+          },
+          "location": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Где предмет лежит в начале дела; null — у героя или не на месте."
+          },
+          "art": {
+            "$ref": "#/$defs/art"
+          }
         }
       }
     }

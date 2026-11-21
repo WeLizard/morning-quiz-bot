@@ -21,6 +21,9 @@ def looks_of(character: dict[str, Any]) -> list[dict[str, Any]]:
     """Materialized looks; a character without looks has one implicit look from its top-level fields."""
     base = {"id": "base", "gender": character["gender"], "age": None, "title": character["title"],
             "title_forms": character["title_forms"], "bio": character["bio"], "art": character.get("art")}
+    for key in ("name", "public"):   # optional: present only when the case authored them
+        if key in character:
+            base[key] = character[key]
     authored = character.get("looks")
     if not authored:
         return [copy.deepcopy(base)]
@@ -54,7 +57,12 @@ def chosen_looks(case_doc: dict[str, Any], doc: dict[str, Any] | None) -> dict[s
 
 
 def public_look(look: dict[str, Any]) -> dict[str, Any]:
-    return {key: copy.deepcopy(look[key]) for key in ("id", "gender", "age", "title", "title_forms", "art")}
+    """What everyone sees of a hero; name and public line only when the case authored them."""
+    result = {key: copy.deepcopy(look[key]) for key in ("id", "gender", "age", "title", "title_forms", "art")}
+    for key in ("name", "public"):
+        if look.get(key) is not None:
+            result[key] = copy.deepcopy(look[key])
+    return result
 
 
 class Renderer:
@@ -84,8 +92,9 @@ class Renderer:
                 target, male, female = (rest.split("|") + ["", ""])[:3]
                 value = female if self._gender(target) == "f" else male
             elif kind == "c":
+                # The hero's own name from its look; a player's label never enters case text.
                 look = self.looks.get(rest)
-                value = self.names.get(rest)
+                value = (look or {}).get("name") or self.names.get(rest)
                 if value is None:   # no party name (e.g. a case preview): the role title, cased like {t:}
                     value = look["title"] if look else rest
                     if value and not _SENTENCE_START.search(head):

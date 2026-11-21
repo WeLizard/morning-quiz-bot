@@ -210,6 +210,15 @@ def _body(body: dict[str, Any], facts: dict[str, Any], pointer: str,
 def _compile_looks(d: dict[str, Any]) -> None:
     """A look changes portrait, title and grammar only; the first look is the authored default."""
     assets = {}
+    names: dict[str, str] = {}   # a hero name names one hero: any looks may meet in one party
+    for i, c in enumerate(d["characters"]):
+        for j, look in enumerate([c] + list(c.get("looks") or ())[1:]):
+            name = look.get("name")
+            if name is None:
+                continue
+            p = _ptr("characters", i) + (_ptr("looks", j) if j else "") + "/name"
+            if names.setdefault(name.casefold(), c["id"]) != c["id"]:
+                _bad("v2.looks", p, f"Имя {name} уже носит другой герой дела")
     for i, c in enumerate(d["characters"]):
         art = c.get("art")
         if art:
@@ -222,7 +231,8 @@ def _compile_looks(d: dict[str, Any]) -> None:
         _unique([look["id"] for look in looks], p)
         first = looks[0]
         if (first["gender"] != c["gender"] or first["bio"] != c["bio"] or first["art"] != c.get("art")
-                or first.get("title", c["title"]) != c["title"] or first.get("title_forms", c["title_forms"]) != c["title_forms"]):
+                or first.get("title", c["title"]) != c["title"] or first.get("title_forms", c["title_forms"]) != c["title_forms"]
+                or first.get("name") != c.get("name") or first.get("public") != c.get("public")):
             _bad("v2.looks", p + "/0", "Первый облик должен совпадать с верхними полями героя")
         for j, look in enumerate(looks):
             if ("title" in look) != ("title_forms" in look):
@@ -241,8 +251,8 @@ def _compile_scene_art(d: dict[str, Any]) -> None:
             for art in [entry.get("art")] + [look.get("art") for look in entry.get("looks") or ()]:
                 if art:
                     taken.add(art["asset_id"])
-    for group in ("events", "variants"):
-        for i, entry in enumerate(d[group]):
+    for group in ("events", "variants", "items"):
+        for i, entry in enumerate(d.get(group, ())):
             art = entry.get("art")
             if art is None:
                 continue
@@ -689,6 +699,7 @@ def compile_v2(case: CaseV2, ruleset_registry: Any = None) -> CompiledCase:
     maps = {name: _ids(d[name], name) for name in
             ("locations", "characters", "facts", "observations", "actions", "dialogues",
              "variants", "compositions", "flags", "events")}
+    maps["items"] = _ids(d.get("items", []), "items")
     _compile_looks(d)
     _compile_scene_art(d)
     if "personal_tasks" in d:
@@ -749,6 +760,12 @@ def compile_v2(case: CaseV2, ruleset_registry: Any = None) -> CompiledCase:
             _refs(o["asserts"], facts, p + "/asserts")
             if o["speaker"] is not None:
                 _ref(o["speaker"], chars, p + "/speaker")
+        if "subject" in o:
+            (kind, target), = o["subject"].items()
+            _ref(target, {"item": maps["items"], "location": loc, "character": chars}[kind], p + "/subject/" + kind)
+    for i, item in enumerate(d.get("items", [])):
+        if item["location"] is not None:
+            _ref(item["location"], loc, _ptr("items", i, "location"))
     for i, l in enumerate(d["locations"]):
         p = _ptr("locations", i)
         _refs(l["connects"], loc, p + "/connects")

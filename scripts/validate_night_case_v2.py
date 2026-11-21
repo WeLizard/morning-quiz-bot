@@ -11,13 +11,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from domain.night_case_simulation import SearchBudget, run_smoke_policy, validate_matrix
 from domain.night_case_state import rules_snapshot
+from domain.night_case_rules import check_rules
 from domain.night_case_v2_format import compile_v2, load_v2
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Validate a Night City v2 case without publishing")
     parser.add_argument("case", type=Path)
-    parser.add_argument("--scope", required=True, choices=("structure", "witness", "smoke"))
+    parser.add_argument("--scope", required=True, choices=("structure", "rules", "witness", "smoke"))
     parser.add_argument("--timezone", default="Europe/Berlin")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-commands", type=int, default=2000)
@@ -26,7 +27,7 @@ def main(argv=None):
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     report = {"scope": args.scope, "scope_passed": False, "publishable": False,
-              "checks": {"structure": "not_checked", "witness": "not_checked", "smoke": "not_checked",
+              "checks": {"structure": "not_checked", "rules": "not_checked", "witness": "not_checked", "smoke": "not_checked",
                          "projections": "not_checked", "human_story": "not_checked", "database": "not_checked"}}
     try:
         budget = SearchBudget(args.max_commands, args.max_states, args.max_seconds)
@@ -39,6 +40,12 @@ def main(argv=None):
         report["checks"]["structure"] = "passed"
         if args.scope == "structure":
             report["scope_passed"] = True
+        elif args.scope == "rules":
+            # Design rules P1-P9 for every case (NIGHT_CITY_MENU_DESIGN.md §2.1).
+            result = check_rules(case.document())
+            report["rules"] = result["rules"]
+            report["checks"]["rules"] = "passed" if result["passed"] else "failed"
+            report["scope_passed"] = result["passed"]
         elif args.scope == "witness":
             matrix = validate_matrix(case, rules, seed=args.seed, budget=budget)
             report["checks"]["witness"] = "passed" if matrix.scope_passed else "not_checked"

@@ -14,7 +14,7 @@ from .night_case_delivery import make_message, dialogue_topic, resolve_dialogue
 from .night_case_personal import story_index, story_predicate, completed_steps, open_offers, original_state, work_progress, record_story, publication
 from .night_case_state import Clock, KernelState, PlayerActor, SystemActor, canonical_hash, event_id_for, parse_command, engine_build_for
 from .night_case_time import _parse, _stamp, _utc, after_quiet, next_slot, resume_deadline
-from .night_case_text import pick_looks
+from .night_case_text import chosen_looks, pick_looks
 
 ENGINE_BUILD = "night-case-core/1"
 
@@ -308,6 +308,10 @@ def _initialize(case, rules, roster, *, game_id, seed, composition_id, selected_
         next(n for n in doc["npcs"] if n["character_id"] == hidden["character"])["location"] = placement["location"]
     looks = pick_looks(c, _rng(seed, "looks"))
     if looks: doc["sealed"]["looks"] = looks
+    # A hero the game plays carries the name of its look; the era pool only names cases without authored names.
+    authored = chosen_looks(c, doc)
+    for npc in doc["npcs"]:
+        if authored[npc["character_id"]].get("name"): npc["name"] = authored[npc["character_id"]]["name"]
     batch = []
     if "communication" in c: doc["communication"] = {"version": 1, "sent": []}
     if "npc_delivery" in c: doc["npc_delivery"] = {"version": 1, "decisions": [], "lines": []}
@@ -603,7 +607,8 @@ def _depart(doc, c, batch, player):
     if "personal_tasks" in c:
         record_story(doc, {"kind": "actor_closed", "account_id": player["account_id"]})
         _cancel_returns(doc, c, batch)
-    doc["npcs"].append({"character_id": player["character_id"], "name": player["name"], "location": player["location"], "status": "active", "origin": "former_player"})
+    hero = chosen_looks(c, doc)[player["character_id"]].get("name")   # the hero keeps its own name; the label leaves with the player
+    doc["npcs"].append({"character_id": player["character_id"], "name": hero or player["name"], "location": player["location"], "status": "active", "origin": "former_player"})
     _event(doc, batch, "status", {"character_id": player["character_id"], "controller": "npc", "status": "active"})
 
 

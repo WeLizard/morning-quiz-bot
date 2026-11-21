@@ -276,14 +276,82 @@ def start(case, rules, roster, *, game_id, seed, now_utc):
     return _initialize(case, rules, roster, game_id=game_id, seed=seed, composition_id=composition["id"], selected_variant_id=variant, now_utc=now_utc)
 
 
-def _initialize(case, rules, roster, *, game_id, seed, composition_id, selected_variant_id, now_utc):
+OPEN_SEATING = "open"
+OPEN_MIN, OPEN_MAX = 3, 12
+
+
+def playable_heroes(case_doc):
+    return sorted(x["id"] for x in case_doc["characters"] if x["can_be_player"])
+
+
+def open_counts(case_doc):
+    """Table sizes of free seating: 3..12, never more than the case has playable heroes."""
+    return list(range(OPEN_MIN, min(OPEN_MAX, len(playable_heroes(case_doc))) + 1))
+
+
+def seated_variants(case_doc, heroes):
+    """Variants in which at least one seated human hero investigates (otherwise no_investigators at once)."""
+    chars = {x["id"]: x for x in case_doc["characters"]}
+    return sorted(v["id"] for v in case_doc["variants"]
+                  if any(h != v["culprit"] and h not in v["accomplices"] and chars[h]["faction"] == "investigation" for h in heroes))
+
+
+def _seat_anyone(c, players, seed):
+    """Seats for "any seat" players: a seeded draw from free heroes; if no variant fits, investigators go first."""
+    chars = {x["id"]: x for x in c["characters"]}
+    fixed = {p["account_id"]: p["character_id"] for p in players if p["character_id"] is not None}
+    anyone = sorted(p["account_id"] for p in players if p["character_id"] is None)
+    free = [h for h in playable_heroes(c) if h not in set(fixed.values())]
+    _rng(seed, "seats").shuffle(free)
+    for order in (free, sorted(free, key=lambda h: chars[h]["faction"] != "investigation")):
+        seats = {**fixed, **dict(zip(anyone, order))}
+        if seated_variants(c, seats.values()): return seats
+    return None
+
+
+def start_open(case, rules, roster, *, game_id, seed, now_utc):
+    """Free seating: as many players as came (3..12), each on a chosen hero and look or on any free seat.
+
+    roster.players rows: {account_id, display_name, character_id|None, look_id|None}. Heroes nobody took are
+    played by the game. The variant of the truth is drawn only among those where a seated human investigates.
+    """
+    c = case.document()
+    if type(roster) is not dict or set(roster) != {"players", "npc_name_pool"} or type(roster["players"]) is not list: raise ValueError("invalid roster")
+    players = roster["players"]
+    playable = {x["id"]: x for x in c["characters"] if x["can_be_player"]}
+    if len(players) not in open_counts(c): raise ValueError("unsupported player count")
+    looks = {}
+    for p in players:
+        if type(p) is not dict or set(p) != {"account_id", "display_name", "character_id", "look_id"}: raise ValueError("invalid players")
+        hero, look = p["character_id"], p["look_id"]
+        if hero is None:
+            if look is not None: raise ValueError("look without a hero")
+            continue
+        if hero not in playable: raise ValueError("hero is not playable")
+        if look is not None:
+            if look not in {x["id"] for x in playable[hero].get("looks") or ()}: raise ValueError("unknown look")
+            looks[hero] = look
+    taken = [p["character_id"] for p in players if p["character_id"] is not None]
+    if len(set(taken)) != len(taken): raise ValueError("hero taken twice")
+    seats = _seat_anyone(c, players, seed)
+    if seats is None: raise ValueError("no variant for seats")
+    variant = _rng(seed, "variant").choice(seated_variants(c, seats.values()))
+    plain = {"players": [{"account_id": p["account_id"], "display_name": p["display_name"]} for p in players], "npc_name_pool": roster["npc_name_pool"]}
+    return _initialize(case, rules, plain, game_id=game_id, seed=seed, composition_id=OPEN_SEATING, selected_variant_id=variant, now_utc=now_utc, seats=seats, seat_looks=looks)
+
+
+def _initialize(case, rules, roster, *, game_id, seed, composition_id, selected_variant_id, now_utc, seats=None, seat_looks=None):
     now = _utc(now_utc)
     c = case.document()
     if type(seed) is not int or seed < 0 or type(game_id) is not str or not game_id: raise ValueError("invalid start identity")
     if type(roster) is not dict or set(roster) != {"players", "npc_name_pool"}: raise ValueError("invalid roster")
-    comp = next((x for x in c["compositions"] if x["id"] == composition_id), None)
     variant = next((x for x in c["variants"] if x["id"] == selected_variant_id), None)
-    if comp is None or variant is None or composition_id not in variant["composition_ids"]: raise ValueError("incompatible composition/variant")
+    if composition_id == OPEN_SEATING:
+        if type(seats) is not dict or variant is None: raise ValueError("incompatible seating/variant")
+        comp = {"players": len(seats), "player_characters": sorted(seats.values())}
+    else:
+        comp = next((x for x in c["compositions"] if x["id"] == composition_id), None)
+        if seats is not None or comp is None or variant is None or composition_id not in variant["composition_ids"]: raise ValueError("incompatible composition/variant")
     human = copy.deepcopy(roster["players"])
     if len(human) != comp["players"] or any(type(p) is not dict or set(p) != {"account_id", "display_name"} or type(p["account_id"]) is not str or not p["account_id"] or type(p["display_name"]) is not str or not 1 <= len(p["display_name"]) <= 120 for p in human): raise ValueError("invalid players")
     if len({p["account_id"] for p in human}) != len(human) or len({p["display_name"] for p in human}) != len(human): raise ValueError("duplicate roster")
@@ -292,8 +360,12 @@ def _initialize(case, rules, roster, *, game_id, seed, composition_id, selected_
     if type(pool) is not list or len(pool) < npc_count or any(type(n) is not str or not 1 <= len(n) <= 120 for n in pool) or len(set(pool)) != len(pool) or set(pool) & {p["display_name"] for p in human}: raise ValueError("invalid NPC name pool")
     human.sort(key=lambda p: p["account_id"])
     chars = sorted(comp["player_characters"])
-    _rng(seed, "assignments").shuffle(chars)
-    assigned = dict(zip((p["account_id"] for p in human), chars))
+    if seats is None:
+        _rng(seed, "assignments").shuffle(chars)
+        assigned = dict(zip((p["account_id"] for p in human), chars))
+    else:
+        if set(seats) != {p["account_id"] for p in human}: raise ValueError("seats do not match the roster")
+        assigned = {p["account_id"]: seats[p["account_id"]] for p in human}
     names = sorted(pool); _rng(seed, "names").shuffle(names)
     characters = {x["id"]: x for x in c["characters"]}
     profile = c["ruleset_ref"]
@@ -307,6 +379,7 @@ def _initialize(case, rules, roster, *, game_id, seed, composition_id, selected_
         placement = next(p for p in hidden["placements"] if p["variants"] == "all" or selected_variant_id in p["variants"])
         next(n for n in doc["npcs"] if n["character_id"] == hidden["character"])["location"] = placement["location"]
     looks = pick_looks(c, _rng(seed, "looks"))
+    looks.update({hero: look for hero, look in (seat_looks or {}).items() if hero in looks})
     if looks: doc["sealed"]["looks"] = looks
     # A hero the game plays carries the name of its look; the era pool only names cases without authored names.
     authored = chosen_looks(c, doc)

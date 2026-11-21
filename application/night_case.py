@@ -23,7 +23,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, exists, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from domain.address import effective_address_form, parse_address_form
-from domain.night_case_engine import Transition, start, step
+from domain.night_case_engine import Transition, open_counts, start, start_open, step
+from domain.night_case_text import looks_of, public_look
 from domain.night_case_projection import CommandIntent, available_actions, project, quote_action
 from domain.night_case_state import (KernelState, PlayerActor, SystemActor, RulesSnapshot,
     decode_state, encode_state, engine_build_for, event_scope, parse_command, rules_snapshot)
@@ -175,6 +176,17 @@ AvailabilityHook = Callable[[TransitionContext], Awaitable[AvailabilityDecision]
 @lru_cache(maxsize=32)
 def _compile(content_bytes: bytes) -> CompiledCase:
     return compile_v2(load_v2(content_bytes))
+
+
+def _lobby_counts(case_doc, version):
+    """Lobby v1 starts the authored compositions; v2 is free seating for 3..12 players."""
+    return [r['players'] for r in case_doc['compositions']] if version==1 else open_counts(case_doc)
+
+
+def _lobby_heroes(case_doc):
+    """Seats of a free-seating lobby: every playable hero with the looks a player may take."""
+    return [{'id':c['id'],'title':c['title'],'looks':[public_look(x) for x in looks_of(c)],'multiple':bool(c.get('looks'))}
+            for c in case_doc['characters'] if c['can_be_player']]
 
 
 # (case_id, version, content_hash) -> CompiledCase whose stored content was
@@ -400,17 +412,26 @@ class NightCaseApplicationService:
         lobby=sealed.lobby
         fields={'version','revision','owner_account_id','case_ref','rules_hash','roster','created_at','title','allowed_counts'}
         try:
-            if (type(lobby) is not dict or set(lobby)!=fields or type(lobby['version']) is not int or lobby['version']!=1
+            if (type(lobby) is not dict or set(lobby)!=fields or type(lobby['version']) is not int or lobby['version'] not in {1,2}
                     or type(lobby['revision']) is not int or lobby['revision']<0 or json_hash(lobby)!=sealed.snapshot_hash
                     or lobby['case_ref']!={'id':sealed.case_id,'version':sealed.version,'hash':sealed.content_hash}
                     or lobby['rules_hash']!=rules.rules_hash or lobby['title']!=case.readonly()['meta']['title']
-                    or lobby['allowed_counts']!=[r['players'] for r in case.readonly()['compositions']]
+                    or lobby['allowed_counts']!=_lobby_counts(case.readonly(),lobby['version'])
                     or type(lobby['roster']) is not list or not 1<=len(lobby['roster'])<=12):
                 raise ValueError()
-            ids,seats,names=set(),set(),set()
+            ids,seats,names,heroes=set(),set(),set(),set()
+            row_fields={'account_id','seat','name','address_form','ready'}|({'character_id','look_id'} if lobby['version']==2 else set())
+            playable={c['id']:{x['id'] for x in c.get('looks') or ()} for c in case.readonly()['characters'] if c['can_be_player']}
             for row in lobby['roster']:
-                if type(row) is not dict or set(row)!={'account_id','seat','name','address_form','ready'}:
+                if type(row) is not dict or set(row)!=row_fields:
                     raise ValueError()
+                if lobby['version']==2:
+                    hero,look=row['character_id'],row['look_id']
+                    if hero is None:
+                        if look is not None: raise ValueError()
+                    elif hero not in playable or hero in heroes or (look is not None and look not in playable[hero]):
+                        raise ValueError()
+                    if hero is not None: heroes.add(hero)
                 if (str(UUID(row['account_id']))!=row['account_id'] or row['account_id'] in ids
                         or row['seat'] not in {f'seat{i:02d}' for i in range(1,13)} or row['seat'] in seats
                         or type(row['name']) is not str or not 1<=len(row['name'])<=120
@@ -478,15 +499,21 @@ class NightCaseApplicationService:
         lobby=locked.sealed.lobby
         if lobby is None: raise NightCaseError('game_not_lobby')
         own=next((r for r in lobby['roster'] if r['account_id']==str(account_id)),None)
-        return {'game_id':locked.game.id,'mode':'night_case',
+        open_seating=lobby['version']==2
+        seat_keys=('seat','name','ready')+(('character_id','look_id') if open_seating else ())
+        view={'game_id':locked.game.id,'mode':'night_case',
             'case':{'id':locked.sealed.case_id,'version':locked.sealed.version,'title':lobby['title']},
             'timezone':locked.sealed.rules['timezone'],'status':locked.sealed.lifecycle,
-            'lobby_revision':lobby['revision'],'seats':[{k:r[k] for k in ('seat','name','ready')} for r in lobby['roster']],
+            'lobby_revision':lobby['revision'],'seats':[{k:r[k] for k in seat_keys} for r in lobby['roster']],
             'self_seat':own['seat'] if own else None,
             'self':{k:own[k] for k in ('name','address_form','ready')} if own else None,
             'allowed_counts':copy.deepcopy(lobby['allowed_counts']),
             'can_start':str(account_id)==lobby['owner_account_id']
             and len(lobby['roster']) in lobby['allowed_counts'] and all(r['ready'] for r in lobby['roster'])}
+        if open_seating:
+            view['seating']='open'
+            if case is not None: view['heroes']=_lobby_heroes(case.readonly())
+        return view
 
     async def _create_prior(self,room_id,aliases,command_id,fingerprint):
         rows=list((await self.session.scalars(select(NightLobbyCommand).where(
@@ -532,11 +559,11 @@ class NightCaseApplicationService:
         await self.session.flush()
         rules=rules_snapshot(cmd.params['timezone']); now=self.clock(); gid=str(uuid4())
         ref={'id':registered.case_id,'version':registered.version,'hash':registered.content_hash}
-        lobby={'version':1,'revision':0,'owner_account_id':str(account.id),'case_ref':ref,'rules_hash':rules.rules_hash,
+        lobby={'version':2,'revision':0,'owner_account_id':str(account.id),'case_ref':ref,'rules_hash':rules.rules_hash,
             'roster':[{'account_id':str(account.id),'seat':'seat01','name':normalize_display_name(account.display_name)[:120] or 'Игрок 1',
-            'address_form':effective_address_form(account.address_form),'ready':False}],
+            'address_form':effective_address_form(account.address_form),'ready':False,'character_id':None,'look_id':None}],
             'created_at':_stamp(now),'title':case.document()['meta']['title'],
-            'allowed_counts':[r['players'] for r in case.document()['compositions']]}
+            'allowed_counts':_lobby_counts(case.document(),2)}
         game=Game(id=gid,room_id=room_id,mode='night_case',status='lobby',phase='lobby',revision=0,
             state=public_envelope(ref,'lobby',{'lobby_revision':0}),is_current=True)
         self.session.add(game); await self.session.flush()
@@ -546,7 +573,7 @@ class NightCaseApplicationService:
             kernel=None,lobby=lobby,snapshot_hash=json_hash(lobby),storage_revision=0,lifecycle='lobby',interruption=None))
         from storage.night_ai_control import NightAIControlRepository
         await NightAIControlRepository(self.session).ensure_empty_lobby_control_locked(gid, now)
-        locked=SealedGame(game,sealed); view=self._lobby_view(locked,account.id)
+        locked=SealedGame(game,sealed); view=self._lobby_view(locked,account.id,case)
         receipt={'command_id':cmd.command_id,'accepted':True,'code':'accepted','lobby_revision':0,'self_seat':'seat01'}
         result={'receipt':receipt,'view':view}
         await self.repo.put_lobby_receipt(NightLobbyCommand(room_id=room_id,original_actor_account_id=account.id,
@@ -562,6 +589,10 @@ class NightCaseApplicationService:
             params['name']=normalize_display_name(params['name'])
             if not 1<=len(params['name'])<=120: raise NightCaseError('invalid_command',422)
             params['address_form']=parse_address_form(params['address_form'])
+        elif kind=='take_seat':
+            if (set(params)!={'character_id','look_id'} or not all(v is None or type(v) is str for v in params.values())
+                    or (params['character_id'] is None and params['look_id'] is not None)):
+                raise NightCaseError('invalid_command',422)
         elif kind=='start_game' and parsed_start is not None:
             if not isinstance(parsed_start,StartRequest) or parse_start_request(command)!=parsed_start or before_start is None:
                 raise NightCaseError('invalid_command',422)
@@ -590,6 +621,7 @@ class NightCaseApplicationService:
                 name=normalize_display_name(account.display_name)[:120] or seat
                 if name.casefold() in {r['name'].casefold() for r in lobby['roster']}: name=seat
                 own={'account_id':str(account.id),'seat':seat,'name':name,'address_form':effective_address_form(account.address_form),'ready':False}
+                if lobby['version']==2: own.update(character_id=None,look_id=None)
                 lobby['roster'].append(own); changed=True
         elif kind=='leave_lobby':
             if own is not None:
@@ -602,10 +634,21 @@ class NightCaseApplicationService:
             if any(r['account_id']!=str(account.id) and r['name'].casefold()==params['name'].casefold() for r in lobby['roster']):
                 raise NightCaseError('duplicate_name')
             own.update(params); changed=True
+        elif kind=='take_seat':
+            if own is None: raise NightCaseError('unavailable',404)
+            if lobby['version']!=2: raise NightCaseError('invalid_command',422)
+            hero,look=params['character_id'],params['look_id']
+            if hero is not None:
+                found=next((c for c in case.readonly()['characters'] if c['id']==hero and c['can_be_player']),None)
+                if found is None or (look is not None and look not in {x['id'] for x in found.get('looks') or ()}):
+                    raise NightCaseError('invalid_command',422)
+                if any(r is not own and r['character_id']==hero for r in lobby['roster']): raise NightCaseError('seat_taken')
+            if (own['character_id'],own['look_id'])!=(hero,look):
+                own.update(character_id=hero,look_id=look,ready=False); changed=True
         elif kind=='start_game':
             if not self.starts_enabled: raise NightCaseError('night_starts_disabled',503)
             if room.owner_account_id!=account.id or lobby['owner_account_id']!=str(account.id): raise NightCaseError('owner_required',403)
-            if len(lobby['roster']) not in lobby['allowed_counts'] or len(lobby['roster']) not in {4,5,8,12}:
+            if len(lobby['roster']) not in lobby['allowed_counts'] or (lobby['version']==1 and len(lobby['roster']) not in {4,5,8,12}):
                 raise NightCaseError('unsupported_count')
             if not all(r['ready'] for r in lobby['roster']): raise NightCaseError('players_not_ready')
             for r in lobby['roster']:
@@ -617,9 +660,17 @@ class NightCaseApplicationService:
                 if not isinstance(availability,AvailabilityDecision) or availability.delayed:
                     raise NightCaseError('runtime_delayed',503)
                 # New games have no historical outage to replay into their clock.
-            roster={'players':[{'account_id':r['account_id'],'display_name':r['name']} for r in lobby['roster']],
-                'npc_name_pool':[f'Житель {i}' for i in range(1,33)]}
-            transition=start(case,rules,roster,game_id=game_id,seed=secrets.randbits(63),now_utc=now)
+            pool=[f'Житель {i}' for i in range(1,33)]
+            if lobby['version']==2:
+                roster={'players':[{'account_id':r['account_id'],'display_name':r['name'],'character_id':r['character_id'],
+                    'look_id':r['look_id']} for r in lobby['roster']],'npc_name_pool':pool}
+                try: transition=start_open(case,rules,roster,game_id=game_id,seed=secrets.randbits(63),now_utc=now)
+                except ValueError as exc:
+                    if str(exc)=='no variant for seats': raise NightCaseError('seats_unsolvable') from exc
+                    raise
+            else:
+                roster={'players':[{'account_id':r['account_id'],'display_name':r['name']} for r in lobby['roster']],'npc_name_pool':pool}
+                transition=start(case,rules,roster,game_id=game_id,seed=secrets.randbits(63),now_utc=now)
             locked.game.started_at=now
             if before_start is not None:
                 options=parsed_start.options or {'mode':'admin','expected_epoch':0,'staged_credential_id':None}
@@ -631,7 +682,7 @@ class NightCaseApplicationService:
                 self.session.add(GamePlayer(game_id=game_id,account_id=UUID(r['account_id']),seat=r['seat'],status='active',
                     public_state={'name':r['name'],'seat':r['seat'],'status':'active'},private_state={},joined_at=now))
             await self.session.flush()
-            view=self._lobby_view(locked,account.id)
+            view=self._lobby_view(locked,account.id,case)
             view['status']='running'; view['can_start']=False
             await self._persist(locked,case,rules,transition,now,str(account.id))
             result={'receipt':{'command_id':cmd.command_id,'accepted':True,'code':'accepted','lobby_revision':lobby['revision'],
@@ -645,7 +696,7 @@ class NightCaseApplicationService:
                 kernel=None,lobby=lobby,snapshot_hash=json_hash(lobby),lifecycle=locked.sealed.lifecycle)
             await self.repo.sync_public(locked,projection={'lobby_revision':lobby['revision']},phase=locked.sealed.lifecycle,
                 public_revision=locked.game.revision+1)
-        view=self._lobby_view(locked,account.id)
+        view=self._lobby_view(locked,account.id,case)
         result={'receipt':{'command_id':cmd.command_id,'accepted':True,'code':'accepted','lobby_revision':lobby['revision'],
             'self_seat':own['seat'] if own else None},'view':view}
         await self.repo.put_command_receipt(game_id=game_id,actor_key=str(account.id),actor_account_id=account.id,
@@ -663,6 +714,10 @@ class NightCaseApplicationService:
     @_atomic
     async def set_ready(self,*,account_id,game_id,command):
         return await self._lobby_command(account_id=account_id,game_id=game_id,command=command,kind='set_ready')
+
+    @_atomic
+    async def take_seat(self,*,account_id,game_id,command):
+        return await self._lobby_command(account_id=account_id,game_id=game_id,command=command,kind='take_seat')
 
     @_atomic
     async def start_game(self,*,account_id,game_id,command):
@@ -908,7 +963,7 @@ class NightCaseApplicationService:
         if locked.sealed.lifecycle=='lobby':
             case,rules=await self._load_case(locked.sealed)
             self._checked_lobby(locked.sealed,case,rules)
-            return {'game_id':game_id,'mode':'night_case','lobby':self._lobby_view(locked,account.id),
+            return {'game_id':game_id,'mode':'night_case','lobby':self._lobby_view(locked,account.id,case),
                 'public':{},'self':None,'menu':[],'server_now':_stamp(now),'runtime_status':'ok'},locked
         case,rules,state=await self._runtime(locked)
         original=selected if selected is not None else account.id if account.id in aliases else sorted(aliases,key=str)[0]

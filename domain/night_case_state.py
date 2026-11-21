@@ -866,7 +866,9 @@ def _validate_state(doc, case, rules):
     sealed_fields = {"variant_id", "seed", "composition_id", "assignments"}
     # night-city-state/1 extension: sealed.looks is optional; states sealed before looks use default looks.
     sealed = _obj(doc["sealed"], sealed_fields | ({"looks"} if type(doc["sealed"]) is dict and "looks" in doc["sealed"] else set()), "sealed")
-    if sealed["variant_id"] not in variant_ids or sealed["composition_id"] not in composition_ids:
+    # composition_id "open" is free seating (any playable heroes, 3..12); it is never an authored composition id.
+    open_seating = sealed["composition_id"] == "open" and "open" not in composition_ids
+    if sealed["variant_id"] not in variant_ids or (sealed["composition_id"] not in composition_ids and not open_seating):
         raise ValueError("unknown variant or composition")
     _int(sealed["seed"], "seed")
     if "looks" in sealed:
@@ -886,11 +888,16 @@ def _validate_state(doc, case, rules):
     _unique(assignments, ("account_id",), "assignments")
     _unique(assignments, ("character_id",), "assignments")
     assigned = {r["account_id"]: r["character_id"] for r in assignments}
-    composition = next(row for row in case_doc["compositions"] if row["id"] == sealed["composition_id"])
-    if "player_characters" in composition and set(assigned.values()) != set(composition["player_characters"]):
-        raise ValueError("composition characters mismatch")
     variant = next(row for row in case_doc["variants"] if row["id"] == sealed["variant_id"])
-    if "composition_ids" in variant and sealed["composition_id"] not in variant["composition_ids"]:
+    if open_seating:
+        playable = {row["id"] for row in case_doc["characters"] if row.get("can_be_player")}
+        if not 3 <= len(assigned) <= 12 or not set(assigned.values()) <= playable:
+            raise ValueError("open seating outside the playable heroes")
+    else:
+        composition = next(row for row in case_doc["compositions"] if row["id"] == sealed["composition_id"])
+        if "player_characters" in composition and set(assigned.values()) != set(composition["player_characters"]):
+            raise ValueError("composition characters mismatch")
+    if not open_seating and "composition_ids" in variant and sealed["composition_id"] not in variant["composition_ids"]:
         raise ValueError("variant incompatible with composition")
     observation_by_id = {row["id"]: row for row in case_doc["observations"]}
     def observation_exists(observation_id):

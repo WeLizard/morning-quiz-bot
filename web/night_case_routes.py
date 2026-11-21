@@ -21,7 +21,9 @@ ERROR_TEXT = {
     'actor_stale': 'Состояние изменилось. Обнови дело и выбери действие снова.',
     'proposal_stale': 'Предложение устарело. Выбери действие снова.',
     'window_closed': 'Это окно уже закрыто. Обнови дело.',
-    'unsupported_count': 'Для дела нужны 4, 5, 8 или 12 игроков.',
+    'unsupported_count': 'Для этого дела столько игроков не подходит.',
+    'seat_taken': 'Этого героя уже занял другой игрок.',
+    'seats_unsolvable': 'С такими местами дело не сходится: пусть кто-то сядет за сыщика или выберет «любое свободное».',
     'players_not_ready': 'Сначала все участники должны подтвердить готовность.',
     'active_game_conflict': 'В комнате уже идёт партия.',
     'forfeit_required': 'Сначала подтверди выход из партии.',
@@ -154,7 +156,7 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
             return await invoke(request, identity, method, write=True, game_id=game_id, command=await body(request))
         app.add_api_route('/api/night-case/games/{game_id}/' + path, handle, methods=['POST'], name='night_case_' + path)
 
-    for path, method in [('join', 'join_lobby'), ('leave', 'leave_lobby'), ('ready', 'set_ready'), ('start', 'start_game')]:
+    for path, method in [('join', 'join_lobby'), ('leave', 'leave_lobby'), ('ready', 'set_ready'), ('seat', 'take_seat'), ('start', 'start_game')]:
         lifecycle(path, method)
 
     @app.get('/api/night-case/games/{game_id}/view')

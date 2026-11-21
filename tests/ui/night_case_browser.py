@@ -472,6 +472,15 @@ async def exercise(port, output, *, with_farm=False, identity_only=False, identi
                 await page.get_by_role('button', name='Открыть дело', exact=True).click()
                 await page.get_by_role('button', name=room['title'], exact=True).click()
                 await page.get_by_label('Имя в этой партии', exact=True).fill('Игрок ' + str(i + 1))
+                if i == 0:
+                    # Free seating: the owner takes the investigator; the others sit on any free seat.
+                    hero = page.locator('.nc-seat', has_text='Следователь из города')
+                    await hero.get_by_role('button', name='Сесть', exact=True).click()
+                    await page.get_by_role('button', name='Любой облик', exact=True).click()
+                    await hero.get_by_text('ты', exact=True).wait_for()
+                    await page.get_by_label('Имя в этой партии', exact=True).fill('Игрок 1')
+                    await page.screenshot(path=str(output / 'lobby-free-seating.png'), full_page=True)
+                    report['screenshots'].append('lobby-free-seating.png')
                 await page.get_by_role('button', name='Я готов', exact=True).click()
                 await page.get_by_role('button', name='Изменить имя и готовность', exact=True).wait_for()
             await pages[0].get_by_role('button', name='Начать дело', exact=True).wait_for(timeout=20000)

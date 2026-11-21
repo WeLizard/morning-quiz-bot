@@ -57,7 +57,9 @@ const errors = {
     game_interrupted: 'Партия приостановлена.',
     game_quarantined: 'Партия временно приостановлена для проверки.',
     players_not_ready: 'Сначала все должны подтвердить готовность.',
-    unsupported_count: 'Нужны 4, 5, 8 или 12 игроков.',
+    unsupported_count: 'Для этого дела столько игроков не подходит.',
+    seat_taken: 'Этого героя уже занял другой игрок.',
+    seats_unsolvable: 'С такими местами дело не сходится: пусть кто-то сядет за сыщика или выберет «любое свободное».',
     rate_limited: 'Слишком много запросов. Подожди немного.',
 };
 const errorText = error => error?.network ? 'Нет связи. Повтори тот же запрос — действие не применится дважды.' : errors[error?.code] || 'Действие сейчас недоступно. Обнови дело и попробуй снова.';
@@ -126,7 +128,7 @@ function open(options) {
     if (!kit || !Q) throw new Error('night_case_shell_required');
     let alive = true, locked = false, epoch = 0, poll = null, timer = null, reading = false, identityReading = false, commandBusy = false;
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
-    let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null;
+    let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null;
     let viewer = boot?.viewer_account_id || null;
     const pages = {public: {items: [], next_cursor: null}, self: {items: [], next_cursor: null}, messages: {items: [], next_cursor: null}};
     const cursors = new Set(), controller = new AbortController();
@@ -189,7 +191,7 @@ function open(options) {
         if (locked || !alive) return;
         locked = true; epoch++; controller.abort(); clearInterval(poll); timer?.stop(); timer = null;
         view = proposal = room = game = boot = invitation = viewer = null;
-        ownDraft = selectedOriginal = notice = ''; recipients = []; channel = 'square'; selectedCase = null;
+        ownDraft = selectedOriginal = notice = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null;
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.menu.register([], 'Ночной город');
         const header = kit.header(); header.node.classList.add('ncase-bar');
@@ -384,7 +386,7 @@ function open(options) {
         if (!live()) return;
         const rooms = panel('Твои компании', ...arr(result.items).map(item =>
             button(item.title || 'Компания', () => enterRoom(item))));
-        if (!arr(result.items).length) rooms.append(p('Собери компанию и пригласи друзей. Дело начнётся, когда соберутся 4, 5, 8 или 12 готовых игроков.'));
+        if (!arr(result.items).length) rooms.append(p('Собери компанию и пригласи друзей. Играть можно от 3 до 12: сколько пришло, столько и играет, невзятых героев ведёт игра.'));
         const title = field('Название компании');
         const code = field('Код или ссылка приглашения');
         frame([kit.scene({shell: 'entry', size: 'tall', title: 'Ночной город', text: 'Детективные истории в разных мирах. Компания берёт дело и неделю живёт в нём: заходи, когда удобно, игра сама напишет, что случилось.'}), rooms,
@@ -422,7 +424,45 @@ function open(options) {
         if (path === 'leave') return entry();
         if (result) await refresh();
     }
+    /* Free seating (lobby v2): every playable hero is a seat; the player is a quiet plate next to the hero. */
+    const heroLook = (hero, lookId) => arr(hero?.looks).find(look => look.id === lookId) || arr(hero?.looks)[0] || {};
+    const heroLine = look => [look.name ? look.title : '', Number.isInteger(look.age) ? `${look.age} лет` : ''].filter(Boolean).join(' · ');
+    const takeSeat = (heroId, lookId = null) => { lookPick = null; return lobbyCommand('seat', {character_id: heroId, look_id: lookId}); };
+    function heroSeats(data) {
+        const seats = arr(data.seats);
+        return kit.seats(arr(data.heroes).map(hero => {
+            const sitter = seats.find(row => row.character_id === hero.id), mine = sitter && sitter.seat === data.self_seat;
+            const look = heroLook(hero, sitter?.look_id), end = [];
+            if (sitter) end.push(kit.tag(mine ? 'ты' : sitter.name, {tone: mine ? 'amber' : ''}));
+            else if (data.self_seat) end.push(kit.button('Сесть', () => Promise.resolve(hero.multiple ? (lookPick = hero.id, render()) : takeSeat(hero.id)).catch(fail), {compact: true, disabled: outbox.busy}));
+            const sub = [sitter && !sitter.look_id && hero.multiple ? hero.title : heroLine(look), sitter ? (sitter.ready ? 'готов' : 'ещё не готов') : 'свободно'].filter(Boolean).join(' · ');
+            return {name: sitter?.look_id || !hero.multiple ? look.name || hero.title : hero.title, sub, me: mine, end};
+        }));
+    }
+    function openLobby() {
+        const data = view.lobby, seats = arr(data.seats), own = seats.find(row => row.seat === data.self_seat);
+        const counts = arr(data.allowed_counts), lo = counts[0] || 3, hi = counts.at(-1) || 12;
+        const anyone = seats.filter(row => !row.character_id);
+        const name = field('Имя в этой партии', own?.name || '');
+        const address = choose('Как обращаться в этой партии', [{id: 'n', label: 'Без рода'}, {id: 'm', label: 'Он'}, {id: 'f', label: 'Она'}], data.self?.address_form || 'n');
+        const picking = arr(data.heroes).find(hero => hero.id === lookPick);
+        const ownHero = arr(data.heroes).find(hero => hero.id === own?.character_id);
+        const ownLine = !own ? '' : ownHero ? `Ты играешь: ${heroLook(ownHero, own.look_id).name || ownHero.title}${own.look_id || !ownHero.multiple ? '' : ' (облик выберет игра)'}.`
+            : 'Ты на любом свободном месте — героя выберет игра при старте.';
+        const buttons = own ? [button(own.ready ? 'Изменить имя и готовность' : 'Я готов', () => lobbyCommand('ready', {name: name.input.value, address_form: address.input.value, ready: !own.ready})),
+            ...(own.character_id ? [button('Встать — любое свободное место', () => takeSeat(null))] : []),
+            ...(data.can_start ? [button('Начать дело', () => lobbyCommand('start'), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
+        return [kit.scene({slot: 'lobby', title: data.case?.title || 'Собираем стол',
+                text: `За столом ${seats.length}. Играть можно от ${lo} до ${hi}: невзятых героев ведёт игра. Выбери героя или садись на любое свободное место; кто злодей, решит только правда дела.`}),
+            ...(picking ? [panel(`Облик: ${picking.title}`, p('Выбери, каким будет этот герой.'), kit.stack(...arr(picking.looks).map(look => button(heroLine({...look, title: look.name || look.title}) || look.id, () => takeSeat(picking.id, look.id))),
+                button('Любой облик', () => takeSeat(picking.id)), button('Отмена', () => { lookPick = null; render(); }, 'text')))] : []),
+            panel('Места за столом', heroSeats(data), anyone.length ? p(`На любом свободном месте: ${anyone.map(row => row.seat === data.self_seat ? 'ты' : row.name).join(', ')}.`) : null),
+            panel('Твоё место', ...(own ? [p(ownLine), name.node, address.node] : []), kit.stack(...buttons)),
+            ...(room?.role === 'owner' ? [invitePanel()] : []),
+            ...(own ? [panel('Выход', kit.stack(button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')))] : [])];
+    }
     function lobby() {
+        if (view.lobby?.seating === 'open') return openLobby();
         const data = view.lobby, own = arr(data.seats).find(row => row.seat === data.self_seat);
         const name = field('Имя в этой партии', own?.name || '');
         const address = choose('Как обращаться в этой партии', [{id: 'n', label: 'Без рода'}, {id: 'm', label: 'Он'}, {id: 'f', label: 'Она'}], data.self?.address_form || 'n');

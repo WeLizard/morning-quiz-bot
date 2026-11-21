@@ -126,6 +126,21 @@ class GhostWhisperTests(unittest.TestCase):
         again = module_play(case, rules, t, "ghost_whisper", {"observation_id": "proof_common", "recipient": self.living})
         self.assertEqual(again.receipt["code"], "action_unavailable")
 
+    def test_memory_already_on_the_board_is_not_shared_again(self):
+        # Published while still in play: the removed player's copy would only duplicate the board entry.
+        case, rules, t = ghost_case()
+        t = learn_key(case, rules, t)
+        t = module_play(case, rules, t, "pin", {"observation_id": "proof_common"}, "account0")
+        self.assertTrue(t.receipt["accepted"], t.receipt)
+        t = make_ghost(case, rules, t)
+        shares = {json.loads(c.quote.params)["observation_id"] for c in choices(menu(case, rules, t, "account0"), "ghost_share")}
+        self.assertNotIn("proof_common", shares)
+        refused = module_play(case, rules, t, "ghost_share", {"observation_id": "proof_common"})
+        self.assertEqual(refused.receipt["code"], "action_unavailable")
+        # The same memory never published by this player stays shareable.
+        shared = module_play(self.case, self.rules, self.t, "ghost_share", {"observation_id": "proof_common"})
+        self.assertTrue(shared.receipt["accepted"], shared.receipt)
+
     def test_whisper_refusals(self):
         case, rules, t = self.case, self.rules, self.t
         for params in ({"observation_id": "public_note", "recipient": self.living},          # public already

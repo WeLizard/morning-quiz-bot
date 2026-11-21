@@ -546,6 +546,7 @@ function removedView() {
     state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'ghost'},
         {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}, {account_id: 'third', character_id: 'cook', name: 'Олег', status: 'active'}];
     state.self.observations = [{observation_id: 'ledger', kind: 'proof', title: 'Книга ключей', body: {text: 'Запись о ключе'}}];
+    state.public.chronicle = [{event_id: 'h1', kind: 'hearing', window_idx: 4, payload: {hearing_id: 'h', stage: 'closed', resolution: 'wrong', suspect: 'lawyer', resolve_window: 4}}];
     state.public.modules = {ghost_testimony: {questions: [{question_event_id: 'q1', asker_character: 'maid', ghost_character: 'lawyer', text: 'Ключ был у дворецкого?', window_idx: 4, answer_by: 5, answer: null, status: 'open'}]}};
     state.menu = [pick('ghost_share', 'На доску', {observation_id: 'ledger'}, 'share'),
         pick('ghost_whisper', 'Передать лично', {observation_id: 'ledger', recipient: 'maid'}, 'to-maid'),
@@ -562,6 +563,8 @@ test('a removed player has one action per window: a memory to the board or to on
     assert.doesNotMatch(all, /[Пп]ризрак/, 'a case without mysticism never speaks of ghosts');
     assert.doesNotMatch(all, /Осталось действий/, 'a removed player has one action, not action points');
     assert.match(all, /Ключ был у дворецкого\?/);
+    assert.match(all, /Слушание в окне 4: стол поддержал обвинение, но ты не виновен/, 'the removed player sees why');
+    assert.match(all, /Площадь ты по-прежнему читаешь/, 'the square stays readable');
     assert.equal(find(fixture.host, node => node.tagName === 'button' && node.textContent.includes('Осмотреть стол')), undefined);
     const to = byLabel(fixture.host, 'Кому передать лично'); to.value = 'cook'; to.events.change();
     await button(fixture.host, 'Улики').click(); await settle();

@@ -100,7 +100,9 @@ def _ghost_eligibility(case_doc, doc, player, kind, params):
     character = next(c for c in case_doc["characters"] if c["id"] == player["character_id"])
     own = {k["observation_id"] for k in doc["knowledge"] if k["account_id"] == player["account_id"]}
     if kind == "ghost_share":
-        allowed = params["observation_id"] in character["ghost_memories"] and params["observation_id"] in _known(doc, player["account_id"])
+        # Like pin: an observation this player already put on the board is not offered a second time.
+        posted = any(b["owner_account_id"] == player["account_id"] and b["observation_id"] == params["observation_id"] for b in doc["public"]["board"])
+        allowed = params["observation_id"] in character["ghost_memories"] and params["observation_id"] in _known(doc, player["account_id"]) and not posted
         return ("accepted" if allowed else "action_unavailable"), player, None
     if kind == "ghost_whisper":
         public = {o["observation_id"] for o in doc["public"]["observations"]} | {b["observation_id"] for b in doc["public"]["board"] if b["observation_id"] is not None}

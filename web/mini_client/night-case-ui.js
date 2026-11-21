@@ -16,6 +16,9 @@ function playerView(value) {
     // Only shared scenes leave the public chronicle: id, window, text and picture.
     safe.public.scenes = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'scene')
         .map(entry => ({event_id: entry.event_id, window_idx: entry.window_idx, body: entry.payload?.body, art: entry.art}));
+    // A wrong verdict is the only way out of play to a removed seat: the removed screen names that hearing.
+    safe.public.removals = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'hearing' && entry.payload?.stage === 'closed' && entry.payload?.resolution === 'wrong')
+        .map(entry => ({window_idx: entry.window_idx, suspect: entry.payload.suspect}));
     safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem', 'finished_window', 'final_ballot']) : null;
     return safe;
 }
@@ -204,6 +207,13 @@ function open(options) {
     const mystic = () => Boolean(view?.public?.modules?.ghost_visions);
     const removedWord = () => mystic() ? 'Призраки' : 'Отстранённые';
     const removedTitle = () => mystic() ? 'Ты — призрак дела' : said('Ты отстранён от расследования', 'Ты отстранена от расследования');
+    // Only a wrong verdict removes a player: the closed hearing that named this character is the reason.
+    const removalReason = () => {
+        const own = view?.self?.character_id;
+        const closed = arr(view?.public?.removals).filter(row => row.suspect === own).at(-1);
+        return closed ? `Слушание в окне ${closed.window_idx}: стол поддержал обвинение, но ${said('ты не виновен', 'ты не виновна')}.` : '';
+    };
+    const ghostChatLine = () => `Площадь ты по-прежнему читаешь, но писать туда не можешь. Писать можно только ${mystic() ? 'другим призракам' : 'другим отстранённым'} — во вкладке «Беседа».`;
     const ghostKinds = new Set(['ghost_share', 'ghost_whisper', 'testimony_answer', 'ghost_sign']);
     const questions = () => arr(view?.public?.modules?.ghost_testimony?.questions);
     const placeName = location => arr(view?.public?.locations).find(item => item.id === location)?.name || 'Усадьба';
@@ -711,8 +721,9 @@ function open(options) {
     function removedActions() {
         const own = view.self, rows = choiceList().filter(row => ghostKinds.has(row.quote.kind));
         const can = [mystic() ? 'показать знак' : null, 'выложить воспоминание на доску', 'передать его одному игроку лично', 'ответить «да» или «нет» на вопрос'].filter(Boolean);
-        const intro = panel(removedTitle(), p(`Ты больше не ходишь, не голосуешь и не обвиняешь. Раз в окно можно сделать одно: ${can.join(', ')}.`),
-            p(`${removedWord()} переписываются отдельно, во вкладке «Беседа».`),
+        const intro = panel(removedTitle(), removalReason() ? kit.alert({tone: 'warn', icon: 'alert', title: removalReason()}) : null,
+            p(`Ты больше не ходишь, не голосуешь и не обвиняешь. Раз в окно можно сделать одно: ${can.join(', ')}.`),
+            p(ghostChatLine()),
             rows.length ? null : p('Сейчас действовать нечем: действие этого окна уже сделано или в памяти пока нет того, что можно передать.'));
         const asked = questions().filter(q => q.ghost_character === own.character_id && q.status === 'open').map(q => {
             const answers = rows.filter(row => row.quote.kind === 'testimony_answer' && row.quote.params.question_event_id === q.question_event_id);
@@ -894,7 +905,8 @@ function open(options) {
             const sender = `${arr(view.public.players).find(p => p.account_id === row.sender_account_id)?.name || 'Участник'}${own ? ' (ты)' : ''}`;
             return put(el('article', 'ncase-message'), el('strong', null, sender), el('span', 'nc-note', row.channel === 'whisper' ? 'Приватная беседа' : row.channel === 'ghost' ? removedWord() : 'Площадь'), p(row.text));
         });
-        return [panel('Переписка', p(`Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. ${removedWord()} разговаривают отдельно.`), ...messages,
+        const intro = view.self.status === 'ghost' ? ghostChatLine() : `Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. ${removedWord()} разговаривают отдельно.`;
+        return [panel('Переписка', p(intro), ...messages,
             ...(pages.messages.next_cursor ? [kit.row(button('Ещё сообщения', async () => { await loadHistory('messages', true); render(); }))] : [])),
             panel('Написать', ...(forms.length ? [channels.node, targetRows, draft.node, p(`Сообщений осталось в этом окне: ${view.self.communication?.remaining ?? '—'}`),
                 kit.row(button('Отправить', async () => {

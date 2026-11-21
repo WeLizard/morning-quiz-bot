@@ -143,3 +143,59 @@ class RulesReportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DirectorCastTests(unittest.TestCase):
+    """Rule P9: the narrator sees the heroes, items and places the records touch, never a player label."""
+
+    def frozen(self, cast):
+        from domain.night_case_director import AuthorizedSource, SafeRecord, build_frozen_context
+        account = 'account:00000000-0000-0000-0000-000000000001'
+        source = AuthorizedSource('window_digest', 'digest-2', account, 2, 1, ('event-1',), ('proof-a',), '')
+        records = (SafeRecord('event', 'event-1', 'result', 'Дверь открыта', account, 1),
+                   SafeRecord('observation', 'proof-a', 'proof', 'Старая улика', account, 1, 'event-1'))
+        return build_frozen_context(source, records, (), case_hash='c' * 64, ruleset_version='core/2',
+                                    fallback='Авторская сводка.', created_at=START,
+                                    closes_at=START.replace(hour=11), cast=cast), source
+
+    def test_cast_enters_the_facts_and_survives_the_frozen_round_trip(self):
+        from domain.night_case_director import FrozenContext, SafeCast
+        cast = (SafeCast('hero', 'Повар', 'Агафья, 45 лет: румяная, в муке по локоть.'),
+                SafeCast('item', 'Ключ от ящика', 'Медный ключ с зелёной ниткой.'))
+        context, source = self.frozen(cast)
+        doc = context.document()
+        self.assertEqual(doc['schema'], 'night-director-view/2')
+        self.assertIn('[герой; Повар] Агафья, 45 лет: румяная, в муке по локоть.', doc['narrative']['facts'])
+        self.assertIn('[предмет; Ключ от ящика] Медный ключ с зелёной ниткой.', doc['narrative']['facts'])
+        FrozenContext.from_document(doc, input_hash=context.input_hash, source=source)
+        tampered = copy.deepcopy(doc); tampered['cast'][0]['body'] = 'Другое'
+        with self.assertRaises(ValueError):
+            FrozenContext.from_document(tampered, input_hash=context.input_hash, source=source)
+
+    def test_without_cast_the_context_stays_version_one(self):
+        context, _ = self.frozen(())
+        self.assertEqual(context.document()['schema'], 'night-director-view/1')
+        self.assertNotIn('cast', context.document())
+
+    def test_cast_that_does_not_fit_is_left_out_not_the_records(self):
+        from domain.night_case_director import SafeCast
+        cast = tuple(SafeCast('hero', f'Герой {i}', 'ж' * 990) for i in range(40))
+        context, _ = self.frozen(cast)
+        facts = context.document()['narrative']['facts']
+        self.assertTrue(any('Старая улика' in f for f in facts))
+        self.assertLessEqual(sum(map(len, facts)), 16000)
+
+    def test_director_cast_describes_the_party_look_and_clue_subjects(self):
+        from application.night_case_director import director_cast
+        doc = named()
+        doc["items"] = [{"id": "drawer_key", "title": "Ключ от ящика", "body": body("Медный ключ."), "location": "library"}]
+        key = RAW["variants"][0]["key_proofs"][0]
+        next(o for o in doc["observations"] if o["id"] == key)["subject"] = {"item": "drawer_key"}
+        party = {"sealed": {"looks": {"cook": "f45"}}, "players": [{"character_id": "lawyer", "name": "Маша"}], "npcs": []}
+        cast = director_cast(doc, party, heroes=("cook", "lawyer"), observation_ids=(key,))
+        kinds = [(c.kind, c.title) for c in cast]
+        self.assertIn(("hero", "Повар"), kinds)
+        self.assertIn(("item", "Ключ от ящика"), kinds)
+        cook = next(c for c in cast if c.title == "Повар")
+        self.assertTrue(cook.body.startswith("Имя cook f45, 45 лет: "), cook.body)
+        self.assertFalse(any("Маша" in c.body for c in cast))

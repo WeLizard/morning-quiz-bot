@@ -14,7 +14,7 @@ import re
 from sqlalchemy import select
 
 from domain.night_case_director import (
-    AuthorizedSource, ContextUnavailable, SafeOffer, SafeRecord,
+    AuthorizedSource, ContextUnavailable, SafeCast, SafeOffer, SafeRecord,
     audience_permitted, build_frozen_context,
 )
 from domain.night_case_projection import MenuChoice, available_actions
@@ -79,6 +79,40 @@ def _renderer(case_doc, doc, audience_ids=()):
 
 def _look_title(case_doc, doc, character_id):
     return _renderer(case_doc,doc).looks[character_id]['title']
+
+
+def director_cast(case_doc, doc, *, heroes=(), observation_ids=()):
+    """Who and what the narrated records touch, as the party sees them (rule P9).
+
+    Heroes: the speaking NPC, claim speakers and clue subjects, by the look sealed for the party
+    (name, age, bio); items and places: clue subjects. Authored content only, never a player
+    label; deterministic, so a dispatch rebuild of the frozen context matches."""
+    renderer=_renderer(case_doc,doc)
+    observations={o['id']:o for o in case_doc['observations']}
+    items={i['id']:i for i in case_doc.get('items',[])}
+    places={l['id']:l for l in case_doc['locations']}
+    wanted=list(heroes); things=[]
+    for oid in observation_ids:
+        item=observations.get(oid)
+        if item is None: continue
+        if item['kind']=='claim' and item.get('speaker'): wanted.append(item['speaker'])
+        subject=item.get('subject') or {}
+        if 'character' in subject: wanted.append(subject['character'])
+        elif subject: things.append(subject)
+    cast=[]
+    for cid in dict.fromkeys(wanted):
+        look=renderer.looks.get(cid)
+        if look is None: continue
+        who=', '.join(str(x) for x in (look.get('name'),f"{look['age']} лет" if look.get('age') else None) if x)
+        bio=renderer.text(look['bio']['text'])
+        cast.append(SafeCast('hero',look['title'],(who+': ' if who else '')+bio[:900]))
+    for subject in things:
+        (kind,target),=subject.items()
+        row=(items if kind=='item' else places).get(target)
+        if row is None: continue
+        cast.append(SafeCast('item' if kind=='item' else 'place',row['title'] if kind=='item' else row['name'],
+                             renderer.text(row['body']['text'])[:1000]))
+    return tuple(dict.fromkeys(cast))
 
 
 def _event_body(event, case_doc=None, doc=None):
@@ -176,13 +210,13 @@ def plan_sources(context, transition, stored_events) -> tuple[DirectorPlan,...]:
             account=context.actor_key
             records=tuple(_observation_record(case_doc,doc,oid,account,event) for oid in source.observation_ids)
             fallback=source.body if len(source.body)<=4000 else 'Ответ персонажа сохранён в точных событиях.'
-            candidates=[(source,records,(),fallback)]
+            candidates=[(source,records,(),fallback,director_cast(case_doc,doc,heroes=(target,),observation_ids=source.observation_ids))]
         elif kind=='scene':
             if audience!='public': raise ValueError('director_scene_audience_corrupt')
             source=AuthorizedSource('scene_narration',event['event_id'],'public',event['window_idx'],None,
                                     (),(),_event_body(event,case_doc,doc))
             fallback=source.body if len(source.body)<=4000 else 'Авторская сцена сохранена в точных событиях.'
-            candidates=[(source,(),(),fallback)]
+            candidates=[(source,(),(),fallback,())]
         else:
             if not audience.startswith('account:'): raise ValueError('director_digest_audience_corrupt')
             summarized=event['payload']['window_idx']
@@ -204,7 +238,7 @@ def plan_sources(context, transition, stored_events) -> tuple[DirectorPlan,...]:
                 records.append(_observation_record(case_doc,doc,oid,account,parent))
             source=AuthorizedSource('window_digest',event['event_id'],audience,event['window_idx'],
                                     summarized,refs,obs,'')
-            candidates=[(source,tuple(records),(),'Окно завершено.')]
+            candidates=[(source,tuple(records),(),'Окно завершено.',director_cast(case_doc,doc,observation_ids=obs))]
             player=next((p for p in doc['players'] if p['account_id']==account),None)
             if player is not None and player['status'] in {'active','fog'}:
                 options=[e for e in available_actions(context.case,context.rules,transition.state,
@@ -213,12 +247,12 @@ def plan_sources(context, transition, stored_events) -> tuple[DirectorPlan,...]:
                 if options:
                     offer=AuthorizedSource('story_offer',event['event_id'],audience,event['window_idx'],
                                            summarized,refs,obs,'')
-                    candidates.append((offer,(),options,'Доступные действия показаны в меню.'))
-        for source,records,offers,fallback in candidates:
+                    candidates.append((offer,(),options,'Доступные действия показаны в меню.',()))
+        for source,records,offers,fallback,cast in candidates:
             try:
                 frozen=build_frozen_context(source,records,offers,case_hash=context.case.content_hash,
                     ruleset_version='core/'+str(case_doc['ruleset_ref']['version']),fallback=fallback,
-                    created_at=row.created_at,closes_at=close)
+                    created_at=row.created_at,closes_at=close,cast=cast)
             except ContextUnavailable:
                 continue  # Artistic context is optional; committed exact events remain.
             plans.append(DirectorPlan(source,frozen,fallback,expires,row.audience_seq))

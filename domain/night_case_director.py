@@ -21,6 +21,7 @@ from .night_case_projection import MenuChoice
 
 
 SCHEMA = 'night-director-view/1'
+SCHEMA_CAST = 'night-director-view/2'   # /1 plus the cast of heroes, items and places (rule P9)
 _REF = re.compile(r'r[0-9]{2}\Z')
 _OFFER = re.compile(r'c[0-9]{2}\Z')
 _HEX = re.compile(r'[0-9a-f]{64}\Z')
@@ -139,6 +140,22 @@ class SafeRecord:
 
 
 @dataclass(frozen=True)
+class SafeCast:
+    """Authored description of a hero look, an item or a place the records touch (rule P9).
+
+    Only case content: a look's name, age and bio, an item's or place's body. Never a player label."""
+    kind: str  # hero | item | place
+    title: str
+    body: str
+
+    def __post_init__(self):
+        if self.kind not in {'hero', 'item', 'place'}:
+            raise ValueError('invalid cast kind')
+        _role_title(self.title)
+        _text(self.body, limit=1000)
+
+
+@dataclass(frozen=True)
 class SafeOffer:
     choice: MenuChoice
 
@@ -168,7 +185,10 @@ def _chunks(alias, classification, body, speaker_title=None):
             for i, part in enumerate(parts, 1)]
 
 
-def _facts_for(kind, action_window, summarized_window, blocks, offers):
+_CAST_LABEL = {'hero': 'герой', 'item': 'предмет', 'place': 'место'}
+
+
+def _facts_for(kind, action_window, summarized_window, blocks, offers, cast=()):
     facts=[]
     if kind=='story_offer': facts.append(f'[предложение; окно {action_window}]')
     elif summarized_window is not None: facts.append(f'[digest; окно {summarized_window}]')
@@ -176,6 +196,8 @@ def _facts_for(kind, action_window, summarized_window, blocks, offers):
         facts.extend(_chunks(block['reference'],block['kind'],block['body'],block['speaker_title']))
     for offer in offers:
         facts.append(f"[{offer['alias']}; предложение; {offer['cost']} AP] {offer['label']}")
+    for row in cast:
+        facts.append(f"[{_CAST_LABEL[row['kind']]}; {row['title']}] {row['body']}")
     return facts
 
 
@@ -217,10 +239,17 @@ class FrozenContext:
         if not isinstance(source,AuthorizedSource): raise ValueError('authorized source required')
         if type(input_hash) is not str or not _HEX.fullmatch(input_hash):
             raise ValueError('invalid input hash')
-        if type(document) is not dict or set(document) != {'schema','narrative','reference_map','exact_blocks','offers','references','catalog_ids','summarized_window','action_window','context_hash'}:
+        base = {'schema','narrative','reference_map','exact_blocks','offers','references','catalog_ids','summarized_window','action_window','context_hash'}
+        if type(document) is not dict or set(document) not in (base, base | {'cast'}):
             raise ValueError('invalid frozen context shape')
-        if document['schema'] != SCHEMA or not _HEX.fullmatch(document['context_hash']):
+        if document['schema'] != (SCHEMA_CAST if 'cast' in document else SCHEMA) or not _HEX.fullmatch(document['context_hash']):
             raise ValueError('invalid frozen context schema/hash')
+        cast = document.get('cast', [])
+        if 'cast' in document and (type(cast) is not list or not cast or len(cast) > MAX_ITEMS
+                                   or any(type(c) is not dict or set(c) != {'kind','title','body'} for c in cast)):
+            raise ValueError('invalid frozen cast')
+        for row in cast:
+            SafeCast(row['kind'], row['title'], row['body'])
         raw = copy.deepcopy(document)
         narrative = raw['narrative']
         if type(narrative) is not dict or set(narrative) != {'audience','audience_key','facts','references','catalog_ids','knowledge_revision','window_idx','case_hash','ruleset_version'}:
@@ -297,7 +326,7 @@ class FrozenContext:
             if (block is None or block['body']!=source.body or block['kind']!=('scene' if source.kind=='scene_narration' else 'result')
                     or block['speaker_title']!=source.speaker_title):
                 raise ValueError('frozen exact source changed')
-        if tuple(_facts_for(source.kind,source.action_window,source.summarized_window,blocks,offers))!=view.facts:
+        if tuple(_facts_for(source.kind,source.action_window,source.summarized_window,blocks,offers,cast))!=view.facts:
             raise ValueError('frozen facts differ from exact records')
         if len(_canonical({'request_token':'0'*64,'kind':'window_digest','facts':list(view.facts),
                            'references':list(view.references),'catalog_ids':list(view.catalog_ids)}))>32768:
@@ -339,7 +368,7 @@ class FrozenContext:
 
 
 def build_frozen_context(source: AuthorizedSource, records, offers, *, case_hash, ruleset_version,
-                         fallback, created_at, closes_at) -> FrozenContext:
+                         fallback, created_at, closes_at, cast=()) -> FrozenContext:
     if not isinstance(source,AuthorizedSource): raise ValueError('authorized source required')
     if type(records) not in {tuple,list} or type(offers) not in {tuple,list} or len(records)>MAX_ITEMS or len(offers)>3:
         raise ValueError('invalid director selection')
@@ -375,16 +404,26 @@ def build_frozen_context(source: AuthorizedSource, records, offers, *, case_hash
         offer_rows.append({'alias':alias,'selection_id':q.selection_id,'label':offer.choice.label,'kind':q.kind,
                            'target_id':q.target_id,'cost':q.cost,'resource_id':q.resource_id,
                            'resource_revision':q.resource_revision,'params':q.params})
+    if type(cast) not in {tuple,list} or any(not isinstance(c,SafeCast) for c in cast):
+        raise ValueError('safe cast required')
+    cast_rows=[{'kind':c.kind,'title':c.title,'body':c.body} for c in dict.fromkeys(cast)]
     facts=_facts_for(source.kind,source.action_window,source.summarized_window,blocks,offer_rows)
     if len(facts)>MAX_ITEMS or any(len(f)>MAX_FACT_TEXT for f in facts) or sum(map(len,facts))>MAX_CONTEXT_TEXT:
         raise ContextUnavailable('critical narrative context exceeds codec')
+    # The cast is optional colour: whatever does not fit the codec is left out, the records never are.
+    while cast_rows:
+        full=_facts_for(source.kind,source.action_window,source.summarized_window,blocks,offer_rows,cast_rows)
+        if len(full)<=MAX_ITEMS and all(len(f)<=MAX_FACT_TEXT for f in full) and sum(map(len,full))<=MAX_CONTEXT_TEXT:
+            facts=full; break
+        cast_rows.pop()
     narrative={'audience':'public' if source.audience_key=='public' else 'private','audience_key':source.audience_key,
                'facts':facts,'references':[r['alias'] for r in references],
                'catalog_ids':[o['alias'] for o in offer_rows],'window_idx':source.action_window,
                'case_hash':case_hash,'ruleset_version':ruleset_version}
-    doc={'schema':SCHEMA,'narrative':narrative,'reference_map':references,'exact_blocks':blocks,
+    doc={'schema':SCHEMA_CAST if cast_rows else SCHEMA,'narrative':narrative,'reference_map':references,'exact_blocks':blocks,
          'offers':offer_rows,'references':[source.cause_id], 'catalog_ids':[],
          'summarized_window':source.summarized_window,'action_window':source.action_window}
+    if cast_rows: doc['cast']=cast_rows
     doc['context_hash']=_hash(doc)
     narrative['knowledge_revision']=doc['context_hash']
     if len(_canonical(doc))>65536 or len(_canonical({'request_token':'0'*64,'kind':source.kind,

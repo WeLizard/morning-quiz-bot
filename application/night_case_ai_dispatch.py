@@ -25,7 +25,7 @@ from application.night_case import NightCaseError, _parse, command_key
 from application.night_case_ai import BindingCaps, byok_audience_allowed, AI_PARTICIPATING_STATUSES
 from application.night_case_orchestrator import CLARIFICATION, NightCaseOrchestrator, _decode
 from application.night_case_director import (stable_job_id, _check_row, _event_body, _look_title,
-    _event_observation_link, _observation_record)
+    _event_observation_link, _observation_record, director_cast)
 from config.night_case_ai import ProfileRevision
 from domain.night_case_director import AuthorizedSource, SafeRecord, SafeOffer, FrozenContext, build_frozen_context, validate_director_result
 from domain.night_case_narrative import LegalAction
@@ -358,8 +358,10 @@ class NightCaseAIDispatcher:
                     quote=LegalAction(saved['selection_id'],saved['kind'],saved['target_id'],saved['cost'],
                         saved['resource_id'],json.loads(saved['params']),saved['resource_revision'])
                     offers.append(SafeOffer(MenuChoice('choice',quote.selection_id,saved['label'],quote)))
+        heroes=(character['id'],) if job.kind=='npc_reply' else ()
+        cast=director_cast(case_doc,doc,heroes=heroes,observation_ids=source.observation_ids) if job.kind in {'npc_reply','window_digest'} else ()
         expected=build_frozen_context(source,records,offers,case_hash=case.content_hash,
-            ruleset_version='core/'+str(case_doc['ruleset_ref']['version']),fallback=job.fallback,created_at=row.created_at,closes_at=close)
+            ruleset_version='core/'+str(case_doc['ruleset_ref']['version']),fallback=job.fallback,created_at=row.created_at,closes_at=close,cast=cast)
         if expected.input_hash!=job.input_hash or canonical_json(expected.document())!=canonical_json(job.frozen_view):raise _Unavailable('source_closed')
         return FrozenContext.from_document(job.frozen_view,input_hash=job.input_hash,source=source)
 

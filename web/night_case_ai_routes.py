@@ -1,7 +1,7 @@
-"""Unmounted Night AI game HTTP adapter; identity and SQL session stay caller-owned.
+"""Night AI game HTTP adapter; identity and SQL session stay caller-owned.
 
-register_night_case_ai_routes adds explicit §7 endpoints. Disabled by default;
-factories are supplied only after the separate runtime integration review.
+register_night_case_ai_routes adds explicit §7 endpoints. Mounted by web.mini_app;
+disabled (404) unless web.night_case_ai_wiring built the services from env.
 """
 from __future__ import annotations
 

@@ -466,3 +466,75 @@ test('shared scenes come from the verified pack, the played finale only from its
         missing.handle.close();
     }
 });
+
+/* AI narrator access (NIGHT_CASE_AI_ACCESS §7): the host's choice before the start. */
+function lobbyView() {
+    return {game_id: 'game', mode: 'night_case', server_now: '2026-11-16T10:00:00Z', runtime_status: 'lobby',
+        lobby: {lobby_revision: 4, seats: [{seat: '1', name: 'Хозяин', ready: true}], self_seat: '1', can_start: true, case: {title: 'Дело'}, self: {address_form: 'n'}},
+        public: {clock: {window_idx: 0, window_seq: 0}}, self: null};
+}
+const plain = value => JSON.parse(JSON.stringify(value));
+const AI_BOOT = {enabled: true, cases: [], viewer_account_id: VIEWER, capabilities: {ai_narrator: true}};
+const byText = (host, text) => find(host, node => node.tagName === 'button' && node.textContent.trim() === text);
+const byLabel = (host, label) => find(host, node => ['input', 'select'].includes(node.tagName) && node.attrs['aria-label'] === label);
+
+test('the host picks the narrator in the lobby: admin request is the default start option', async () => {
+    const status = {status: 'authored', model_label: null, mode: 'authored', epoch: 2, can_configure: true, staged_credential_id: null};
+    const fixture = controller(lobbyView(), url => url.endsWith('/ai') ? status : url.endsWith('/start') ? {receipt: {accepted: true}} : undefined, {bootstrap: AI_BOOT});
+    await settle();
+    const group = find(fixture.host, node => node.attrs?.['aria-label'] === 'Кто ведёт партию');
+    assert.ok(group, 'narrator choice is shown to the host');
+    assert.equal(byText(fixture.host, 'У админа').attrs['aria-pressed'], 'true');
+    byText(fixture.host, 'Начать дело').click(); await settle();
+    const start = fixture.calls.find(call => call.url.endsWith('/start'));
+    assert.deepEqual(plain(start.body.params), {ai: {mode: 'admin', expected_epoch: 2, staged_credential_id: null}});
+    fixture.handle.close();
+});
+
+test('own key: sent once to the byok route, cleared from the form, then the start names the staged key', async () => {
+    let status = {status: 'authored', model_label: null, mode: 'authored', epoch: 0, can_configure: true, staged_credential_id: null};
+    const presets = {items: [{id: 'openai', preset_version: 1, required_fields: [], optional_fields: ['project_id'], models: [], manual_model_id: true}], byok_ready: true, reason: null};
+    const fixture = controller(lobbyView(), url => {
+        if (url === '/api/night-case/ai/presets') return presets;
+        if (url.endsWith('/ai/byok')) { status = {...status, mode: 'byok', credential_configured: true, staged_credential_id: 'staged-1', expires_at: '2026-11-16T11:00:00Z'}; return {result: {staged_credential_id: 'staged-1'}}; }
+        if (url.endsWith('/ai')) return status;
+        if (url.endsWith('/start')) return {receipt: {accepted: true}};
+        return undefined;
+    }, {bootstrap: AI_BOOT});
+    await settle();
+    byText(fixture.host, 'Свой ключ').click(); await settle();
+    byText(fixture.host, 'Начать дело').click(); await settle();
+    assert.equal(fixture.calls.filter(call => call.url.endsWith('/start')).length, 0, 'no start without a staged key');
+    byLabel(fixture.host, 'Модель (ID у провайдера)').value = 'model-x';
+    const secret = byLabel(fixture.host, 'Ключ API');
+    assert.equal(secret.type, 'password'); assert.equal(secret.autocomplete, 'new-password');
+    secret.value = 'BYOK_SECRET_CANARY';
+    byText(fixture.host, 'Подключить ключ').click(); await settle();
+    const sent = fixture.calls.filter(call => call.url.endsWith('/ai/byok'));
+    assert.equal(sent.length, 1);
+    assert.deepEqual(plain({...sent[0].body, client_request_id: 'id'}), {expected_epoch: 0, client_request_id: 'id', settings: {preset: 'openai', model_id: 'model-x'}, secret: 'BYOK_SECRET_CANARY'});
+    assert.equal(secret.value, '', 'the key does not stay in the form');
+    byText(fixture.host, 'Начать дело').click(); await settle();
+    const start = fixture.calls.find(call => call.url.endsWith('/start'));
+    assert.deepEqual(plain(start.body.params), {ai: {mode: 'byok', expected_epoch: 0, staged_credential_id: 'staged-1'}});
+    assert.equal(fixture.calls.filter(call => JSON.stringify(call.body || '').includes('BYOK_SECRET_CANARY')).length, 1);
+    fixture.handle.close();
+});
+
+test('without the narrator capability the lobby has no AI choice and the start carries no options', async () => {
+    const fixture = controller(lobbyView(), url => url.endsWith('/start') ? {receipt: {accepted: true}} : undefined);
+    await settle();
+    assert.equal(find(fixture.host, node => node.attrs?.['aria-label'] === 'Кто ведёт партию'), undefined);
+    byText(fixture.host, 'Начать дело').click(); await settle();
+    assert.deepEqual(plain(fixture.calls.find(call => call.url.endsWith('/start')).body.params), {});
+    assert.equal(fixture.calls.some(call => call.url.includes('/ai')), false);
+    fixture.handle.close();
+});
+
+test('a running game shows the narrator status to everyone, controls only to the starter', async () => {
+    const running = view();
+    const fixture = controller(running, url => url.endsWith('/ai') ? {status: 'pending', model_label: null} : undefined, {bootstrap: AI_BOOT});
+    await settle();
+    assert.match(fixture.host.textContent, /Ведущий: авторский текст, ждём ответа администратора/);
+    fixture.handle.close();
+});

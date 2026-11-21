@@ -1,4 +1,4 @@
-"""Unmounted Night AI admin router with existing session and CSRF authority."""
+"""Night AI admin router (mounted by web.postgres_admin) with existing session and CSRF authority."""
 from __future__ import annotations
 
 import hmac
@@ -27,7 +27,7 @@ def _pagination(request):
 
 
 def make_night_case_ai_admin_router(*, service_factory=None, views_factory=None,
-                                    deployment_id: str, enabled=False) -> APIRouter:
+                                    deployment_id: str, enabled=False, catalog=None) -> APIRouter:
     """Admin §7 read/write routes. Mount only behind existing AdminAuthMiddleware.
 
     Uses ``request.app.state.admin_database.transaction()`` and verifies the
@@ -37,8 +37,8 @@ def make_night_case_ai_admin_router(*, service_factory=None, views_factory=None,
     principal=AdminPrincipal(deployment_id)
     router=APIRouter()
 
-    def authenticated(request, *, write):
-        if not enabled: raise HTTPException(404,'Unavailable')
+    def authenticated(request, *, write, require_enabled=True):
+        if require_enabled and not enabled: raise HTTPException(404,'Unavailable')
         auth=getattr(request.app.state,'admin_auth',None)
         session=getattr(request.state,'admin_session',None)
         if auth is None or session is None or not getattr(auth,'configured',False):
@@ -78,6 +78,14 @@ def make_night_case_ai_admin_router(*, service_factory=None, views_factory=None,
     async def body(request,required,optional=frozenset()):
         authenticated(request,write=True)
         return await bounded_json(request,required=required,optional=optional)
+
+    @router.get('/api/admin/night-case/ai/catalog')
+    async def catalog_view(request: Request):
+        # The only route answering while the narrator is off: the admin screen says why.
+        authenticated(request,write=False,require_enabled=False)
+        if not enabled or catalog is None:
+            return _reply({'enabled':False})
+        return _reply({'enabled':True,**catalog()})
 
     @router.get('/api/admin/night-case/ai/profiles')
     async def profiles(request: Request):

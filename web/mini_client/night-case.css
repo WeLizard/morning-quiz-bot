@@ -30,3 +30,6 @@
 .ncase-scene-art {display:block;width:min(100%,240px);aspect-ratio:2/3;height:auto;object-fit:cover;align-self:center;border-radius:var(--qw-r-control)}
 @media(min-width:1024px) {.ncase-main {padding-inline:var(--qw-s-4)}.ncase-main .nc-hero {min-height:260px}}
 @media(prefers-reduced-motion:reduce) {.ncase-main * {scroll-behavior:auto}}
+.ncase-key-fields {display:flex;flex-direction:column;gap:var(--qw-s-3)}
+.ncase-key-fields:empty {display:none}
+.ncase-narrator-pick {margin-block:var(--qw-s-2)}

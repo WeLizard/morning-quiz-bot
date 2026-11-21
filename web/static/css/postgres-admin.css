@@ -174,3 +174,16 @@
 .pg-activity-chart svg { display: block; width: 100%; max-height: 220px; }
 .pg-admin pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .pg-admin .pg-photo-image { display: block; width: min(100%, 420px); height: auto; border-radius: 16px; }
+/* Night City narrator section (night-ai-admin.js) */
+.pg-admin #night-ai h2 { margin: 28px 0 12px; font-size: 18px; }
+.night-ai-note { color: var(--text-secondary); }
+.night-ai-error { color: var(--danger, #ff6b6b); }
+.night-ai-table { overflow-x: auto; }
+.night-ai-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.night-ai-actions .btn { min-height: 44px; }
+.night-ai-actions .form-select { min-height: 44px; max-width: 260px; }
+.night-ai-form { display: grid; gap: 12px; max-width: 640px; margin: 16px 0; padding: 20px; }
+.night-ai-form .form-group { display: grid; gap: 6px; margin: 0; }
+.night-ai-form .form-input, .night-ai-form .form-select { min-height: 44px; }
+.night-ai-extra { display: grid; gap: 12px; }
+.night-ai-extra:empty { display: none; }

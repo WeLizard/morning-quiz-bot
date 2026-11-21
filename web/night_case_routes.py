@@ -62,7 +62,7 @@ def night_viewer_matches(expected, account_id, *, required):
 
 
 def register_night_case_routes(app, *, principal, identity_for, read_body,
-                               enabled=False, service_factory=None, orchestrator=None):
+                               enabled=False, service_factory=None, orchestrator=None, ai_enabled=False):
     """Mount with the real room_principal context manager and an explicit service factory.
 
     The feature is off unless configured. Tests can inject a boundary fake; production
@@ -126,7 +126,11 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
                 result = await getattr(service, method)(account_id=UUID(str(who.account_id)), **kwargs)
                 if method == 'list_cases':
                     # Entry availability only; legacy endpoints retain their own ACL.
-                    result = {**result, 'viewer_account_id': viewer, 'capabilities': {'legacy_mafia': True, 'free_intent': orchestrator is not None}}
+                    # Free text needs a real intent transport; a bare orchestrator only carries AI start options.
+                    free_intent = orchestrator is not None and (getattr(orchestrator, 'dispatcher', None) is not None
+                                                                or getattr(orchestrator, 'transport', None) is not None)
+                    result = {**result, 'viewer_account_id': viewer, 'capabilities': {
+                        'legacy_mafia': True, 'free_intent': free_intent, 'ai_narrator': bool(ai_enabled)}}
                 return JSONResponse(result, headers={'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization'})
         except (NightCaseError,NightAIControlError) as exc:
             # Neither service internals, provider text nor validation pointers become HTTP errors.

@@ -13,6 +13,9 @@ const pick = (value, keys) => Object.fromEntries(keys.filter(key => value && Obj
 function playerView(value) {
     const safe = pick(value, ['game_id', 'mode', 'server_now', 'runtime_status', 'final_summary', 'lobby', 'menu', 'history_seats', 'selected_original_account_id']);
     safe.public = pick(value?.public, ['clock', 'world', 'art', 'locations', 'players', 'npcs', 'board', 'observations', 'modules', 'hearing', 'final', 'flags', 'locks']);
+    // Only shared scenes leave the public chronicle: id, window, text and picture.
+    safe.public.scenes = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'scene')
+        .map(entry => ({event_id: entry.event_id, window_idx: entry.window_idx, body: entry.payload?.body, art: entry.art}));
     safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem', 'finished_window', 'final_ballot']) : null;
     return safe;
 }
@@ -464,6 +467,16 @@ function open(options) {
             ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`)),
             ...arr(own.modules?.archive_requests?.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоей хронике.')));
     }
+    // Event and finale pictures: only assets of the verified pack, alt from the case.
+    function sceneArt(art, fallback) {
+        const artwork = assets.get(art?.asset_id);
+        if (!artwork) return null;
+        const image = el('img', 'ncase-scene-art');
+        image.src = artwork.url; image.alt = text(art?.alt).slice(0, 300) || artwork.alt || fallback;
+        image.loading = 'lazy';
+        return image;
+    }
+    const sceneOf = eventId => arr(view?.public?.scenes).find(entry => entry.event_id === eventId);
     function place() {
         const own = view.self, location = arr(view.public.locations).find(item => item.id === own.location);
         const over = Boolean(view.public.final || view.final_summary);
@@ -474,9 +487,12 @@ function open(options) {
         const artwork = assets.get(location?.art?.asset_id);
         scene.style?.setProperty('--img', artwork ? `url(${artwork.variants[sceneTime()] || artwork.url})` : 'none');
         if (over) return [scene];
+        const window_ = view.public.clock?.window_idx;
+        const current = arr(view.public.scenes).filter(entry => entry.window_idx === window_).at(-1);
+        const shared = current ? panel('Сейчас в усадьбе', sceneArt(current.art, 'Сцена окна'), p(bodyText(current.body))) : null;
         const waiting = arr(own.modules?.archive_requests?.requests).filter(item => item.status === 'pending');
         const free = boot?.capabilities?.free_intent === true ? field('Что ты хочешь сделать?', '', true) : null;
-        return [scene,
+        return [scene, shared,
             panel('Доступные действия', ...(acts.length ? actionGroups(acts) : [p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')]),
                 ...(waiting.length ? [p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в хронику и досье.`)] : [])),
             panel('Карта усадьбы', p('Можно перейти только в соседние места.'), ...actionGroups(moves)),
@@ -643,7 +659,8 @@ function open(options) {
     function history() {
         const eventCards = (stream, title) => panel(title, ...pages[stream].items.map(item => {
             const payload = item.payload || {};
-            return put(el('article', 'ncase-event'), el('strong', null, `Окно ${item.window_idx}`), p(eventText(item)),
+            return put(el('article', 'ncase-event'), el('strong', null, `Окно ${item.window_idx}`),
+                item.kind === 'scene' ? sceneArt(sceneOf(item.event_id)?.art, 'Сцена окна') : null, p(eventText(item)),
                 ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : []));
         }), ...(pages[stream].next_cursor ? [kit.row(button('Ещё записи', async () => { await loadHistory(stream, true); render(); }))] : []));
         return [eventCards('public', 'Общий ход дела'), eventCards('self', 'Твои события')];
@@ -670,7 +687,7 @@ function open(options) {
         const stateNotice = clock.phase === 'frozen' ? panel('Стол ждёт возвращения', p('Общий простой остановил окна. Отметь возвращение, чтобы продолжить.'),
             kit.row(...choiceList().filter(row => row.quote.kind === 'seen').map(row => actionButton(row)))) : own.status === 'departed' ? panel('Участие завершено', p('Тебе доступна собственная разрешённая история до выхода и итог дела.')) : own.status === 'ghost' ? panel('Ты наблюдаешь за делом', p('Обычные действия недоступны. Переписка призраков и разрешённые воспоминания остаются отдельными.')) : null;
         const final = own.postmortem;
-        const finale = pub.final || view.final_summary ? panel('Дело завершено', p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
+        const finale = pub.final || view.final_summary ? panel('Дело завершено', sceneArt(final?.variant_art, 'Развязка дела'), p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
             p(final?.goal_results?.find(row => row.account_id === own.account_id)?.met ? 'Твоя личная цель выполнена.' : 'Подробности своей личной цели смотри в итоговом досье.')) : null;
         const finalHearing = clock.phase === 'final_hearing' && !pub.final;
         const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? panel(finalHearing ? 'Итоговое слушание' : 'Идёт слушание',

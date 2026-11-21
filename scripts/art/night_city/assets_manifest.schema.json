@@ -11,7 +11,7 @@
     "assets": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": {"pattern": "^manor_(?:char|loc)_[a-z0-9_]+$"},
+      "propertyNames": {"pattern": "^manor_(?:char|loc|scene)_[a-z0-9_]+$"},
       "additionalProperties": {"$ref": "#/$defs/asset"}
     }
   },

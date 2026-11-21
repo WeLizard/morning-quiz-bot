@@ -27,5 +27,6 @@
 .ncase-main .nc-hero {width:100%;box-sizing:border-box;min-height:200px}
 .ncase-main .nc-hero .copy {min-width:0}
 .ncase-role-portrait {width:min(100%,240px);max-height:320px;object-fit:contain;align-self:center}
+.ncase-scene-art {display:block;width:min(100%,240px);aspect-ratio:2/3;height:auto;object-fit:cover;align-self:center;border-radius:var(--qw-r-control)}
 @media(min-width:1024px) {.ncase-main {padding-inline:var(--qw-s-4)}.ncase-main .nc-hero {min-height:260px}}
 @media(prefers-reduced-motion:reduce) {.ncase-main * {scroll-behavior:auto}}

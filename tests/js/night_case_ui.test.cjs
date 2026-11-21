@@ -83,12 +83,12 @@ function controller(view, requestHook, options = {}) {
         header() { return {node: make('header'), set() {}}; }, timer() { return {clock: make('span'), stop() {}}; },
         loadShell() {}, useWorld() {}, seats(rows) { return wrap('seats', rows.map(row => make('span', '', row.name))); },
     };
-    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {configure() {}, menu: {register() {}}, nav: {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`} };
+    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {configure() {}, menu: {register() {}}, nav: {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle: require('node:crypto').webcrypto.subtle} };
     const host = new Node('div');
     const listeners = new Map();
     const doc = {createElement: make, documentElement: new Node('html'), hidden: false,
         addEventListener(kind, listener, {signal} = {}) { listeners.set(kind, listener); signal?.addEventListener('abort', () => listeners.delete(kind)); }};
-    runInNewContext(source, {window: win, document: doc, AbortController, setTimeout, clearTimeout,
+    runInNewContext(source, {window: win, document: doc, AbortController, setTimeout, clearTimeout, TextEncoder,
         setInterval(fn) { intervals.add(fn); return fn; }, clearInterval(fn) { intervals.delete(fn); }});
     const request = async (url, init) => {
         calls.push({url, body: init.body, expectedViewer: init.expectedViewer, signal: init.signal});
@@ -398,4 +398,49 @@ test('after the final the place shows no actions and no free intent box without 
     assert.doesNotMatch(fixture.host.textContent, /Осталось действий|Предложить действие|Осмотреть стол/);
     assert.match(fixture.host.textContent, /Дело завершено/);
     fixture.handle.close();
+});
+
+test('shared scenes and the played finale show only pictures of the verified pack', async () => {
+    const crypto = require('node:crypto');
+    const sort = value => Array.isArray(value) ? value.map(sort) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sort(value[key])])) : value;
+    const manifest = {schema: 'nc-assets/2', world: 'manor_lake', files: {'assets/scene_ev_blizzard.webp': 'a'.repeat(64), 'assets/scene_final_variant_b.webp': 'b'.repeat(64)}, assets: {
+        manor_scene_ev_blizzard: {url: 'assets/scene_ev_blizzard.webp', alt: 'Метель'},
+        manor_scene_variant_b: {url: 'assets/scene_final_variant_b.webp', alt: 'Лодочный сарай'},
+    }};
+    const digest = crypto.createHash('sha256').update(JSON.stringify(sort(manifest))).digest('hex');
+    const pointer = `/app/night/packs/${digest}/assets.json`;
+    const state = view();
+    Object.assign(state.public, {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer}, clock: {window_idx: 2, window_seq: 1, phase: 'investigation'}, chronicle: [
+        {event_id: 'evt_window', kind: 'window', window_idx: 2, payload: {window_idx: 2}},
+        {event_id: 'evt_scene', kind: 'scene', window_idx: 2, payload: {content_event_id: 'ev_blizzard', body: {text: 'Метель отрезала лодочный сарай.'}}, art: {asset_id: 'manor_scene_ev_blizzard', alt: 'Метель над озером'}},
+        {event_id: 'evt_secret', kind: 'observation_granted', window_idx: 2, payload: {observation_id: 'SECRET_CANARY'}},
+    ]});
+    assert.deepEqual(JSON.parse(JSON.stringify(api.playerView(state).public.scenes)), [{event_id: 'evt_scene', window_idx: 2, body: {text: 'Метель отрезала лодочный сарай.'}, art: {asset_id: 'manor_scene_ev_blizzard', alt: 'Метель над озером'}}]);
+    const images = host => { const found = []; const walk = node => { if (node.tagName === 'img') found.push(node); for (const child of node.children || []) if (child && child.children) walk(child); }; walk(host); return found; };
+    const hook = url => url === pointer ? manifest : undefined;
+    const live = controller(state, hook); await settle();
+    assert.match(live.host.textContent, /Сейчас в усадьбе/);
+    assert.match(live.host.textContent, /Метель отрезала лодочный сарай/);
+    assert.doesNotMatch(live.host.textContent, /SECRET_CANARY/);
+    const scene = images(live.host).find(node => node.className === 'ncase-scene-art');
+    assert.equal(scene.src, `/app/night/packs/${digest}/assets/scene_ev_blizzard.webp`);
+    assert.equal(scene.alt, 'Метель над озером');
+    live.handle.close();
+
+    const over = view();
+    Object.assign(over.public, {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer}, final: {code: 'unresolved', at: '2026-11-20T10:00:00Z'}});
+    over.self.postmortem = {ending: {text: 'Финал'}, variant_final_text: {text: 'Разгадка'}, variant_art: {asset_id: 'manor_scene_variant_b', alt: 'След по льду'}, goal_results: []};
+    const done = controller(over, hook); await settle();
+    const finale = images(done.host).find(node => node.className === 'ncase-scene-art');
+    assert.equal(finale.src, `/app/night/packs/${digest}/assets/scene_final_variant_b.webp`);
+    assert.equal(finale.alt, 'След по льду');
+    done.handle.close();
+
+    const unknown = view();
+    Object.assign(unknown.public, {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer}});
+    unknown.public.final = {code: 'unresolved', at: '2026-11-20T10:00:00Z'};
+    unknown.self.postmortem = {ending: {text: 'Финал'}, variant_art: {asset_id: 'manor_scene_variant_c', alt: 'Нет в паке'}, goal_results: []};
+    const missing = controller(unknown, hook); await settle();
+    assert.equal(images(missing.host).filter(node => node.className === 'ncase-scene-art').length, 0);
+    missing.handle.close();
 });

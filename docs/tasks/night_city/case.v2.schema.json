@@ -912,6 +912,9 @@
             "minItems": 0,
             "maxItems": 8,
             "uniqueItems": true
+          },
+          "art": {
+            "$ref": "#/$defs/art"
           }
         }
       },
@@ -1041,6 +1044,9 @@
           },
           "body": {
             "$ref": "#/$defs/body"
+          },
+          "art": {
+            "$ref": "#/$defs/art"
           },
           "effects": {
             "type": "array",

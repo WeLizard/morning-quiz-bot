@@ -36,10 +36,12 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = 'c062098db8c18849c724412f57dd4dab4498cf6fdfe83630ca23ee1201f04e9b'
+MANOR_CASE_CANONICAL_SHA256 = '2e24c6891922e6c6b31b529c7c7142ef929cdc465f5e4d7b1c280c94feb7aae9'
 MANOR_LOOKS = 20                                  # extra appearance portraits from characters_variants/
-MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS             # characters, locations, looks
-MANOR_WEBPS = 20 + 8 * 4 + 81 + MANOR_LOOKS       # portraits, place times, items, looks
+MANOR_SCENES = 6 + 3                              # event scenes and per-variant finales from scenes_events/
+MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS + MANOR_SCENES              # characters, locations, looks, scenes
+MANOR_WEBPS = 20 + 8 * 4 + 81 + MANOR_LOOKS + MANOR_SCENES        # portraits, place times, items, looks, scenes
+SCENE_GROUPS = {'events': 'scene_', 'variants': 'scene_final_'}  # case group -> source file prefix
 
 BUDGET = {'scene': 150_000, 'back': 90_000, 'frame': 90_000, 'frame_small': 60_000, 'icon': 30_000, 'thumb': 20_000}
 
@@ -609,6 +611,23 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
             variants[time] = export_one(path, f'location_{place_id}_{time}.webp', 600, 76, asset_id)
         assets[asset_id] = {'url': variants['day'], 'alt': alt, 'variants': variants}
 
+    scene_count = 0
+    for group, prefix in SCENE_GROUPS.items():
+        for entry in case.get(group, []):
+            art = entry.get('art') or {}
+            asset_id, alt = art.get('asset_id'), art.get('alt')
+            if asset_id != f"manor_scene_{entry['id']}" or not isinstance(alt, str) or not alt:
+                raise SystemExit(f"scene art must be manor_scene_<id> with alt: {group}/{entry['id']}")
+            path = source.find(f"scenes_events/{prefix}{entry['id']}.png")
+            if path is None:
+                raise SystemExit(f"missing scene image {prefix}{entry['id']}.png")
+            if asset_id in assets:
+                raise SystemExit(f'duplicate case art asset_id: {asset_id}')
+            assets[asset_id] = {'url': export_one(path, f"{prefix}{entry['id']}.webp", 600, 78, asset_id), 'alt': alt}
+            scene_count += 1
+    if scene_count != MANOR_SCENES:
+        raise SystemExit(f'manor_lake case must have {MANOR_SCENES} scene pictures, found {scene_count}')
+
     item_paths = sorted((source.dir / 'items').glob('i_*.png'))
     if len(item_paths) != 81:
         raise SystemExit(f'expected 81 individual Manor item PNGs, found {len(item_paths)}')
@@ -636,7 +655,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
 
     manifest = {'schema': 'nc-assets/1', 'world': 'manor_lake', 'assets': assets}
     (out_dir / 'assets.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(f"manor_lake assets: {len(case_chars)} characters, {look_count} looks, {len(case_places) * len(TIMES)} place variants, "
+    print(f"manor_lake assets: {len(case_chars)} characters, {look_count} looks, {len(case_places) * len(TIMES)} place variants, {scene_count} scenes, "
           f"{len(item_paths)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
     if report_out:
         report = {
@@ -650,7 +669,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None):
             'manifest_sha256': hashlib.sha256((out_dir / 'assets.json').read_bytes()).hexdigest(),
             'manifest_asset_ids': sorted(assets), 'manifest_count': len(assets),
             'character_count': len(case_chars), 'look_count': look_count, 'location_count': len(case_places),
-            'location_variant_count': len(case_places) * len(TIMES), 'item_count': len(item_paths),
+            'location_variant_count': len(case_places) * len(TIMES), 'scene_count': scene_count, 'item_count': len(item_paths),
             'item_bytes': item_bytes, 'total_export_bytes': sum(r['bytes'] for r in entries),
             'assets': entries,
         }
@@ -689,12 +708,12 @@ def case_art_refs(case_path):
     if case.get('meta', {}).get('version') != 2 or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
         raise SystemExit('manor_lake case does not match the pinned v2 art source')
     refs = {}
-    for group in ('characters', 'locations'):
+    for group in ('characters', 'locations', *SCENE_GROUPS):
         for entry in case.get(group, []):
             arts = [entry.get('art') or {}] + [look.get('art') or {} for look in (entry.get('looks') or [])[1:]]
             for art in arts:
                 asset_id, alt = art.get('asset_id'), art.get('alt')
-                if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc)_[a-z0-9_]+', asset_id):
+                if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc|scene)_[a-z0-9_]+', asset_id):
                     raise SystemExit(f'missing or invalid public art.asset_id in {group}')
                 if not isinstance(alt, str) or not alt:
                     raise SystemExit(f'missing public art.alt for {asset_id}')

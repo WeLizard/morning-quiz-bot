@@ -233,6 +233,24 @@ def _compile_looks(d: dict[str, Any]) -> None:
                 assets[look["art"]["asset_id"]] = p + _ptr(j)
 
 
+def _compile_scene_art(d: dict[str, Any]) -> None:
+    """Event and variant pictures are optional; each names its own asset, never a portrait or a place."""
+    taken = set()
+    for group in ("characters", "locations"):
+        for entry in d[group]:
+            for art in [entry.get("art")] + [look.get("art") for look in entry.get("looks") or ()]:
+                if art:
+                    taken.add(art["asset_id"])
+    for group in ("events", "variants"):
+        for i, entry in enumerate(d[group]):
+            art = entry.get("art")
+            if art is None:
+                continue
+            if art["asset_id"] in taken:
+                _bad("v2.art", _ptr(group, i, "art", "asset_id"), "Картинка сцены повторяет чужой asset_id")
+            taken.add(art["asset_id"])
+
+
 def _compile_modules(d, maps, predicates):
     """Validate the finite module catalogs; never execute authored content."""
     modules = d["module_data"]
@@ -672,6 +690,7 @@ def compile_v2(case: CaseV2, ruleset_registry: Any = None) -> CompiledCase:
             ("locations", "characters", "facts", "observations", "actions", "dialogues",
              "variants", "compositions", "flags", "events")}
     _compile_looks(d)
+    _compile_scene_art(d)
     if "personal_tasks" in d:
         _compile_personal(d, maps)
     loc, chars, facts, obs = (maps[n] for n in ("locations", "characters", "facts", "observations"))

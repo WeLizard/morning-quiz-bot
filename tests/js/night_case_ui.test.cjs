@@ -83,7 +83,7 @@ function controller(view, requestHook, options = {}) {
         header() { return {node: make('header'), set() {}}; }, timer() { return {clock: make('span'), stop() {}}; },
         loadShell() {}, useWorld() {}, seats(rows) { return wrap('seats', rows.map(row => make('span', '', row.name))); },
     };
-    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {configure() {}, menu: {register() {}}, nav: {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle: require('node:crypto').webcrypto.subtle} };
+    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {configure() {}, menu: {register() {}}, nav: options.nav || {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle: require('node:crypto').webcrypto.subtle} };
     const host = new Node('div');
     const listeners = new Map();
     const doc = {createElement: make, documentElement: new Node('html'), hidden: false,
@@ -105,15 +105,33 @@ function controller(view, requestHook, options = {}) {
     return {host, handle, calls, nodes, intervals, doc, listeners};
 }
 
-test('Case default entry exposes classic mode only with the server capability and a live callback', async () => {
+test('Case entry is the game root: no Mafia, no single-case hero, companies and invitation', async () => {
     let opened = 0;
     const fixture = controller(view(), url => url === '/api/guest/rooms' ? {items: []} : undefined,
         {target: null, bootstrap: {enabled: true, viewer_account_id: VIEWER, capabilities: {legacy_mafia: true}}, openLegacy: () => opened++});
     await settle();
-    const classic = find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Классическая Мафия');
-    assert.ok(classic); await classic.click(); assert.equal(opened, 1);
-    fixture.handle.close(); await classic.click(); assert.equal(opened, 1);
+    const textOf = node => [node.textContent || '', ...(node.children || []).map(textOf)].join(' ');
+    const all = textOf(fixture.host);
+    assert.ok(!find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Классическая Мафия'));
+    assert.doesNotMatch(all, /Хозяин исчез|Твои комнаты/);
+    for (const label of ['Твои компании', 'Новая компания', 'Войти по приглашению']) assert.match(all, new RegExp(label));
+    assert.equal(opened, 0);
+    fixture.handle.close();
     assert.equal(fixture.intervals.size, 0);
+});
+
+test('a company is one step below the root: Back returns to the company list', async () => {
+    const stack = [];
+    const nav = {push(entry) { if (!stack.some(item => item.id === entry.id)) stack.push(entry); }, pop(id) { const i = stack.findIndex(item => item.id === id); if (i >= 0) stack.splice(i); }};
+    const fixture = controller(view(), url => url === '/api/guest/rooms' ? {items: [{id: 'room', title: 'Пятничная компания'}]} : undefined, {nav});
+    await settle();
+    assert.deepEqual(stack.map(item => item.id), ['night-case-room']);
+    assert.equal(stack[0].onBack(), true);
+    await settle();
+    assert.deepEqual(stack.map(item => item.id), []);
+    assert.ok(fixture.calls.some(call => call.url === '/api/guest/rooms'));
+    assert.ok(find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Пятничная компания'));
+    fixture.handle.close();
 });
 
 function view() {

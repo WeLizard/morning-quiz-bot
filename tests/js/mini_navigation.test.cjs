@@ -462,29 +462,15 @@ const ncWrites = (app, suffix) => app.requests.filter(r => r.path === ncq(`${NCB
 async function ncEntry(app) { await findButton(app.content, 'Открыть дело').click(); await flush(); await flush(); }
 async function ncTable(app) { await ncEntry(app); await findButton(app.content, 'Открыть').click(); await flush(); await flush(); await flush(); }
 
-test('Case enabled keeps six synthetic classic tables reachable without writing or creating tables', async () => {
-    const rooms = Array.from({length: 6}, (_, i) => ncRoom({id: `retained-${i}`, title: `Сохранённый стол ${i}`}));
+test('Case enabled opens the weekly case with no Mafia prototype entry, even when the server allows it', async () => {
     const overrides = ncOverrides(ncLobby(), {
         '/api/night-case/bootstrap?identity=guest': {status: 200, body: {enabled: true, capabilities: {legacy_mafia: true}}},
-        [ncq('/api/guest/rooms')]: {status: 200, body: {items: rooms}},
     });
-    for (const [i, room] of rooms.entries()) {
-        const base = `/api/guest/rooms/${room.id}/mafia`;
-        overrides[ncq(base + '/lobby')] = {status: 200, body: {lobby: ncLobby(i ? {} : {status: 'day', round: 1})}};
-        overrides[ncq(base + '/discussion')] = {status: 200, body: {enabled: true, items: []}};
-        overrides[ncq(base + '/role')] = {status: 200, body: {role: 'citizen', title: 'Мирный житель', alive: true, seat: 'p1', targets: []}};
-    }
     const app = await application(true, '', {savedGuest: true, manualTimers: true, nightCaseEnabled: true, overrides});
     await ncEntry(app);
     assert.equal(app.nightCaseMounts.length, 1);
-    await app.nightCaseMounts[0].openLegacy(); await flush(); await flush();
-    for (const room of rooms) {
-        const card = app.content.querySelectorAll('li').find(node => node.textContent.includes(room.title));
-        assert.ok(card, room.title); await findButton(card, 'Открыть').click(); await flush(); await flush();
-        assert.ok(app.requests.some(row => row.path === ncq(`/api/guest/rooms/${room.id}/mafia/lobby`)));
-        await app.ui.back(); await flush(); await flush();
-    }
-    assert.ok(!app.requests.some(row => row.path.includes('/mafia/') && row.options.method === 'POST'));
+    assert.equal(app.nightCaseMounts[0].openLegacy, undefined);
+    assert.ok(!app.requests.some(row => row.path.includes('/mafia/')));
 });
 
 test('Night City entry is one screen for Telegram and the browser: company, invitation, rooms, open tables, Telegram group', async () => {
@@ -904,8 +890,7 @@ test('polling redraws without losing the draft and stops after leaving the game'
 
 test('Telegram: the group table is a secondary path; messages stay text and commands carry the Mini App CSRF', async () => {
     const chat = '-880000000044', base = `/api/mini/mafia/chats/${chat}`;
-    const app = await application(true, '', {nightCaseEnabled: true, overrides: {
-        '/api/night-case/bootstrap?identity=telegram': {status: 200, body: {enabled: true, capabilities: {legacy_mafia: true}}},
+    const app = await application(true, '', {overrides: {
         '/api/mini/chats?limit=50': {status: 200, body: {items: [{chat_id: chat, title: 'Дело', type: 'supergroup', mafia: {status: 'playing', seated: 5, joined: true}}], has_more: false}},
         [ncq('/api/guest/rooms', 'telegram')]: {status: 200, body: {items: []}},
         [ncq('/api/guest/rooms/open', 'telegram')]: {status: 200, body: {items: []}},
@@ -914,7 +899,6 @@ test('Telegram: the group table is a secondary path; messages stay text and comm
         [`${base}/discussion:POST`]: {status: 200, body: {id: 2, accepted: true}},
     }});
     await ncEntry(app);
-    await app.nightCaseMounts[0].openLegacy(); await flush(); await flush();
     assert.match(app.content.textContent, /Играть в Telegram-группе/);
     assert.match(app.content.textContent, /Открытых столов сейчас нет/);
     assert.match(app.content.textContent, /за столом 5 · ты за столом/);

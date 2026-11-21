@@ -1816,8 +1816,8 @@
         const identity = state.authenticated ? 'telegram' : 'guest';
         shell({game: true, onHome: () => { if (state.authenticated) navigate('home'); else guestHome(); }});
         if (!window.NightCity) { note(content, 'Ночной город не загрузился. Обнови приложение.', 'error'); return; }
-        // Chat ids name an existing classic table. A Room/invite alone does not
-        // identify a game mode; choosing a mode never grants access to its table.
+        // The Mafia prototype is not a menu item: with the weekly case enabled every room and
+        // invite opens the case. Only an explicit chat id or mode reaches the prototype.
         const legacy = target?.chatId || target?.mode === 'legacy_mafia';
         if (window.NightCase && !legacy) {
             try {
@@ -1825,26 +1825,7 @@
                 if (version !== generation) return;
                 if (bootstrap.enabled === true) {
                     window.NightCity.close();
-                    const openLegacy = bootstrap.capabilities?.legacy_mafia === true
-                        ? () => openNightCity({...target, mode: 'legacy_mafia'}) : null;
-                    if (openLegacy && target && !target.mode && (target.room || target.roomId || target.code || target.short)) {
-                        window.NightCase.close();
-                        const kit = window.NightCity.kit, header = kit.header();
-                        document.documentElement.classList.add('nc');
-                        kit.loadShell(); kit.useWorld(null);
-                        header.set({eyebrow: 'Ночной город', title: 'Выбери режим'});
-                        const main = el('div', undefined, 'nc-main');
-                        main.append(kit.panel({title: 'Какой стол открыть?'},
-                            kit.note('Комната и приглашение общие. Выбери игру, к которой хочешь вернуться.'),
-                            kit.stack(
-                                kit.button('Недельное расследование', () => openNightCity({...target, mode: 'night_case'}), {kind: 'primary'}),
-                                kit.button('Классическая Мафия', openLegacy, {kind: 'secondary'}))));
-                        content.append(header.node, main);
-                        return;
-                    }
-                    window.NightCase.open({host: content, target, identity, bootstrap,
-                        openLegacy: openLegacy ? () => openNightCity({mode: 'legacy_mafia'}) : null,
-                        isCurrent: () => version === generation});
+                    window.NightCase.open({host: content, target, identity, bootstrap, isCurrent: () => version === generation});
                     return;
                 }
                 window.NightCase.close();

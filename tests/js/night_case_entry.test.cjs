@@ -44,40 +44,26 @@ test('enabled Case preserves direct Telegram legacy table target without a Case 
     assert.equal(app.requests.length, 0);
 });
 
-test('main entry defaults to Case and exposes an explicit classic entry callback', async () => {
+test('main entry opens Case with no classic Mafia callback even when the server allows it', async () => {
     const app = entry(); await app.open();
     assert.equal(app.calls[0].mode, 'night_case');
-    assert.equal(typeof app.calls[0].options.openLegacy, 'function');
-    await app.calls[0].options.openLegacy();
-    assert.equal(app.calls.at(-1).mode, 'legacy_mafia');
-    assert.equal(app.calls.at(-1).options.target.mode, 'legacy_mafia');
-    assert.equal(app.calls.at(-2).closed, 'night_case');
+    assert.equal(app.calls[0].options.openLegacy, undefined);
+    assert.ok(!buttons(app.nodes).some(node => node.label === 'Классическая Мафия'));
 });
 
 for (const target of [{roomId: 'old-room'}, {room: {id: 'old-room'}}, {code: 'old-invite'}]) {
-    test('ambiguous Room target requires an explicit mode before either controller joins: ' + JSON.stringify(target), async () => {
+    test('Room target opens the case directly, no mode choice: ' + JSON.stringify(target), async () => {
         const app = entry(); await app.open(target);
-        assert.ok(!app.calls.some(call => call.mode));
-        const classic = buttons(app.nodes).find(node => node.label === 'Классическая Мафия');
-        assert.ok(classic); await classic.click();
-        assert.equal(app.calls.at(-1).mode, 'legacy_mafia');
-        assert.equal(JSON.stringify(app.calls.at(-1).options.target), JSON.stringify({...target, mode: 'legacy_mafia'}));
+        assert.equal(app.calls.filter(call => call.mode).length, 1);
+        assert.equal(app.calls.at(-1).mode, 'night_case');
+        assert.equal(JSON.stringify(app.calls.at(-1).options.target), JSON.stringify(target));
     });
 }
 
-test('explicit Case room target bypasses the mode choice', async () => {
+test('explicit Case room target opens the case', async () => {
     const app = entry(); await app.open({roomId: 'case-room', mode: 'night_case'});
     assert.equal(app.calls[0].mode, 'night_case');
     assert.equal(app.calls[0].options.target.roomId, 'case-room');
-});
-
-test('short room deep link keeps short-code semantics when classic mode is chosen', async () => {
-    const app = entry(); await app.open({code: 'ABCDEFGH'});
-    const classic = buttons(app.nodes).find(node => node.label === 'Классическая Мафия');
-    assert.ok(classic); await classic.click();
-    assert.equal(app.calls.at(-1).mode, 'legacy_mafia');
-    assert.equal(app.calls.at(-1).options.target.short, 'ABCDEFGH');
-    assert.equal(app.calls.at(-1).options.target.code, undefined);
 });
 
 test('legacy normalization preserves long tokens and applies to explicit classic routing', async () => {
@@ -93,10 +79,8 @@ test('legacy normalization preserves long tokens and applies to explicit classic
     }
 });
 
-test('Case choice retains eight-symbol code for its own short_code branch', async () => {
+test('eight-symbol room code goes to the case as its own code', async () => {
     const app = entry(); await app.open({code: 'ABCDEFGH'});
-    assert.ok(!app.calls.some(call => call.mode));
-    await buttons(app.nodes).find(node => node.label === 'Недельное расследование').click();
     assert.equal(app.calls.at(-1).mode, 'night_case');
     assert.equal(app.calls.at(-1).options.target.code, 'ABCDEFGH');
 });

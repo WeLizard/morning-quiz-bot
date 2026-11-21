@@ -1,4 +1,4 @@
-"""Bounded real Case/legacy entry QA, own browser DB; never opens retained tables."""
+"""Bounded real Case entry QA, own browser DB: the game root, a company and Back, no Mafia prototype."""
 import asyncio
 import json
 import os
@@ -27,8 +27,7 @@ async def main():
     output.mkdir(parents=True, exist_ok=True)
     harness = Harness(4899)
     report = {'scope': 'night_entry_compatibility', 'frames': [], 'errors': [], 'audio_requests': [],
-              'limits': ['Entry shell is always dark; day/night have identical approved static shell art.',
-                         'No existing Mafia table joined; retained day/lobby/chat resumption tested by JS synthetic HTTP fixtures.']}
+              'limits': ['Entry shell is always dark; day/night have identical approved static shell art.']}
     try:
         await harness.start()
         async with async_playwright() as p:
@@ -45,8 +44,10 @@ async def main():
             assert response.ok
             await page.goto(harness.origin + '/app')
             await page.get_by_role('button', name='Открыть дело', exact=True).click()
-            await page.get_by_role('button', name='Классическая Мафия', exact=True).wait_for()
-            report['default_case_entry'] = True
+            await page.get_by_role('heading', name='Твои компании', exact=True).wait_for()
+            body = await page.locator('body').inner_text()
+            assert 'Классическая Мафия' not in body and 'Хозяин исчез' not in body, body[:400]
+            report['case_root_without_mafia'] = True
             for period in ['day', 'night']:
                 for width, height in [(375, 812), (390, 844), (1280, 800)]:
                     await page.set_viewport_size({'width': width, 'height': height})
@@ -54,25 +55,26 @@ async def main():
                     gaps = await capture(page, path)
                     report['frames'].append({'path': str(path), 'gaps': gaps})
                     assert not gaps['issues'], gaps
-            await page.get_by_role('button', name='Классическая Мафия', exact=True).click()
-            await page.get_by_role('heading', name='Город засыпает', exact=True).wait_for()
-            report['real_classic_entry'] = True
-            # A syntactically valid invitation alone must not join any Room.
-            writes = []
-            page.on('request', lambda request: writes.append(request.url) if request.method == 'POST' and '/rooms' in request.url else None)
-            # Query changes the document; hash-only goto would keep the mounted
-            # legacy controller (launch parsing intentionally happens at bootstrap).
+            # A company is one step below the root: the browser ‹ appears there and returns to the list.
+            back = page.get_by_role('button', name='Назад', exact=True)
+            assert not await back.is_visible()
+            await page.get_by_label('Название компании', exact=True).fill('Пятничная компания')
+            await page.get_by_role('button', name='Создать', exact=True).click()
+            await back.wait_for()
+            path = output / 'company-390.png'
+            await page.set_viewport_size({'width': 390, 'height': 844})
+            await page.screenshot(path=str(path), full_page=True); report['frames'].append({'path': str(path)})
+            await back.click()
+            await page.get_by_role('heading', name='Твои компании', exact=True).wait_for()
+            await page.get_by_role('button', name='Пятничная компания', exact=True).wait_for()
+            assert not await back.is_visible()
+            report['back_from_company'] = True
+            # A room link opens the case directly: no mode choice.
             await page.goto(harness.origin + '/app?room=' + 'Z' * 43)
-            await page.get_by_role('button', name='Недельное расследование', exact=True).wait_for()
-            for period in ['day', 'night']:
-                for width, height in [(375, 812), (390, 844), (1280, 800)]:
-                    await page.set_viewport_size({'width': width, 'height': height})
-                    path = output / f'mode-choice-{period}-{width}.png'
-                    gaps = await capture(page, path)
-                    report['frames'].append({'path': str(path), 'gaps': gaps})
-                    assert not gaps['issues'], gaps
-            assert not writes, writes
-            report['no_room_writes_before_choice'] = True
+            await page.get_by_text('Ночной город').first.wait_for()
+            await page.wait_for_timeout(1500)
+            assert await page.get_by_role('button', name='Недельное расследование', exact=True).count() == 0
+            report['room_link_without_mode_choice'] = True
             assert not report['audio_requests'], report['audio_requests']
             assert not report['errors'], report['errors']
             report['passed'] = True

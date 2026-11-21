@@ -31,11 +31,11 @@ async def smoke(output):
                     await page.goto(ORIGIN + '/app')
                     await page.get_by_role('button', name='Продолжить как гость', exact=True).click()
                     await page.get_by_role('button', name='Открыть дело', exact=True).click()
-                    await page.get_by_label('Название комнаты', exact=True).wait_for()
+                    await page.get_by_label('Название компании', exact=True).wait_for()
                 report['steps'].append('two_new_guests_by_visible_guest_onboarding_and_open_case')
                 host, joiner = pages
                 title = 'UI invite smoke ' + uuid4().hex[:8]
-                await host.get_by_label('Название комнаты', exact=True).fill(title)
+                await host.get_by_label('Название компании', exact=True).fill(title)
                 async with host.expect_response(lambda r: urlsplit(r.url).path == '/api/guest/rooms' and r.request.method == 'POST') as pending:
                     await host.get_by_role('button', name='Создать', exact=True).click()
                 response = await pending.value; assert response.ok, (response.status, await response.text())
@@ -57,7 +57,7 @@ async def smoke(output):
                 await host.screenshot(path=str(path), full_page=True); report['frames'].append(str(path))
                 await joiner.get_by_label('Код или ссылка приглашения', exact=True).fill(short)
                 async with joiner.expect_response(lambda r: urlsplit(r.url).path == '/api/guest/rooms/join' and r.request.method == 'POST') as pending:
-                    await joiner.get_by_role('button', name='Войти в комнату', exact=True).click()
+                    await joiner.get_by_role('button', name='Войти', exact=True).click()
                 response = await pending.value; assert response.ok, (response.status, await response.text())
                 assert (await response.json())['id'] == room['id']
                 async with joiner.expect_response(lambda r: urlsplit(r.url).path == f'/api/night-case/games/{game}/join' and r.request.method == 'POST') as pending:

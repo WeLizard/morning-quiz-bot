@@ -179,6 +179,21 @@ def test_admin_section_says_off_and_hides_routes_without_narrator():
     asyncio.run(run())
 
 
+def test_admin_section_answers_through_the_dev_container_port_mapping(monkeypatch):
+    # In the dev stack the admin's peer is the Docker bridge, not 127.0.0.1.
+    async def run():
+        app = admin_app(make_night_ai_admin_router(env={}))
+        bridge = httpx.ASGITransport(app=app, client=('172.23.0.1', 40000))
+        async with httpx.AsyncClient(transport=bridge, base_url='http://127.0.0.1') as client:
+            assert (await client.get('/api/admin/night-case/ai/catalog')).status_code == 403
+            monkeypatch.setattr('web.admin_auth.in_dev_container', lambda: True)
+            catalog = await client.get('/api/admin/night-case/ai/catalog')
+            assert catalog.status_code == 200 and catalog.json() == {'enabled': False}
+        async with httpx.AsyncClient(transport=bridge, base_url='http://admin.lan') as client:
+            assert (await client.get('/api/admin/night-case/ai/catalog')).status_code == 403
+    asyncio.run(run())
+
+
 def test_admin_catalog_comes_from_operator_manifest(tmp_path):
     async def run():
         wiring = load_night_ai_wiring(env_for(manifest(tmp_path / 'm.json')))

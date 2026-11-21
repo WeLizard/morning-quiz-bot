@@ -131,6 +131,19 @@ def test_remote_http_is_rejected_and_request_size_and_content_type_are_bounded()
     asyncio.run(run())
 
 
+def test_plain_http_from_the_docker_bridge_passes_only_inside_the_dev_container(monkeypatch):
+    async def run():
+        app = application(AdminAuth(TOKEN, hosts=["admin.lan", "127.0.0.1"]))
+        bridge = httpx.ASGITransport(app, client=("172.23.0.1", 40000))
+        async with httpx.AsyncClient(transport=bridge, base_url="http://127.0.0.1") as client:
+            assert (await client.get("/login")).status_code == 403
+            monkeypatch.setattr("web.admin_auth.in_dev_container", lambda: True)
+            assert (await client.get("/login")).status_code == 200
+        async with httpx.AsyncClient(transport=bridge, base_url="http://admin.lan") as client:
+            assert (await client.get("/login")).status_code == 403
+    asyncio.run(run())
+
+
 def test_admin_password_setup_disables_bootstrap_token_and_survives_restart(tmp_path):
     async def run():
         path = tmp_path / 'credentials.json'

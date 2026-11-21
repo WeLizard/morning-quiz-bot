@@ -155,6 +155,26 @@ class AdminAuth:
         return False
 
 
+LOCAL_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def in_dev_container():
+    return os.getenv('MQB_DEV_CONTAINER') == '1' and Path('/.dockerenv').is_file()
+
+
+def plain_http_allowed(request):
+    """Plain HTTP reaches the admin only on a local hostname: from loopback, or through the
+    loopback port mapping of the local dev container (its peer is the Docker bridge)."""
+    if request.url.hostname not in LOCAL_HOSTNAMES:
+        return False
+    try:
+        if ipaddress.ip_address(request.client.host).is_loopback:
+            return True
+    except (ValueError, AttributeError):
+        pass
+    return in_dev_container()
+
+
 class AdminAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, *, auth):
         super().__init__(app)
@@ -164,14 +184,7 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         auth = self.auth
         if request.url.hostname not in auth.hosts:
             return JSONResponse({"detail": "Недопустимый адрес админки"}, status_code=400)
-        try:
-            loopback = ipaddress.ip_address(request.client.host).is_loopback
-        except (ValueError, AttributeError):
-            loopback = False
-        container_proxy = (os.getenv('MQB_DEV_CONTAINER') == '1' and Path('/.dockerenv').is_file()
-                           and request.url.hostname in {"localhost", "127.0.0.1", "::1"})
-        if request.url.scheme != "https" and not ((loopback or container_proxy)
-                                                   and request.url.hostname in {"localhost", "127.0.0.1", "::1"}):
+        if request.url.scheme != "https" and not plain_http_allowed(request):
             return JSONResponse({"detail": "Вне loopback админка требует HTTPS"}, status_code=403)
         origin = request.headers.get("origin")
         expected_origin = f"{request.url.scheme}://{request.url.netloc}"

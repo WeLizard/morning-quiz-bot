@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 
 from application.night_case_ai import AdminPrincipal, NightAIControlError
+from web.admin_auth import plain_http_allowed
 from web.night_case_ai_routes import (_error, _integer, _invalid, _reply,
                                       _text, _uuid, bounded_json)
 
@@ -43,9 +44,8 @@ def make_night_case_ai_admin_router(*, service_factory=None, views_factory=None,
         session=getattr(request.state,'admin_session',None)
         if auth is None or session is None or not getattr(auth,'configured',False):
             raise HTTPException(401,'Authentication required')
-        if request.url.scheme!='https' and (request.client is None or
-                request.client.host not in {'127.0.0.1','::1'} or
-                request.url.hostname not in {'127.0.0.1','localhost','::1'}):
+        # Same rule as AdminAuthMiddleware, kept here in case the router is mounted without it.
+        if request.url.scheme!='https' and not plain_http_allowed(request):
             raise HTTPException(403,'Forbidden')
         if auth.get_session(request) is not session:
             raise HTTPException(401,'Authentication required')

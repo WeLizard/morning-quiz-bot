@@ -58,7 +58,7 @@ class ManorAssetExportTests(unittest.TestCase):
         ], cwd=ROOT, env=env, check=True, capture_output=True, text=True)
         subprocess.run([
             sys.executable, '-I', str(BUILDER), '--immutable-only',
-            '--assets-out', str(cls.out), '--immutable-out', str(cls.packs),
+            '--assets-out', str(cls.out), '--immutable-out', str(cls.packs), '--sealed-out', str(cls.sealed),
             '--report-out', str(cls.report_path), '--compare-assets', str(cls.out / 'assets'),
         ], cwd=ROOT, env=env, check=True, capture_output=True, text=True)
         cls.manifest = json.loads((cls.out / 'assets.json').read_text(encoding='utf-8'))
@@ -133,7 +133,17 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(len(finales), 3)
         sealed = self.report['sealed']
         self.assertEqual(set(sealed), set(finales))
-        self.assertEqual({path.name for path in self.sealed.iterdir()}, {digest + '.webp' for digest in sealed.values()})
+        manifest_sha, case_hash = self.report['immutable_manifest_sha256'], self.report['case_canonical_sha256']
+        self.assertEqual({path.name for path in self.sealed.iterdir()}, {digest + '.webp' for digest in sealed.values()}
+                         | {f'case-{case_hash}.json', f'pack-{manifest_sha}-case-{case_hash}.json'})
+        # The game finds the pack and the finales itself, from the published index.
+        from application import night_art
+        meta = json.loads(CASE.read_text(encoding='utf-8'))['meta']
+        self.assertEqual(night_art.binding_for_case(meta, case_hash, self.sealed),
+                         {'schema': 'night-art-binding/1', 'world': 'manor_lake', 'style_pack': meta['style_pack'],
+                          'manifest_sha256': manifest_sha})
+        self.assertEqual(night_art.sealed_pictures(manifest_sha, case_hash, self.sealed), sealed)
+        self.assertEqual(night_art.sealed_pictures(manifest_sha, 'f' * 64, self.sealed), {})
         for row in self.report['sealed_assets']:
             path = self.sealed / (row['export_sha256'] + '.webp')
             self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), sealed[row['asset_id']])
@@ -217,7 +227,7 @@ class ManorAssetExportTests(unittest.TestCase):
         env['TEMP'] = env['TMP'] = r'F:\Temp'
         result = subprocess.run([
             sys.executable, '-I', str(BUILDER), '--immutable-only',
-            '--assets-out', str(self.out), '--immutable-out', str(self.packs),
+            '--assets-out', str(self.out), '--immutable-out', str(self.packs), '--sealed-out', str(self.sealed),
             '--report-out', str(self.report_path), '--compare-assets', str(self.out / 'assets'),
         ], cwd=ROOT, env=env, check=True, capture_output=True, text=True)
         self.assertIn('reused', result.stdout)
@@ -231,7 +241,7 @@ class ManorAssetExportTests(unittest.TestCase):
         foreign_file.write_bytes(b'foreign owner data')
         result = subprocess.run([
             sys.executable, '-I', str(BUILDER), '--immutable-only',
-            '--assets-out', str(self.out), '--immutable-out', str(fake_root),
+            '--assets-out', str(self.out), '--immutable-out', str(fake_root), '--sealed-out', str(self.sealed),
             '--report-out', str(self.report_path),
         ], cwd=ROOT, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
@@ -254,7 +264,7 @@ class ManorAssetExportTests(unittest.TestCase):
             packs = Path(self.temp.name) / f'bad-packs-{index}'
             result = subprocess.run([
                 sys.executable, '-I', str(BUILDER), '--immutable-only',
-                '--assets-out', str(variant_out), '--immutable-out', str(packs),
+                '--assets-out', str(variant_out), '--immutable-out', str(packs), '--sealed-out', str(self.sealed),
                 '--report-out', str(self.report_path),
             ], cwd=ROOT, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)

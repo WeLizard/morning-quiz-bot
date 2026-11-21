@@ -28,6 +28,7 @@ from domain.night_case_projection import CommandIntent, available_actions, proje
 from domain.night_case_state import (KernelState, PlayerActor, SystemActor, RulesSnapshot,
     decode_state, encode_state, engine_build_for, event_scope, parse_command, rules_snapshot)
 from domain.frozen_json import freeze, thaw
+from application import night_art
 from domain.night_case_v2_format import CompiledCase, compile_v2, load_v2
 from domain.night_case_narrative import (ActionContext, ActionProposal, confirm_action, propose_action)
 from storage.admin_actions import operation_fence
@@ -256,28 +257,14 @@ def _art_binding(report, metadata):
     if art is None:
         if 'art' in report: raise NightCaseError('invalid_art_binding',422)
         return None
-    if (type(art) is not dict or set(art)-{'sealed'}!={'schema','world','style_pack','manifest_sha256'}
+    if (type(art) is not dict or set(art)!={'schema','world','style_pack','manifest_sha256'}
             or art['schema']!='night-art-binding/1' or art['world']!=metadata.get('world')
             or art['style_pack']!=metadata.get('style_pack')
             or any(type(art[k]) is not str or re.fullmatch('[a-z][a-z0-9_]{1,63}',art[k]) is None for k in ('world','style_pack'))
             or type(art['manifest_sha256']) is not str or re.fullmatch('[0-9a-f]{64}',art['manifest_sha256']) is None):
         raise NightCaseError('invalid_art_binding',422)
-    _sealed_binding(art)
     return {'manifest_sha256':art['manifest_sha256'],
             'manifest_url':'/app/night/packs/'+art['manifest_sha256']+'/assets.json'}
-
-
-def _sealed_binding(art):
-    """Pictures kept out of the public pack until the game ends: {asset_id: sha256 of the WebP}.
-
-    The address is the file's own hash, so it cannot be guessed from anything players see
-    before the final; the server serves /app/night/sealed/<sha256>.webp only for matching bytes."""
-    sealed=(art or {}).get('sealed',{})
-    if (type(sealed) is not dict or len(sealed)>64
-            or any(type(k) is not str or re.fullmatch('[a-z][a-z0-9_]{1,95}',k) is None
-                   or type(v) is not str or re.fullmatch('[0-9a-f]{64}',v) is None for k,v in sealed.items())):
-        raise NightCaseError('invalid_art_binding',422)
-    return dict(sealed)
 
 
 def _reveal_finale(own,sealed):
@@ -386,9 +373,12 @@ class NightCaseApplicationService:
         if registered is None or registered.content_hash!=sealed.content_hash: raise NightCaseError('game_quarantined',503)
         try:
             binding=_art_binding(registered.validation_report,case.readonly()['meta'])
-            if not with_sealed: return binding
-            return binding,_sealed_binding(registered.validation_report.get('art'))
         except NightCaseError as exc: raise NightCaseError('game_quarantined',503) from exc
+        if not with_sealed: return binding
+        # Pictures withheld until the final (per-variant finales) belong to the bound pack;
+        # the game finds them itself from the pack index the asset builder published.
+        sealed_map=night_art.sealed_pictures(binding['manifest_sha256'],sealed.content_hash) if binding else {}
+        return binding,sealed_map
 
     async def _runtime(self,locked):
         case,rules=await self._load_case(locked.sealed)
@@ -456,6 +446,11 @@ class NightCaseApplicationService:
         if not isinstance(operator,OperatorPrincipal) or not isinstance(operator.operator_id,str) or not 1<=len(operator.operator_id)<=119: raise NightCaseError('operator_required',403)
         if operator.account_id is not None: await self._principal(operator.account_id)
         original=load_v2(canonical_json(content)); case=compile_v2(original)
+        requested=validation_report
+        if type(validation_report) is dict and 'art' not in validation_report:
+            # No hand-made binding: the case binds to the pack built for its exact content hash.
+            found=night_art.binding_for_case(case.document()['meta'],case.content_hash)
+            if found is not None: validation_report={**validation_report,'art':found}
         _art_binding(validation_report,case.document()['meta'])
         ref=FrozenCaseRef(case.case_id,case.case_version,case.content_hash)
         build=engine_build_for(case.document()['ruleset_ref'])
@@ -464,7 +459,12 @@ class NightCaseApplicationService:
         if admission=='rehearsal' and ref not in self.registry.allowed_cases: raise NightCaseError('case_unavailable')
         existing=await self.repo.get_case(ref.case_id,ref.case_version)
         if existing:
-            if existing.content_hash!=ref.content_hash or canonical_json(existing.validation_report)!=canonical_json(validation_report):
+            # A repeat registration without art keeps whatever pack the first one found.
+            stored=existing.validation_report
+            if requested is not validation_report and type(stored) is dict:
+                stored={k:v for k,v in stored.items() if k!='art'}
+                validation_report=requested
+            if existing.content_hash!=ref.content_hash or canonical_json(stored)!=canonical_json(validation_report):
                 raise NightCaseError('command_conflict')
             return ref
         report=copy.deepcopy(validation_report)

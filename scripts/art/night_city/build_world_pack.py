@@ -516,8 +516,8 @@ def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEA
     The public manifest contains only art.asset_id and art.alt from the authored case.
     Source paths and hashes go to the optional private report, never to assets.json.
     Per-variant finales would spoil the answer, so they stay out of the public folder and
-    manifest: each goes to sealed_out as <sha256>.webp, and the {asset_id: sha256} map
-    (the 'sealed' part of the case's art binding) goes to the private report only.
+    manifest: each goes to sealed_out as <sha256>.webp, and the {asset_id: sha256} map goes
+    to the private report; --immutable-only then writes it into the pack index.
     """
     case_path = ROOT / 'content/night_city/manor_lake.case.json'
     case_bytes = case_path.read_bytes()
@@ -692,7 +692,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEA
     (out_dir / 'assets.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f"manor_lake assets: {len(case_chars)} characters, {look_count} looks, {len(case_places) * len(TIMES)} place variants, {scene_count} scenes, "
           f"{len(item_paths)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
-    print(f"sealed finales (art binding 'sealed'): {json.dumps(sealed, sort_keys=True)}")
+    print(f"sealed finales: {json.dumps(sealed, sort_keys=True)}")
     if report_out:
         report = {
             'schema': 'nc-assets-build-report/1', 'world': 'manor_lake',
@@ -791,7 +791,34 @@ def verify_immutable_pack(directory, manifest_bytes, files):
             raise SystemExit(f'content-addressed file differs; refusing overwrite: {directory / rel}')
 
 
-def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_assets=None):
+def write_pack_index(sealed_dir, *, world, style_pack, case_hash, manifest_sha, sealed):
+    """The server's own way to find art, so nothing is pinned by hand.
+
+    sealed/pack-<manifest_sha>-case-<case_hash>.json
+                                 the sealed pictures {asset_id: sha256} of this pack for this case;
+                                 kept forever, games bound to an older pack still find their finales
+    sealed/case-<case_hash>.json the pack a newly registered case binds to (the latest publish)
+    Neither is served: from sealed/ only <sha256>.webp with matching bytes is.
+    """
+    sealed_dir = Path(sealed_dir)
+    sealed_dir.mkdir(parents=True, exist_ok=True)
+    for asset_id, digest in sealed.items():
+        path = sealed_dir / f'{digest}.webp'
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise SystemExit(f'sealed picture is missing or differs: {asset_id}')
+    index = {'schema': 'nc-pack-index/1', 'world': world, 'style_pack': style_pack, 'case_content_hash': case_hash,
+             'manifest_sha256': manifest_sha, 'sealed': dict(sorted(sealed.items()))}
+    target = sealed_dir / f'pack-{manifest_sha}-case-{case_hash}.json'
+    if target.exists() and target.read_bytes() != canonical_json_bytes(index):
+        raise SystemExit(f'pack index differs; refusing overwrite: {target}')
+    target.write_bytes(canonical_json_bytes(index))
+    pointer = {'schema': 'nc-case-art/1', 'world': world, 'style_pack': style_pack, 'case_content_hash': case_hash,
+               'manifest_sha256': manifest_sha}
+    (sealed_dir / f'case-{case_hash}.json').write_bytes(canonical_json_bytes(pointer))
+    return index
+
+
+def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_assets=None, sealed_out=SEALED_DIR):
     """Publish immutable nc-assets/2 from existing WebPs. Does not re-encode or edit nc-assets/1."""
     assets_out, packs_root, report_path = Path(assets_out), Path(packs_root), Path(report_out)
     resolved_report = report_path.resolve()
@@ -897,6 +924,12 @@ def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_a
         verify_immutable_pack(destination, manifest_bytes, files)
         action = 'published'
 
+    sealed = report.get('sealed')
+    if not isinstance(sealed, dict) or len(sealed) != MANOR_SEALED:
+        raise SystemExit(f'private report must list {MANOR_SEALED} sealed finale pictures; rebuild with --assets-only')
+    case_meta = json.loads((ROOT / 'content/night_city/manor_lake.case.json').read_text(encoding='utf-8'))['meta']
+    write_pack_index(sealed_out, world='manor_lake', style_pack=case_meta['style_pack'], case_hash=case_hash,
+                     manifest_sha=manifest_sha, sealed=sealed)
     report.update({
         'case_canonical_sha256': case_hash,
         'immutable_manifest_sha256': manifest_sha,
@@ -974,7 +1007,7 @@ def main():
             parser.error('--immutable-only is standalone; do not combine it with other build options')
         if not args.report_out:
             parser.error('--report-out is required with --immutable-only')
-        publish_immutable_manor_assets(args.assets_out, args.immutable_out, args.report_out, args.compare_assets)
+        publish_immutable_manor_assets(args.assets_out, args.immutable_out, args.report_out, args.compare_assets, args.sealed_out)
         return
     if args.assets_only:
         if args.worlds or args.all or args.inventory or args.places:

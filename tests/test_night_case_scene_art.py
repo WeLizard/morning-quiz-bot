@@ -4,7 +4,11 @@ import json
 import unittest
 from pathlib import Path
 
-from application.night_case import NightCaseError, _art_binding, _reveal_finale, _sealed_binding
+import hashlib
+import tempfile
+
+from application import night_art
+from application.night_case import NightCaseError, _art_binding, _reveal_finale
 from domain.night_case_projection import project
 from domain.night_case_simulation import DEFAULT_START, SearchBudget, _Runner
 from domain.night_case_state import PlayerActor, rules_snapshot
@@ -103,20 +107,32 @@ class SealedFinaleBindingTests(unittest.TestCase):
     META = {'world': 'manor_lake', 'style_pack': 'noir_print_a'}
     BASE = {'schema': 'night-art-binding/1', 'world': 'manor_lake', 'style_pack': 'noir_print_a', 'manifest_sha256': 'a' * 64}
 
-    def test_sealed_map_is_optional_strict_and_never_public(self):
-        self.assertEqual(_sealed_binding(self.BASE), {})
-        sealed = {'manor_scene_variant_b': 'b' * 64}
-        report = {'art': {**self.BASE, 'sealed': sealed}}
-        public = _art_binding(report, self.META)
+    def test_binding_has_no_hand_made_sealed_map(self):
+        public = _art_binding({'art': self.BASE}, self.META)
         self.assertEqual(set(public), {'manifest_sha256', 'manifest_url'})
-        self.assertNotIn('b' * 64, json.dumps(public))
-        self.assertEqual(_sealed_binding(report['art']), sealed)
-        for bad in ([], {'manor_scene_variant_b': 'B' * 64}, {'Bad': 'b' * 64}, {'manor_scene_variant_b': 'b' * 63},
-                    {f'manor_scene_{i}': 'b' * 64 for i in range(65)}):
-            with self.assertRaises(NightCaseError):
-                _art_binding({'art': {**self.BASE, 'sealed': bad}}, self.META)
         with self.assertRaises(NightCaseError):
-            _art_binding({'art': {**self.BASE, 'extra': {}}}, self.META)
+            _art_binding({'art': {**self.BASE, 'sealed': {'manor_scene_variant_b': 'b' * 64}}}, self.META)
+
+    def test_game_finds_pack_and_sealed_pictures_by_itself(self):
+        case_hash, manifest = 'c' * 64, 'a' * 64
+        with tempfile.TemporaryDirectory(dir=r'F:\Temp') as raw:
+            root = Path(raw)
+            self.assertIsNone(night_art.binding_for_case(self.META, case_hash, root))
+            payload = b'finale'
+            digest = hashlib.sha256(payload).hexdigest()
+            (root / f'{digest}.webp').write_bytes(payload)
+            (root / f'case-{case_hash}.json').write_text(json.dumps({'schema': 'nc-case-art/1', 'world': 'manor_lake',
+                'style_pack': 'noir_print_a', 'case_content_hash': case_hash, 'manifest_sha256': manifest}))
+            (root / f'pack-{manifest}-case-{case_hash}.json').write_text(json.dumps({'schema': 'nc-pack-index/1',
+                'world': 'manor_lake', 'style_pack': 'noir_print_a', 'case_content_hash': case_hash, 'manifest_sha256': manifest,
+                'sealed': {'manor_scene_variant_b': digest, 'manor_scene_variant_c': 'd' * 64}}))
+            self.assertEqual(night_art.binding_for_case(self.META, case_hash, root), self.BASE)
+            self.assertIsNone(night_art.binding_for_case({**self.META, 'world': 'other'}, case_hash, root))
+            self.assertIsNone(night_art.binding_for_case(self.META, 'e' * 64, root))
+            # Only pictures whose bytes are on disk under their own hash are revealed.
+            self.assertEqual(night_art.sealed_pictures(manifest, case_hash, root), {'manor_scene_variant_b': digest})
+            self.assertEqual(night_art.sealed_pictures(manifest, 'e' * 64, root), {})
+            self.assertEqual(night_art.sealed_pictures('../x', case_hash, root), {})
 
     def test_only_a_revealed_postmortem_gets_the_sealed_address(self):
         sealed = {'manor_scene_variant_b': 'b' * 64}

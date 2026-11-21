@@ -164,6 +164,48 @@ class RecoveryPostgresTests(unittest.IsolatedAsyncioTestCase):
         other,*_=await self.running()
         self.assertFalse((await self.availability(other)).delayed)
 
+    async def test_registration_finds_the_built_pack_and_its_sealed_pictures_itself(self):
+        from application import night_art
+        from application.night_case import FrozenCaseRef
+        from domain.night_case_format import canonical_content_hash
+        document=copy.deepcopy(self.doc); document['meta']['id']='auto_'+uuid4().hex[:24]
+        document['meta']['world']='manor_lake'; document['meta']['style_pack']='noir_print_a'; document['meta']['crime_type']='missing'
+        content_hash=canonical_content_hash(document)
+        ref=FrozenCaseRef(document['meta']['id'],document['meta']['version'],content_hash)
+        self.registry=NightCaseRegistry(frozenset({ref}),self.registry.allowed_timezones,self.registry.cursor_secret)
+        temporary=TemporaryDirectory(prefix='mqb-art-auto-',dir=r'F:\Temp'); self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name); manifest='a'*64; payload=b'sealed finale'; digest=hashlib.sha256(payload).hexdigest()
+        (root/f'{digest}.webp').write_bytes(payload)
+        (root/f'case-{content_hash}.json').write_text(json.dumps({'schema':'nc-case-art/1','world':'manor_lake',
+            'style_pack':'noir_print_a','case_content_hash':content_hash,'manifest_sha256':manifest}))
+        (root/f'pack-{manifest}-case-{content_hash}.json').write_text(json.dumps({'schema':'nc-pack-index/1','world':'manor_lake',
+            'style_pack':'noir_print_a','case_content_hash':content_hash,'manifest_sha256':manifest,'sealed':{'manor_scene_variant_a':digest}}))
+        original=night_art.SEALED_DIR; night_art.SEALED_DIR=root
+        self.addCleanup(setattr,night_art,'SEALED_DIR',original)
+        report={'scope':'synthetic_fixture'}  # no hand-made art binding
+        async with self.db.transaction() as session:
+            await self.service(session).register_case(operator=self.operator,content=document,validation_report=report,admission='rehearsal')
+        async with self.db.transaction() as session:
+            stored=(await session.get(NightCase,(ref.case_id,ref.case_version))).validation_report
+        self.assertEqual(stored['art'],{'schema':'night-art-binding/1','world':'manor_lake','style_pack':'noir_print_a','manifest_sha256':manifest})
+        # A later rebuild moves the pointer; a repeat registration neither conflicts nor rebinds.
+        (root/f'case-{content_hash}.json').write_text(json.dumps({'schema':'nc-case-art/1','world':'manor_lake',
+            'style_pack':'noir_print_a','case_content_hash':content_hash,'manifest_sha256':'b'*64}))
+        async with self.db.transaction() as session:
+            await self.service(session).register_case(operator=self.operator,content=document,validation_report=report,admission='rehearsal')
+            self.assertEqual((await session.get(NightCase,(ref.case_id,ref.case_version))).validation_report['art']['manifest_sha256'],manifest)
+        self.ref=ref
+        game,*_=await self.running()
+        async with self.db.transaction() as session:
+            service=self.service(session)
+            view=await service.get_view(account_id=self.owner,game_id=game)
+            locked=await service.repo.lock_game(game,shared=True)
+            case,_=await service._load_case(locked.sealed)
+            binding,sealed=await service._art(locked.sealed,case,with_sealed=True)
+        self.assertEqual(view['public']['art']['manifest_sha256'],manifest)
+        self.assertNotIn(digest,json.dumps(view))  # a running game never sees a sealed address
+        self.assertEqual(sealed,{'manor_scene_variant_a':digest})
+
     async def test_art_binding_is_immutable_and_room_theme_does_not_rebind_history(self):
         from application.night_case import FrozenCaseRef
         from domain.night_case_format import canonical_content_hash
@@ -187,8 +229,7 @@ class RecoveryPostgresTests(unittest.IsolatedAsyncioTestCase):
         (manifest.parent/'assets/fixture.txt').write_bytes(fixture_bytes)
         manifest.write_bytes(original_bytes)
         self.assertEqual(hashlib.sha256(original_bytes).hexdigest(),digest)
-        report={'scope':'synthetic_fixture','art':{'schema':'night-art-binding/1','world':'manor_lake','style_pack':'noir_print_a','manifest_sha256':digest,
-            'sealed':{'fixture_finale':'c'*64}}}
+        report={'scope':'synthetic_fixture','art':{'schema':'night-art-binding/1','world':'manor_lake','style_pack':'noir_print_a','manifest_sha256':digest}}
         async with self.db.transaction() as session:
             await self.service(session).register_case(operator=self.operator,content=document,validation_report=report,admission='rehearsal')
         self.ref=ref
@@ -197,7 +238,6 @@ class RecoveryPostgresTests(unittest.IsolatedAsyncioTestCase):
             first=await self.service(session).get_view(account_id=self.owner,game_id=game)
             room=await session.get(Room,self.room); room.world='other-world'
         self.assertEqual(first['public']['art'],{'manifest_sha256':digest,'manifest_url':'/app/night/packs/'+digest+'/assets.json'})
-        self.assertNotIn('c'*64,json.dumps(first))  # sealed pictures never reach a running game's view
         async with self.db.transaction() as session:
             second=await self.service(session).get_view(account_id=self.owner,game_id=game)
             self.assertEqual(first['public']['art'],second['public']['art'])

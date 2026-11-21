@@ -21,10 +21,6 @@ sys.path.insert(0, str(ROOT))
 DB_NAME = 'morning_quiz_night_browser'
 CASE_PATH = ROOT / 'content/night_city/manor_lake.case.json'
 ART_HASH = '701d7ecb7ab415b04dc05b095391a8f644ccfc6560d2c17c49956db5d9c1facd'
-# Per-variant finales withheld from the pack until the final (build report 'sealed').
-SEALED_ART = {'manor_scene_variant_a': 'f648a983a622cb099f3bd70623d2d2a39dbbda139ad5dfedf4102d05f295ff15',
-              'manor_scene_variant_b': '444e7345bb8de7e4dac3c8afef05768d6803baaccd81951451b88d016dd3adec',
-              'manor_scene_variant_c': 'f5f35241bd342944e2b2f8768792ea66aad2c345b938450a7a529afb258123ad'}
 
 
 class FixtureClock:
@@ -131,8 +127,10 @@ async def setup():
             from storage.models import NightCase
             from domain.night_case_v2_format import compile_v2, load_v2
             compiled = compile_v2(load_v2(CASE_PATH.read_bytes()))
-            art = {'schema': 'night-art-binding/1', 'world': document['meta']['world'],
-                   'style_pack': document['meta']['style_pack'], 'manifest_sha256': ART_HASH, 'sealed': SEALED_ART}
+            from application.night_art import binding_for_case
+            art = binding_for_case(document['meta'], compiled.content_hash)  # what registration itself finds
+            if art is None or art['manifest_sha256'] != ART_HASH:
+                raise RuntimeError(f'built pack for the case is {art and art["manifest_sha256"]}, expected {ART_HASH}')
             report = {'scope': 'owned-browser-fixture', 'art': art, 'pure_reports': reports,
                       'browser': 'not_checked', 'production': 'not_authorized'}
             existing = await session.get(NightCase, (compiled.case_id, compiled.case_version))

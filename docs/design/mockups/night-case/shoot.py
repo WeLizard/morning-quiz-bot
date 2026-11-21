@@ -20,10 +20,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import serve  # noqa: E402
 
-SCREENS = ['01_case', '02a_lobby', '02b_look', '03_role', '04_place', '05_dossier', '06_board', '07_chat', '08_history', '09_hearing', '10_final']
-LABELS = {'01_case': '1 Дело недели', '02a_lobby': '2a Сбор · выбор героя', '02b_look': '2b Облик героя', '03_role': '3 Твоя роль',
-          '04_place': '4 Место', '05_dossier': '5 Досье', '06_board': '6 Улики', '07_chat': '7 Беседа', '08_history': '8 Хроника',
-          '09_hearing': '9 Итоговое слушание', '10_final': '10 Дело закрыто'}
+SCREENS = ['01_root', '02_worlds', '03_case', '04_lobby', '05_pick', '06_role', '07_place', '08_talk', '09_feed', '10_board', '11_dossier', '12_hearing', '13_final_hearing', '14_final']
+LABELS = {'01_root': '1 Ночной город', '02_worlds': '2 Новое дело · миры', '03_case': '3 Дело мира', '04_lobby': '4 Сбор',
+          '05_pick': '5 Выбор персонажа', '06_role': '6 Твоя роль', '07_place': '7 Место', '08_talk': '8 Разговор',
+          '09_feed': '9 Гостиная у камина', '10_board': '10 Улики', '11_dossier': '11 Досье', '12_hearing': '12 Слушание',
+          '13_final_hearing': '13 Итоговое слушание', '14_final': '14 Дело закрыто'}
 VIEWPORTS = {
     'tg390': dict(w=390, h=700, q='', full=True),
     'web360': dict(w=360, h=780, q='', full=False),

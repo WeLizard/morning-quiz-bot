@@ -11,9 +11,6 @@
 .ncase-face.xs{width:32px;height:32px}
 .ncase-face.sm{width:36px;height:36px}
 .ncase-face.lg{width:76px;height:76px;box-shadow:0 0 0 2px var(--nc-edge),0 0 0 5px rgb(var(--nc-page-rgb)/.9),0 0 0 6px var(--nc-edge-soft)}
-.ncase-faces{display:flex;align-items:center;margin-top:var(--qw-s-2);padding-left:6px}
-.ncase-faces .ncase-face{margin-left:-6px}
-.ncase-more{margin-left:6px;font:700 var(--qw-fs-caption)/1 var(--qw-font);color:var(--qw-game-muted)}
 
 /* ---------- section tabs: icon over label, no bottom bar (game mode) ---------- */
 .ncase-nav{position:sticky;top:calc(var(--qw-header-h) + var(--qw-safe-top));z-index:28;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
@@ -30,10 +27,6 @@
 /* ---------- 01 case of the week ---------- */
 .ncase-facts{display:flex;flex-wrap:wrap;gap:var(--qw-s-2);margin-top:var(--qw-s-3)}
 .ncase-facts .nc-tag{background:rgb(var(--nc-page-rgb)/.72);color:var(--qw-game-text);border-color:var(--nc-edge-soft)}
-.ncase-case{display:grid;grid-template-columns:88px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
-.ncase-case-back{width:88px;aspect-ratio:2/3;border-radius:8px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge),0 10px 24px rgb(0 0 0/.5)}
-.ncase-case strong{display:block;margin-top:2px;font:750 var(--qw-fs-h3)/1.2 var(--qw-font)}
-.ncase-case .nc-muted{display:block;margin-top:4px}
 .ncase-how{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--qw-s-3)}
 .ncase-how li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
 .ncase-how img{width:64px;height:64px;border-radius:10px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
@@ -135,22 +128,14 @@
 .ncase-secret{display:grid;grid-template-columns:72px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
 .ncase-secret img{width:72px;height:96px;border-radius:8px;object-fit:cover;filter:saturate(.8);box-shadow:0 0 0 1px var(--nc-edge-soft)}
 .ncase-secret p{font-size:var(--qw-fs-body);line-height:1.45}
-.ncase-shelf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--qw-s-3)}
-.ncase-mini{margin:0;text-align:center}
-.ncase-mini .nc-evidence-art{display:block}
-.ncase-mini figcaption{margin-top:4px;font-size:var(--qw-fs-caption);line-height:1.3;color:var(--qw-game-muted)}
 
 /* ---------- 06 board: evidence cards on the kit's frame_evidence ---------- */
 .ncase-evi{padding-top:var(--qw-s-3);border-top:1px solid var(--nc-rule)}
 .nc-head+.ncase-evi,.nc-head+.nc-muted+.ncase-evi{border-top:0}
 .ncase-evi.claim-card .nc-evidence-art{opacity:.8}
-.ncase-evi-act{justify-content:flex-start;margin-top:var(--qw-s-2)}
 .ncase-draft{width:100%;box-sizing:border-box;min-height:88px;padding:10px 12px;border-radius:var(--qw-r-control);border:1px solid var(--nc-field-line);font:inherit;resize:vertical}
 
 /* ---------- 07 chat: hero portraits beside the bubbles ---------- */
-.ncase-channels{max-width:440px;width:100%}
-.ncase-channels>button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
-.ncase-channels .ic{--s:20px;color:inherit}
 .ncase-chatmain .nc-msg .ncase-face{margin-top:2px}
 .ncase-compose .nc-field{width:100%;box-sizing:border-box;padding:12px;border-radius:var(--qw-r-control);border:1px solid var(--nc-field-line);font:inherit}
 .nc-main.has-dock.ncase-chatmain{padding-bottom:calc(var(--nc-dock-h) + var(--qw-safe-bottom) + var(--qw-s-4))}
@@ -203,6 +188,96 @@
 .ncase-cast .ncase-fac{grid-area:s;justify-self:start}
 .ncase-cast .nc-tag{grid-area:r}
 
+/* ---------- the player plate (§3.4): the hero first, the player small beside ---------- */
+.ncase-who{display:inline-flex;flex-wrap:wrap;align-items:center;gap:3px 6px;min-width:0}
+.ncase-who .nm{font:700 var(--qw-fs-small)/1.25 var(--qw-font);color:var(--qw-game-text)}
+.ncase-tag{display:inline-block;padding:0 7px;border-radius:var(--qw-r-pill);border:1px solid var(--nc-edge-soft);background:rgb(var(--nc-page-rgb)/.6);
+  font:650 12px/18px var(--qw-font);color:var(--qw-game-muted);white-space:nowrap}
+.ncase-tag.me{border-color:var(--nc-accent);color:var(--nc-accent-text)}
+.ncase-tag.game{border-style:dashed}
+.nc-msg .ncase-who{margin-bottom:2px}
+.nc-msg .ncase-who .nm{font-size:var(--qw-fs-caption);color:var(--nc-gold-text)}
+.ncase-person .ncase-tag{margin-top:3px}
+.ncase-suspect .ncase-tag{align-self:flex-start;margin:3px 8px 0}
+.ncase-left{justify-content:flex-start}
+
+/* ---------- 01 root ---------- */
+.ncase-mycase{display:grid;grid-template-columns:76px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
+.ncase-mycase .art{position:relative;width:64px}
+.ncase-mycase .cover{width:64px;aspect-ratio:2/3;border-radius:6px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge)}
+.ncase-mycase .ncase-face{position:absolute;right:-14px;bottom:-8px}
+.ncase-mycase strong{display:block;font:750 var(--qw-fs-h3)/1.2 var(--qw-font)}
+.ncase-mycase .nc-muted{display:block;margin-top:2px}
+.ncase-news{display:flex;align-items:flex-start;gap:6px;margin-top:6px;font:650 var(--qw-fs-small)/1.35 var(--qw-font);color:var(--nc-accent-text)}
+.ncase-news .ic{--s:18px;margin-top:1px}
+.ncase-rows li{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:var(--qw-s-3);align-items:center}
+.ncase-rows .thumb{width:44px;height:60px;border-radius:6px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
+
+/* ---------- 02 worlds: the kit's .nc-world tiles; a world without a case is dimmed ---------- */
+.ncase-worlds .nc-world{--w-accent:var(--nc-edge)}
+.ncase-worlds .nc-world.soon img{filter:grayscale(.65) brightness(.5)}
+.ncase-worlds .w-cases{display:block;margin-top:4px;font:700 var(--qw-fs-caption)/1.2 var(--qw-font);color:var(--nc-accent-text)}
+.ncase-worlds .soon .w-cases{color:var(--qw-game-muted);font-weight:600}
+.ncase-worlds .tick{box-sizing:border-box;padding:5px;border-radius:50%;background:var(--nc-accent);color:var(--nc-accent-ink);box-shadow:0 0 0 2px var(--nc-page)}
+.ncase-worlds .tick svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- 03 case card: the cast ---------- */
+.ncase-castgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:var(--qw-s-3) var(--qw-s-2)}
+.ncase-castgrid li{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;text-align:center}
+.ncase-castgrid .ncase-face{width:56px;height:56px}
+.ncase-castgrid .nm{font:650 var(--qw-fs-caption)/1.25 var(--qw-font);overflow-wrap:anywhere}
+.ncase-never{display:flex;flex-wrap:wrap;align-items:center;gap:var(--qw-s-2) var(--qw-s-3);padding-top:var(--qw-s-3);border-top:1px solid var(--nc-rule)}
+.ncase-never .faces{display:flex;padding-left:6px}
+.ncase-never .faces .ncase-face{margin-left:-6px;filter:grayscale(.5) brightness(.8)}
+.ncase-never .nc-muted{flex:1 1 200px}
+
+/* ---------- 07 place: the action points and the narrator line in the scene ---------- */
+.ncase-hero-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--qw-s-2) var(--qw-s-4);margin-top:var(--qw-s-3)}
+.ncase-hero-row .ncase-ap{margin-top:0}
+.ncase-narr{display:inline-flex;align-items:center;gap:6px;padding:2px 10px 2px 6px;border-radius:var(--qw-r-pill);border:1px solid var(--nc-edge-soft);
+  background:rgb(var(--nc-page-rgb)/.75);font:650 var(--qw-fs-caption)/1.4 var(--qw-font);color:var(--qw-game-text)}
+.ncase-narr .ic{--s:18px}
+
+/* ---------- 08 talk ---------- */
+.ncase-npc{display:grid;grid-template-columns:104px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
+.ncase-npc .portrait{width:104px;aspect-ratio:3/4;border-radius:10px;object-fit:cover;object-position:50% 8%;
+  box-shadow:0 0 0 1px var(--nc-edge),0 0 0 4px rgb(var(--nc-page-rgb)/.9),0 0 0 5px var(--nc-edge-soft)}
+.ncase-npc .ncase-who{margin-top:4px}
+.ncase-npc .ncase-who .nm{font:800 var(--qw-fs-h2)/1.15 var(--qw-font)}
+.ncase-npc .nc-muted{margin-top:6px}
+:root.nc .nc-msg .ncase-npc-say{background:var(--nc-tint);border-color:var(--nc-edge)}
+.ncase-acts.one{grid-template-columns:minmax(0,1fr)}
+
+/* ---------- 09 feed «Гостиная у камина» ---------- */
+.ncase-week .ncase-track{margin-top:2px}
+.ncase-feed{gap:var(--qw-s-3)}
+.ncase-report{display:grid;grid-template-columns:80px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;padding:var(--qw-s-3);border-radius:14px;border:1px solid var(--nc-edge);background:var(--nc-tint)}
+.ncase-report img{width:80px;height:106px;border-radius:8px;object-fit:cover}
+.ncase-report p{margin-top:4px;font-size:var(--qw-fs-body);line-height:1.45}
+.ncase-pub{display:grid;grid-template-columns:52px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;padding:8px 10px;border-radius:12px;border:1px dashed var(--nc-edge-soft)}
+.ncase-pub img{width:52px;height:52px;object-fit:contain;padding:4px;box-sizing:border-box;border-radius:8px;background:var(--nc-surface-2)}
+.ncase-pub .nc-muted{display:block}
+.ncase-pub strong{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.ncase-hearing-note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--qw-s-2) var(--qw-s-3);align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--nc-shadow);background:rgb(var(--nc-page-rgb)/.6)}
+.ncase-hearing-note .faces{display:flex;align-items:center;gap:4px}
+.ncase-hearing-note .faces .ic{--s:20px}
+.ncase-hearing-note strong{display:block;font:700 var(--qw-fs-small)/1.3 var(--qw-font)}
+.ncase-hearing-note .nc-muted{display:block}
+.ncase-hearing-note .qw-btn{grid-column:1/-1;justify-self:start}
+
+/* ---------- 11 dossier: a note (whisper) ---------- */
+.ncase-note{padding:12px 14px;border-radius:4px 14px 14px 14px;background:linear-gradient(180deg,rgb(42 36 24),rgb(31 26 18));border:1px solid var(--nc-edge-soft);box-shadow:0 6px 14px rgb(0 0 0/.35)}
+.ncase-note .from{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.ncase-note p{margin-top:8px;font-size:var(--qw-fs-body);line-height:1.45}
+
+/* ---------- 12 hearing: accuser and accused ---------- */
+.ncase-accuse{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:var(--qw-s-2);text-align:center}
+.ncase-accuse figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.ncase-accuse figcaption{display:flex;flex-direction:column;align-items:center;gap:2px}
+.ncase-accuse .ncase-who{justify-content:center}
+.ncase-accuse .ic.mid{--s:32px}
+.ncase-cast .ncase-who .nm{font-size:var(--qw-fs-body)}
+
 /* ===== contrast mode (UI_RULES §16): solid plates, 2 px outlines ===== */
 :root.nc[data-qw-contrast="1"] :is(.ncase-hero,.ncase-look,.ncase-suspect,.ncase-act,.ncase-cite,.ncase-go){border-width:2px}
 :root.nc[data-qw-contrast="1"] :is(.ncase-hero,.ncase-look,.ncase-suspect,.ncase-act,.ncase-cite)[aria-pressed="true"]{border-width:3px;box-shadow:none}
@@ -216,3 +291,5 @@
 :root.nc[data-qw-contrast="1"] .ncase-rolecard .face::after{background:linear-gradient(180deg,transparent 45%,var(--nc-page) 72%)}
 :root.nc[data-qw-contrast="1"] :is(.ncase-track i){outline:1px solid var(--qw-game-line)}
 :root.nc[data-qw-contrast="1"] .ncase-cite.claim{border-style:dashed}
+:root.nc[data-qw-contrast="1"] :is(.ncase-tag,.ncase-narr){background:var(--nc-page);border-width:2px}
+:root.nc[data-qw-contrast="1"] :is(.ncase-note,.ncase-report,.ncase-hearing-note,.ncase-pub){border-width:2px;background:var(--nc-surface)}

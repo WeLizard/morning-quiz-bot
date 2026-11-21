@@ -116,6 +116,7 @@ class CommandReceipt:
 class SealedGame:
     game: Game
     sealed: NightGameSealed
+    shared: bool = False  # read without FOR UPDATE: writes through it are refused
 
 
 class NightCaseRepository:
@@ -145,14 +146,37 @@ class NightCaseRepository:
     async def get_case(self, case_id: str, version: int) -> NightCase | None:
         return await self.session.get(NightCase, (case_id, version))
 
-    async def lock_game(self, game_id: str) -> SealedGame | None:
-        game = (await self.session.execute(select(Game).where(Game.id == game_id).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+    async def case_pin(self, case_id: str, version: int):
+        """``(content_hash, validation_report)`` of a registered case without its content.
+
+        Plain columns, not an entity, so no partially loaded NightCase enters the
+        identity map. Content of a row is immutable (``night_history_immutable``).
+        """
+        return (await self.session.execute(select(NightCase.content_hash, NightCase.validation_report).where(
+            NightCase.case_id == case_id, NightCase.version == version))).one_or_none()
+
+    async def lock_game(self, game_id: str, *, shared: bool = False, snapshot: bool = False) -> SealedGame | None:
+        """Read the Game and sealed rows, locking them until the end of the transaction.
+
+        Default ``FOR UPDATE`` is for writers. ``shared=True`` takes ``FOR SHARE``:
+        it still excludes every writer for the whole transaction, but readers of
+        one game no longer queue behind each other. ``snapshot=True`` takes no row
+        lock at all; only for callers whose result is a function of the sealed row
+        plus immutable or append-only rows (see ``get_view``). Shared and snapshot
+        results refuse every write through them.
+        """
+        def statement(model, column):
+            query = select(model).where(column == game_id)
+            if not snapshot:
+                query = query.with_for_update(read=shared)
+            return query.execution_options(populate_existing=True)
+        game = (await self.session.execute(statement(Game, Game.id))).scalar_one_or_none()
         if game is None or game.mode != 'night_case':
             return None
-        sealed = (await self.session.execute(select(NightGameSealed).where(NightGameSealed.game_id == game_id).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+        sealed = (await self.session.execute(statement(NightGameSealed, NightGameSealed.game_id))).scalar_one_or_none()
         if sealed is None:
             raise NightStorageCorruption('night_sealed_missing')
-        return SealedGame(game, sealed)
+        return SealedGame(game, sealed, shared or snapshot)
 
     async def create_sealed(self, row: NightGameSealed) -> NightGameSealed:
         if json_hash(row.rules) != row.rules_hash:
@@ -168,6 +192,8 @@ class NightCaseRepository:
         canonical_json(kernel, max_bytes=MAX_KERNEL_BYTES)
         canonical_json(lobby, max_bytes=MAX_RECORD_BYTES)
         canonical_json(interruption, max_bytes=MAX_RECORD_BYTES)
+        if locked.shared:
+            raise NightStorageCorruption('night_shared_lock_write')
         if locked.sealed.storage_revision != expected_storage_revision:
             raise NightStorageConflict('night_storage_revision')
         if len(snapshot_hash) != 64:
@@ -181,6 +207,8 @@ class NightCaseRepository:
 
     async def sync_public(self, locked: SealedGame, *, projection: dict[str, Any],
                           phase: str, public_revision: int) -> bool:
+        if locked.shared:
+            raise NightStorageCorruption('night_shared_lock_write')
         row, sealed = locked.game, locked.sealed
         envelope = public_envelope({'id': sealed.case_id, 'version': sealed.version, 'hash': sealed.content_hash}, sealed.lifecycle, projection)
         changed = canonical_json(row.state) != canonical_json(envelope)

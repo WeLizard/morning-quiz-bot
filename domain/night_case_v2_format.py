@@ -5,7 +5,7 @@ Compilation is a structural/content gate, not publication or a V4 witness.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import copy
 import json
 from pathlib import Path
@@ -13,6 +13,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from domain.frozen_json import freeze as _freeze
 from domain.night_case_format import (
     CaseFormatError, ValidationIssue, canonical_content_hash, load_case_bytes,
 )
@@ -73,10 +74,23 @@ class CompiledCase:
     case_version: int
     content_hash: str
     compiler_version: str = COMPILER_VERSION
+    _readonly: Any = field(default=None, init=False, repr=False, compare=False)
 
     def document(self) -> dict[str, Any]:
         """Return a fresh copy; no mutable alias reaches the compiled snapshot."""
         return json.loads(self._json)
+
+    def readonly(self) -> dict[str, Any]:
+        """The parsed case, shared and deeply frozen (parsed once per instance).
+
+        For hot read paths that only look at the case. Any mutation raises
+        ``TypeError``; ``copy.deepcopy`` of any part returns plain dicts/lists.
+        """
+        cached = self._readonly
+        if cached is None:
+            cached = _freeze(json.loads(self._json))
+            object.__setattr__(self, "_readonly", cached)
+        return cached
 
 
 def _exact_numbers(value: Any, schema: dict[str, Any], defs: dict[str, Any], pointer: str = "") -> None:

@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from domain.frozen_json import FrozenDict
+
 ID = re.compile(r"[a-z][a-z0-9_]{1,31}\Z", re.ASCII)
 HASH = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 UTC_STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z\Z", re.ASCII)
@@ -318,6 +320,8 @@ MODULE_PLAYER_PARAMS = {"archive_request": {"query_id"}, "version_mark": {"versi
 
 
 def engine_build_for(ruleset_ref):
+    if type(ruleset_ref) is FrozenDict:  # read-only parsed case (CompiledCase.readonly)
+        ruleset_ref = dict(ruleset_ref)
     ref = _obj(ruleset_ref, {"id", "version"}, "ruleset_ref")
     _int(ref["version"], "ruleset version", 1, 2)
     if ref["id"] != "night_case.core":
@@ -802,7 +806,14 @@ def _validate_modules(doc, case_doc, modules, streams, all_event_by_id):
             raise ValueError("archive knowledge has no retained grant")
 
 
+def _case_doc(case):
+    """Read-only parsed case when the case offers one (CompiledCase), else a fresh copy."""
+    readonly = getattr(case, "readonly", None)
+    return readonly() if readonly is not None else case.document()
+
+
 def _validate_state(doc, case, rules):
+    # A fresh mutable copy: validators below check exact plain types of case data.
     case_doc = case.document()
     personal = "personal_tasks" in case_doc
     fields = {"state_schema", "game_id", "case_ref", "ruleset_ref", "rules", "rules_hash", "compiler_version", "engine_build", "sealed", "clock", "players", "npcs", "public", "knowledge", "private_events", "dialogue_cursors", "action_uses", "event_uses", "hearing", "final_ballots", "receipts", "idle_windows", "final"}
@@ -1279,7 +1290,7 @@ def _validate_state(doc, case, rules):
 
 
 class KernelState(_Snapshot):
-    __slots__ = ("_max_bytes", "_max_nodes")
+    __slots__ = ("_max_bytes", "_max_nodes", "_validated")
 
     def __init__(self, document, *, ruleset_version=1):
         _int(ruleset_version, "snapshot ruleset version", 1, 2)
@@ -1287,6 +1298,18 @@ class KernelState(_Snapshot):
         object.__setattr__(self, "_max_bytes", max_bytes)
         object.__setattr__(self, "_max_nodes", max_nodes)
         object.__setattr__(self, "_bytes", _json_bytes(document, max_bytes=max_bytes, max_nodes=max_nodes))
+        # (case, rules) this exact snapshot was produced by from_document for;
+        # a plainly constructed snapshot is never treated as validated.
+        object.__setattr__(self, "_validated", None)
+
+    def validated_for(self, case, rules):
+        """This snapshot if from_document already produced it for an equal case and rules,
+        else a freshly validated one. from_document is deterministic and idempotent on
+        its own output, so the result is identical to from_document(self.document(), ...)."""
+        seen = self._validated
+        if seen is not None and (seen[0] is case or seen[0] == case) and (seen[1] is rules or seen[1] == rules):
+            return self
+        return KernelState.from_document(self.document(), case, rules)
 
     def document(self):
         return _load(self._bytes, max_bytes=self._max_bytes, max_nodes=self._max_nodes)
@@ -1316,7 +1339,9 @@ class KernelState(_Snapshot):
         if "npc_delivery" in doc:
             doc["npc_delivery"]["lines"].sort(key=lambda r: (r["npc"], r["topic"], r["window_idx"]))
             doc["npc_delivery"]["decisions"].sort(key=lambda r: (r["scope"]["npc_id"], r["scope"]["topic_id"], r["scope"]["window_idx"], r["rule_version"]))
-        return cls(doc, ruleset_version=case.document()["ruleset_ref"]["version"])
+        state = cls(doc, ruleset_version=_case_doc(case)["ruleset_ref"]["version"])
+        object.__setattr__(state, "_validated", (case, rules))
+        return state
 
 
 def encode_state(state: KernelState) -> bytes:
@@ -1326,7 +1351,7 @@ def encode_state(state: KernelState) -> bytes:
 
 
 def decode_state(raw: bytes, case, rules) -> KernelState:
-    ref = case.document()["ruleset_ref"]
+    ref = _case_doc(case)["ruleset_ref"]
     engine_build_for(ref)
     limits = {"max_bytes": 16 * 1024 * 1024, "max_nodes": 500000} if ref["version"] == 2 else {}
     return KernelState.from_document(_load(raw, **limits), case, rules)

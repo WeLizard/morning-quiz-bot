@@ -27,6 +27,7 @@ from domain.night_case_engine import Transition, start, step
 from domain.night_case_projection import CommandIntent, available_actions, project, quote_action
 from domain.night_case_state import (KernelState, PlayerActor, SystemActor, RulesSnapshot,
     decode_state, encode_state, engine_build_for, event_scope, parse_command, rules_snapshot)
+from domain.frozen_json import freeze, thaw
 from domain.night_case_v2_format import CompiledCase, compile_v2, load_v2
 from domain.night_case_narrative import (ActionContext, ActionProposal, confirm_action, propose_action)
 from storage.admin_actions import operation_fence
@@ -175,6 +176,36 @@ def _compile(content_bytes: bytes) -> CompiledCase:
     return compile_v2(load_v2(content_bytes))
 
 
+# (case_id, version, content_hash) -> CompiledCase whose stored content was
+# re-hashed once in this process. night_cases content is immutable in SQL and
+# night_game_sealed pins exactly this triple, so later reads only confirm the pin.
+_VERIFIED_CASES: dict[tuple[str,int,str],CompiledCase]={}
+_VERIFIED_CASES_MAX=32
+
+
+# Pure-function caches for the read path. Keys carry every input: the exact
+# case (content hash + compiler), rules hash, kernel hash and viewer.
+# KernelState is immutable; projections are stored frozen and every caller gets
+# its own plain copy, so no caller can see another's mutations.
+_STATES: dict[tuple,KernelState]={}
+_PROJECTIONS: dict[tuple,dict]={}
+
+
+def _remember(cache,key,value,limit):
+    if len(cache)>=limit: cache.pop(next(iter(cache)))
+    cache[key]=value
+    return value
+
+
+def _projection(case,rules,state,viewer_id=None):
+    key=(case.content_hash,case.compiler_version,rules.rules_hash,
+        hashlib.sha256(encode_state(state)).hexdigest(),viewer_id)
+    frozen=_PROJECTIONS.get(key)
+    if frozen is None:
+        frozen=_remember(_PROJECTIONS,key,freeze(project(case,rules,state,None if viewer_id is None else PlayerActor(viewer_id))),256)
+    return thaw(frozen)
+
+
 async def historical_aliases(session: AsyncSession, account_id: UUID) -> frozenset[UUID]:
     """Only a matching AccountMerge audit AND immutable merged_into edge prove ancestry."""
     found, frontier = {account_id}, {account_id}
@@ -236,11 +267,11 @@ def _art_binding(report, metadata):
 
 
 def _public(case, rules, state, art=None):
-    raw=project(case,rules,state)
+    raw=_projection(case,rules,state)
     allowed=('game_id','case_id','flags','locks','observations','board','chronicle','players','npcs','hearing','final','locations','modules','looks')
     result={k:raw[k] for k in allowed if k in raw}
     result['clock']={k:raw['clock'][k] for k in ('timezone','window_idx','window_seq','phase','opened_at','closes_at','freeze_at','forget_at')}
-    meta=case.document()['meta']  # a fresh parse of the whole case; once is enough
+    meta=case.readonly()['meta']
     result['world']=copy.deepcopy(meta.get('world'))
     result['style_pack']=copy.deepcopy(meta.get('style_pack'))
     result['crime_type']=copy.deepcopy(meta.get('crime_type'))
@@ -265,7 +296,7 @@ def _menu(entries,case=None):
         if 'quote' in row:
             row['quote']['params']=json.loads(row['quote']['params'])
             if case is not None and row['quote']['kind']=='talk':
-                content=case.document()
+                content=case.readonly()
                 dialogue=next(d for d in content['dialogues'] if d['id']==row['quote']['params']['dialogue_id'])
                 title=next(c['title'] for c in content['characters'] if c['id']==dialogue['character'])
                 row['npc_title']=title
@@ -300,12 +331,26 @@ class NightCaseApplicationService:
         return row
 
     async def _load_case(self,sealed):
-        row=await self.repo.get_case(sealed.case_id,sealed.version)
-        if row is None or json_hash(row.content)!=row.content_hash or row.content_hash!=sealed.content_hash:
-            raise NightCaseError('game_quarantined',503)
+        key=(sealed.case_id,sealed.version,sealed.content_hash)
+        case=_VERIFIED_CASES.get(key)
+        if case is not None:
+            pin=await self.repo.case_pin(sealed.case_id,sealed.version)
+            if pin is None or pin.content_hash!=sealed.content_hash: raise NightCaseError('game_quarantined',503)
+        else:
+            row=await self.repo.get_case(sealed.case_id,sealed.version)
+            if row is None or row.content_hash!=sealed.content_hash:
+                raise NightCaseError('game_quarantined',503)
+            try:
+                content=canonical_json(row.content)  # json_hash(row.content) is sha256 of exactly these bytes
+                if hashlib.sha256(content).hexdigest()!=row.content_hash: raise ValueError('night_content_hash')
+                case=_compile(content)
+            except (ValueError, KeyError) as exc:
+                raise NightCaseError('game_quarantined',503) from exc
+            if (case.case_id,case.case_version,case.content_hash)!=key: raise NightCaseError('game_quarantined',503)
+            if len(_VERIFIED_CASES)>=_VERIFIED_CASES_MAX: _VERIFIED_CASES.pop(next(iter(_VERIFIED_CASES)))
+            _VERIFIED_CASES[key]=case
         try:
-            case=_compile(canonical_json(row.content))
-            build=engine_build_for(case.document()['ruleset_ref'])
+            build=engine_build_for(case.readonly()['ruleset_ref'])
             rules=RulesSnapshot.from_document(sealed.rules)
         except (ValueError, KeyError) as exc:
             raise NightCaseError('game_quarantined',503) from exc
@@ -315,8 +360,9 @@ class NightCaseApplicationService:
         return case,rules
 
     async def _art(self,sealed,case):
-        registered=await self.repo.get_case(sealed.case_id,sealed.version)
-        try: return _art_binding(registered.validation_report,case.document()['meta'])
+        registered=await self.repo.case_pin(sealed.case_id,sealed.version)
+        if registered is None or registered.content_hash!=sealed.content_hash: raise NightCaseError('game_quarantined',503)
+        try: return _art_binding(registered.validation_report,case.readonly()['meta'])
         except NightCaseError as exc: raise NightCaseError('game_quarantined',503) from exc
 
     async def _runtime(self,locked):
@@ -325,8 +371,11 @@ class NightCaseApplicationService:
         if sealed.kernel is None: raise NightCaseError('game_not_started')
         encoded=canonical_json(sealed.kernel,max_bytes=MAX_KERNEL_BYTES)
         if hashlib.sha256(encoded).hexdigest()!=sealed.snapshot_hash: raise NightCaseError('game_quarantined',503)
-        try: state=decode_state(encoded,case,rules)
-        except ValueError as exc: raise NightCaseError('game_quarantined',503) from exc
+        key=(case.content_hash,case.compiler_version,rules.rules_hash,sealed.snapshot_hash)
+        state=_STATES.get(key)
+        if state is None:
+            try: state=_remember(_STATES,key,decode_state(encoded,case,rules),64)
+            except ValueError as exc: raise NightCaseError('game_quarantined',503) from exc
         seats=list((await self.session.scalars(select(GamePlayer).where(GamePlayer.game_id==locked.game.id))).all())
         if {str(s.account_id) for s in seats}!={p['account_id'] for p in state.players}:
             raise NightCaseError('game_quarantined',503)
@@ -339,8 +388,8 @@ class NightCaseApplicationService:
             if (type(lobby) is not dict or set(lobby)!=fields or type(lobby['version']) is not int or lobby['version']!=1
                     or type(lobby['revision']) is not int or lobby['revision']<0 or json_hash(lobby)!=sealed.snapshot_hash
                     or lobby['case_ref']!={'id':sealed.case_id,'version':sealed.version,'hash':sealed.content_hash}
-                    or lobby['rules_hash']!=rules.rules_hash or lobby['title']!=case.document()['meta']['title']
-                    or lobby['allowed_counts']!=[r['players'] for r in case.document()['compositions']]
+                    or lobby['rules_hash']!=rules.rules_hash or lobby['title']!=case.readonly()['meta']['title']
+                    or lobby['allowed_counts']!=[r['players'] for r in case.readonly()['compositions']]
                     or type(lobby['roster']) is not list or not 1<=len(lobby['roster'])<=12):
                 raise ValueError()
             ids,seats,names=set(),set(),set()
@@ -360,9 +409,12 @@ class NightCaseApplicationService:
             raise NightCaseError('game_quarantined',503) from exc
         return copy.deepcopy(lobby)
 
-    async def _access(self,account_id,game_id,*,history=False):
+    async def _access(self,account_id,game_id,*,history=False,shared=False,snapshot=False):
+        # shared=True only for strictly read-only callers (no write anywhere in
+        # the transaction): FOR SHARE still excludes every writer, readers of
+        # one game just stop queueing behind each other.
         account=await self._principal(account_id)
-        locked=await self.repo.lock_game(game_id)
+        locked=await self.repo.lock_game(game_id,shared=shared,snapshot=snapshot)
         if locked is None: raise NightCaseError('unavailable',404)
         aliases=await historical_aliases(self.session,account.id) if history else frozenset({account.id})
         if locked.sealed.lifecycle=='lobby':
@@ -758,7 +810,7 @@ class NightCaseApplicationService:
         if prior: return copy.deepcopy(prior.result)
         if locked.sealed.lifecycle in {'interrupted','stopped','lobby'}: raise NightCaseError('game_interrupted' if locked.sealed.lifecycle=='interrupted' else 'game_not_running')
         case,rules,state=await self._runtime(locked); now=self.clock(); _stamp(now)
-        try: cmd=parse_command(raw,actor,ruleset_version=case.document()['ruleset_ref']['version'])
+        try: cmd=parse_command(raw,actor,ruleset_version=case.readonly()['ruleset_ref']['version'])
         except ValueError as exc: raise NightCaseError('invalid_command',422) from exc
         state=await self._availability(locked,case,rules,state,now,str(account.id))
         transition=step(case,rules,state,actor,cmd,now_utc=now)
@@ -812,14 +864,27 @@ class NightCaseApplicationService:
         return selected
 
     async def get_view(self,*,account_id,game_id,original_account_id=None):
-        account,locked,aliases=await self._access(account_id,game_id,history=True)
+        # Lock-free first: the view is a function of the sealed row plus rows that
+        # every game writer changes together with storage_revision (seats, cutoffs)
+        # or that are immutable (case). ACL rows are read after the sealed row, so
+        # they are never older than the state. If any game write committed while
+        # we read, the revision moved: redo the view under FOR SHARE, which
+        # excludes writers exactly like the old FOR UPDATE did.
+        result,locked=await self._view(account_id,game_id,original_account_id,snapshot=True)
+        revision=await self.session.scalar(select(NightGameSealed.storage_revision).where(NightGameSealed.game_id==game_id))
+        if revision==locked.sealed.storage_revision: return result
+        result,_=await self._view(account_id,game_id,original_account_id,snapshot=False)
+        return result
+
+    async def _view(self,account_id,game_id,original_account_id,*,snapshot):
+        account,locked,aliases=await self._access(account_id,game_id,history=True,snapshot=snapshot,shared=not snapshot)
         selected=self._history_selection(locked,aliases,original_account_id)
         now=self.clock()
         if locked.sealed.lifecycle=='lobby':
             case,rules=await self._load_case(locked.sealed)
             self._checked_lobby(locked.sealed,case,rules)
             return {'game_id':game_id,'mode':'night_case','lobby':self._lobby_view(locked,account.id),
-                'public':{},'self':None,'menu':[],'server_now':_stamp(now),'runtime_status':'ok'}
+                'public':{},'self':None,'menu':[],'server_now':_stamp(now),'runtime_status':'ok'},locked
         case,rules,state=await self._runtime(locked)
         original=selected if selected is not None else account.id if account.id in aliases else sorted(aliases,key=str)[0]
         player=next(p for p in state.players if p['account_id']==str(original))
@@ -831,7 +896,7 @@ class NightCaseApplicationService:
             # The final summary is separately allowed; fresh public state is never mixed in.
             final=None if state.final is None else {k:state.final[k] for k in ('code','at')}
         else:
-            raw=project(case,rules,state,PlayerActor(str(original)))
+            raw=_projection(case,rules,state,str(original))
             view={'public':_public(case,rules,state,await self._art(locked.sealed,case)),'self':raw['self']}
             view['self'].pop('receipts',None)
             titles={cid:look['title'] for cid,look in raw['looks'].items()}
@@ -842,14 +907,14 @@ class NightCaseApplicationService:
         result={'game_id':game_id,'mode':'night_case',**view,'menu':menu,'server_now':_stamp(now),
             'runtime_status':locked.sealed.lifecycle,'final_summary':final}
         if locked.sealed.lifecycle in {'finished','stopped'}:
-            titles={cid:look['title'] for cid,look in project(case,rules,state)['looks'].items()}
+            titles={cid:look['title'] for cid,look in _projection(case,rules,state)['looks'].items()}
             result['history_seats']=[{'original_account_id':p['account_id'],'display_name':p['name'],
                 'role_title':titles[p['character_id']],'status':p['status']} for p in state.players if UUID(p['account_id']) in aliases]
             result['selected_original_account_id']=str(original)
-        return result
+        return result,locked
 
     async def quote(self,*,account_id,game_id,intent: CommandIntent | dict):
-        account,locked,_=await self._access(account_id,game_id)
+        account,locked,_=await self._access(account_id,game_id,shared=True)
         if locked.sealed.lifecycle!='running': raise NightCaseError('game_not_running')
         case,rules,state=await self._runtime(locked)
         try: quote=quote_action(case,rules,state,PlayerActor(str(account.id)),intent,now_utc=self.clock())
@@ -899,14 +964,14 @@ class NightCaseApplicationService:
             'sender_account_id':str(row.sender_account_id),'recipient_account_ids':copy.deepcopy(row.recipients)}
 
     async def get_message(self,*,account_id,game_id,message_id):
-        _,locked,aliases=await self._access(account_id,game_id,history=True)
+        _,locked,aliases=await self._access(account_id,game_id,history=True,shared=True)
         case,rules,state=await self._runtime(locked)
         row=await self.repo.message(game_id,message_id,authorized_aliases=tuple(aliases))
         if row is None or not await self._message_allowed(locked,state,row,aliases): raise NightCaseError('unavailable',404)
         return self._message_dto(row)
 
     async def history(self,*,account_id,game_id,stream,cursor=None,limit=50,original_account_id=None):
-        account,locked,aliases=await self._access(account_id,game_id,history=True)
+        account,locked,aliases=await self._access(account_id,game_id,history=True,shared=True)
         selected=self._history_selection(locked,aliases,original_account_id)
         if selected is not None: aliases=frozenset({selected})
         if stream not in {'public','self','messages'} or type(limit) is not int or not 1<=limit<=50:

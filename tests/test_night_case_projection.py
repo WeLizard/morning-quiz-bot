@@ -241,14 +241,20 @@ class MenuMaterializationTests(unittest.TestCase):
         from tests.test_night_case_engine import personal_setup
         case, rules, t, actors = personal_setup()
         actor = PlayerActor(actors["person_01"])
+        # A snapshot not produced by from_document is validated exactly once per menu;
+        # one already validated for this case and rules is not validated again.
+        plain = KernelState(t.state.document(), ruleset_version=case.document()["ruleset_ref"]["version"])
         with patch.object(KernelState, "from_document", wraps=KernelState.from_document) as validate:
-            menu = available_actions(case, rules, t.state, actor, now_utc=NOW)
+            menu = available_actions(case, rules, plain, actor, now_utc=NOW)
             self.assertEqual(validate.call_count, 1)
+        with patch.object(KernelState, "from_document", wraps=KernelState.from_document) as validate:
+            self.assertEqual(available_actions(case, rules, t.state, actor, now_utc=NOW), menu)
+            self.assertLessEqual(validate.call_count, 1)
         for entry in menu:
             if isinstance(entry, MenuChoice):
                 intent = CommandIntent(entry.quote.kind, json.loads(entry.quote.params))
                 with patch.object(KernelState, "from_document", wraps=KernelState.from_document) as validate:
-                    self.assertEqual(entry.quote, quote_action(case, rules, t.state, actor, intent, now_utc=NOW))
+                    self.assertEqual(entry.quote, quote_action(case, rules, plain, actor, intent, now_utc=NOW))
                     self.assertEqual(validate.call_count, 1)
 
 

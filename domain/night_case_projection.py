@@ -9,7 +9,7 @@ from datetime import datetime
 from .night_case_narrative import LegalAction
 from .night_case_delivery import dialogue_topic, say_audience, sent_count
 from .night_case_personal import story_index, story_predicate, completed_steps, open_offers, original_state, step_visible, work_progress
-from .night_case_state import KernelState, PlayerActor, canonical_hash, parse_command
+from .night_case_state import KernelState, PlayerActor, _case_doc, canonical_hash, parse_command
 from .night_case_text import Renderer, public_look
 from .night_case_time import _parse, _utc
 
@@ -255,9 +255,14 @@ def _revision(doc, player, kind, params, case_doc):
     return canonical_hash(dependencies)
 
 
+def _validated(state, case, rules):
+    if type(state) is KernelState: return state.validated_for(case, rules)
+    return KernelState.from_document(state.document(), case, rules)
+
+
 def quote_action(case, rules, state, actor, intent, *, now_utc):
     if not isinstance(actor, PlayerActor): raise ValueError("not_participant")
-    doc, case_doc = KernelState.from_document(state.document(), case, rules).document(), case.document()
+    doc, case_doc = _validated(state, case, rules).document(), _case_doc(case)
     return _quote_from_documents(rules, doc, case_doc, actor, intent, now_utc=now_utc)
 
 
@@ -280,7 +285,7 @@ def _quote_from_documents(rules, doc, case_doc, actor, intent, *, now_utc):
 
 def available_actions(case, rules, state, viewer, *, now_utc):
     if not isinstance(viewer, PlayerActor): return ()
-    doc, c = KernelState.from_document(state.document(), case, rules).document(), case.document()
+    doc, c = _validated(state, case, rules).document(), _case_doc(case)
     player = _player(doc, viewer)
     if player is None: return ()
     intents = []
@@ -328,7 +333,7 @@ def available_actions(case, rules, state, viewer, *, now_utc):
 
 
 def project(case, rules, state, viewer=None):
-    doc, c = KernelState.from_document(state.document(), case, rules).document(), case.document()
+    doc, c = _validated(state, case, rules).document(), _case_doc(case)
     player = _player(doc, viewer) if isinstance(viewer, PlayerActor) else None
     content_observations = {o["id"]: o for o in c["observations"]}
     def materialized(oid, source):

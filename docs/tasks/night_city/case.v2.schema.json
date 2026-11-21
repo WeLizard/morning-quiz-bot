@@ -174,11 +174,14 @@
             "enum": [
               "version_archive",
               "turning_point",
-              "archive_requests"
+              "archive_requests",
+              "ghost_whisper",
+              "ghost_testimony",
+              "ghost_visions"
             ]
           },
           "minItems": 0,
-          "maxItems": 3,
+          "maxItems": 6,
           "uniqueItems": true
         },
         "difficulty": {
@@ -1584,6 +1587,61 @@
                   }
                 }
               ]
+            }
+          }
+        },
+        "ghost_whisper": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {},
+          "description": "Модуль без настроек (MANOR_MODULES_V2 §9)."
+        },
+        "ghost_testimony": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {},
+          "description": "Модуль без настроек (MANOR_MODULES_V2 §9)."
+        },
+        "ghost_visions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signs"
+          ],
+          "description": "Знаки выбывших; включённый модуль означает, что в деле есть мистика (MANOR_MODULES_V2 §9).",
+          "properties": {
+            "signs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 48,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "character",
+                  "location",
+                  "label",
+                  "body"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "character": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "location": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "label": {
+                    "$ref": "#/$defs/label"
+                  },
+                  "body": {
+                    "$ref": "#/$defs/body"
+                  }
+                }
+              }
             }
           }
         }

@@ -1,6 +1,6 @@
 # Manor: три модуля поверх исполнимого v2
 
-Дата: 2026-11-15. Статус: **контракт на независимом ревью, не реализовано**.
+Дата: 2026-11-15. Статус: реализовано (§1–8); §9 — модули выбывших игроков, добавлены 2026-11-21.
 Это следующий pure-domain срез после A–D; не PG, UI, AI provider или разрешение публикации.
 Канонический Game.mode будущего application adapter — `night_case`, не имя исторического UI.
 Источники: [канон мира](worlds/canon/manor_lake.md), [draft01](drafts/01_manor_lake_missing.md),
@@ -18,7 +18,8 @@
 принимает ровно прежний контракт, `meta.modules=[]`, без новых полей и kinds.
 Новое расширение явно выбирает `ruleset_ref={id:"night_case.core",version:2}`.
 Его `meta.modules` — непустое множество из `version_archive`, `turning_point`,
-`archive_requests`; каждое имя обозначает **версию модуля 1** внутри ruleset/2.
+`archive_requests`, `ghost_whisper`, `ghost_testimony`, `ghost_visions` (три последних — §9);
+каждое имя обозначает **версию модуля 1** внутри ruleset/2.
 Другие имена, лишние настройки и неподдержанный профиль отклоняются, а не игнорируются.
 
 Для ruleset/2 единственное новое поле корня case — `module_data:object`.
@@ -288,7 +289,7 @@ state/case и явно передают его parser-у; quote intent materiali
 Command также перепроверяется для текущего профиля, не обходя /1 gate. Simulation создаёт
 команды через эти же API/step; нигде не выбирает профиль по присланному kind.
 
-Profile/2 имеет максимум 15 Event kinds: 11 core + два archive + version_marked + npc_revealed.
+Profile/2 имеет максимум 20 Event kinds: 11 core + два archive + version_marked + npc_revealed + пять из §9.
 Каждый новый kind принимается codec только при включённом соответствующем модуле.
 Имена protected route/reveal flags уникальны между всеми владельцами; посторонние writers
 запрещены. Reference resolution использует один compiled registry, не догадки по префиксу ID.
@@ -478,3 +479,122 @@ i_S1_01_antique_key, i_S7_06_closed_book, i_C2_05_secret_compartment_book; от�
 
 Порядок: сначала reviewed module fixtures/engine contracts, затем авторский Manor mapping,
 потом полная матрица. PG, UI, рассказчик и первые тесты с людьми — следующие этапы.
+
+## 9. Модули выбывших игроков: `ghost_whisper`, `ghost_testimony`, `ghost_visions`
+
+Зачем: игрок, которого стол по ошибке отстранил на слушании (status `ghost`), остаётся
+в игре и раз в окно влияет на неё (weekly §3.2). До этого среза было только core-действие
+`ghost_share` — опубликовать на доске разрешённое воспоминание. Три модуля добавляют
+остальные действия из §3.2. Старые дела их не включают, их партии не меняются.
+
+Общие правила для всех трёх:
+
+- Действие выбывшего бесплатно и одно на окно: `ghost_share`, `ghost_whisper`,
+  `testimony_answer` и `ghost_sign` вместе записывают `ghost_used_window`. Фазы — те же,
+  что у `ghost_share`: идущее окно investigation или final_hearing.
+- Выбывший не получает новых знаний о мире (как с архивом). Передаёт он только то,
+  что его персонаж уже знал.
+- **Мистика — свойство дела, а не мира.** Включённый `ghost_visions` и означает «в этом деле есть
+  мистика». Тогда экран называет выбывших «призраками». Без него — «отстранёнными»:
+  человек жив, но отстранён от расследования, передаёт записки и отвечает на вопросы.
+  Отдельного флага мистики нет, чтобы два источника не расходились.
+
+### `ghost_whisper`: личная передача воспоминания
+
+`module_data.ghost_whisper = {}` — настроек нет.
+
+Команда `ghost_whisper`, params **ровно** `{observation_id:ID, recipient:CharacterId}`.
+Eligibility: актор — ghost, `ghost_used_window != window_idx`; observation входит
+в `ghost_memories` его персонажа и в **собственное** knowledge актора, но не публична
+(нет в public.observations и на доске — передавать известное всем бессмысленно);
+recipient — персонаж другого человека со status active или fog; этот же observation этому же
+recipient актор ещё не передавал (второй раз — только потраченное окно). Знает ли получатель
+это observation, eligibility не читает: меню выбывшего не раскрывает чужие знания, проверка
+повтора смотрит только собственные `ghost_whispered` актора.
+
+Принятие: `ghost_used_window = window_idx`, отмечается присутствие, actor_seq+1 у отправителя.
+События (обычные envelope core, по одному адресату):
+
+| kind | payload | правила |
+| --- | --- | --- |
+| `ghost_whispered` | `{observation_id:ID, recipient_character:CharacterId}` | Поток отправителя; receipt.result_ref ссылается на него. |
+| `ghost_whisper_received` | `{from_character:CharacterId, observation_id:ID}` | Поток получателя, то же окно. Ровно одна пара на whisper. |
+
+Если получатель ещё не знал observation, следом в его потоке идёт обычный
+`observation_granted` и запись knowledge с source
+`{kind:"ghost", source_id:<event_id ghost_whisper_received>, actor_character:<персонаж отправителя>,
+location:null, window_idx:<окно>}`. Pin сохраняет этот source: на доске видно, что улика
+пришла от выбывшего. Proof остаётся proof — его автор и вариант те же, меняется только путь.
+У получателя не меняются AP, actor_seq и присутствие.
+
+Codec: пары whispered↔received совпадают по окну, observation и персонажам; отправитель
+к тому окну уже ghost (публичный status), observation есть в его ghost_memories и knowledge;
+получатель — другой игрок. Source `kind:"ghost"` допустим только при этом модуле и только
+со ссылкой на received того же потока плюс сохранённый grant с тем же source.
+Self `modules.ghost_whisper = {sent:[{event_id,observation_id,recipient_character,window_idx}],
+received:[{event_id,observation_id,from_character,window_idx}]}`.
+
+### `ghost_testimony`: вопрос «да или нет»
+
+`module_data.ghost_testimony = {}` — настроек нет.
+
+Живой игрок спрашивает выбывшего; тот отвечает «да» или «нет». Вопрос и ответ публичны:
+выбывший влияет на весь стол, а не на одного. Ответ — утверждение, не доказательство:
+он не попадает на доску как proof и не считается ключом. Свободного текста от выбывшего нет,
+поэтому он не может назвать роль или имя (§3.2).
+
+- `testimony_ask`, params **ровно** `{ghost:CharacterId, text:string[1..200]}`. Eligibility:
+  актор active (не fog), phase investigation, окна 1..13, AP≥act_cost; ghost — персонаж
+  другого игрока со status ghost; у этого актора нет открытого вопроса к этому ghost.
+  Стоит act_cost (1 ОД), отмечает присутствие. Событие public
+  `testimony_asked {asker_character, ghost_character, text, answer_by}`, answer_by=window_idx+1.
+  Вопрос открыт, пока нет ответа и текущее окно ≤ answer_by; потом он истёк без ответа,
+  ОД не возвращаются.
+- `testimony_answer`, params **ровно** `{question_event_id:EventId, answer:"yes"|"no"}`.
+  Eligibility: актор — ghost этого вопроса, `ghost_used_window != window_idx`, вопрос открыт.
+  Событие public `testimony_answered {question_event_id, answer}`.
+
+Codec: asker был active, ghost — ghost на момент вопроса; без дублей открытого вопроса той же
+пары; ответ один, не позже answer_by, от ещё не ушедшего ghost; текст 1..200 символов.
+Public `modules.ghost_testimony = {questions:[{question_event_id, asker_character, ghost_character,
+text, window_idx, answer_by, answer:"yes"|"no"|null, status:"open"|"answered"|"expired"}]}`
+в порядке хроники. Текст вопроса — слова игрока, ведущему-ИИ он не передаётся.
+
+### `ghost_visions`: явление (только дела с мистикой)
+
+```text
+module_data.ghost_visions = {
+  signs: [{id:ID, character:CharacterId, location:LocationId, label:Label, body:Body}][1..48]
+}
+```
+
+Character — can_be_player; ID уникальны. Знак — авторская подсказка, а не улика:
+observations он не выдаёт.
+
+Команда `ghost_sign`, params **ровно** `{sign_id:ID}`. Eligibility: актор — ghost,
+`ghost_used_window != window_idx`, знак принадлежит его персонажу и ещё не показан в партии.
+Событие public `ghost_sign {sign_id, character_id, location, body}`; body равен авторскому.
+Codec: знак из каталога, один раз, поля равны авторским, персонаж к тому моменту ghost.
+Public `modules.ghost_visions = {signs:[{event_id, sign_id, character_id, location, window_idx, body}]}`.
+
+### Тесты среза
+
+Модули выключены — команды отклоняются, старые kinds и hashes не меняются. Для каждого модуля:
+eligibility (не ghost, повтор в окне, чужая или публичная память, ушедший получатель, AP,
+окно 14), события и receipt, decode/replay, подмена истории отклоняется codec, меню и quotes
+выбывшего и живого, проекция. Усадьба включает `ghost_whisper` и `ghost_testimony`,
+`ghost_visions` — нет: в этом деле мистики нет. Знаки проверяются отдельной fixture.
+
+### Экран (`web/mini_client/night-case-ui.js`)
+
+- Выбывшему вкладка «Место» вместо ходов и действий показывает панель «Ты отстранён от
+  расследования» (в деле с мистикой — «Ты — призрак дела»): вопросы к нему с кнопками «Да»/«Нет»,
+  карточки воспоминаний с кнопками «На доску» и «Передать лично» и выбором получателя, знаки
+  (только с `ghost_visions`) и список уже переданного. Подтверждение говорит «это твоё
+  единственное действие в этом окне» вместо цены в ОД.
+- Живому вкладка «Улики» показывает панель «Вопросы отстранённым» («Вопросы призракам»):
+  все вопросы с ответом или сроком и форму «Кого спросить» + текст до 200 символов + «Спросить · 1 ОД»;
+  в деле с мистикой ниже — «Явления».
+- Личная находка, полученная шёпотом, подписана «Передано лично: <персонаж> — отстранённый игрок»
+  («— призрак дела»). Чат выбывших называется по делу: «Отстранённые» или «Призраки».
+- Выбор получателя и черновик вопроса переживают перерисовку экрана при опросе, как черновик беседы.

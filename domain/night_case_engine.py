@@ -778,6 +778,22 @@ def _apply_player(doc, c, rules, batch, player, kind, params, target, command_id
             doc["public"]["board"].append(entry)
             event = _event(doc, batch, "board", {"board_id": board_id})
             if "personal_tasks" in c and entry["observation_id"]: publication(c, doc, entry["observation_id"], account, event["event_id"])
+        elif kind == "ghost_whisper":
+            # A removed player passes a remembered observation to one living player (MANOR_MODULES_V2 §9).
+            player["ghost_used_window"] = idx
+            recipient = target["account_id"]
+            result = _event(doc, batch, "ghost_whispered", {"observation_id": params["observation_id"], "recipient_character": target["character_id"]}, account)
+            received = _event(doc, batch, "ghost_whisper_received", {"from_character": player["character_id"], "observation_id": params["observation_id"]}, recipient)
+            _grant(doc, batch, params["observation_id"], recipient, kind="ghost", source_id=received["event_id"], character=player["character_id"], location=None)
+        elif kind == "testimony_ask":
+            player["ap"] -= rules.act_cost
+            _event(doc, batch, "testimony_asked", {"asker_character": player["character_id"], "ghost_character": params["ghost"], "text": params["text"], "answer_by": idx + 1})
+        elif kind == "testimony_answer":
+            player["ghost_used_window"] = idx
+            _event(doc, batch, "testimony_answered", {"question_event_id": params["question_event_id"], "answer": params["answer"]})
+        elif kind == "ghost_sign":
+            player["ghost_used_window"] = idx
+            _event(doc, batch, "ghost_sign", {"sign_id": target["id"], "character_id": target["character"], "location": target["location"], "body": copy.deepcopy(target["body"])})
         elif kind == "forfeit": _depart(doc, c, batch, player)
         else: raise ValueError("unsupported player command")
     if kind not in {"seen", "finish_window"} and player["status"] != "departed": player["finished_window"] = False

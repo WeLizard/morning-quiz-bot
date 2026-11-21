@@ -538,3 +538,64 @@ test('a running game shows the narrator status to everyone, controls only to the
     assert.match(fixture.host.textContent, /Ведущий: авторский текст, ждём ответа администратора/);
     fixture.handle.close();
 });
+
+const pick = (kind, label, params, id) => ({kind: 'choice', label, quote: {kind, params, selection_id: id, cost: 0}});
+function removedView() {
+    const state = view();
+    state.self.account_id = VIEWER; state.self.status = 'ghost'; state.self.ap = 0;
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'ghost'},
+        {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}, {account_id: 'third', character_id: 'cook', name: 'Олег', status: 'active'}];
+    state.self.observations = [{observation_id: 'ledger', kind: 'proof', title: 'Книга ключей', body: {text: 'Запись о ключе'}}];
+    state.public.modules = {ghost_testimony: {questions: [{question_event_id: 'q1', asker_character: 'maid', ghost_character: 'lawyer', text: 'Ключ был у дворецкого?', window_idx: 4, answer_by: 5, answer: null, status: 'open'}]}};
+    state.menu = [pick('ghost_share', 'На доску', {observation_id: 'ledger'}, 'share'),
+        pick('ghost_whisper', 'Передать лично', {observation_id: 'ledger', recipient: 'maid'}, 'to-maid'),
+        pick('ghost_whisper', 'Передать лично', {observation_id: 'ledger', recipient: 'cook'}, 'to-cook'),
+        pick('testimony_answer', 'Ответить «да»', {question_event_id: 'q1', answer: 'yes'}, 'q1-yes'),
+        pick('testimony_answer', 'Ответить «нет»', {question_event_id: 'q1', answer: 'no'}, 'q1-no')];
+    return state;
+}
+
+test('a removed player has one action per window: a memory to the board or to one chosen player, or a yes/no answer', async () => {
+    const fixture = controller(removedView()); await settle();
+    const all = fixture.host.textContent;
+    assert.match(all, /Ты отстранён от расследования/);
+    assert.doesNotMatch(all, /[Пп]ризрак/, 'a case without mysticism never speaks of ghosts');
+    assert.doesNotMatch(all, /Осталось действий/, 'a removed player has one action, not action points');
+    assert.match(all, /Ключ был у дворецкого\?/);
+    assert.equal(find(fixture.host, node => node.tagName === 'button' && node.textContent.includes('Осмотреть стол')), undefined);
+    const to = byLabel(fixture.host, 'Кому передать лично'); to.value = 'cook'; to.events.change();
+    await button(fixture.host, 'Улики').click(); await settle();
+    await button(fixture.host, 'Место').click(); await settle();
+    assert.notEqual(byLabel(fixture.host, 'Кому передать лично'), to, 'the screen was rebuilt');
+    assert.equal(byLabel(fixture.host, 'Кому передать лично').value, 'cook', 'the chosen recipient survives a re-render');
+    await button(fixture.host, 'Передать лично').click(); await settle();
+    assert.equal(fixture.calls.find(row => row.url.endsWith('/intent')).body.selection_id, 'to-cook');
+    assert.match(fixture.host.textContent, /единственное действие в этом окне/);
+    assert.doesNotMatch(fixture.host.textContent, /Стоимость:/);
+    await button(fixture.host, 'Подтвердить').click(); await settle();
+    await button(fixture.host, 'Да').click(); await settle();
+    assert.equal(fixture.calls.filter(row => row.url.endsWith('/intent')).at(-1).body.selection_id, 'q1-yes');
+    fixture.handle.close();
+});
+
+test('a living player asks a removed one from the board for 1 action; a case with mysticism speaks of ghosts and signs', async () => {
+    const state = removedView();
+    state.self = {...state.self, account_id: 'other', character_id: 'maid', status: 'active', ap: 2, observations: []};
+    state.menu = [{kind: 'form', entry_id: 'testimony_ask', label: 'testimony_ask', command_kind: 'testimony_ask', cost: 1, subject_ids: ['lawyer'], board_ids: [], hearing_id: null}];
+    state.public.modules.ghost_visions = {signs: [{event_id: 'e9', sign_id: 'cold', character_id: 'lawyer', location: 'library', window_idx: 4, body: {text: 'В библиотеке гаснет свеча.'}}]};
+    const fixture = controller(state, url => url.endsWith('/quote') ? {} : url.endsWith('/commands') ? {receipt: {accepted: true}} : undefined);
+    await settle();
+    await button(fixture.host, 'Улики').click(); await settle();
+    const all = fixture.host.textContent;
+    assert.match(all, /Вопросы призракам/);
+    assert.match(all, /Библиотека: В библиотеке гаснет свеча\./);
+    assert.match(all, /слова, а не доказательство/);
+    find(fixture.host, node => node.tagName === 'textarea' && node.attrs['aria-label'] === 'Вопрос, на который можно ответить «да» или «нет»').value = '  Вы видели свет в окне?  ';
+    await button(fixture.host, 'Спросить · 1 ОД').click(); await settle();
+    const sent = fixture.calls.find(row => row.url.endsWith('/commands'));
+    assert.equal(sent.body.kind, 'testimony_ask');
+    assert.deepEqual({...sent.body.params}, {ghost: 'lawyer', text: 'Вы видели свет в окне?'});
+    await button(fixture.host, 'Беседа').click(); await settle();
+    assert.match(fixture.host.textContent, /Призраки разговаривают отдельно/);
+    fixture.handle.close();
+});

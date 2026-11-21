@@ -316,7 +316,11 @@ PLAYER_PARAMS = {
     "ghost_share": {"observation_id"}, "forfeit": set(),
 }
 SYSTEM_PARAMS = {"system.tick": {"expected_due_at"}, "system.resume": {"outage_id", "unavailable_from", "resumed_at"}}
-MODULE_PLAYER_PARAMS = {"archive_request": {"query_id"}, "version_mark": {"version_id", "state"}, "story_reply": {"offer_event_id", "accept"}, "say": {"channel", "recipients", "text"}}
+MODULE_PLAYER_PARAMS = {"archive_request": {"query_id"}, "version_mark": {"version_id", "state"}, "story_reply": {"offer_event_id", "accept"}, "say": {"channel", "recipients", "text"},
+                        # Removed-player modules (MANOR_MODULES_V2 §9); each case enables them explicitly.
+                        "ghost_whisper": {"observation_id", "recipient"}, "testimony_ask": {"ghost", "text"},
+                        "testimony_answer": {"question_event_id", "answer"}, "ghost_sign": {"sign_id"}}
+TESTIMONY_TEXT_MAX = 200
 
 
 def engine_build_for(ruleset_ref):
@@ -352,6 +356,12 @@ class Command(_Snapshot):
         for field, value in params.items():
             if field == "citations":
                 _ids(value, field, typed=False, maximum=5)
+            elif field == "text" and doc["kind"] == "testimony_ask":
+                _str(value, field, 1, TESTIMONY_TEXT_MAX)
+            elif field == "answer":
+                _enum(value, {"yes", "no"}, field)
+            elif field == "question_event_id":
+                _str(value, field, 1, 128)
             elif field == "text":
                 _str(value, field, 1, 1200)
             elif field == "choice":
@@ -415,6 +425,12 @@ def _event(value, *, private, modules=(), personal=False):
         public_kinds.add("version_marked")
     if "turning_point" in modules:
         public_kinds.add("npc_revealed")
+    if "ghost_whisper" in modules:
+        private_kinds |= {"ghost_whispered", "ghost_whisper_received"}
+    if "ghost_testimony" in modules:
+        public_kinds |= {"testimony_asked", "testimony_answered"}
+    if "ghost_visions" in modules:
+        public_kinds.add("ghost_sign")
     if personal:
         private_kinds |= {"story_result", "story_offer", "story_return_closed", "story_epilogue"}
         public_kinds.add("authored_card_delivered")
@@ -456,6 +472,11 @@ def _event(value, *, private, modules=(), personal=False):
         "story_return_closed": {"offer_event_id", "decision"},
         "story_epilogue": {"trip_id", "body"},
         "authored_card_delivered": {"observation_id", "body"},
+        "ghost_whispered": {"observation_id", "recipient_character"},
+        "ghost_whisper_received": {"from_character", "observation_id"},
+        "testimony_asked": {"asker_character", "ghost_character", "text", "answer_by"},
+        "testimony_answered": {"question_event_id", "answer"},
+        "ghost_sign": {"sign_id", "character_id", "location", "body"},
     }
     _obj(payload, shapes[kind], f"{kind} payload")
     if kind == "window":
@@ -552,6 +573,26 @@ def _event(value, *, private, modules=(), personal=False):
     elif kind == "npc_revealed":
         _id(payload["character_id"], "character_id")
         _id(payload["location"], "location")
+    elif kind == "ghost_whispered":
+        _id(payload["observation_id"], "observation_id")
+        _id(payload["recipient_character"], "recipient_character")
+    elif kind == "ghost_whisper_received":
+        _id(payload["from_character"], "from_character")
+        _id(payload["observation_id"], "observation_id")
+    elif kind == "testimony_asked":
+        _id(payload["asker_character"], "asker_character")
+        _id(payload["ghost_character"], "ghost_character")
+        _str(payload["text"], "testimony text", 1, TESTIMONY_TEXT_MAX)
+        _int(payload["answer_by"], "answer_by", 2, 14)
+        if payload["answer_by"] != row["window_idx"] + 1:
+            raise ValueError("testimony answer window mismatch")
+    elif kind == "testimony_answered":
+        _str(payload["question_event_id"], "question_event_id", 1, 128)
+        _enum(payload["answer"], {"yes", "no"}, "testimony answer")
+    elif kind == "ghost_sign":
+        for field in ("sign_id", "character_id", "location"):
+            _id(payload[field], field)
+        _body(payload["body"])
     else:
         if not payload["flags"] and not payload["locks"]:
             raise ValueError("empty world change")
@@ -685,6 +726,15 @@ def _validate_modules(doc, case_doc, modules, streams, all_event_by_id):
     def scene_predicates_feasible(predicates, event, *, allow_current_world=False):
         return True in predicate_values(predicates, event, frozenset(), allow_current_world)
 
+    # Removed-player modules (MANOR_MODULES_V2 §9): one free ghost action per window across kinds.
+    characters = {c["id"]: c for c in case_doc["characters"]}
+    signs = {s["id"]: s for s in modules.get("ghost_visions", {}).get("signs", [])}
+    ghost_modules = {"ghost_whisper", "ghost_testimony", "ghost_visions"} & set(modules)
+    questions, answered, shown_signs, ghost_actions = {}, set(), set(), {}
+
+    def ghost_act(character, window):
+        ghost_actions[(character, window)] = ghost_actions.get((character, window), 0) + 1
+
     for event in chronicle:
         payload, kind, window = event["payload"], event["kind"], event["window_idx"]
         if kind == "status" and payload["character_id"] in controller_status:
@@ -693,6 +743,29 @@ def _validate_modules(doc, case_doc, modules, streams, all_event_by_id):
             entry = board[payload["board_id"]]
             if entry["observation_id"] is not None:
                 published.add(entry["observation_id"])
+            owner = players.get(entry["owner_account_id"])
+            if owner is not None and controller_status.get(owner["character_id"]) == "ghost":
+                ghost_act(owner["character_id"], window)  # ghost_share
+        elif kind == "testimony_asked":
+            asker, ghost = payload["asker_character"], payload["ghost_character"]
+            if asker == ghost or controller_status.get(asker) != "active" or controller_status.get(ghost) != "ghost" or window > 13:
+                raise ValueError("testimony question actors or window")
+            if any(q["payload"]["asker_character"] == asker and q["payload"]["ghost_character"] == ghost and qid not in answered and window <= q["payload"]["answer_by"] for qid, q in questions.items()):
+                raise ValueError("testimony question repeated while open")
+            questions[event["event_id"]] = event
+        elif kind == "testimony_answered":
+            question = questions.get(payload["question_event_id"])
+            if question is None or payload["question_event_id"] in answered or window > question["payload"]["answer_by"] or controller_status.get(question["payload"]["ghost_character"]) != "ghost":
+                raise ValueError("testimony answer reference, repeat, window or actor")
+            answered.add(payload["question_event_id"])
+            ghost_act(question["payload"]["ghost_character"], window)
+        elif kind == "ghost_sign":
+            sign = signs.get(payload["sign_id"])
+            authored = None if sign is None else {"sign_id": sign["id"], "character_id": sign["character"], "location": sign["location"], "body": sign["body"]}
+            if sign is None or sign["id"] in shown_signs or payload != authored or controller_status.get(sign["character"]) != "ghost":
+                raise ValueError("ghost sign reference, repeat, content or actor")
+            shown_signs.add(sign["id"])
+            ghost_act(sign["character"], window)
         elif kind == "version_marked":
             theory, account = payload["version_id"], payload["by_account"]
             if theory not in theories or account not in players:
@@ -804,6 +877,51 @@ def _validate_modules(doc, case_doc, modules, streams, all_event_by_id):
             raise ValueError("archive grant provenance mismatch")
         if not any(e["kind"] == "observation_granted" and e["audience"]["ids"] == [account] and e["payload"] == {"observation_id": observation, "source": source} for e in doc["private_events"]):
             raise ValueError("archive knowledge has no retained grant")
+
+    if "ghost_whisper" in modules:
+        by_character = {p["character_id"]: p for p in players.values()}
+
+        def left_before(character, window, statuses):
+            # A public status change strictly before the window; streams share no order inside one window.
+            return any(e["kind"] == "status" and e["payload"]["character_id"] == character and e["window_idx"] < window
+                       and (e["payload"]["controller"] == "npc" or e["payload"]["status"] in statuses) for e in chronicle)
+
+        sent, received = [], []
+        for account, player in players.items():
+            for event in streams.get("account:" + account, []):
+                payload, window = event["payload"], event["window_idx"]
+                if event["kind"] == "ghost_whispered":
+                    sender, recipient, observation = player["character_id"], payload["recipient_character"], payload["observation_id"]
+                    became_ghost = any(e["kind"] == "status" and e["payload"] == {"character_id": sender, "controller": "player", "status": "ghost"} and e["window_idx"] <= window for e in chronicle)
+                    knows = any(k["account_id"] == account and k["observation_id"] == observation for k in doc["knowledge"])
+                    if (not became_ghost or left_before(sender, window, ()) or observation not in characters[sender]["ghost_memories"]
+                            or recipient not in by_character or recipient == sender or left_before(recipient, window, ("ghost",)) or not knows):
+                        raise ValueError("ghost whisper actor, memory or recipient")
+                    sent.append((window, sender, recipient, observation))
+                    ghost_act(sender, window)
+                elif event["kind"] == "ghost_whisper_received":
+                    received.append((window, payload["from_character"], player["character_id"], payload["observation_id"]))
+        if sorted(sent) != sorted(received):
+            raise ValueError("ghost whisper pairs mismatch")
+    ghost_grants = [{"account_id": e["audience"]["ids"][0], "observation_id": e["payload"]["observation_id"], "source": e["payload"]["source"]}
+                    for e in doc["private_events"] if e["kind"] == "observation_granted" and e["payload"]["source"]["kind"] == "ghost"]
+    for row in [k for k in doc["knowledge"] if k["source"]["kind"] == "ghost"] + ghost_grants:
+        source, account = row["source"], row["account_id"]
+        origin = all_event_by_id.get(source["source_id"])
+        expected = None if origin is None else {"kind": "ghost", "source_id": origin["event_id"], "actor_character": origin["payload"].get("from_character"), "location": None, "window_idx": origin["window_idx"]}
+        if ("ghost_whisper" not in modules or origin is None or origin["kind"] != "ghost_whisper_received" or origin["audience"] != {"kind": "accounts", "ids": [account]}
+                or origin["payload"]["observation_id"] != row["observation_id"] or source != expected):
+            raise ValueError("ghost knowledge provenance mismatch")
+        grants = [e["payload"] for e in streams.get("account:" + account, []) if e["kind"] == "observation_granted"]
+        if row not in doc["knowledge"] or {"observation_id": row["observation_id"], "source": source} not in grants:
+            raise ValueError("ghost knowledge has no retained grant")
+    if ghost_modules:
+        if any(count > 1 for count in ghost_actions.values()):
+            raise ValueError("more than one ghost action in a window")
+        for p in players.values():
+            windows = [w for (character, w) in ghost_actions if character == p["character_id"]]
+            if windows and (p["ghost_used_window"] is None or p["ghost_used_window"] < max(windows)):
+                raise ValueError("ghost_used_window behind ghost history")
 
 
 def _case_doc(case):
@@ -1023,6 +1141,8 @@ def _validate_state(doc, case, rules):
         _source(row["source"])
         if row["source"]["actor_character"] is not None and row["source"]["actor_character"] not in character_ids or row["source"]["location"] is not None and row["source"]["location"] not in location_ids:
             raise ValueError("unknown knowledge source reference")
+        if row["source"]["kind"] == "ghost" and "ghost_whisper" not in modules:
+            raise ValueError("ghost knowledge source without ghost_whisper")
     _unique(doc["knowledge"], ("account_id", "observation_id"), "knowledge")
     for row in _arr(doc["dialogue_cursors"], "dialogue_cursors"):
         _obj(row, {"account_id", "dialogue_id", "node_id"}, "dialogue_cursor")
@@ -1228,7 +1348,7 @@ def _validate_state(doc, case, rules):
         elif kind == "world_changed":
             if not {r["id"] for r in payload["flags"]} <= {r["id"] for r in public["flags"]} or not {r["location"] for r in payload["locks"]} <= location_ids:
                 raise ValueError("unknown world change reference")
-        if kind in {"action_result", "scene", "story_result", "story_offer", "story_epilogue", "authored_card_delivered"} and not set(payload["body"]["mentions"]) <= fact_ids:
+        if kind in {"action_result", "scene", "story_result", "story_offer", "story_epilogue", "authored_card_delivered", "ghost_sign"} and not set(payload["body"]["mentions"]) <= fact_ids:
             raise ValueError("event body mentions unknown fact")
     if modules:
         _validate_modules(doc, case_doc, modules, streams, all_event_by_id)

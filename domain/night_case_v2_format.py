@@ -380,6 +380,16 @@ def _compile_modules(d, maps, predicates):
                         _bad("v2.scene", ep, "Scene observation должен существовать во всех вариантах")
         if turning["recovery"] is not None:
             _ref(turning["recovery"]["character"], concealed, base + "/recovery/character")
+    if "ghost_visions" in modules:
+        signs = modules["ghost_visions"]["signs"]
+        base = "/module_data/ghost_visions/signs"
+        _ids(signs, "signs", base)
+        for i, sign in enumerate(signs):
+            p = base + _ptr(i)
+            _ref(sign["character"], chars, p + "/character")
+            _ref(sign["location"], loc, p + "/location")
+            if not chars[sign["character"]]["can_be_player"]:
+                _bad("v2.sign", p + "/character", "Знак явления бывает только у игрового героя")
     def protected_writes(value, pointer=""):
         if isinstance(value, dict):
             if value.get("kind") == "set_flag" and value["flag"] in protected:

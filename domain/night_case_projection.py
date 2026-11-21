@@ -66,6 +66,62 @@ def _module(c, name):
     return c.get("module_data", {}).get(name, {})
 
 
+def _enabled(c, name):
+    """A module may carry no settings (`{}`), so presence of its key is what enables it."""
+    return name in c.get("module_data", {})
+
+
+GHOST_KINDS = frozenset({"ghost_share", "ghost_whisper", "testimony_answer", "ghost_sign"})
+
+
+def removed_label(c):
+    """Mysticism is a property of the case: only cases with ghost_visions speak of ghosts (MANOR_MODULES_V2 §9)."""
+    return "Призраки" if _enabled(c, "ghost_visions") else "Отстранённые"
+
+
+def _questions(doc):
+    """Public testimony questions with their answer event (or None), in chronicle order."""
+    chronicle = doc["public"]["chronicle"]
+    answers = {e["payload"]["question_event_id"]: e for e in chronicle if e["kind"] == "testimony_answered"}
+    return [(e, answers.get(e["event_id"])) for e in chronicle if e["kind"] == "testimony_asked"]
+
+
+def _question_open(doc, question, answer):
+    return answer is None and doc["final"] is None and doc["clock"]["window_idx"] <= question["payload"]["answer_by"]
+
+
+def _shown_signs(doc):
+    return {e["payload"]["sign_id"] for e in doc["public"]["chronicle"] if e["kind"] == "ghost_sign"}
+
+
+def _ghost_eligibility(case_doc, doc, player, kind, params):
+    """One free action per window for a removed player; it never reveals what others know."""
+    if kind not in GHOST_KINDS or player["ghost_used_window"] == doc["clock"]["window_idx"]: return "action_unavailable", player, None
+    character = next(c for c in case_doc["characters"] if c["id"] == player["character_id"])
+    own = {k["observation_id"] for k in doc["knowledge"] if k["account_id"] == player["account_id"]}
+    if kind == "ghost_share":
+        allowed = params["observation_id"] in character["ghost_memories"] and params["observation_id"] in _known(doc, player["account_id"])
+        return ("accepted" if allowed else "action_unavailable"), player, None
+    if kind == "ghost_whisper":
+        public = {o["observation_id"] for o in doc["public"]["observations"]} | {b["observation_id"] for b in doc["public"]["board"] if b["observation_id"] is not None}
+        recipient = next((p for p in doc["players"] if p["character_id"] == params["recipient"] and p["account_id"] != player["account_id"] and p["status"] in {"active", "fog"}), None)
+        oid = params["observation_id"]
+        # A second copy to the same person would only spend the window; the check reads the sender's own history.
+        repeat = any(e["kind"] == "ghost_whispered" and player["account_id"] in e["audience"]["ids"] and e["payload"]["observation_id"] == oid
+                     and e["payload"]["recipient_character"] == params["recipient"] for e in doc["private_events"])
+        if _enabled(case_doc, "ghost_whisper") and oid in character["ghost_memories"] and oid in own and oid not in public and recipient is not None and not repeat:
+            return "accepted", player, recipient
+    elif kind == "testimony_answer":
+        question = next(((q, a) for q, a in _questions(doc) if q["event_id"] == params["question_event_id"]), None)
+        if _enabled(case_doc, "ghost_testimony") and question and question[0]["payload"]["ghost_character"] == player["character_id"] and _question_open(doc, *question):
+            return "accepted", player, question[0]
+    elif kind == "ghost_sign":
+        sign = next((x for x in _module(case_doc, "ghost_visions").get("signs", []) if x["id"] == params["sign_id"]), None)
+        if sign and sign["character"] == player["character_id"] and sign["id"] not in _shown_signs(doc):
+            return "accepted", player, sign
+    return "action_unavailable", player, None
+
+
 def _talk_exhausted(c, doc, account, params, option):
     """A talk option that can no longer tell this player anything new is not offered (it would only burn AP)."""
     grants = {e["observation"] for o in option["outcomes"] for e in o["effects"] if e["kind"] == "grant_observation"}
@@ -144,11 +200,8 @@ def _eligibility(case_doc, doc, actor, kind, params, now_utc):
         if audience is not None and sent_count(doc, actor.account_id) < case_doc["communication"]["max_messages_per_window"]:
             return "accepted", player, audience
         return "action_unavailable", player, None
-    if player["status"] == "ghost":
-        character = next(c for c in case_doc["characters"] if c["id"] == player["character_id"])
-        allowed = kind == "ghost_share" and player["ghost_used_window"] != clock["window_idx"] and params["observation_id"] in character["ghost_memories"] and params["observation_id"] in _known(doc, player["account_id"])
-        return ("accepted" if allowed else "action_unavailable"), player, None
-    if kind == "ghost_share": return "action_unavailable", player, None
+    if player["status"] == "ghost": return _ghost_eligibility(case_doc, doc, player, kind, params)
+    if kind in GHOST_KINDS: return "action_unavailable", player, None
     if player["status"] == "fog" and kind != "story_reply": return "action_unavailable", player, None
     if kind == "move":
         source = next(l for l in case_doc["locations"] if l["id"] == player["location"])
@@ -194,6 +247,11 @@ def _eligibility(case_doc, doc, actor, kind, params, now_utc):
     elif kind == "pin":
         if any(k["account_id"] == actor.account_id and k["observation_id"] == params["observation_id"] for k in doc["knowledge"]):
             if not any(b["owner_account_id"] == actor.account_id and b["observation_id"] == params["observation_id"] for b in doc["public"]["board"]): return "accepted", player, None
+    elif kind == "testimony_ask":
+        ghost = next((p for p in doc["players"] if p["character_id"] == params["ghost"] and p["status"] == "ghost"), None)
+        repeat = any(q["payload"]["asker_character"] == player["character_id"] and q["payload"]["ghost_character"] == params["ghost"] and _question_open(doc, q, a) for q, a in _questions(doc))
+        if _enabled(case_doc, "ghost_testimony") and ghost and not repeat and clock["phase"] == "investigation" and 1 <= clock["window_idx"] <= 13 and player["ap"] >= 1:
+            return "accepted", player, ghost
     elif kind == "claim": return "accepted", player, None
     elif kind == "finish_window": return ("action_unavailable" if player["finished_window"] else "accepted"), player, None
     elif kind == "accuse":
@@ -245,6 +303,20 @@ def _revision(doc, player, kind, params, case_doc):
         dependencies["cursor"] = next((c["node_id"] for c in doc["dialogue_cursors"] if c["account_id"] == player["account_id"] and c["dialogue_id"] == d["id"]), d["entry_node"])
         dependencies["npc"] = next({"status": n["status"], "location": n["location"], "origin": n["origin"]} for n in doc["npcs"] if n["character_id"] == d["character"])
         preds = next(o["available_when"] for n in d["nodes"] if n["id"] == params["node_id"] for o in n["options"] if o["id"] == params["option_id"])
+    elif kind == "ghost_whisper":
+        dependencies["recipient"] = next((p["status"] for p in doc["players"] if p["character_id"] == params["recipient"]), None)
+        dependencies["public"] = any(o["observation_id"] == params["observation_id"] for o in doc["public"]["observations"]) or any(b["observation_id"] == params["observation_id"] for b in doc["public"]["board"])
+        preds = []
+    elif kind == "testimony_ask":
+        dependencies["ghost"] = next((p["status"] for p in doc["players"] if p["character_id"] == params["ghost"]), None)
+        dependencies["open"] = [q["event_id"] for q, a in _questions(doc) if q["payload"]["asker_character"] == player["character_id"] and q["payload"]["ghost_character"] == params["ghost"] and _question_open(doc, q, a)]
+        preds = []
+    elif kind == "testimony_answer":
+        dependencies["answered"] = any(a is not None for q, a in _questions(doc) if q["event_id"] == params["question_event_id"])
+        preds = []
+    elif kind == "ghost_sign":
+        dependencies["shown"] = params["sign_id"] in _shown_signs(doc)
+        preds = []
     else: preds = []
     dependencies["predicates"] = [{"predicate": p, "satisfied": _predicates([p], doc, player, case_doc)} for p in preds]
     if kind == "move": dependencies["locked"] = params["location"] in {l["location"] for l in doc["public"]["locks"]}
@@ -272,12 +344,12 @@ def _quote_from_documents(rules, doc, case_doc, actor, intent, *, now_utc):
     kind = intent.kind if isinstance(intent, CommandIntent) else intent["kind"]
     code, player, _ = _eligibility(case_doc, doc, actor, kind, params, now_utc)
     if code != "accepted": raise ValueError(code)
-    target_key = {"story_reply": "offer_event_id", "archive_request": "query_id", "version_mark": "version_id", "move": "location", "act": "action_id", "talk": "option_id", "pin": "observation_id", "ghost_share": "observation_id", "accuse": "suspect", "vote": "hearing_id", "final_vote": "suspect"}.get(kind)
+    target_key = {"story_reply": "offer_event_id", "archive_request": "query_id", "version_mark": "version_id", "move": "location", "act": "action_id", "talk": "option_id", "pin": "observation_id", "ghost_share": "observation_id", "ghost_whisper": "recipient", "testimony_answer": "question_event_id", "ghost_sign": "sign_id", "accuse": "suspect", "vote": "hearing_id", "final_vote": "suspect"}.get(kind)
     target = params.get(target_key) if target_key else kind
-    if kind in {"claim", "say"}: target = kind + ":" + canonical_hash(params)[0:24]
+    if kind in {"claim", "say", "testimony_ask"}: target = kind + ":" + canonical_hash(params)[0:24]
     if target is None: target = "abstain"
     selection = canonical_hash({"kind": kind, "params": params})[:24]
-    cost = rules.move_cost if kind == "move" else rules.act_cost if kind in {"act", "archive_request"} else rules.talk_cost if kind == "talk" else 0
+    cost = rules.move_cost if kind == "move" else rules.act_cost if kind in {"act", "archive_request", "testimony_ask"} else rules.talk_cost if kind == "talk" else 0
     if kind == "say": cost = 1 if params["channel"] == "whisper" else 0
     resource_id = "case:" + canonical_hash({"game": doc["game_id"], "actor": actor.account_id, "kind": kind})[:32]
     return LegalAction(selection, kind, str(target), cost, resource_id, params, _revision(doc, player, kind, params, case_doc))
@@ -311,6 +383,16 @@ def available_actions(case, rules, state, viewer, *, now_utc):
     character = next(item for item in c["characters"] if item["id"] == player["character_id"])
     for observation_id in sorted(_known(doc, viewer.account_id) & set(character["ghost_memories"])):
         intents.append(("ghost_share", {"observation_id": observation_id}, "Поделиться воспоминанием"))
+    if player["status"] == "ghost":
+        own = sorted({k["observation_id"] for k in doc["knowledge"] if k["account_id"] == viewer.account_id} & set(character["ghost_memories"]))
+        living = sorted(p["character_id"] for p in doc["players"] if p["account_id"] != viewer.account_id and p["status"] in {"active", "fog"})
+        for observation_id in own:
+            for recipient in living: intents.append(("ghost_whisper", {"observation_id": observation_id, "recipient": recipient}, "Передать лично"))
+        for question, answer in _questions(doc):
+            if question["payload"]["ghost_character"] == player["character_id"]:
+                for value, label in (("yes", "Ответить «да»"), ("no", "Ответить «нет»")): intents.append(("testimony_answer", {"question_event_id": question["event_id"], "answer": value}, label))
+        for sign in _module(c, "ghost_visions").get("signs", []):
+            if sign["character"] == player["character_id"]: intents.append(("ghost_sign", {"sign_id": sign["id"]}, sign["label"]))
     intents += [("seen", {}, "Я здесь"), ("finish_window", {}, "Завершить окно"), ("forfeit", {}, "Покинуть дело")]
     entries = []
     for kind, params, label in intents:
@@ -322,13 +404,16 @@ def available_actions(case, rules, state, viewer, *, now_utc):
     for kind, params in (("claim", {"text": "x"}), ("accuse", {"suspect": subjects[0], "citations": []}) if subjects else ("accuse", {"suspect": "none", "citations": []}), ("vote", {"hearing_id": doc["hearing"]["id"], "choice": "support", "citations": []}) if doc["hearing"] else ("vote", {"hearing_id": "none", "choice": "support", "citations": []}), ("final_vote", {"suspect": None, "citations": []})):
         if _eligibility(c, doc, viewer, kind, params, now_utc)[0] == "accepted":
             entries.append(MenuForm("form", kind, kind, kind, 0, subjects if kind in {"accuse", "final_vote"} else (), board_ids if kind != "claim" else (), doc["hearing"]["id"] if kind == "vote" else None))
+    if _enabled(c, "ghost_testimony"):
+        askable = tuple(sorted(p["character_id"] for p in doc["players"] if p["status"] == "ghost" and _eligibility(c, doc, viewer, "testimony_ask", {"ghost": p["character_id"], "text": "x"}, now_utc)[0] == "accepted"))
+        if askable: entries.append(MenuForm("form", "testimony_ask", "testimony_ask", "testimony_ask", rules.act_cost, askable, (), None))
     if "communication" in c:
         nearby = tuple(sorted(p["character_id"] for p in doc["players"] if p["account_id"] != viewer.account_id and p["status"] in {"active", "fog"} and p["location"] == player["location"]))
         samples = [("square", [], ()), ("ghost", [], ())]
         if nearby: samples.append(("whisper", [nearby[0]], nearby))
         for channel, recipients, targets in samples:
             if _eligibility(c, doc, viewer, "say", {"channel": channel, "recipients": recipients, "text": "x"}, now_utc)[0] == "accepted":
-                entries.append(SayForm("form", "say:" + channel, {"square": "Площадь", "whisper": "Приватная беседа", "ghost": "Призраки"}[channel], "say", channel, int(channel == "whisper"), targets))
+                entries.append(SayForm("form", "say:" + channel, {"square": "Площадь", "whisper": "Приватная беседа", "ghost": removed_label(c)}[channel], "say", channel, int(channel == "whisper"), targets))
     return tuple(entries)
 
 
@@ -391,6 +476,14 @@ def project(case, rules, state, viewer=None):
                 response = next((r for r in own if r["kind"] == "archive_response" and r["payload"]["request_event_id"] == e["event_id"]), None)
                 requests.append({"request_event_id": e["event_id"], "query_id": e["payload"]["query_id"], "due_window": e["payload"]["due_window"], "status": response["payload"]["disposition"] if response else "cancelled_terminal" if doc["final"] else "pending", "response_event_id": response["event_id"] if response else None})
             result["self"]["modules"]["archive_requests"] = {"requests": sorted(requests, key=lambda x: x["query_id"])}
+        if _enabled(c, "ghost_testimony"):
+            result["modules"]["ghost_testimony"] = {"questions": [{"question_event_id": q["event_id"], "asker_character": q["payload"]["asker_character"], "ghost_character": q["payload"]["ghost_character"], "text": q["payload"]["text"], "window_idx": q["window_idx"], "answer_by": q["payload"]["answer_by"], "answer": a["payload"]["answer"] if a else None, "status": "answered" if a else "open" if _question_open(doc, q, a) else "expired"} for q, a in _questions(doc)]}
+        if _enabled(c, "ghost_visions"):
+            result["modules"]["ghost_visions"] = {"signs": [{"event_id": e["event_id"], "sign_id": e["payload"]["sign_id"], "character_id": e["payload"]["character_id"], "location": e["payload"]["location"], "window_idx": e["window_idx"], "body": copy.deepcopy(e["payload"]["body"])} for e in doc["public"]["chronicle"] if e["kind"] == "ghost_sign"]}
+        if player and _enabled(c, "ghost_whisper"):
+            own = [e for e in doc["private_events"] if e["audience"]["ids"] == [player["account_id"]]]
+            result["self"]["modules"]["ghost_whisper"] = {"sent": [{"event_id": e["event_id"], "observation_id": e["payload"]["observation_id"], "recipient_character": e["payload"]["recipient_character"], "window_idx": e["window_idx"]} for e in own if e["kind"] == "ghost_whispered"],
+                                                          "received": [{"event_id": e["event_id"], "observation_id": e["payload"]["observation_id"], "from_character": e["payload"]["from_character"], "window_idx": e["window_idx"]} for e in own if e["kind"] == "ghost_whisper_received"]}
     if player and "communication" in c:
         sent = sent_count(doc, player["account_id"])
         limit = c["communication"]["max_messages_per_window"]

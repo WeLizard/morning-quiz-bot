@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-MANOR_HASH = 'fd59988e06724893d8f519eeabd211834bb3cf055d19d8fa22c07e82109fd489'
+MANOR_HASH = 'b13ee4a05aef436603940643c20547f8d3db8dad4b7f53bc6d4b26b9d658766d'
 
 
 def _flag(env, key):

@@ -17,7 +17,7 @@ SCHEMA = ROOT / 'scripts/art/night_city/assets_manifest.schema.json'
 IMMUTABLE_SCHEMA = ROOT / 'scripts/art/night_city/immutable_assets_manifest.schema.json'
 CASE = ROOT / 'content/night_city/manor_lake.case.json'
 ART = ROOT / 'docs/tasks/night_city/art_batch2/noir_print_a'
-PINNED_CASE_HASH = 'fd59988e06724893d8f519eeabd211834bb3cf055d19d8fa22c07e82109fd489'
+PINNED_CASE_HASH = 'b13ee4a05aef436603940643c20547f8d3db8dad4b7f53bc6d4b26b9d658766d'
 
 
 def case_art_refs(groups=('characters', 'locations', 'events')):
@@ -273,7 +273,7 @@ class ManorAssetExportTests(unittest.TestCase):
     def test_pinned_case_version_and_hash(self):
         case = json.loads(CASE.read_text(encoding='utf-8'))
         canonical = json.dumps(case, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
-        self.assertEqual(case['meta']['version'], 3)
+        self.assertEqual(case['meta']['version'], 4)
         self.assertEqual(hashlib.sha256(canonical).hexdigest(), PINNED_CASE_HASH)
 
 

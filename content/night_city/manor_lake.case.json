@@ -185,7 +185,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "key_ledger",
+        "duty_roster",
+        "meal_order"
+      ],
       "art": {
         "asset_id": "manor_char_housekeeper",
         "alt": "Портрет: Экономка"
@@ -268,7 +272,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "lawyer_receipt",
+        "draft_copy",
+        "will_original_section"
+      ],
       "art": {
         "asset_id": "manor_char_lawyer",
         "alt": "Портрет: Адвокат"
@@ -352,7 +360,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "regimen_sample",
+        "regimen_inquiry_card",
+        "scarf_receipt"
+      ],
       "art": {
         "asset_id": "manor_char_doctor",
         "alt": "Портрет: Домашний врач"
@@ -436,7 +448,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "butler_testimony",
+        "correspondence_opened",
+        "passage_key_spec"
+      ],
       "art": {
         "asset_id": "manor_char_butler",
         "alt": "Портрет: Дворецкий"
@@ -518,7 +534,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "maid_testimony",
+        "meal_order",
+        "duty_roster"
+      ],
       "art": {
         "asset_id": "manor_char_maid",
         "alt": "Портрет: Горничная"
@@ -602,7 +622,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "cache_secret_card",
+        "claim_scarf_is_owner",
+        "scarf_receipt"
+      ],
       "art": {
         "asset_id": "manor_char_gardener",
         "alt": "Портрет: Садовник"
@@ -688,7 +712,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "cook_testimony",
+        "meal_order",
+        "meal_receipt"
+      ],
       "art": {
         "asset_id": "manor_char_cook",
         "alt": "Портрет: Повар"
@@ -775,7 +803,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "anonymous_invitation",
+        "invitation_order_copy",
+        "intrigue_authorship_card"
+      ],
       "art": {
         "asset_id": "manor_char_companion",
         "alt": "Портрет: Компаньонка"
@@ -867,7 +899,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "undeveloped_plate",
+        "sitter_identity_card",
+        "claim_light_proves_owner"
+      ],
       "art": {
         "asset_id": "manor_char_niece_artist",
         "alt": "Портрет: Племянница-художница"
@@ -951,7 +987,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "gambler_debt_card",
+        "cash_location",
+        "cash_ledger"
+      ],
       "art": {
         "asset_id": "manor_char_nephew_gambler",
         "alt": "Портрет: Племянник-игрок"
@@ -1030,7 +1070,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "rights_original_section",
+        "daughter_rights_copy",
+        "daughter_alibi"
+      ],
       "art": {
         "asset_id": "manor_char_daughter",
         "alt": "Портрет: Дочь от первого брака"
@@ -1762,7 +1806,11 @@
           "mentions": []
         }
       },
-      "ghost_memories": [],
+      "ghost_memories": [
+        "anonymous_invitation",
+        "horn_record",
+        "owner_hand_sample"
+      ],
       "art": {
         "asset_id": "manor_char_investigator",
         "alt": "Портрет: Следователь из города"
@@ -6147,7 +6195,7 @@
   },
   "meta": {
     "id": "manor_lake_missing",
-    "version": 3,
+    "version": 4,
     "title": "Хозяин исчез из запертой библиотеки",
     "genre": "noir",
     "language": "ru",
@@ -6171,7 +6219,9 @@
     "modules": [
       "version_archive",
       "turning_point",
-      "archive_requests"
+      "archive_requests",
+      "ghost_whisper",
+      "ghost_testimony"
     ],
     "duration": "week",
     "world": "manor_lake",
@@ -7182,7 +7232,9 @@
         "through_window": 12,
         "requires_board_keys": true
       }
-    }
+    },
+    "ghost_whisper": {},
+    "ghost_testimony": {}
   },
   "communication": {
     "version": 1,

@@ -36,9 +36,12 @@ _EVENT_LABELS = {
     'observation_granted':'Выдана карточка', 'archive_requested':'Запрошен архив',
     'version_marked':'Отмечена версия', 'npc_revealed':'Появился персонаж',
     'story_return_closed':'Решение по письму зафиксировано',
+    # Removed players (MANOR_MODULES_V2 §9): a question is player text, so only its label crosses.
+    'ghost_whispered':'Передано воспоминание', 'ghost_whisper_received':'Получено воспоминание',
+    'testimony_asked':'Вопрос выбывшему', 'testimony_answered':'Ответ выбывшего',
 }
 _BODY_KINDS = {'action_result','archive_response','scene','story_result',
-               'story_offer','story_epilogue','authored_card_delivered'}
+               'story_offer','story_epilogue','authored_card_delivered','ghost_sign'}
 _OFFER_KINDS = {'move','act','talk','archive_request','version_mark'}
 
 

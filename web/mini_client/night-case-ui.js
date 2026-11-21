@@ -144,6 +144,8 @@ function open(options) {
     let alive = true, locked = false, epoch = 0, poll = null, timer = null, reading = false, identityReading = false, commandBusy = false;
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
     let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null;
+    // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
+    let askGhost = null, askText = ''; const whisperTo = new Map();
     let viewer = boot?.viewer_account_id || null;
     const pages = {public: {items: [], next_cursor: null}, self: {items: [], next_cursor: null}, messages: {items: [], next_cursor: null}};
     const cursors = new Set(), controller = new AbortController();
@@ -198,17 +200,26 @@ function open(options) {
     const female = () => view?.self?.role?.gender === 'f';
     const said = (male, fem) => female() ? fem : male;
     const observationTitle = observationId => [...arr(view?.public?.observations), ...arr(view?.self?.observations)].find(item => item.observation_id === observationId)?.title;
+    // Mysticism belongs to the case: only a case with signs (module ghost_visions) speaks of ghosts.
+    const mystic = () => Boolean(view?.public?.modules?.ghost_visions);
+    const removedWord = () => mystic() ? 'Призраки' : 'Отстранённые';
+    const removedTitle = () => mystic() ? 'Ты — призрак дела' : said('Ты отстранён от расследования', 'Ты отстранена от расследования');
+    const ghostKinds = new Set(['ghost_share', 'ghost_whisper', 'testimony_answer', 'ghost_sign']);
+    const questions = () => arr(view?.public?.modules?.ghost_testimony?.questions);
+    const placeName = location => arr(view?.public?.locations).find(item => item.id === location)?.name || 'Усадьба';
     // Zero-cost bookkeeping needs no «Стоимость: 0 ОД» step: the proposal is confirmed right away.
     const instant = new Set(['seen', 'finish_window']);
     let info = '';
     const receipts = {claim: 'Версия опубликована на доске.', accuse: 'Обвинение предъявлено: открыто слушание.', vote: 'Твой голос на слушании записан.', final_vote: 'Твой голос записан. Его можно изменить, пока слушание не закрылось.',
-        pin: 'Улика опубликована на доске.', finish_window: 'Окно завершено.', archive_request: 'Запрос отправлен. Ответ придёт в следующем окне — его покажут в хронике и досье.', seen: 'Отмечено: ты за столом.'};
+        pin: 'Улика опубликована на доске.', finish_window: 'Окно завершено.', archive_request: 'Запрос отправлен. Ответ придёт в следующем окне — его покажут в хронике и досье.', seen: 'Отмечено: ты за столом.',
+        ghost_share: 'Воспоминание опубликовано на доске.', ghost_whisper: 'Воспоминание передано лично.', testimony_answer: 'Ответ записан на доске.', ghost_sign: 'Знак явлен всем за столом.',
+        testimony_ask: 'Вопрос задан. Ответ «да» или «нет» появится на доске.'};
 
     function invalidate() {
         if (locked || !alive) return;
         locked = true; epoch++; controller.abort(); clearInterval(poll); timer?.stop(); timer = null;
         view = proposal = room = game = boot = invitation = viewer = null;
-        ownDraft = selectedOriginal = notice = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null;
+        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; askGhost = null; whisperTo.clear();
         ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null;
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.menu.register([], 'Ночной город');
@@ -321,7 +332,9 @@ function open(options) {
         if (!proposal) return null;
         if (proposal.sending) return panel(proposal.label || 'Подтвердить действие', status('Отправляем…'));
         return panel(proposal.label || 'Подтвердить действие',
-            p(proposal.forfeit ? 'Ты прекратишь участие. Назад в эту партию вернуться нельзя; ранее разрешённая история сохранится.' : `Стоимость: ${Number(proposal.cost) || 0} ОД. До подтверждения действие не применяется.`),
+            p(proposal.forfeit ? 'Ты прекратишь участие. Назад в эту партию вернуться нельзя; ранее разрешённая история сохранится.'
+                : ghostKinds.has(proposal.kind) ? 'Это твоё единственное действие в этом окне. До подтверждения оно не применяется.'
+                : `Стоимость: ${Number(proposal.cost) || 0} ОД. До подтверждения действие не применяется.`),
             kit.row(button('Отмена', () => { proposal = null; render(); }), button('Подтвердить', async () => {
                 if (proposal.forfeit) { proposal = null; await command('forfeit', {}); }
                 else await confirmProposal();
@@ -671,13 +684,14 @@ function open(options) {
         const moves = choiceList().filter(row => row.quote.kind === 'move');
         const acts = choiceList().filter(row => ['act', 'talk', 'archive_request', 'story_reply'].includes(row.quote.kind));
         const nearby = arr(own.nearby).filter(row => row.character_id !== own.character_id);
-        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), over ? null : p(`Осталось действий: ${own.ap}`), over ? null : narratorLine()));
+        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), over || own.status === 'ghost' ? null : p(`Осталось действий: ${own.ap}`), over ? null : narratorLine()));
         const artwork = assets.get(location?.art?.asset_id);
         scene.style?.setProperty('--img', artwork ? `url(${artwork.variants[sceneTime()] || artwork.url})` : 'none');
         if (over) return [scene];
         const window_ = view.public.clock?.window_idx;
         const current = arr(view.public.scenes).filter(entry => entry.window_idx === window_).at(-1);
         const shared = current ? panel('Сейчас в усадьбе', sceneArt(current.art, 'Сцена окна'), p(bodyText(current.body))) : null;
+        if (own.status === 'ghost') return [scene, shared, ...removedActions()];
         const waiting = arr(own.modules?.archive_requests?.requests).filter(item => item.status === 'pending');
         const free = boot?.capabilities?.free_intent === true ? field('Что ты хочешь сделать?', '', true) : null;
         return [scene, shared,
@@ -692,6 +706,44 @@ function open(options) {
                     render();
                 }))] : [])),
             ...choiceList().filter(row => row.quote.kind === 'seen').map(row => panel(row.label, kit.stack(actionButton(row))))];
+    }
+    // A removed player: one free action per window (MANOR_MODULES_V2 §9). Everything offered comes from the menu.
+    function removedActions() {
+        const own = view.self, rows = choiceList().filter(row => ghostKinds.has(row.quote.kind));
+        const can = [mystic() ? 'показать знак' : null, 'выложить воспоминание на доску', 'передать его одному игроку лично', 'ответить «да» или «нет» на вопрос'].filter(Boolean);
+        const intro = panel(removedTitle(), p(`Ты больше не ходишь, не голосуешь и не обвиняешь. Раз в окно можно сделать одно: ${can.join(', ')}.`),
+            p(`${removedWord()} переписываются отдельно, во вкладке «Беседа».`),
+            rows.length ? null : p('Сейчас действовать нечем: действие этого окна уже сделано или в памяти пока нет того, что можно передать.'));
+        const asked = questions().filter(q => q.ghost_character === own.character_id && q.status === 'open').map(q => {
+            const answers = rows.filter(row => row.quote.kind === 'testimony_answer' && row.quote.params.question_event_id === q.question_event_id);
+            return panel(`Вопрос от: ${nameOf(q.asker_character)}`, p(`«${q.text}»`), p(`Ответ увидят все. Ответить можно до окна ${q.answer_by}.`),
+                answers.length ? kit.row(...answers.map(row => button(row.quote.params.answer === 'yes' ? 'Да' : 'Нет', () => selectAction(row, `Ответить «${row.quote.params.answer === 'yes' ? 'да' : 'нет'}»`)))) : null);
+        });
+        const memories = new Map();
+        for (const row of rows.filter(item => ['ghost_share', 'ghost_whisper'].includes(item.quote.kind))) {
+            const key = row.quote.params.observation_id;
+            if (!memories.has(key)) memories.set(key, {share: null, whisper: []});
+            if (row.quote.kind === 'ghost_share') memories.get(key).share = row; else memories.get(key).whisper.push(row);
+        }
+        const all = [...arr(own.observations), ...arr(view.public.observations)];
+        const cards = [...memories].map(([key, item]) => {
+            const observation = all.find(entry => entry.observation_id === key) || {title: 'Воспоминание'};
+            const title = observation.title || 'воспоминание';
+            const offered = item.whisper.map(row => row.quote.params.recipient);
+            const to = offered.length ? choose('Кому передать лично', offered.map(char => ({id: char, label: nameOf(char)})), offered.includes(whisperTo.get(key)) ? whisperTo.get(key) : offered[0]) : null;
+            to?.input.addEventListener('change', () => whisperTo.set(key, to.input.value));
+            const buttons = [...(item.share ? [button('На доску', () => selectAction(item.share, `На доску: ${title}`))] : []),
+                ...(to ? [button('Передать лично', () => {
+                    const row = item.whisper.find(entry => entry.quote.params.recipient === to.input.value);
+                    return row ? selectAction(row, `Передать «${title}»: ${nameOf(row.quote.params.recipient)}`) : null;
+                })] : [])];
+            return evidenceCard(observation, 'Твоё воспоминание. На доске его увидят все, лично — только тот, кому передашь.', buttons, to?.node);
+        });
+        const signs = rows.filter(row => row.quote.kind === 'ghost_sign');
+        const sent = arr(own.modules?.ghost_whisper?.sent).map(row => p(`Окно ${row.window_idx}: «${observationTitle(row.observation_id) || 'воспоминание'}» — ${nameOf(row.recipient_character)}`));
+        return [intro, ...asked, ...cards,
+            signs.length ? panel('Явление', p('Знак увидят все за столом. Каждый знак — один раз за дело.'), kit.row(...signs.map(row => button(row.label, () => selectAction(row, `Явление: ${row.label}`))))) : null,
+            sent.length ? panel(said('Ты уже передал лично', 'Ты уже передала лично'), ...sent) : null];
     }
     // Shown on every tab: finishing the window, or who is still playing it.
     // Actions grouped by verb: «Осмотреть · 1 ОД» once, then short buttons with the object only.
@@ -726,10 +778,10 @@ function open(options) {
         const finish = choiceList().find(row => row.quote.kind === 'finish_window');
         return finish ? panel('Окно', p(`${said('Сделал', 'Сделала')} всё, что ${said('хотел', 'хотела')}? Заверши окно: когда завершат все, следующее откроется раньше.`), kit.stack(actionButton(finish))) : null;
     }
-    function evidenceCard(item, source, actions = []) {
+    function evidenceCard(item, source, actions = [], extra = null) {
         return panel(item.title || (item.kind === 'claim' ? 'Утверждение' : 'Доказательство'),
             el('strong', item.kind === 'claim' ? 'ncase-claim' : 'ncase-proof', item.kind === 'claim' ? 'Утверждение — требует проверки' : 'Доказательство'),
-            p(bodyText(item.body) || text(item.text)), source ? p(source) : null, actions.length ? kit.row(...actions) : null);
+            p(bodyText(item.body) || text(item.text)), source ? p(source) : null, extra, actions.length ? kit.row(...actions) : null);
     }
     function board() {
         const all = [...arr(view.public.observations), ...arr(view.self.observations)], observations = new Map(all.map(item => [item.observation_id, item]));
@@ -752,7 +804,9 @@ function open(options) {
         const personal = arr(view.self.observations).map(item => {
             const actions = choiceList().filter(row => ['pin', 'ghost_share'].includes(row.quote.kind) && row.quote.params.observation_id === item.observation_id)
                 .map(row => actionButton(row, row.quote.kind === 'pin' ? `${onBoard.has(item.observation_id) ? 'Подтвердить от себя' : 'Опубликовать'}: ${item.title || 'улика'}` : `${row.label}: ${item.title || 'воспоминание'}`));
+            const passed = item.source?.kind === 'ghost' ? `Передано лично: ${nameOf(item.source.actor_character)} — ${mystic() ? 'призрак дела' : 'отстранённый игрок'}.` : '';
             const source = lost.has(item.observation_id) ? 'Твоя находка. Оригинала больше нет: от него остался пепел. Записанное тобой — всё, что от него осталось.'
+                : passed ? `${passed}${onBoard.has(item.observation_id) ? ' Эта улика уже на доске.' : ''}`
                 : onBoard.has(item.observation_id) ? 'Твоя находка. Эта улика уже на доске.' : 'Твоя находка';
             return evidenceCard(item, source, actions);
         });
@@ -762,7 +816,34 @@ function open(options) {
         const draft = field('Твоя версия для доски', '', true);
         return [...hearings(), panel('Доска дела', p('Текст игрока и показания остаются утверждениями. Для обвинения нужны опубликованные доказательства.')),
             ...publicItems, ...(claimForm ? [panel('Добавить версию', draft.node, kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value}))))] : []),
+            ...testimony(), ...signsSeen(),
             panel('Твои находки', p('Они не становятся известны другим до публикации.')), ...personal, ...theories];
+    }
+    // Questions to removed players: public, answered «да» or «нет»; the answer is a claim, never evidence.
+    function testimony() {
+        const form = formList().find(row => row.command_kind === 'testimony_ask');
+        if (!questions().length && !form) return [];
+        const rows = questions().slice().reverse().map(q => put(el('article', 'ncase-event'),
+            el('strong', null, `Окно ${q.window_idx} · вопрос от: ${nameOf(q.asker_character)} · кому: ${nameOf(q.ghost_character)}`), p(`«${q.text}»`),
+            p(q.status === 'answered' ? `Ответ: ${q.answer === 'yes' ? 'да' : 'нет'}.` : q.status === 'open' ? `Ждёт ответа до окна ${q.answer_by}.` : 'Ответа не было.')));
+        let ask = [];
+        if (form) {
+            const ghosts = arr(form.subject_ids);
+            const who = choose('Кого спросить', ghosts.map(char => ({id: char, label: nameOf(char)})), ghosts.includes(askGhost) ? askGhost : ghosts[0]);
+            const question = field('Вопрос, на который можно ответить «да» или «нет»', askText, true);
+            question.input.maxLength = 200;
+            who.input.addEventListener('change', () => { askGhost = who.input.value; });
+            question.input.addEventListener('input', () => { askText = question.input.value; });
+            ask = [who.node, question.node, kit.row(button(`Спросить · ${Number(form.cost) || 0} ОД`, async () => {
+                const result = await command('testimony_ask', {ghost: who.input.value, text: question.input.value.trim()});
+                if (result?.receipt?.accepted === true) { askText = ''; render(); }
+            }))];
+        }
+        return [panel(mystic() ? 'Вопросы призракам' : 'Вопросы отстранённым', p('Выбывший отвечает только «да» или «нет». Его ответ — слова, а не доказательство: улик он не добавляет.'), ...rows, ...ask)];
+    }
+    function signsSeen() {
+        const signs = arr(view.public.modules?.ghost_visions?.signs);
+        return signs.length ? [panel('Явления', ...signs.slice().reverse().map(sign => p(`Окно ${sign.window_idx} · ${placeName(sign.location)}: ${bodyText(sign.body)}`)))] : [];
     }
     function hearings() {
         return formList().filter(row => ['accuse', 'vote', 'final_vote'].includes(row.command_kind)).map(form => {
@@ -811,9 +892,9 @@ function open(options) {
         const messages = pages.messages.items.map(row => {
             const own = row.sender_account_id === view.self.account_id;
             const sender = `${arr(view.public.players).find(p => p.account_id === row.sender_account_id)?.name || 'Участник'}${own ? ' (ты)' : ''}`;
-            return put(el('article', 'ncase-message'), el('strong', null, sender), el('span', 'nc-note', row.channel === 'whisper' ? 'Приватная беседа' : row.channel === 'ghost' ? 'Призраки' : 'Площадь'), p(row.text));
+            return put(el('article', 'ncase-message'), el('strong', null, sender), el('span', 'nc-note', row.channel === 'whisper' ? 'Приватная беседа' : row.channel === 'ghost' ? removedWord() : 'Площадь'), p(row.text));
         });
-        return [panel('Переписка', p('Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. Призраки разговаривают отдельно.'), ...messages,
+        return [panel('Переписка', p(`Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. ${removedWord()} разговаривают отдельно.`), ...messages,
             ...(pages.messages.next_cursor ? [kit.row(button('Ещё сообщения', async () => { await loadHistory('messages', true); render(); }))] : [])),
             panel('Написать', ...(forms.length ? [channels.node, targetRows, draft.node, p(`Сообщений осталось в этом окне: ${view.self.communication?.remaining ?? '—'}`),
                 kit.row(button('Отправить', async () => {
@@ -837,6 +918,10 @@ function open(options) {
         case 'npc_revealed': return 'Хозяин найден.';
         case 'world_changed': return 'Обстановка в усадьбе изменилась.';
         case 'version_marked': return `${who(payload.by_account)}: версия ${payload.state === 'archived' ? 'отправлена в архив' : 'возвращена'}.`;
+        case 'ghost_whispered': return `Ты ${said('передал', 'передала')} лично «${observationTitle(payload.observation_id) || 'воспоминание'}»: ${player(payload.recipient_character)}.`;
+        case 'ghost_whisper_received': return `${player(payload.from_character)} передаёт тебе лично: «${observationTitle(payload.observation_id) || 'воспоминание'}».`;
+        case 'testimony_asked': return `Вопрос от: ${player(payload.asker_character)} · кому: ${player(payload.ghost_character)}. «${text(payload.text)}»`;
+        case 'testimony_answered': { const q = questions().find(row => row.question_event_id === payload.question_event_id); return `${q ? player(q.ghost_character) : 'Выбывший'} отвечает: ${payload.answer === 'yes' ? 'да' : 'нет'}.`; }
         case 'final': return 'Дело закрыто.';
         case 'afk_notice': return `Ты ${said('пропустил', 'пропустила')} окон подряд: ${payload.missed_windows}.`;
         case 'window_digest': return 'Итог окна записан в хронику.';
@@ -856,7 +941,8 @@ function open(options) {
     function rules() {
         return [panel('Как идёт дело', p('Четырнадцать окон на семь дней. Окна открывает сервер; заходи в удобное время. На перемещения и действия тратятся очки действий.'),
             p('Личные находки известны только тебе. Публикуй доказательства на доску, сравнивай документы и проверяй показания. Архивные запросы приходят в следующее окно.'),
-            p('Обвинение обсуждается на слушании. Найти хозяина — ещё не значит доказать, кто его вывел и скрывал. Личная цель указана в твоём досье и засчитывается сервером.'))];
+            p('Обвинение обсуждается на слушании. Найти хозяина — ещё не значит доказать, кто его вывел и скрывал. Личная цель указана в твоём досье и засчитывается сервером.'),
+            p(`Кого стол отстранил по ошибке, тот остаётся в игре: раз в окно выкладывает воспоминание на доску, передаёт его одному игроку лично или отвечает «да» или «нет» на вопрос. Вопрос выбывшему стоит 1 ОД; его ответ — слова, а не доказательство.`))];
     }
     function render() {
         if (!live()) return;
@@ -873,7 +959,7 @@ function open(options) {
         if (!view.self) return frame([panel('Дело недоступно', p('Твоё участие не найдено. Вернись к списку компаний.'))]);
         const own = view.self, pub = view.public, clock = pub.clock || {};
         const stateNotice = clock.phase === 'frozen' ? panel('Стол ждёт возвращения', p('Общий простой остановил окна. Отметь возвращение, чтобы продолжить.'),
-            kit.row(...choiceList().filter(row => row.quote.kind === 'seen').map(row => actionButton(row)))) : own.status === 'departed' ? panel('Участие завершено', p('Тебе доступна собственная разрешённая история до выхода и итог дела.')) : own.status === 'ghost' ? panel('Ты наблюдаешь за делом', p('Обычные действия недоступны. Переписка призраков и разрешённые воспоминания остаются отдельными.')) : null;
+            kit.row(...choiceList().filter(row => row.quote.kind === 'seen').map(row => actionButton(row)))) : own.status === 'departed' ? panel('Участие завершено', p('Тебе доступна собственная разрешённая история до выхода и итог дела.')) : own.status === 'ghost' && tab !== 'place' ? panel(removedTitle(), p('Твоё действие окна — во вкладке «Место».')) : null;
         const final = own.postmortem;
         const finale = pub.final || view.final_summary ? panel('Дело завершено', sealedArt(final?.variant_art, 'Развязка дела'), p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
             p(final?.goal_results?.find(row => row.account_id === own.account_id)?.met ? 'Твоя личная цель выполнена.' : 'Подробности своей личной цели смотри в итоговом досье.')) : null;

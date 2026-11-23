@@ -10,7 +10,6 @@ label { display: block; font-size: 14px; margin-bottom: 10px; }
 input { width: 100%; min-height: 48px; border: 1px solid #566171; border-radius: 10px; background: #101319; color: #fff; padding: 12px; font: inherit; }
 input:focus-visible, button:focus-visible { outline: 3px solid #d5ff54; outline-offset: 3px; }
 button { width: 100%; min-height: 48px; display: flex; justify-content: space-between; align-items: center; border: 0; border-radius: 10px; padding: 12px 18px; color: #142000; background: #d5ff54; font: inherit; font-weight: 700; cursor: pointer; }
-button:disabled { opacity: .65; cursor: wait; }
 #loginError { min-height: 20px; font-size: 13px; color: #ffa7a7; }
 .login-note { margin: 24px 0 0; color: #a4afbd; font-size: 12px; line-height: 1.7; }
 @media (max-width: 420px) { .login-card { padding: 24px; } }
@@ -22,6 +21,7 @@ button:disabled { opacity: .65; cursor: wait; }
 .login-description, .login-note { color: var(--mq-muted); }
 .login-card input { background: var(--mq-page); border-color: #676e82; border-radius: 12px; color: var(--mq-text); }
 .login-card button { background: var(--mq-accent); color: var(--mq-ink); border-radius: 12px; }
+.login-card button:disabled { background: var(--mq-page); color: var(--mq-muted); cursor: wait; outline: 1px dashed var(--mq-muted); outline-offset: -1px; }
 .login-card input:focus-visible, .login-card button:focus-visible { outline-color: var(--mq-accent); }
 #loginError { color: var(--mq-danger); }
 @media (max-width: 420px) { .login-card { padding: 26px; } .login-page { padding: 16px; } }

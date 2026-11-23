@@ -54,12 +54,13 @@
 .pg-subtitle { color: var(--text-secondary); margin: 12px 0 0; font-size: 14px; line-height: 1.65; max-width: 620px; }
 .pg-admin .btn { min-height: 44px; padding: 11px 16px; border-radius: 12px; border: 1px solid transparent; font-size: 13px; line-height: 1.4; font-weight: 600; box-shadow: none; gap: 9px; text-decoration: none; transition: background-color 150ms, border-color 150ms; touch-action: manipulation; }
 .pg-admin .btn-primary { background: var(--primary); color: var(--mq-ink); }
-.pg-admin .btn-primary:hover { background: #e5ff8a; transform: none; box-shadow: none; }
+.pg-admin .btn-primary:hover:not(:disabled) { background: #e5ff8a; transform: none; box-shadow: none; }
 .pg-admin .btn-secondary { border-color: #636b80; background: #1a1d29; color: var(--text-primary); }
-.pg-admin .btn-secondary:hover { background: #272c3c; color: var(--text-primary); transform: none; }
+.pg-admin .btn-secondary:hover:not(:disabled) { background: #272c3c; color: var(--text-primary); transform: none; }
 .pg-admin .btn-danger-outline { color: var(--mq-danger); border-color: #9a5666; background: transparent; }
-.pg-admin .btn-danger-outline:hover { background: #321d26; }
+.pg-admin .btn-danger-outline:hover:not(:disabled) { background: #321d26; }
 .pg-admin button:disabled { opacity: .55; cursor: wait; }
+.pg-admin button.btn:disabled { background: var(--bg-primary); color: var(--text-secondary); border: 1px dashed var(--text-secondary); box-shadow: none; opacity: 1; transform: none; }
 .pg-admin :focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
 .pg-admin .card { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 20px; box-shadow: none; }
 .pg-admin .card:hover { transform: none; box-shadow: none; }

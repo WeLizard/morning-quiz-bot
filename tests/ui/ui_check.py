@@ -956,6 +956,64 @@ def run_errors(pw_browser):
     return c
 
 
+def run_disabled_buttons(pw_browser):
+    checks = Checks()
+    page = pw_browser.new_page()
+    shared = ('web/shell/qw-tokens.css', 'web/shell/qw-shell.css')
+    hub = 'web/mini_client/styles.css'
+    worlds = (
+        ('hub', 'data-theme', ('light', 'dark'), (hub,), '<button class="primary" disabled>Blocked</button>'),
+        ('farm', 'data-farm-theme', ('day', 'night'), ('qw_farm/static/style.css',),
+         '<button class="catalog-card" disabled>Blocked catalog card</button>'),
+        ('nc qw-mode-game', 'data-theme', ('dark',), (hub, 'web/mini_client/night-city.css'), ''),
+        ('alchemy', 'data-theme', ('dark',), ('minigames/alchemia-1.0/style.css',), ''),
+    )
+    for world, attribute, themes, sheets, extra in worlds:
+        for theme in themes:
+            for contrast in ('0', '1'):
+                page.set_content(f'''<!doctype html><html class="{world}" {attribute}="{theme}" data-qw-contrast="{contrast}">
+                    <body><section class="card">
+                    <button class="qw-btn primary">Available</button>
+                    <button class="qw-btn primary" disabled>Blocked</button>
+                    <button class="qw-btn primary" aria-disabled="true">Blocked via ARIA</button>
+                    <div class="qw-btn-group"><button aria-pressed="true" disabled>Blocked selected segment</button></div>
+                    {extra}</section></body></html>''')
+                for path in (*shared, *sheets):
+                    page.add_style_tag(content=(ROOT / path).read_text(encoding='utf-8'))
+                page.add_style_tag(content='button {transition:none!important}')
+                available, native, aria, segment, *legacy = page.locator('button').evaluate_all('''buttons => buttons.map(b => {
+                    const s = getComputedStyle(b);
+                    return [s.backgroundColor, s.backgroundImage, s.color, s.opacity, s.borderTopStyle, s.outlineStyle, s.boxShadow];
+                })''')
+                label = f'{world}/{theme}/contrast={contrast}'
+                checks.ok(native == aria and native[:2] != available[:2] and native[3:5] == ['1', 'dashed'] and native[6] == 'none',
+                          f'{label}: neutral primary for either disabled attribute (active={available}, native={native}, aria={aria})')
+                checks.ok(segment[:2] != available[:2] and segment[3] == '1' and segment[5] == 'dashed',
+                          f'{label}: selected disabled segment has a dashed outline')
+                if legacy:
+                    checks.ok(legacy[0][3:5] == ['1', 'dashed'], f'{label}: legacy button has a dashed border')
+
+    admin_css = ROOT / 'web/static/css'
+    for scope, variant, files in (
+        ('login-card', '', ('quiz-brand.css', 'admin-auth.css')),
+        ('pg-admin', 'btn btn-primary', ('style.css', 'components.css', 'quiz-brand.css', 'postgres-admin.css')),
+    ):
+        page.set_content(f'''<!doctype html><html data-admin-theme="night"><body class="{scope}">
+            <button class="{variant}">Available</button><button class="{variant}" disabled>Blocked</button></body></html>''')
+        for path in files:
+            page.add_style_tag(content=(admin_css / path).read_text(encoding='utf-8'))
+        page.add_style_tag(content='button {transition:none!important}')
+        available = page.locator('button').first
+        blocked = page.locator('button').last
+        get_style = '''b => { const s = getComputedStyle(b); return [s.backgroundColor, s.borderTopStyle, s.outlineStyle, s.transform]; }'''
+        initial = blocked.evaluate(get_style)
+        blocked.hover()
+        checks.ok(initial == blocked.evaluate(get_style) and initial[0] != available.evaluate(get_style)[0]
+                  and 'dashed' in initial[1:], f'{scope}: disabled button stays neutral on hover')
+    page.close()
+    return checks
+
+
 def main(argv):
     command = argv[1] if len(argv) > 1 else 'nav'
     try:
@@ -981,6 +1039,8 @@ def main(argv):
                 checks = run_startup(pw_browser, base)
             elif command == 'gaps-selftest':
                 checks = run_gaps_selftest(pw_browser)
+            elif command == 'disabled-buttons':
+                checks = run_disabled_buttons(pw_browser)
             elif command == 'gaps':
                 base = argv[argv.index('--base') + 1].rstrip('/') if '--base' in argv else None
                 if not base:

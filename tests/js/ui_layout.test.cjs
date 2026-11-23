@@ -34,6 +34,7 @@ function check(t, ...args) {
 
 test('shell navigation, BackButton, ⚙ menu and safe-area work with and without Telegram', t => check(t, 'nav'));
 test('button-gap scanner catches glued buttons and allows .qw-btn-group', t => check(t, 'gaps-selftest'));
+test('disabled buttons are visibly distinct across game themes', t => check(t, 'disabled-buttons'));
 test('pages render with telegram.org blocked; Telegram launches use the pinned SDK (QW_UI_BASE_URL)', t => {
     if (!process.env.QW_UI_BASE_URL) { t.skip('set QW_UI_BASE_URL to a running app'); return; }
     check(t, 'startup', '--base', process.env.QW_UI_BASE_URL);

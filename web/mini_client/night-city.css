@@ -172,18 +172,18 @@
 :root.nc .nc-portrait[aria-pressed="true"]{border-color:var(--qw-game-accent);box-shadow:inset 0 0 0 1px var(--qw-game-accent);background:#2a2012}
 .nc-portrait .tick{position:absolute;right:6px;bottom:6px;width:24px;height:24px}
 :root.nc .nc-portrait:disabled{opacity:.35;cursor:not-allowed}
+:root.nc :is(.nc-pick,.nc-portrait):disabled{border-style:dashed}
 :root.nc[data-qw-contrast="1"] .nc-portrait{border-width:2px;background:#15171c}
 :root.nc[data-qw-contrast="1"] .nc-portrait[aria-pressed="true"]{border-width:3px}
 
 /* ---------- buttons in the style: gold leaf on ink; sizes, gaps and classes stay the shell's ---------- */
 :root.nc .qw-btn{border-color:var(--nc-gold);background:#15140f;color:#f6e7c8;box-shadow:inset 0 0 0 2px #15140f,inset 0 0 0 3px rgb(214 165 82/.22);border-radius:var(--qw-r-control)}
 :root.nc .qw-btn .ic{--s:24px;margin-left:-4px}
-:root.nc .qw-btn.primary{border-color:#5a3c10;color:var(--qw-game-accent-ink);text-shadow:0 1px 0 rgb(255 236 190/.45);
+:root.nc .qw-btn.primary:where(:not(:disabled,[aria-disabled="true"])){border-color:#5a3c10;color:var(--qw-game-accent-ink);text-shadow:0 1px 0 rgb(255 236 190/.45);
   background:linear-gradient(180deg,#f3c873 0%,#e2a443 48%,#c98a2c 100%);box-shadow:inset 0 0 0 2px rgb(255 228 160/.35),0 2px 0 #3b2708}
 :root.nc .qw-btn.text{border-color:transparent;background:transparent;box-shadow:none;color:var(--nc-gold-text)}
 :root.nc .qw-btn.danger{border-color:transparent;background:transparent;box-shadow:none;color:var(--qw-game-danger)}
-:root.nc .qw-btn:disabled{opacity:1;color:#b5a88f;border-style:dashed;border-color:#6a5a3e;background:#141412;box-shadow:none;text-shadow:none;cursor:not-allowed}
-:root.nc .qw-btn.primary:disabled{color:#b5a88f}
+:root.nc .qw-btn:is(:disabled,[aria-disabled="true"]){opacity:1;color:#b5a88f;border-style:dashed;border-color:#6a5a3e;background:#141412;box-shadow:none;text-shadow:none;cursor:not-allowed}
 
 /* ---------- bottom dock ---------- */
 .nc-dock{position:fixed;z-index:25;left:0;right:0;bottom:0;padding:var(--qw-s-3) calc(var(--qw-gutter) + var(--qw-safe-right)) calc(var(--qw-s-3) + var(--qw-safe-bottom)) calc(var(--qw-gutter) + var(--qw-safe-left));
@@ -334,9 +334,9 @@
 :root.nc[data-qw-contrast="1"] .nc-track i.ready{background:var(--qw-game-accent);outline-color:#fff}
 :root.nc[data-qw-contrast="1"] .nc-dock{background:#0b0c0f;border-top-width:2px}
 :root.nc[data-qw-contrast="1"] .qw-btn{border-width:2px;box-shadow:none;background:#15140f}
-:root.nc[data-qw-contrast="1"] .qw-btn.primary{background:#f2b45a;border-color:#1d1000;text-shadow:none}
+:root.nc[data-qw-contrast="1"] .qw-btn.primary:where(:not(:disabled,[aria-disabled="true"])){background:#f2b45a;border-color:#1d1000;text-shadow:none}
 :root.nc[data-qw-contrast="1"] :is(.qw-btn.text,.qw-btn.danger){background:transparent;text-decoration:underline;text-underline-offset:3px}
-:root.nc[data-qw-contrast="1"] .qw-btn:disabled{color:#e6dcc8;border-color:#c4ab7e;background:#15140f}
+:root.nc[data-qw-contrast="1"] .qw-btn:is(:disabled,[aria-disabled="true"]){color:#e6dcc8;border-color:#c4ab7e;background:#15140f}
 :root.nc[data-qw-contrast="1"] .nc-field::placeholder{color:#d8cfbf}
 :root.nc[data-qw-contrast="1"] .nc-rolecard .face{background:#121014}
 :root.nc[data-qw-contrast="1"] .nc-net{background:#2a1214;border-bottom:2px solid #ffc2bc;color:#fff}
@@ -463,11 +463,10 @@ span.emb{box-sizing:border-box;padding:12px!important;color:var(--nc-invest)}
 
 /* ---------- buttons: the world's accent on ink; sizes stay the core's ---------- */
 :root.nc .qw-btn{border-color:var(--nc-edge);background:var(--nc-btn);color:var(--nc-btn-text);box-shadow:inset 0 0 0 2px var(--nc-btn),inset 0 0 0 3px var(--nc-rule)}
-:root.nc .qw-btn.primary{border-color:var(--nc-accent-lo);color:var(--nc-accent-ink);text-shadow:none;
+:root.nc .qw-btn.primary:where(:not(:disabled,[aria-disabled="true"])){border-color:var(--nc-accent-lo);color:var(--nc-accent-ink);text-shadow:none;
   background:linear-gradient(180deg,var(--nc-accent-hi) 0%,var(--nc-accent) 48%,var(--nc-accent-lo) 100%);box-shadow:inset 0 0 0 2px rgb(255 255 255/.22),0 2px 0 rgb(0 0 0/.45)}
 :root.nc .qw-btn.text{color:var(--nc-accent-text)}
-:root.nc .qw-btn:disabled{color:var(--nc-muted);border-color:var(--nc-line);background:var(--nc-surface)}
-:root.nc .qw-btn.primary:disabled{color:var(--nc-muted)}
+:root.nc .qw-btn:is(:disabled,[aria-disabled="true"]){color:var(--nc-muted);border-color:var(--nc-line);background:var(--nc-surface)}
 
 /* ---------- dock, fields, ticket ---------- */
 .nc-dock{background:linear-gradient(180deg,rgb(var(--nc-page-rgb)/.9),var(--nc-page) 30%);border-top-color:var(--nc-edge);box-shadow:0 -1px 0 var(--nc-page),0 -2px 0 var(--nc-rule),0 -14px 28px rgb(0 0 0/.4)}
@@ -538,8 +537,8 @@ span.emb{box-sizing:border-box;padding:12px!important;color:var(--nc-invest)}
 :root.nc[data-qw-contrast="1"] :is(.nc-seat,.nc-list>li,.nc-log li){border-top-color:var(--qw-game-line)}
 :root.nc[data-qw-contrast="1"] .nc-dock{background:var(--nc-page)}
 :root.nc[data-qw-contrast="1"] .qw-btn{background:var(--nc-btn)}
-:root.nc[data-qw-contrast="1"] .qw-btn.primary{background:var(--nc-accent);border-color:var(--nc-accent-ink)}
-:root.nc[data-qw-contrast="1"] .qw-btn:disabled{color:#fff;border-color:var(--qw-game-line);background:var(--nc-btn)}
+:root.nc[data-qw-contrast="1"] .qw-btn.primary:where(:not(:disabled,[aria-disabled="true"])){background:var(--nc-accent);border-color:var(--nc-accent-ink)}
+:root.nc[data-qw-contrast="1"] .qw-btn:is(:disabled,[aria-disabled="true"]){color:#fff;border-color:var(--qw-game-line);background:var(--nc-btn)}
 :root.nc[data-qw-contrast="1"] .nc-rolecard .face{background:var(--nc-page)}
 :root.nc[data-qw-contrast="1"] :is(.nc-mine .emb,.nc-role-chip .ic){background:var(--nc-surface-2);box-shadow:0 0 0 2px var(--nc-gold)}
 :root.nc[data-qw-contrast="1"] .nc-track i.in{background:var(--nc-edge-hc)}

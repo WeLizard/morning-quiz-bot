@@ -802,7 +802,7 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 :root[data-farm-theme=night] :is(.card,.home-project-card,.home-project-card.is-finished,.caravan,.minigame-card,.login-card,dialog,.fg-result){background:var(--surface);border-color:var(--line);color:var(--ink)}
 :root[data-farm-theme=night] :is(.callout,.shift-box,.queue-job,.object-card,.more-item,.code,.land-expansion,.project-barn-shelf,.project-inventory-shelf,.minigame-clock,.minigame-cooldown,.tag,.alpha,.avatar,.fund-mark,.fg-stage,.fg-gauge){background:var(--surface-soft);border-color:var(--line);color:var(--ink)}
 :root[data-farm-theme=night] :is(.secondary,.light,.panel-close,.header-actions button,.pill-row button,.find-filters button,.building-purpose-pick,.fg-close,.fg-key,.fg-act,.village-back,.village-townhall){background:var(--surface-soft);border-color:var(--line);color:var(--ink)}
-:root[data-farm-theme=night] :is(.primary,.fg-act.primary,.pill-row button.active){background:var(--green);color:var(--accent-ink);border-color:var(--green)}
+:root[data-farm-theme=night] :is(.primary,.fg-act.primary,.pill-row button.active):where(:not(:disabled)){background:var(--green);color:var(--accent-ink);border-color:var(--green)}
 :root[data-farm-theme=night] :is(.rail button.active,.find-filters button[aria-pressed=true],.map-chip[aria-pressed=true],.seedbar .seed.active,.home-project-card.is-active,.object-card .state.busy,.fg-key:active){background:var(--surface-selected);border-color:var(--green);color:var(--ink)}
 :root[data-farm-theme=night] :is(input,select,textarea,.panel-content select,.minigame-sack-row select){background:var(--paper);color:var(--ink);border-color:var(--line)}
 :root[data-farm-theme=night] :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
@@ -983,7 +983,7 @@ body,.topbar,.rail,.side-panel,.card,dialog,.seedbar,.seedcard,.map-chip,.map-co
 .tg-big.tg-hold{transform:scale(.985);box-shadow:inset 0 3px 0 #0002}
 .tg-big.tg-hot,:root[data-farm-theme=night] .tg-big.tg-hot{background:#c9632f;border-color:#a44d22;color:#fff}
 /* Hold-button states of fishing (hot) and "Валка" (hot, ready, stalled). The ":root .fg-controls" prefix is needed: at night
-   ":root[data-farm-theme=night] :is(.primary,.fg-act.primary,.pill-row button.active)" (0,4,1) repaints every .primary and swallowed .tg-hot;
+   the night palette rule (0,4,1) repaints enabled .primary buttons and can swallow .tg-hot;
    the contrast-mode counterparts are at the end of the file, inside the contrast block. */
 :root .fg-controls .tg-big.tg-hot{background:#c9632f;border-color:#a44d22;color:#fff}
 :root .fg-controls .tg-big.tg-ready{background:#2f7a43;border-color:#1f5a32;color:#fff}
@@ -1613,7 +1613,7 @@ dialog.entry-info-dialog{max-width:520px}
 :root[data-qw-contrast="1"] :is(.card,.home-project-card,.caravan,.minigame-card,.login-card,dialog,.fg-result,.catalog-card,.catalog-search,.callout,.shift-box,.queue-job,.object-card,.more-item,.land-expansion,.tag,.event,.crate,.fund-tier){background:var(--surface);border:var(--qw-outline-w) solid var(--line);color:var(--ink)}
 :root[data-qw-contrast="1"] :is(.bulk-action,.bulk-plan){border-color:var(--ink)}
 :root[data-qw-contrast="1"] :is(.secondary,.light,.panel-close,.pill-row button,.find-filters button,.building-purpose-pick,.catalog-section,.catalog-clear,.village-back,.village-townhall){background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 var(--qw-outline-w) var(--ink)}
-:root[data-qw-contrast="1"] :is(.primary,.pill-row button.active){background:var(--hc-pick);color:var(--hc-pick-ink);border-color:var(--hc-pick)}
+:root[data-qw-contrast="1"] :is(.primary,.pill-row button.active):where(:not(:disabled)){background:var(--hc-pick);color:var(--hc-pick-ink);border-color:var(--hc-pick)}
 :root[data-qw-contrast="1"] :is(.find-filters button[aria-pressed=true],.map-chip[aria-pressed=true],.catalog-section[aria-pressed=true],.home-project-card.is-active,.object-card.is-selected){background:var(--surface);color:var(--ink);border-color:var(--hc-pick);box-shadow:inset 0 0 0 3px var(--hc-pick);outline:0}
 :root[data-qw-contrast="1"] :is(input,select,textarea){background:var(--surface);color:var(--ink);border:var(--qw-outline-w) solid var(--ink)}
 :root[data-qw-contrast="1"] .catalog-search input{border:0}

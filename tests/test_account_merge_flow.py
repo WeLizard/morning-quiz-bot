@@ -413,7 +413,7 @@ def test_merge_locks_users_identities_sessions_before_accounts(pg_env, monkeypat
                 assert response.status_code == 200, response.text
                 assert 'accounts' in seen and 'users' in seen
                 first_account = seen.index('accounts')
-                for table in ('users', 'account_identities', 'guest_sessions'):
+                for table in ('users', 'account_identities', 'account_sessions'):
                     assert table in seen[:first_account], (choice, table, seen)
                     assert table not in seen[first_account:], (choice, table, seen)
                 # The Telegram lookup takes the User row before the identity rows.

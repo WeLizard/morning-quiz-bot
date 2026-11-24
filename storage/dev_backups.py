@@ -7,11 +7,13 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 from urllib.parse import urlsplit
 from uuid import uuid4
 import zipfile
 
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 
 from .models import Base
 
@@ -21,6 +23,7 @@ CONTAINER = 'mqb-local-dev-postgres-1'
 ROLE = 'mqb_dev'
 DBNAME = 'morning_quiz_dev'
 MAX_BYTES = 256 * 1024 * 1024
+LEGACY_SESSION_TABLES = {'guest_sessions', 'mini_app_sessions'}
 
 
 def _inside_dev_container():
@@ -79,7 +82,7 @@ async def fingerprints(session):
     # During an in-place upgrade the live dev schema may be one revision behind
     # the checked-out models. Fingerprint only known tables that actually exist;
     # this makes a pre-migration backup possible without inventing empty tables.
-    for table in sorted(set(Base.metadata.tables) & present):
+    for table in sorted((set(Base.metadata.tables) | LEGACY_SESSION_TABLES) & present):
         # Table names are code-owned, never supplied by an HTTP client.
         row = (await session.execute(text(f'SELECT count(*), md5(coalesce(string_agg(row_to_json(t)::text, chr(10) ORDER BY row_to_json(t)::text), \'\')) FROM "{table}" t'))).one()
         result[table] = {'rows': row[0], 'digest': row[1]}
@@ -89,7 +92,7 @@ async def fingerprints(session):
 def validate_table_manifest(tables):
     if not isinstance(tables, dict):
         raise ValueError('Неполный манифест архива')
-    known = set(Base.metadata.tables)
+    known = set(Base.metadata.tables) | LEGACY_SESSION_TABLES
     for name, fingerprint in tables.items():
         if (not isinstance(name, str) or name not in known
                 or not isinstance(fingerprint, dict)
@@ -230,12 +233,36 @@ def trash(backup_id):
     return {'id': backup_id, 'removed_from_list': True, 'recoverable': True}
 
 
+def _upgrade_legacy_archive(database, raw):
+    """Migrate an old archive in a separate local database before overwriting dev."""
+    target = 'mqb_restore_' + uuid4().hex
+    command(['createdb', '-U', ROLE, '-T', 'template0', target])
+    try:
+        command(['pg_restore', '-U', ROLE, '-d', target, '--no-owner', '--exit-on-error'], raw=raw)
+        url = make_url(database.settings.url).set(database=target)
+        env = {**os.environ, 'DATABASE_URL': url.render_as_string(hide_password=False)}
+        result = subprocess.run([sys.executable, '-m', 'alembic', 'upgrade', 'head'],
+                                cwd=WORKSPACE, env=env, capture_output=True, timeout=180)
+        if result.returncode:
+            raise RuntimeError('Не удалось обновить схему резервной копии в отдельной БД')
+        return command(['pg_dump', '-U', ROLE, '-d', target, '--format=custom', '--no-owner'])
+    finally:
+        command(['dropdb', '-U', ROLE, target])
+
+
 async def restore_dev(database, backup_id, *, confirmation):
     """Offline CLI only. PowerShell owns the exclusive dev lease and stopped-service guard."""
     if confirmation != DBNAME or os.getenv('MQB_DEV_RESTORE_ID') != backup_id:
         raise ValueError('Используйте Restore-LocalDevBackup.ps1 с явным подтверждением dev-БД')
     await asyncio.to_thread(guard, database)
     manifest, files = await asyncio.to_thread(read_verified, backup_id)
+    source = files['database.dump']
+    if LEGACY_SESSION_TABLES & manifest['tables'].keys():
+        async with database.transaction() as session:
+            current_schema = await session.scalar(text("SELECT to_regclass('account_sessions')"))
+        if not current_schema:
+            raise ValueError('Сначала обновите постоянную dev-БД до текущей схемы')
+        source = await asyncio.to_thread(_upgrade_legacy_archive, database, source)
     safety = await create(database)
     _, previous_files = await asyncio.to_thread(read_verified, safety['id'])
     retained = ROOT / ('before-restore-' + uuid4().hex)
@@ -243,7 +270,7 @@ async def restore_dev(database, backup_id, *, confirmation):
     def restore_database(raw):
         command(['pg_restore', '-U', ROLE, '-d', DBNAME, '--no-owner', '--clean', '--if-exists', '--single-transaction', '--exit-on-error'], raw=raw)
     try:
-        await asyncio.to_thread(restore_database, files['database.dump'])
+        await asyncio.to_thread(restore_database, source)
         await database.engine.dispose()  # Discard prepared statements tied to the replaced schema.
         # Format 1 archives contained the old file-backed bank. It is restored
         # only for backwards recovery; format 2 keeps the bank solely in PG.

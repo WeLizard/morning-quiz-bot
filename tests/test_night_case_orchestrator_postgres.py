@@ -243,7 +243,7 @@ class NightCaseOrchestratorPostgresTests(unittest.IsolatedAsyncioTestCase):
             async with self.db.transaction() as session:
                 self.assertTrue(await session.scalar(text('SELECT pg_try_advisory_xact_lock(:key)'),{'key':AI_CONFIG_LOCK}))
                 await session.execute(select(Game).where(Game.id==game).with_for_update(nowait=True))
-                if revoke: (await session.get(GuestSession,token_hash)).revoked=True
+                if revoke: (await session.get(GuestSession,GuestSession.key(token_hash))).revoked=True
             if not revoke:
                 command=await self.player_command(game,self.accounts[1],'seen')
                 async with self.db.transaction() as session:

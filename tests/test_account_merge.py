@@ -163,7 +163,7 @@ def test_auto_merge_empty_guest_into_telegram(pg_url):
             async with env.db.transaction() as session:
                 sec = await session.get(Account, gid)
                 assert sec.archived and sec.merged_into_id == tid and sec.merged_at
-                assert (await session.get(GuestSession, 'g' * 64)).account_id == tid
+                assert (await session.get(GuestSession, GuestSession.key('g' * 64))).account_id == tid
                 assert (await session.get(AlchemyProgress, tid)).points_total == Decimal(7)
                 audit = await session.scalar(select(AccountMerge).where(AccountMerge.merged_account_id == gid))
                 assert audit.main_account_id == tid and audit.initiated_via == 'telegram_login'
@@ -385,7 +385,7 @@ def test_moved_guest_sessions_lose_telegram_freshness(pg_url):
                 aid, bid = a.id, b.id
             await merge(env, aid, bid)
             async with env.db.transaction() as session:
-                row = await session.get(GuestSession, 'f' * 64)
+                row = await session.get(GuestSession, GuestSession.key('f' * 64))
                 assert row.account_id == aid and row.created_via is None
     run(case())
 

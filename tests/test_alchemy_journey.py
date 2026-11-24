@@ -205,7 +205,7 @@ def test_guest_logout_and_expiry_reject_claim_without_receipt(pg_env):
             assert logout.value.status == 401
             _, expired, expired_id = await guest(db)
             async with db.transaction() as session:
-                (await session.get(GuestSession, credential_hash(expired))).expires_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
+                (await session.get(GuestSession, GuestSession.key(credential_hash(expired)))).expires_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
             with pytest.raises(MiniAppError) as expiry:
                 await service.guest_claim_stage(expired, **{**command, 'expected_account_id': expired_id})
             assert expiry.value.status == 401

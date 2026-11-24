@@ -92,7 +92,7 @@ class AccountSecurityService:
         """A Telegram proof younger than 15 minutes: a recent Mini App session or browser Telegram login."""
         threshold = self.guests.now() - FRESH_TELEGRAM
         if who.channel == 'telegram':
-            mini = await session.get(MiniAppSession, token_digest(mini_cookie)) if mini_cookie else None
+            mini = await session.get(MiniAppSession, MiniAppSession.key(token_digest(mini_cookie))) if mini_cookie else None
             return mini is not None and not mini.revoked and mini.created_at > threshold
         return row is not None and row.created_via == 'telegram' and row.created_at > threshold
 
@@ -103,7 +103,7 @@ class AccountSecurityService:
         if credential is None or await self._identity(session, account_id, PROVIDER) is None:
             raise MiniAppError(409, 'Сначала задай логин и пароль', code='no_password')
         keep_guest = self._guest_hash(who, guest_cookie)
-        row = await session.get(GuestSession, keep_guest) if keep_guest else None
+        row = await session.get(GuestSession, GuestSession.key(keep_guest)) if keep_guest else None
         key = f'account:{who.account_id}'
         if not await self._fresh_telegram(session, who, row, mini_cookie):
             if not isinstance(current_password, str) or not current_password:

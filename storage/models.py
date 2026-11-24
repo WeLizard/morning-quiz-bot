@@ -276,18 +276,57 @@ class RoomTransport(TimestampMixin, Base):
     )
 
 
-class GuestSession(Base):
-    __tablename__ = "guest_sessions"
+class AccountSession(Base):
+    """Both login channels share storage, with separate credential namespaces."""
+    __tablename__ = 'account_sessions'
 
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
-    account_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
-    # 'guest' | 'password' | 'telegram' (browser Telegram login); NULL for sessions before 0031.
+    account_id: Mapped[Optional[UUID]] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='CASCADE'))
+    account_revision: Mapped[Optional[int]] = mapped_column(Integer)
     created_via: Mapped[Optional[str]] = mapped_column(String(16))
     user_agent: Mapped[Optional[str]] = mapped_column(String(120))
+    user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'))
+    user_revision: Mapped[Optional[int]] = mapped_column(Integer)
+    bot_key_id: Mapped[Optional[str]] = mapped_column(String(64))
+    init_data_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    auth_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    __mapper_args__ = {'polymorphic_on': kind, 'polymorphic_abstract': True}
+    __table_args__ = (
+        CheckConstraint(
+            "(kind = 'browser' AND account_id IS NOT NULL AND account_revision IS NOT NULL "
+            "AND user_id IS NULL AND user_revision IS NULL AND bot_key_id IS NULL "
+            "AND init_data_hash IS NULL AND auth_date IS NULL) OR "
+            "(kind = 'mini' AND account_id IS NULL AND account_revision IS NULL "
+            "AND created_via IS NULL AND user_agent IS NULL AND user_id IS NOT NULL "
+            "AND user_revision IS NOT NULL AND bot_key_id IS NOT NULL "
+            "AND init_data_hash IS NOT NULL AND auth_date IS NOT NULL)",
+            name='ck_account_sessions_kind_fields',
+        ),
+        Index('ix_account_sessions_account_id', 'account_id', postgresql_where=sql_text("kind = 'browser'")),
+        Index('ix_account_sessions_browser_expiry', 'expires_at', postgresql_where=sql_text("kind = 'browser'")),
+        Index('ix_account_sessions_mini_user_expiry', 'user_id', 'expires_at', postgresql_where=sql_text("kind = 'mini'")),
+        Index('ix_account_sessions_mini_expiry', 'expires_at', postgresql_where=sql_text("kind = 'mini'")),
+        Index('uq_account_sessions_mini_init_data', 'bot_key_id', 'init_data_hash', unique=True,
+              postgresql_where=sql_text("kind = 'mini'")),
+    )
+
+    @classmethod
+    def key(cls, digest):
+        return cls.__mapper__.polymorphic_identity, digest
+
+
+class GuestSession(AccountSession):
+    """Browser sessions, including password and linked Telegram browser access."""
+    __mapper_args__ = {'polymorphic_identity': 'browser'}
+
+
+class MiniAppSession(AccountSession):
+    """Telegram WebView sessions with an initData replay record."""
+    __mapper_args__ = {'polymorphic_identity': 'mini'}
 
 
 class User(ModerationMixin, TimestampMixin, Base):
@@ -768,25 +807,6 @@ class AdminAction(Base):
         Index("ix_admin_actions_target", "scope", "target_id", "created_at"),
         Index("ix_admin_actions_account_target", "target_account_id", "created_at"),
         CheckConstraint("(scope = 'accounts' AND target_id IS NULL AND target_account_id IS NOT NULL) OR (scope <> 'accounts' AND target_id IS NOT NULL AND target_account_id IS NULL)", name="ck_admin_actions_typed_target"),
-    )
-
-
-class MiniAppSession(Base):
-    """Opaque, short-lived user sessions. Raw credentials are never stored."""
-    __tablename__ = 'mini_app_sessions'
-    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    bot_key_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    init_data_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    user_revision: Mapped[int] = mapped_column(Integer, nullable=False)
-    auth_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false', nullable=False)
-    __table_args__ = (
-        UniqueConstraint('bot_key_id', 'init_data_hash', name='uq_mini_app_init_data'),
-        Index('ix_mini_app_sessions_user_expiry', 'user_id', 'expires_at'),
-        Index('ix_mini_app_sessions_expiry', 'expires_at'),
     )
 
 

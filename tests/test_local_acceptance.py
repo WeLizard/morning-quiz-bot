@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 from fastapi import FastAPI
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from tests.local_database import isolated_database
 from tests.test_admin_auth import TOKEN, login
@@ -304,26 +304,24 @@ def test_mini_session_migration_preserves_all_existing_operational_rows(pg_env, 
         from alembic.migration import MigrationContext
         from alembic.operations import Operations
         from alembic.script import ScriptDirectory
-        from storage.models import MiniAppSession
         async with isolated_database(pg_env) as (db, _):
             await JsonToPostgresImporter(db, snapshot(tmp_path)).run()
             async def existing_rows():
                 async with db.transaction() as session:
                     return {table.name: sorted(json.dumps(dict(row), sort_keys=True, default=str)
                         for row in (await session.execute(select(table))).mappings())
-                        for table in Base.metadata.sorted_tables if table.name != 'mini_app_sessions'}
+                        for table in Base.metadata.sorted_tables}
             before = await existing_rows()
             migration = ScriptDirectory.from_config(Config('alembic.ini')).get_revision('20260830_0006').module
             async with db.engine.begin() as connection:
                 def upgrade(sync):
-                    MiniAppSession.__table__.drop(sync)
                     with monkeypatch.context() as patch:
                         patch.setattr(migration, 'op', Operations(MigrationContext.configure(sync)))
                         migration.upgrade()
                 await connection.run_sync(upgrade)
             assert await existing_rows() == before
             async with db.transaction() as session:
-                assert await session.scalar(select(func.count()).select_from(MiniAppSession)) == 0
+                assert await session.scalar(text('SELECT count(*) FROM mini_app_sessions')) == 0
     asyncio.run(run())
 
 

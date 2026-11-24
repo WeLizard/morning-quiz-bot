@@ -85,7 +85,7 @@ class MiniAppStore:
             if session_limit is not None and count >= session_limit:
                 raise MiniAppError(429, 'Слишком много входов. Повторите позже.')
             created = await session.scalar(insert(MiniAppSession).values(
-                token_hash=token_digest(raw_token), bot_key_id=self.bot_key_id,
+                kind='mini', token_hash=token_digest(raw_token), bot_key_id=self.bot_key_id,
                 init_data_hash=identity.fingerprint, user_id=user.id, user_revision=user.moderation_revision,
                 auth_date=datetime.fromtimestamp(identity.auth_date, timezone.utc),
                 created_at=now, expires_at=expires, revoked=False,
@@ -152,7 +152,7 @@ class MiniAppStore:
     async def logout(self, token):
         digest = token_digest(token)
         async with self.database.transaction() as session:
-            row = await session.get(MiniAppSession, digest)
+            row = await session.get(MiniAppSession, MiniAppSession.key(digest))
             if row and row.bot_key_id == self.bot_key_id:
                 row.revoked = True  # Keep replay tombstone until expiry.
 

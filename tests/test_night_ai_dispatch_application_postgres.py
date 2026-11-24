@@ -703,7 +703,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
             async with self.db.transaction() as s:
                 self.backend.contexts+=1
                 try:
-                    guest=await s.get(GuestSession,token,populate_existing=True)
+                    guest=await s.get(GuestSession,GuestSession.key(token),populate_existing=True)
                     if guest.revoked:raise NightCaseError('unavailable',404)
                     yield s
                 finally:self.backend.contexts-=1
@@ -714,7 +714,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         try:
             await asyncio.wait_for(self.backend.entered.wait(),2)
             self.assertEqual(self.backend.contexts,0)
-            async with self.db.transaction() as s:(await s.get(GuestSession,token)).revoked=True
+            async with self.db.transaction() as s:(await s.get(GuestSession,GuestSession.key(token))).revoked=True
         finally:self.backend.release.set()
         with self.assertRaises(NightCaseError):await task
         async with self.db.transaction() as s:

@@ -118,6 +118,24 @@ def test_restore_verifies_only_tables_captured_in_pre_migration_snapshot(root, m
     assert all('room_invites' not in query for query in checks)
 
 
+def test_legacy_session_backup_uses_an_isolated_database_for_upgrade(root, monkeypatch):
+    manifest = {name: {'rows': 1, 'digest': 'a' * 32} for name in backups.LEGACY_SESSION_TABLES}
+    key = archive({'database.dump': b'old'}, tables=manifest)
+    assert backups.read_verified(key)[0]['tables'] == manifest
+    command = Mock(side_effect=[b'', b'', b'upgraded', b''])
+    migrate = Mock(return_value=SimpleNamespace(returncode=0))
+    monkeypatch.setattr(backups, 'command', command)
+    monkeypatch.setattr(backups.subprocess, 'run', migrate)
+    dev = SimpleNamespace(settings=SimpleNamespace(
+        url='postgresql+asyncpg://mqb_dev@127.0.0.1:55433/morning_quiz_dev'))
+    assert backups._upgrade_legacy_archive(dev, b'old') == b'upgraded'
+    calls = [call.args[0] for call in command.call_args_list]
+    assert [call[0] for call in calls] == ['createdb', 'pg_restore', 'pg_dump', 'dropdb']
+    target = calls[0][-1]
+    assert target.startswith('mqb_restore_') and calls[-1][-1] == target
+    assert migrate.call_args.kwargs['env']['DATABASE_URL'].endswith('/' + target)
+
+
 def test_inplace_restore_rejects_missing_explicit_offline_intent(monkeypatch):
     monkeypatch.delenv('MQB_DEV_RESTORE_ID', raising=False)
     with pytest.raises(ValueError, match='PowerShell|ps1'):

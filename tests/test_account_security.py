@@ -177,9 +177,8 @@ def test_recovery_by_fresh_telegram_session_and_stale_session(pg_env):
                         'login': 'recover_me', 'password': NEW_PASSWORD})).status_code == 200
                 # The same session older than 15 minutes needs the current password.
                 async with env.db.transaction() as session:
-                    stale = await session.get(GuestSession, next(
-                        r.token_hash for r in (await session.scalars(select(GuestSession))).all()
-                        if r.created_via == 'telegram'))
+                    stale = next(r for r in (await session.scalars(select(GuestSession))).all()
+                                 if r.created_via == 'telegram')
                     stale.created_at -= timedelta(minutes=20)
                 denied = await recovered.post('/api/account/password', headers=HEADERS,
                                               json={'new_password': PASSWORD})

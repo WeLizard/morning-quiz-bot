@@ -41,7 +41,7 @@ def test_guest_lifecycle_and_moderation(guest_pg_url):
             async with db.transaction() as session:
                 assert await session.scalar(select(func.count()).select_from(Account)) == 1
                 assert await session.scalar(select(func.count()).select_from(User)) == 0
-                row = await session.get(GuestSession, credential_hash(raw))
+                row = await session.get(GuestSession, GuestSession.key(credential_hash(raw)))
                 assert row.token_hash != raw and row.account_id is not None
             rotated, new_raw = await store.resume(raw)
             assert rotated['account_id'] == profile['account_id'] and new_raw == raw
@@ -56,7 +56,7 @@ def test_guest_lifecycle_and_moderation(guest_pg_url):
             for flag in ('archived', 'bot_blocked', 'moderation_revision'):
                 profile, raw = await store.start()
                 async with db.transaction() as session:
-                    row = await session.get(GuestSession, credential_hash(raw))
+                    row = await session.get(GuestSession, GuestSession.key(credential_hash(raw)))
                     account = await session.get(Account, row.account_id)
                     setattr(account, flag, 1 if flag == 'moderation_revision' else True)
                 with pytest.raises(MiniAppError):

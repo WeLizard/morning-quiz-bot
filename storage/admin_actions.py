@@ -13,7 +13,7 @@ import json
 
 from sqlalchemy import and_, select, text, or_, update
 
-from .models import Account, AdminAction, Chat, ChatMember, Game, GuestSession, QuizSession, User, SystemState
+from .models import Account, AdminAction, Chat, ChatMember, Game, GuestSession, MiniAppSession, QuizSession, User, SystemState
 from .games import GameRepository
 from .score_ledger import RewardLedger, ensure_account_for_user
 
@@ -223,6 +223,9 @@ class AdminActions:
             row.moderation_revision += 1
             if row.bot_blocked or row.archived:
                 await session.execute(update(GuestSession).where(GuestSession.account_id == account_id).values(revoked=True))
+                telegram_user = select(User.id).where(User.account_id == account_id)
+                await session.execute(update(MiniAppSession).where(
+                    MiniAppSession.user_id.in_(telegram_user)).values(revoked=True))
             return await self._record(session, action_id, 'accounts', account_id, kind,
                                       request, before, moderation(row))
 

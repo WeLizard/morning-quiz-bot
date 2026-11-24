@@ -200,14 +200,14 @@ def test_session_renewal_and_expiry(farm_pg_url, identity):
             endpoint = '/api/guest/resume' if identity == 'guest' else '/api/mini/session/renew'
             headers = GUEST_HEADERS if identity == 'guest' else MINI_HEADERS
             async with env.db.transaction() as session:
-                before_expiry = (await session.get(table, digest)).expires_at
+                before_expiry = (await session.get(table, table.key(digest))).expires_at
             env.now[0] += 60
             for _ in range(2):
                 response = await p.client.post(endpoint, headers=headers)
                 assert response.status_code == 200, response.text
                 assert p.client.cookies.get(cookie_name) == raw
             async with env.db.transaction() as session:
-                expires = (await session.get(table, digest)).expires_at
+                expires = (await session.get(table, table.key(digest))).expires_at
                 assert expires > before_expiry
                 assert await session.scalar(select(func.count()).select_from(table)) == 1
             assert (await view(p))['id'] == p.farm_id

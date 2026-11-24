@@ -17,7 +17,7 @@ next visit (``claim_village``): no background workers.
 from .catalog import (BUILDINGS, ITEMS, level, income_ref, FUND_LEVEL,
                       SEASON_DAYS, FUND_TIERS, FUND_MARKUP, MIN_SHARE_PCT, DEBT_SLOW, DEBT_SLOW_DEN, FEAST_DAYS, FEAST_PCT,
                       DECOR_SHOP, DECOR_EXTRA, REWARD_DECOR, TIER_DISCOUNT_PCT, MAX_CONTRIBUTION, FUND_REWARD_TEXT,
-                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET, PLANTATION_UPKEEP, RUSH_DAYS, RUSH_PCT)
+                      TREE_RENT_STEP, TREE_RENT_FREE_OFFSET, RUSH_DAYS, RUSH_PCT)
 from .upkeep_config import land_plot_rate, settings_for
 
 TZ_OFFSET = 10800
@@ -88,8 +88,10 @@ def tree_upkeep(farm, upkeep_config=None):
                for index, _ in enumerate(ordered_trees(farm), 1))
 
 
-def base_upkeep(farm, upkeep_config=None):
+def base_upkeep(farm, upkeep_config=None, *, at=None):
     """Daily bill before discounts for land, buildings, fields, orchards and plantations."""
+    from .plantations import upkeep_per_hectare
+
     settings = settings_for(upkeep_config)
     size = farm['size']
     per_plot = land_plot_rate(size, settings)
@@ -107,7 +109,7 @@ def base_upkeep(farm, upkeep_config=None):
     total += settings['field_per_hectare'] * sum(
         f.get('ha', 0) for f in farm.get('fields', []) if isinstance(f, dict)
     )
-    return total + PLANTATION_UPKEEP * len(farm.get('plantations', []))
+    return total + sum(upkeep_per_hectare(hectare.get('crop'), at) for hectare in farm.get('plantations', []))
 
 
 def perk(farm, name, at):
@@ -133,7 +135,7 @@ def discount_active(farm, at):
 
 
 def upkeep(farm, at, upkeep_config=None):
-    u = base_upkeep(farm, upkeep_config)
+    u = base_upkeep(farm, upkeep_config, at=at)
     return u * (100 - TIER_DISCOUNT_PCT) // 100 if discount_active(farm, at) else u
 
 
@@ -315,7 +317,7 @@ def status(farm, at, upkeep_config=None):
     return dict(
         active=lv >= settings['upkeep_level'], fund_open=lv >= FUND_LEVEL,
         upkeep=upkeep(farm, at, settings) if lv >= settings['upkeep_level'] else 0,
-        base_upkeep=base_upkeep(farm, settings),
+        base_upkeep=base_upkeep(farm, settings, at=at),
         discount=discount_active(farm, at), debt=e['debt'], slow=e['debt'] > 0, billed_today=e['billed_day'] >= moscow_day(at),
         season=season, season_ends_at=season_end(season), ref=ref, thresholds=thresholds(ref),
         personal=rec['personal'] if rec else 0, tiers=rec['tiers'] if rec else 0, joined=bool(rec and rec['joined']),

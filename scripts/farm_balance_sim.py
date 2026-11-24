@@ -1503,7 +1503,7 @@ def plantation_payback_report(days, crew_only=False):
                 candidate = candidate_land + planting
                 payback = {cost: None for cost in (draft, candidate)}
                 for i in range(days):
-                    net -= PT.PLANTATION_UPKEEP
+                    net -= PT.upkeep_per_hectare(crop, midnight + i * DAY)
                     for session in sessions:
                         now = midnight + i * DAY + session
                         if now < cycle['ready_at']:

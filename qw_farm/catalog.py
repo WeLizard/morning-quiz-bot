@@ -13,6 +13,7 @@ def tick(now):
 VERSION = 'farm-2026-10-r9'
 PLANTATIONS_WIRED = True  # Controls entry and plantation commands. Stock and recipes remain readable if switched off.
 PLANTATION_UPKEEP = 1200
+PLANTATION_WINTER_UPKEEP = 600
 TEA_LEAF_ITEM = dict(id='tea_leaf', name='Свежий чайный лист', price=28, color='#77a654', kind='product')
 CROPS = {}
 # id, title, seed cost, seconds, yield, unit NPC value, XP, level, tint

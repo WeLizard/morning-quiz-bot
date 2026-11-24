@@ -69,6 +69,7 @@ def test_sequential_purchases_have_stable_ids_and_upkeep():
     assert before - state['coins'] == sum(s['cost'] for s in plantations.STEPS.values())
     error('already_owned', cmd, state, 'buy_plantation', {'step': 3})
     assert catalog.public_catalog()['plantations']['upkeep'] == 1200
+    assert catalog.public_catalog()['plantations']['vineyard_winter_upkeep'] == 600
 
 
 def test_planting_revision_and_owner_projection():
@@ -138,13 +139,13 @@ def test_harvest_waits_and_ages_only_after_collection():
     expected = deepcopy(state)
     progression.grant_xp(expected, 576, 'harvest', at, True, 2 * economy.DAY)
     cmd(state, 'plantation_auto', data, at)
-    assert state['coins'] == before['coins'] and state['inventory']['grape'] == 41
-    assert state['market']['counts']['h:grape'] == 41
+    assert state['coins'] == before['coins'] and state['inventory']['grape'] == 53
+    assert state['market']['counts']['h:grape'] == 53
     assert state['xp'] == expected['xp']
     hectare = state['plantations'][0]
     assert hectare['cycle']['started_at'] == at
     assert hectare['cycle']['ready_at'] == moscow(2028, 3, 3)
-    for quantity in [41, 41, 68]:
+    for quantity in [53, 53, 88]:
         at = hectare['cycle']['ready_at'] + 1
         stock = state['inventory']['grape']
         cmd(state, 'plantation_auto', dict(plantation=1, revision=hectare['revision']), at)
@@ -172,18 +173,17 @@ def test_tea_enters_order_pool_after_first_collection():
 def test_current_season_keeps_its_reward_after_rebalance(monkeypatch):
     state = farm()
     cmd(state, 'buy_plantation', {'step': 1})
-    cmd(state, 'plant_plantation', dict(plantation=1, revision=0, crop='vineyard'))
+    grape = plantations.CULTURES['vineyard']
+    with monkeypatch.context() as old_catalog:
+        old_catalog.setitem(grape, 'yield_qty', 75)
+        cmd(state, 'plant_plantation', dict(plantation=1, revision=0, crop='vineyard'))
     hectare = state['plantations'][0]
     cycle = deepcopy(hectare['cycle'])
-    grape = plantations.CULTURES['vineyard']
-    monkeypatch.setitem(grape, 'yield_qty', 100)
-    monkeypatch.setitem(grape, 'xp', 40)
-    monkeypatch.setitem(grape, 'seconds', economy.DAY)
     assert hectare['cycle'] == cycle and plantations.cycle_reward(cycle) == (41, 576)
     cmd(state, 'plantation_auto', dict(plantation=1, revision=1), cycle['ready_at'])
     assert state['inventory']['grape'] == 41
-    assert hectare['cycle']['ready_at'] == cycle['ready_at'] + economy.DAY
-    assert plantations.cycle_reward(hectare['cycle']) == (54, 288)
+    assert hectare['cycle']['ready_at'] == cycle['ready_at'] + 2 * economy.DAY
+    assert plantations.cycle_reward(hectare['cycle']) == (53, 576)
 
 
 def test_plantation_processing_uses_standard_workshops():
@@ -232,6 +232,6 @@ def test_farm_service_replays_and_rejects_stale_tab():
             await service.command('harvest-plantation-2', 'plantation_auto', data)
         assert stale.value.code == 'stale_object'
         assert unit.farms[state['id']] == after
-        assert live['inventory']['grape'] == 41 and live['plantations'][0]['harvests'] == 1
+        assert live['inventory']['grape'] == 53 and live['plantations'][0]['harvests'] == 1
         assert [k for k, kind in unit.records if kind == 'plantation_auto'] == ['harvest-plantation-1']
     asyncio.run(scenario())

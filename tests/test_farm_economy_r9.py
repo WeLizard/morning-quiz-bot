@@ -1,6 +1,7 @@
 """Farm r9 stage 14: upkeep, the two-part village fund (personal scale + shared counter) and paid decor."""
 import asyncio
 from copy import deepcopy
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -82,6 +83,35 @@ def test_one_bill_per_active_moscow_day_and_a_free_first_day():
     f['inventory']['wheat'] = 1
     cmd(f, 'sell', {'item': 'wheat', 'qty': 1}, D1 + 5 * DAY)               # idle days are not billed one by one
     assert f['economy']['stats']['upkeep_paid'] == 204
+
+
+def test_winter_vineyard_upkeep_in_owner_view_and_active_day_bill():
+    winter_start = int(datetime.fromisoformat('2026-12-01T00:00:00+03:00').timestamp())
+    winter_end = int(datetime.fromisoformat('2027-03-01T00:00:00+03:00').timestamp())
+    f = farm(lv=41, coins=2_000_000)
+    other_upkeep = economy.base_upkeep(f)
+    for step in (1, 2, 3):
+        cmd(f, 'buy_plantation', {'step': step}, winter_start - 1)
+    for hectare, crop in enumerate(('vineyard', 'vineyard', 'tea_garden'), 1):
+        cmd(f, 'plant_plantation', {'plantation': hectare, 'revision': 0, 'crop': crop}, winter_start - 1)
+
+    assert project(f, f, winter_start - 1)['economy_status']['base_upkeep'] == other_upkeep + 4800
+    economy.record(f, economy.season_of(winter_start), 41)['tiers'] = 3
+    winter_base = other_upkeep + 3600
+    winter_due = winter_base * 75 // 100
+    for now in (winter_start, winter_end - 1):
+        status = project(f, f, now)['economy_status']
+        assert status['base_upkeep'] == winter_base
+    assert project(f, f, winter_start)['economy_status']['upkeep'] == winter_due
+    assert project(f, f, winter_end)['economy_status']['base_upkeep'] == other_upkeep + 4800
+
+    coins = f['coins']
+    for now in (winter_start, winter_start + 10, winter_end):
+        f['inventory']['wheat'] = 1
+        cmd(f, 'sell', {'item': 'wheat', 'qty': 1}, now)
+    total_due = winter_due + other_upkeep + 4800
+    assert f['coins'] == coins + 3 * W - total_due
+    assert f['economy']['stats']['upkeep_paid'] == total_due
 
 
 def test_no_bill_below_l10_and_for_rescue_pay_and_failed_commands():

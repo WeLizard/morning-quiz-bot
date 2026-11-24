@@ -33,7 +33,7 @@ def test_two_tabs_can_collect_a_plantation_cycle_only_once(farm_pg_url):
             after = await raw_farm(env, actor)
             expected = deepcopy(before)
             progression.grant_xp(expected, 576, 'harvest', env.now[0], True, 2 * 86400)
-            assert after['inventory']['grape'] == 41 and after['xp'] == expected['xp']
+            assert after['inventory']['grape'] == 53 and after['xp'] == expected['xp']
             hectare = after['plantations'][0]
             assert hectare['harvests'] == 1 and hectare['revision'] == data['revision'] + 1
             assert await accepted(actor, 'plantation_auto', data, key=keys[winner]) == replies[winner].json()

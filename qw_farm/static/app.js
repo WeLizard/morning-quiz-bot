@@ -2779,6 +2779,7 @@ function renderPlantations(p){
  const panel=el('div',null,'plantations-panel'),mine=S.me.plantations||[],next=NAV.nextPlantationStep(P.steps,mine.length);
  p.append(panel);
  note('На каждом гектаре растёт одна многолетняя культура. После сбора начинается новый сезон.',panel);
+ if(P.vineyard_winter_upkeep!=null)note(`Зимой содержание виноградника — ${fmt(P.vineyard_winter_upkeep)} монет за гектар в сутки.`,panel);
  if(mine.length){
   panel.append(el('h3',`Мои плантации · ${mine.length} га`,'subheading'));
   for(const h of mine)panel.append(plantationCard(h,P));

@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 
 from . import market, progression
-from .catalog import ITEMS, PLANTATION_UPKEEP, level
+from .catalog import ITEMS, PLANTATION_UPKEEP, PLANTATION_WINTER_UPKEEP, level
 from .domain import duration, find, inventory, named, need, number, pay
 from .economy import DAY, TZ_OFFSET
 
@@ -17,7 +17,7 @@ STEP_ENDS = tuple(sum(STEPS[n]['ha'] for n in STEPS if n <= step) for step in ST
 MAX_HECTARES = STEP_ENDS[-1]
 CULTURES = {
     'vineyard': dict(name='Виноград', level=32, cost=40_000, juvenile=3, seconds=2 * DAY,
-                     yield_qty=75, item='grape', xp=80, winter_pause=True),
+                     yield_qty=98, item='grape', xp=80, winter_pause=True),
     'tea_garden': dict(name='Чайный куст', level=32, cost=30_000, juvenile=2, seconds=DAY,
                        yield_qty=95, item='tea_leaf', xp=40, winter_pause=False),
 }
@@ -41,6 +41,14 @@ def winter_window(at):
     year = local.year - (local.month < 3)
     return (int(datetime(year, 12, 1, tzinfo=MOSCOW).timestamp()),
             int(datetime(year + 1, 3, 1, tzinfo=MOSCOW).timestamp()))
+
+
+def upkeep_per_hectare(crop, at=None):
+    if crop == 'vineyard' and at is not None:
+        start, end = winter_window(at)
+        if start <= at < end:
+            return PLANTATION_WINTER_UPKEEP
+    return PLANTATION_UPKEEP
 
 
 def cycle_deadline(spec, at, active_seconds):
@@ -77,6 +85,7 @@ def cycle_reward(cycle, quality=AUTO_QUALITY):
 
 def public_catalog():
     return dict(steps=STEPS, cultures=CULTURES, upkeep=PLANTATION_UPKEEP, auto_quality=AUTO_QUALITY,
+                vineyard_winter_upkeep=PLANTATION_WINTER_UPKEEP,
                 young_harvests=YOUNG_HARVESTS, young_pct=YOUNG_PCT, xp_multiplier=XP_MULTIPLIER)
 
 

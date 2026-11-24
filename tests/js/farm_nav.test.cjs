@@ -228,7 +228,7 @@ test('return picture card works in guests and village; a late visit cannot reope
 });
 
 test('catalogue hover keeps row gaps and outlined categories use the shared button gap',()=>{
- const css=read('style.css');assert.match(css,/\.catalog-card:hover:not\(:disabled\)\{transform:none\}/);
+ const css=read('style.css');assert.match(css,/\.catalog-card:hover:not\(:disabled,\[aria-disabled="true"\]\)\{transform:none\}/);
  const groups=[...css.matchAll(/\.catalog-sections\{([^}]+)\}/g)];assert.ok(groups.length>=2);for(const [,rules]of groups)assert.match(rules,/gap:var\(--qw-btn-gap\)/);
  const shell=read('../../web/shell/qw-shell.css');assert.match(shell,/\.qw-menu\{[^}]*bottom:var\(--qw-safe-bottom\);[^}]*max-height:[^}]+--qw-safe-bottom/);assert.doesNotMatch(css,/body \.qw-menu\{/);
 });

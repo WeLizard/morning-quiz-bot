@@ -6,7 +6,7 @@
 <title>Весёлый фермер · QuizzyWizzy</title>
 <link rel="stylesheet" href="/app/shell/qw-tokens.css">
 <link rel="stylesheet" href="/app/shell/qw-shell.css?v=20261124-account-game-preferences">
-<link rel="stylesheet" href="/app/farm/assets/style.css?v=20261124-village-guests">
+<link rel="stylesheet" href="/app/farm/assets/style.css?v=20261124-fund-harvest">
 <link rel="stylesheet" href="/app/farm/assets/field_overlay.css?v=20261030c">
 <link rel="stylesheet" href="/app/farm/assets/plantation_overlay.css?v=20261124-plantation-work">
 <link rel="stylesheet" href="/app/farm/assets/dasha-game.css">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/app/farm/assets/merchant.css">
 <link rel="stylesheet" href="/app/farm/assets/construction.css?v=20261116-building-effects">
 <script src="/app/shell/qw-shell.js?v=20261124-account-game-preferences"></script>
-<script type="module" src="/app/farm/assets/app.js?v=20261124-account-game-preferences"></script>
+<script type="module" src="/app/farm/assets/app.js?v=20261124-fund-harvest"></script>
 </head>
 <body class="compact farm-login">
 <header class="topbar">
@@ -63,6 +63,10 @@
       <svg class="harvest-art" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M7 20h26l-3 15H10Z" fill="#b87848"/><path d="M10 23h20l-2 9H12Z" fill="#d99a5a"/><path d="M11 20c1-9 17-9 18 0" fill="none" stroke="#7e563d" stroke-width="2.5" stroke-linecap="round"/><path d="M15 19c-3-8 1-13 6-13 4 0 7 5 4 12-3 4-7 4-10 1Z" fill="#e5ad45"/><path d="M20 18c-2-8 3-13 8-11 4 2 4 8-1 12-3 2-5 1-7-1Z" fill="#d97851"/><path d="M14 18c-4-5-3-10 1-12 4-1 7 3 6 9-2 4-4 5-7 3Z" fill="#83a963"/><path d="M17 27h.1m5 0h.1m5 0h.1" stroke="#f4d29b" stroke-width="2" stroke-linecap="round"/></svg>
       <span>Собрать урожай</span>
      </button>
+     <div id="harvest-status" class="harvest-status" role="status" aria-live="polite" hidden>
+      <svg class="harvest-status-art" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9h16l-1.5 11h-13L4 9Z"/><path d="M8 9c0-3 1.5-5 4-5s4 2 4 5"/><path d="M10 14h4"/></svg>
+      <span id="harvest-status-copy"></span>
+     </div>
     </div>
     <div class="map-controls" data-qw-group><button id="zoom-in" type="button" title="Приблизить" aria-label="Приблизить"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5.5v13M5.5 12h13"/></svg></button><button id="zoom-out" type="button" title="Отдалить" aria-label="Отдалить"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.5 12h13"/></svg></button><button id="center-map" type="button" title="Вся ферма" aria-label="Показать всю ферму"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 9V6a1.5 1.5 0 0 1 1.5-1.5h3M15 4.5h3A1.5 1.5 0 0 1 19.5 6v3M19.5 15v3a1.5 1.5 0 0 1-1.5 1.5h-3M9 19.5H6A1.5 1.5 0 0 1 4.5 18v-3"/><circle cx="12" cy="12" r="2"/></svg></button></div>
    </div>

@@ -699,7 +699,7 @@ let seedCardVisible=false,seedCardTimer=0;
 function showSeedCard(ms=0){seedCardVisible=true;clearTimeout(seedCardTimer);updateSeedCard();if(ms)seedCardTimer=setTimeout(hideSeedCard,ms);}
 function hideSeedCard(){clearTimeout(seedCardTimer);seedCardVisible=false;$('seedcard').hidden=true;}
 // [лента][Всё]: the seeds scroll in #seed-track; «Всё» is the bar's own last block, so it never covers the last seeds.
-function renderSeeds(){const bar=$('seedbar'),parent=$('seed-track'),scroll=parent.scrollLeft;parent.replaceChildren();bar.querySelector('#catalog-button')?.remove();bar.querySelector('#fert-toggle')?.remove();bar.hidden=!own();$('quick-stack').hidden=!own();$('harvest-all').hidden=!own();updateSeedCard();updateRepeat();if(!own())return;
+function renderSeeds(){const bar=$('seedbar'),parent=$('seed-track'),scroll=parent.scrollLeft;parent.replaceChildren();bar.querySelector('#catalog-button')?.remove();bar.querySelector('#fert-toggle')?.remove();bar.hidden=!own();$('quick-stack').hidden=!own();$('harvest-all').hidden=!own();$('harvest-status').hidden=!own();updateSeedCard();updateRepeat();if(!own())return;
  for(let c of sortSeeds(Object.values(S.catalog.crops).filter(c=>!c.exotic&&!c.orchard),S.me.level)){let locked=c.level>S.me.level,st=seedStats(c,S.catalog.items[c.id].price,S.speed,S.catalog.crop_classes),b=button(null,()=>{S.seed=c.id;renderSeeds();showSeedCard(2600);document.body.classList.remove('panel-open');},`seed ${S.seed===c.id?'active':''} cls-${st.cls}`,locked);b.addEventListener('pointerenter',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('pointerleave',()=>{if(c.id===S.seed)hideSeedCard();});b.addEventListener('focus',()=>{if(c.id===S.seed)showSeedCard(2600);});b.addEventListener('blur',()=>{if(c.id===S.seed)hideSeedCard();});const details=el('small',null,'seed-details');if(locked)details.append(el('span',`С ${c.level} ур.`));else details.append(el('span',`${fmt(c.cost)} мон.`),el('span',seedTimeText(st.seconds)));b.append(icon(c.id),el('span',c.name),details);b.dataset.class=st.cls;b.setAttribute('aria-label',locked?`${c.name}: нужен уровень ${c.level}`:seedLine(c,st));bindInfoPress(b,()=>({kind:'crop',id:c.id,name:c.name,level:c.level,locked,lock:locked?`С ${c.level} ур.`:''}));parent.append(b);}
  for(const k of MERCH.seedPacks(S.catalog,stock,S.me.level)){const b=button(null,()=>{S.seed=k.id;renderSeeds();document.body.classList.remove('panel-open');},`seed ${S.seed===k.id?'active':''} cls-pack`);b.dataset.seedPack=k.id;const d=el('small',null,'seed-details');d.append(el('span','из пакета'),el('span',`осталось ${k.left}`));b.append(icon(k.id),el('span',k.name),d);b.setAttribute('aria-label',`${k.name}: посадить из пакета, осталось ${k.left}`);parent.append(b);}
  // «Недавнее»: the last placed buildings, trees, decor and roads, one tap back to placement (E1 variant B).
@@ -735,7 +735,35 @@ function tapMachine(id){const plan=planTap(id,S.lastRun,S.me,S.catalog,now());
  const [w,replant]=checkbox('Сразу пересеять те же культуры',true);box.append(w,el('p','Уберёт готовые зерновые (до 24 грядок за рейс). В следующий раз машина по нажатию повторит этот рейс сама.','note'));
  modal(spec.name,box,[button('Отправить комбайн',safe(async()=>{const plan=planMachine({machine:id,crop:'',replant:replant.checked},S.me,S.catalog,now());if(!plan.ok){toast(plan.why,true);return;}$('dialog').close();await runPlan(plan);}),'primary')]);}
 let readiness='';
-function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(['fields','plantations'].includes(S.tab)&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>(o.crop&&o.crop.ready_at<=now())||ORCH.ripe(o,now())).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);updateWineAgingDeadline();syncFarmRewardsDialog();}
+function updateReady(){
+ updateRateFeedback();if(!S.farm)return;updateRepeat();
+ const stamp=readySnapshot();
+ if(stamp!==readiness){
+  readiness=stamp;
+  if(['fields','plantations'].includes(S.tab)&&own()&&!S.fieldGame)poll();
+  if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();
+ }
+ const t=now(),objects=S.farm.objects||[];
+ const ready=objects.filter(o=>(o.crop&&o.crop.ready_at<=t)||ORCH.ripe(o,t)).length;
+ const next=objects.reduce((soon,o)=>{
+  const at=o.crop?.ready_at??o.fruit?.ready_at;
+  return Number.isFinite(at)&&at>t?Math.min(soon,at):soon;
+ },Infinity);
+ const harvest=$('harvest-all'),status=$('harvest-status'),copy=$('harvest-status-copy');
+ harvest.hidden=!own()||ready===0;
+ harvest.disabled=!!ready&&(S.busy||!!rateSeconds('write')||!!S.pending);
+ const action=ready?`Собрать урожай · ${ready}`:'Собрать урожай';
+ const label=harvest.querySelector('span');
+ if(label.textContent!==action){label.textContent=action;harvest.setAttribute('aria-label',action);}
+ let message='';
+ if(ready){
+  const remaining=rateSeconds('write');
+  message=S.busy?'Сохраняется другое действие':S.pending?'Подтверждается прошлое действие':remaining?`Сбор можно начать через ${timeText(remaining)}`:'';
+ }else if(Number.isFinite(next))message=`Урожай поспеет через ${timeText(next-t)}`;
+ status.hidden=!own()||!message;
+ if(copy.textContent!==message)copy.textContent=message;
+ document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);updateWineAgingDeadline();syncFarmRewardsDialog();
+}
 function clickObject(o,cell){hideStoneSpeech();
  if(S.placing){
   const p=S.placing;if(p.committing)return;
@@ -2431,11 +2459,30 @@ function upkeepCard(p,e){
  p.append(c);
 }
 function fundGoodsDialog(){
- const e=ECON(),w=el('div',null,'fund-goods'),inputs={};
+ const e=ECON(),w=el('div',null,'fund-goods'),rows=[];
  const ids=Object.keys(S.me.inventory).filter(k=>S.me.inventory[k]>0&&S.catalog.items[k]&&!MERCH.isBound(S.catalog,k)).sort((a,b)=>itemName(a).localeCompare(itemName(b),'ru'));
- if(!ids.length)w.append(el('p','На складе пусто.'));
- for(const id of ids){const [fw,fi]=field(`${itemName(id)}: есть ${S.me.inventory[id]}, ≈${fmt(Math.floor(S.catalog.items[id].price*e.markup/100))} мон. за штуку`,'number',0);fi.min=0;fi.max=S.me.inventory[id];inputs[id]=fi;w.append(fw);}
- modal('Товары в фонд деревни',w,[button('Внести',safe(async()=>{const items={};for(const [id,i] of Object.entries(inputs)){const q=Math.floor(Number(i.value));if(q>0)items[id]=Math.min(q,stock(id));}if(!Object.keys(items).length){toast('Выбери хотя бы один товар.',true);return;}if(await command('fund_contribute',{coins:0,items}))$('dialog').close();}),'primary',!ids.length)]);
+ const searchWrap=el('label',null,'fund-goods-search');
+ const search=el('input');search.type='search';search.placeholder='Найти товар';search.setAttribute('aria-label','Найти товар на складе');searchWrap.append(search);w.append(searchWrap);
+ const list=el('div',null,'fund-goods-list');
+ if(!ids.length)list.append(el('p','На складе нет товаров, доступных для вклада.','fund-goods-empty'));
+ for(const id of ids){
+  const item=S.catalog.items[id],quantity=stock(id),unitValue=Math.floor((item.fund_price??item.price)*e.markup/100);
+  const row=el('article',null,'fund-goods-item'),copy=el('div',null,'fund-goods-copy');
+  copy.append(el('strong',itemName(id)),el('small',`На складе ${fmt(quantity)} · ≈${fmt(unitValue)} мон. за штуку`));
+  const input=el('input');input.type='number';input.inputMode='numeric';input.min='0';input.max=String(quantity);input.step='1';input.value='0';input.setAttribute('aria-label',`Количество товара «${itemName(id)}» (на складе ${fmt(quantity)})`);
+  const entry={id,input,row,name:itemName(id)};rows.push(entry);row.append(copy,input);list.append(row);
+ }
+ w.append(list);
+ const emptySearch=el('p','Ничего не найдено.','fund-goods-empty');emptySearch.hidden=true;list.append(emptySearch);
+ search.addEventListener('input',()=>{const query=search.value.trim().toLocaleLowerCase('ru');let shown=0;for(const entry of rows){const visible=entry.name.toLocaleLowerCase('ru').includes(query);entry.row.hidden=!visible;if(visible)shown++;}emptySearch.hidden=shown>0||!query;});
+ const summary=el('div','Выбрано: 0 · Итого: 0 мон.','fund-goods-total');summary.setAttribute('aria-live','polite');summary.setAttribute('aria-atomic','true');
+ const contribute=button('Внести',()=>{},'primary',true);let saving=false;
+ const chosenItems=()=>{const items={};for(const {id,input} of rows){const q=Math.floor(Number(input.value));if(q>0)items[id]=Math.min(q,stock(id));}return items;};
+ const update=()=>{const items=chosenItems();let quantity=0,total=0;for(const [id,q] of Object.entries(items)){quantity+=q;const item=S.catalog.items[id];total+=Math.floor((item.fund_price??item.price)*q*e.markup/100);}summary.textContent=`Выбрано: ${fmt(quantity)} · Итого: ${fmt(total)} мон.`;contribute.disabled=saving||quantity===0;};
+ for(const {input,id} of rows){input.addEventListener('input',update);input.addEventListener('change',()=>{input.value=String(Math.max(0,Math.min(stock(id),Math.floor(Number(input.value)||0))));update();});}
+ contribute.onclick=safe(async()=>{if(saving)return;const items=chosenItems();if(!Object.keys(items).length)return;saving=true;update();try{if(await command('fund_contribute',{coins:0,items})&&w.isConnected&&$('dialog').open)$('dialog').close();}finally{saving=false;if(w.isConnected&&$('dialog').open)update();}});
+ modal('Товары в фонд деревни',w,[contribute]);
+ const modalFooter=$('dialog-body').querySelector('.card-footer');modalFooter.classList.add('fund-goods-footer');modalFooter.prepend(summary);
 }
 // «Рывок деревни» (qw_farm/economy.py rush_pct): the last days of a lagging season count contributions more for the common goal only.
 function rushNote(){const r=S.village?.rush_pct;return r>100?`Рывок деревни: цель сезона ещё не набрана, поэтому до конца сезона каждый вклад идёт в общую цель ×${String(r/100).replace('.',',')}. Личная шкала и награды считают вклад как есть.`:'';}

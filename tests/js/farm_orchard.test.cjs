@@ -196,7 +196,7 @@ test('the app wires the orchard: tab, seeds, counters, placement, card, asset li
  assert.ok(read('qw_farm/static/farm_nav.js').includes("['orchard','orchard','Сад']")&&app.includes("orchard:typeof renderOrchard==='function'?renderOrchard:undefined"),'«Сад» is a farm menu item');
  assert.equal((app.match(/!c\.exotic&&!c\.orchard/g)||[]).length,3,'the seed bar and both tractor lists hide the orchard fruit');
  assert.ok(app.includes('due(o.fruit?.ready_at)'),'a ripening tree refreshes the panel');
- assert.ok(app.includes("||ORCH.ripe(o,now())).length;$('harvest-all')")&&app.includes("||(o.type==='tree'&&o.fruit&&o.fruit.ready_at<=t)).length,animals"),'trees are counted in «Собрать урожай»');
+ assert.ok(app.includes('(o.crop&&o.crop.ready_at<=t)||ORCH.ripe(o,t)'),'ripe orchard fruit is included in «Собрать урожай»');
  assert.ok(app.includes('ORCH.plantCommand(p.spec,cell)'),'a sapling is placed through plant_tree');
  assert.ok(app.includes("else if(o.type==='tree'){renderTree(o,p);return;")&&app.includes('function confirmUproot'));
  assert.ok(app.includes("o.type!=='tree'&&!['house','barn']"),'trees are not listed as workshops');

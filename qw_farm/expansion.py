@@ -806,9 +806,7 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_c
         event(farm, now, text, kind)
         return text
     if kind in farm_rewards.SCHEMAS:
-        text = farm_rewards.claim(farm, data['reward'], now)
-        event(farm, now, text, kind)
-        return text
+        return farm_rewards.claim(farm, data['reward'], now)
     if kind in textile.SCHEMAS:
         text = textile.apply(farm, kind, data)
         event(farm, now, text, kind)

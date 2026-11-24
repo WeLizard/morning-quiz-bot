@@ -99,6 +99,23 @@ def pending(farm):
             if r['claimed_at'] is None]
 
 
+def journal_events(farm):
+    """Build journal entries from receipts kept in the farm aggregate, including old claims."""
+    events = []
+    for reward in farm.get(KEY, {}).values():
+        if reward['claimed_at'] is None:
+            continue
+        contents = []
+        if reward['coins']:
+            coins = f'{reward["coins"]:,}'.replace(',', ' ')
+            contents.append(f'{coins} мон.')
+        contents.extend(f'{ITEMS[item]["name"]} ×{quantity}' for item, quantity in reward['items'].items())
+        contents.extend(f'{BUILDINGS[kind]["name"]} (декор)' for kind in reward['decor'])
+        text = f'Получена награда «{reward["title"]}»: {", ".join(contents)}.'
+        events.append(dict(at=reward['claimed_at'], text=text, kind='claim_farm_reward'))
+    return events
+
+
 def decor_credits(farm):
     available = {}
     for r in farm.get(KEY, {}).values():

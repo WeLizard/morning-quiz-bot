@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from qw_farm import farm_rewards
-from qw_farm.domain import FarmError, apply, new_farm, project, validate_state
+from qw_farm.domain import FarmError, apply, event, new_farm, project, validate_state
 
 
 NOW = 1_800_000_000
@@ -76,6 +76,7 @@ def test_claim_is_atomic_and_private_and_decor_uses_one_free_placement():
     assert state['inventory']['wheat'] == 4 and state['coins'] == initial_coins + 30
     projected = project(state, state, NOW)
     assert projected['farm_rewards'] == [] and projected['farm_reward_decor'] == {'fd_cup': 1}
+    assert sum(entry['kind'] == 'claim_farm_reward' for entry in projected['events']) == 1
     fail('farm_reward_claimed', run, state, 'claim_farm_reward', data)
     fail('occupied', run, state, 'build', dict(type='fd_cup', x=0, y=0))
     assert farm_rewards.decor_credits(state) == {'fd_cup': 1}
@@ -86,6 +87,25 @@ def test_claim_is_atomic_and_private_and_decor_uses_one_free_placement():
     fail('locked', run, state, 'build', dict(type='fd_cup', x=7, y=7))
     assert not farm_rewards.enqueue(state, GIFT, NOW + 30, **CONTENTS)
     validate_state(json.loads(json.dumps(state)))
+
+
+def test_journal_includes_a_preexisting_claim_at_its_original_time():
+    state, visitor = farm(), farm()
+    state['settings']['visibility'] = 'public'
+    farm_rewards.enqueue(state, GIFT, NOW, title='Опора деревни', decor=['dc_garden_clock'])
+    assert all(entry['kind'] != 'claim_farm_reward' for entry in project(state, state, NOW)['events'])
+    farm_rewards.claim(state, GIFT, NOW + 10)
+    event(state, NOW + 10, 'Награда получена.', 'claim_farm_reward')
+    event(state, NOW + 20, 'Подарок Сороки.', 'merchant')
+    before = deepcopy(state)
+    expected = {'at': NOW + 10, 'text': 'Получена награда «Опора деревни»: Садовые часы (декор).',
+                'kind': 'claim_farm_reward'}
+    for _ in range(2):
+        journal = project(state, state, NOW + 20)['events']
+        assert journal[0]['kind'] == 'merchant' and journal[1] == expected
+        assert [entry for entry in journal if entry['kind'] == 'claim_farm_reward'] == [expected]
+    assert state == before
+    assert 'events' not in project(state, visitor, NOW + 20)
 
 
 def test_merge_deduplicates_pending_and_preserves_claimed_and_spent_decor():

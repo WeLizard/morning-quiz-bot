@@ -78,9 +78,12 @@ def unbound(keys):
     need(not any(ITEMS.get(k,{}).get('bound') for k in keys),'bound_item','Эта вещь привязана к ферме: её нельзя передать или продать.',422)
 
 
+JOURNAL_LIMIT = 80
+
+
 def event(farm, now, text, kind='info'):
     farm['events'].insert(0, dict(at=now,text=text,kind=kind))
-    del farm['events'][80:]
+    del farm['events'][JOURNAL_LIMIT:]
 
 
 def object_cells(obj):
@@ -713,6 +716,10 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
         result['daily_cash_bonus']=daily_bonus.public(farm,now)
         result['farm_rewards']=farm_rewards.pending(farm)
         result['farm_reward_decor']=farm_rewards.decor_credits(farm)
+        reward_events=farm_rewards.journal_events(farm)
+        if reward_events:
+            other_events=[entry for entry in result['events'] if entry['kind']!='claim_farm_reward']
+            result['events']=sorted(reward_events+other_events,key=lambda entry:entry['at'],reverse=True)[:JOURNAL_LIMIT]
         from . import dyeworks
         result['dyeworks']=dyeworks.public(farm)
         result.pop('tavern',None)  # exposed only as the current-day village_build projection

@@ -160,20 +160,58 @@
     }
 
     /* ---------------- theme and preferences (hub palette; games keep their own) ---------------- */
-    const prefs = {haptics: true, theme: 'system', contrast: false};
+    const prefs = {haptics: true, theme: 'system', contrast: false, timezone: null};
     try {
         const saved = JSON.parse(localStorage.getItem('mqb-ui-preferences') || '{}');
         if (typeof saved.haptics === 'boolean') prefs.haptics = saved.haptics;
         if (['system', 'dark', 'light'].includes(saved.theme)) prefs.theme = saved.theme;
         if (typeof saved.contrast === 'boolean') prefs.contrast = saved.contrast;
     } catch {}
-    const savePrefs = () => { try { localStorage.setItem('mqb-ui-preferences', JSON.stringify(prefs)); } catch {} };
+    const savePrefs = () => { try { localStorage.setItem('mqb-ui-preferences', JSON.stringify({haptics: prefs.haptics, theme: prefs.theme, contrast: prefs.contrast})); } catch {} };
     /* «Контрастный режим» (UI_RULES §16) is an Account setting («Профиль → Настройки»). The device keeps the last known
        value so every page (hub, Alchemy, Night City, farm) applies <html data-qw-contrast="1"> before its first paint;
        a profile response from the server (QW.prefs.applyAccount) always wins over that cache. */
     function applyContrast() {
         if (prefs.contrast) root.setAttribute('data-qw-contrast', '1');
         else root.removeAttribute('data-qw-contrast');
+    }
+    function deviceTimezone() {
+        try {
+            const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (typeof zone === 'string' && zone) { new Intl.DateTimeFormat('en', {timeZone: zone}); return zone; }
+        } catch {}
+        return 'UTC';
+    }
+    function resolvedTimezone() { return prefs.timezone || deviceTimezone(); }
+    function formatDate(value, locales, options = {}) {
+        const date = value instanceof Date ? value : new Date(value);
+        if (!Number.isFinite(date.getTime())) return '';
+        try { return date.toLocaleString(locales, {...options, timeZone: resolvedTimezone()}); }
+        catch { return date.toLocaleString(locales, {...options, timeZone: deviceTimezone()}); }
+    }
+    function timezonePicker({zones = [], selected = null, label = 'Часовой пояс', searchLabel = 'Найти часовой пояс', fieldClass = 'field', allowAuto = false} = {}) {
+        const available = [...new Set(zones.filter(zone => typeof zone === 'string' && zone))].sort();
+        const wrap = document.createElement('div'), search = document.createElement('input'), select = document.createElement('select');
+        wrap.className = fieldClass;
+        const caption = document.createElement('span'); caption.textContent = label;
+        search.type = 'search'; search.placeholder = 'Найти, например Asia/Tokyo';
+        search.setAttribute('aria-label', searchLabel); select.setAttribute('aria-label', label);
+        if (fieldClass === 'ncase-field') { search.className = 'nc-field'; select.className = 'nc-field'; }
+        let current = selected === null && allowAuto ? '' : available.includes(selected) ? selected : available.includes(deviceTimezone()) ? deviceTimezone() : available.includes('UTC') ? 'UTC' : available[0] || '';
+        const update = () => {
+            const query = search.value.trim().toLocaleLowerCase();
+            const visible = available.filter(zone => !query || zone.toLocaleLowerCase().includes(query));
+            const choices = current && !visible.includes(current) ? [current, ...visible] : visible;
+            const options = choices.map(zone => { const option = document.createElement('option'); option.textContent = zone; option.value = zone; return option; });
+            if (allowAuto) { const automatic = document.createElement('option'); automatic.textContent = 'Автоматически (по устройству)'; automatic.value = ''; options.unshift(automatic); }
+            select.replaceChildren(...options);
+            select.value = current;
+        };
+        select.addEventListener('change', () => { current = select.value; });
+        search.addEventListener('input', update);
+        wrap.append(caption, search, select);
+        update();
+        return {node: wrap, input: select, search};
     }
     applyContrast();
     function setContrast(value, {save = true} = {}) {
@@ -1192,6 +1230,7 @@
         boot,
         /** Changes options after boot, e.g. the hub switching into game mode for Night City. */
         configure(options) {
+            if (Object.hasOwn(options || {}, 'identity') && options.identity !== config.identity) prefs.timezone = null;
             Object.assign(config, options);
             root.classList.toggle('qw-mode-game', config.mode === 'game');
             root.classList.toggle('qw-mode-hub', config.mode !== 'game');
@@ -1213,7 +1252,16 @@
             /** Applies «Контрастный режим» on this device at once; the hub stores it on the Account (POST /api/account/contrast-mode). */
             setContrast(value) { return setContrast(value); },
             /** Applies the server value from a profile response ({contrast_mode}); a missing field changes nothing. */
-            applyAccount(profile) { if (typeof profile?.contrast_mode === 'boolean') setContrast(profile.contrast_mode); return prefs.contrast; },
+            applyAccount(profile) {
+                if (typeof profile?.contrast_mode === 'boolean') setContrast(profile.contrast_mode);
+                if (Object.hasOwn(profile || {}, 'timezone')) prefs.timezone = typeof profile.timezone === 'string' ? profile.timezone : null;
+                return prefs.contrast;
+            },
+            resolvedTimezone,
+            deviceTimezone,
+            formatDate,
+            timezonePicker,
+            setTimezone(value) { prefs.timezone = typeof value === 'string' && value ? value : null; return resolvedTimezone(); },
         },
         refreshChrome() { syncChromeColors(); writeInsets(); },
     };

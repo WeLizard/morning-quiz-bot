@@ -106,6 +106,7 @@
         QW.menu.register([]);
         setHubTitle(game ? null : title ?? (page ? PAGE_TITLES[page] || null : null));
         const profile = state.authenticated ? state.me : state.guest;
+        if (profile) QW.prefs?.applyAccount(profile);
         QW.menu.setAccount(profile ? {name: profile.display_name || 'Гость',
             subtitle: state.authenticated ? 'Telegram · профиль и настройки' : profile.login ? `${profile.login} · профиль` : 'Гостевой профиль'} : null);
     }
@@ -1050,7 +1051,7 @@
             } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
         }, 'danger'));
         box.append(guestExit);
-        guestMain.append(box, appearanceCard('guest'), farmRequestNotificationsCard('guest'));
+        guestMain.append(box, timezoneSetting('guest'), appearanceCard('guest'), farmRequestNotificationsCard('guest'));
         if (focusLink) { linkAnchor.scrollIntoView?.({block: 'center'}); linkAnchor.nextElementSibling?.focus?.(); }
     }
     // Guest «Чаты» / «Рейтинг»: both depend on Telegram chats, so a guest sees one clear step instead of an empty list.
@@ -1611,7 +1612,7 @@
                             if (!setup.can_start) note(box, 'В каталоге пока нет доступных фото-загадок.');
                         }
                     } else if (q) {
-                        note(box, `Фото ${q.question_number}/${q.question_count} · до ${new Date(q.ends_at * 1000).toLocaleTimeString('ru-RU')}`);
+                        note(box, `Фото ${q.question_number}/${q.question_count} · до ${QW.prefs?.formatDate?.(q.ends_at * 1000, 'ru-RU', {hour: '2-digit', minute: '2-digit'}) || new Date(q.ends_at * 1000).toLocaleTimeString('ru-RU')}`);
                         const image = el('img'); image.alt = 'Что изображено на фото?'; image.className = 'play-photo';
                         const imageUrl = `${q.image_url}${q.image_url.includes('?') ? '&' : '?'}identity=${mediaIdentity}`;
                         const imageStatus = el('p'); let imageRetry = 0;
@@ -1730,7 +1731,7 @@
                     const q = current.question;
                     if (q) {
                         box.append(el('h2', q.question));
-                        note(box, `Ответы до ${new Date(q.ends_at).toLocaleTimeString('ru-RU')}`);
+                        note(box, `Ответы до ${QW.prefs?.formatDate?.(q.ends_at, 'ru-RU', {hour: '2-digit', minute: '2-digit'}) || new Date(q.ends_at).toLocaleTimeString('ru-RU')}`);
                         q.options.forEach((option, index) => {
                             const choice = button(option, () => command('answer', {game_id: current.game_id, round_id: q.round_id, selected_option: index}));
                             choice.disabled = q.answered || q.closed;
@@ -2021,7 +2022,7 @@
             ach.append(links);
         }
         grid.append(ach); content.append(grid);
-        if (state.progress.last_activity) note(content, `Последняя активность: ${new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
+        if (state.progress.last_activity) note(content, `Последняя активность: ${QW.prefs?.formatDate?.(state.progress.last_activity, 'ru-RU') || new Date(state.progress.last_activity).toLocaleString('ru-RU')}`);
         content.append(button('Обновить прогресс', load, 'text'));
     }
     // «Контрастный режим»: an Account setting for the hub and every game (UI_RULES §16). The shell applies it on this
@@ -2054,6 +2055,41 @@
             return Boolean(result.contrast_mode);
         } catch (error) { window.QW?.prefs?.setContrast(!on); throw error; }
         finally { window.QW?.menu?.refresh?.(); }
+    }
+    function timezoneSetting(channel) {
+        const version = generation, account = (channel === 'guest' ? state.guest : state.me)?.account_id;
+        const current = () => version === generation && account === (channel === 'guest' ? state.guest : state.me)?.account_id;
+        const section = el('section', undefined, 'card account-timezone-setting');
+        section.append(el('h2', 'Часовой пояс'));
+        const message = el('p', 'Загружаю список часовых поясов…', 'muted'); section.append(message);
+        const load = channel === 'guest' ? guestRequest('/api/account/timezones') : request('/api/account/timezones');
+        load.then(result => {
+            if (!current()) return;
+            const picker = QW.prefs?.timezonePicker?.({zones: result.timezones || [], selected: (channel === 'guest' ? state.guest : state.me)?.timezone ?? null,
+                label: 'Часовой пояс аккаунта', searchLabel: 'Найти часовой пояс', allowAuto: true});
+            if (!picker) { message.textContent = 'Не удалось открыть список часовых поясов.'; return; }
+            section.append(picker.node);
+            const status = el('p', '', 'muted');
+            const save = button('Сохранить часовой пояс', async () => {
+                save.disabled = true; status.textContent = '';
+                try {
+                    const path = `/api/account/timezone?identity=${channel}`;
+                    const body = JSON.stringify({timezone: picker.input.value || null, account_id: account});
+                    const result = channel === 'guest'
+                        ? await guestRequest(path, 'POST', {headers: {'Content-Type': 'application/json'}, body})
+                        : await request(path, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Guest-CSRF': '1'}, body});
+                    if (!current()) return;
+                    const profile = channel === 'guest' ? state.guest : state.me;
+                    if (profile) profile.timezone = result.timezone ?? null;
+                    QW.prefs?.applyAccount(result);
+                    status.textContent = result.timezone ? `Сохранено: ${result.timezone}` : 'Будет использоваться часовой пояс устройства.';
+                } catch (error) { if (current()) status.textContent = error.message; }
+                finally { if (current()) save.disabled = false; }
+            }, 'primary');
+            section.append(save, status);
+            message.textContent = 'Автоматический режим использует часовой пояс устройства. Выбранная зона применяется к личным датам во всех играх.';
+        }).catch(error => { if (current()) message.textContent = error.message; });
+        return section;
     }
     // Theme and haptics: per device, the same card for a Telegram player and a guest; the contrast mode follows the account.
     function appearanceCard(channel) {
@@ -2106,7 +2142,7 @@
         const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
         row.append(copy, el('span', '✓', 'badge')); via.append(row);
         content.append(via, devicesSection('telegram'));
-        content.append(appearanceCard('telegram'), farmRequestNotificationsCard('telegram'));
+        content.append(timezoneSetting('telegram'), appearanceCard('telegram'), farmRequestNotificationsCard('telegram'));
         const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}
@@ -2227,7 +2263,7 @@
         content.append(el('h2', 'Активность по чатам'));
         if (!data.chats.length) note(content, gm('Ты пока не играл в чатах.', 'Ты пока не играла в чатах.', 'Пока нет сыгранных партий в чатах.'), 'empty');
         else for (const chat of data.chats) {
-            const when = chat.last_answer_at ? ` · последний ответ ${new Date(chat.last_answer_at).toLocaleDateString('ru-RU')}` : '';
+            const when = chat.last_answer_at ? ` · последний ответ ${QW.prefs?.formatDate?.(chat.last_answer_at, 'ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric'}) || new Date(chat.last_answer_at).toLocaleDateString('ru-RU')}` : '';
             note(content, `${chat.title}: ответов ${chat.answered}, правильных ${chat.correct}, очков ${chat.score}${when}`);
         }
         content.append(button('Обновить', () => navigate('history'), 'quiet'));

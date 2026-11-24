@@ -85,6 +85,8 @@ class Account(ModerationMixin, TimestampMixin, Base):
     # Accessibility «Контрастный режим» (Профиль → Настройки): one switch for the hub and every game,
     # applied as <html data-qw-contrast="1"> by the shell (docs/design/UI_RULES.md §16).
     contrast_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Optional IANA timezone selected in the account profile; NULL keeps the device-derived default.
+    timezone: Mapped[Optional[str]] = mapped_column(String(64))
 
     __table_args__ = (
         CheckConstraint("merged_into_id IS NULL OR merged_into_id <> id",

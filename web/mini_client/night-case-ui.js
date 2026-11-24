@@ -192,23 +192,6 @@ function open(options) {
         if (value != null) select.value = value;
         return {input: select, node: put(el('label', 'ncase-field'), el('span', null, label), select)};
     };
-    const chooseTimezone = (zones, preferred) => {
-        const search = el('input', 'nc-field'); search.type = 'search'; search.setAttribute('aria-label', 'Найти часовой пояс');
-        search.placeholder = 'Например, Asia/Tokyo';
-        const select = el('select', 'nc-field'); select.setAttribute('aria-label', 'Часовой пояс окон');
-        let selected = zones.includes(preferred) ? preferred : zones.includes('UTC') ? 'UTC' : zones[0];
-        const update = () => {
-            const query = search.value.trim().toLocaleLowerCase();
-            const visible = zones.filter(zone => !query || zone.toLocaleLowerCase().includes(query));
-            const choices = selected && !visible.includes(selected) ? [selected, ...visible] : visible;
-            select.replaceChildren(...choices.map(zone => { const option = el('option', null, zone); option.value = zone; return option; }));
-            select.value = selected;
-        };
-        select.addEventListener('change', () => { selected = select.value; });
-        search.addEventListener('input', update);
-        update();
-        return {input: select, node: put(el('div', 'ncase-field'), el('span', null, 'Часовой пояс окон'), search, select)};
-    };
     const displayName = row => row?.title || row?.name || 'Участник';
     // Older lobbies stored the seat id («seat02») for a player without a free name: show «Игрок 2» instead.
     const seatName = row => /^seat\d\d$/.test(row?.name || '') ? `Игрок ${Number(row.name.slice(4))}` : row?.name || 'Игрок';
@@ -492,7 +475,7 @@ function open(options) {
             control.setAttribute('aria-pressed', String(mode === key)); return control;
         }));
         group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Кто ведёт партию');
-        const until = ai.expires_at ? ' до ' + new Date(ai.expires_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : '';
+        const until = ai.expires_at ? ' до ' + (root.QW?.prefs?.formatDate?.(ai.expires_at, 'ru-RU', {hour: '2-digit', minute: '2-digit'}) || new Date(ai.expires_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})) : '';
         const body = mode === 'admin' ? [p('Партия сразу начнётся на авторском тексте, а администратор получит запрос. Если одобрит — новые сцены будет писать ИИ.')]
             : mode === 'authored' ? [p('Сцены и ответы ведёт авторский текст дела. ИИ не подключается.')]
             : ai.staged_credential_id && !aiKeyForm ? [p(`Ключ сохранён для этой партии${until}. Если не начать дело до этого времени, ключ придётся ввести снова.`),
@@ -589,9 +572,13 @@ function open(options) {
         if (!cases.length) return frame([panel('Дело пока недоступно', p('Проверенные дела ещё не открыты для этой компании.'))], room?.title || 'Компания');
         const choice = choose('Дело', cases.map(item => ({id: `${item.id}:${item.version}`, label: item.title})), selectedCase);
         const zones = [...new Set(cases.flatMap(item => arr(item.timezones)))].sort();
-        let deviceZone = 'UTC';
-        try { deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch {}
-        const zone = chooseTimezone(zones, deviceZone);
+        let deviceZone = root.QW?.prefs?.deviceTimezone?.() || 'UTC';
+        try { deviceZone = Intl.DateTimeFormat('en', {timeZone: deviceZone}).resolvedOptions().timeZone || deviceZone; } catch { deviceZone = 'UTC'; }
+        const preferredZone = Object.hasOwn(boot || {}, 'account_timezone')
+            ? (boot.account_timezone || deviceZone)
+            : root.QW?.prefs?.resolvedTimezone?.() || deviceZone;
+        const zone = root.QW?.prefs?.timezonePicker?.({zones, selected: preferredZone, label: 'Часовой пояс окон', searchLabel: 'Найти часовой пояс окон', fieldClass: 'ncase-field'});
+        if (!zone) throw new Error('timezone_picker_unavailable');
         frame([kit.scene({shell: 'rooms', title: room.title || 'Компания', text: 'Выбери дело. Каждый в компании отдельно присоединяется к сбору.'}),
             panel('Начать сбор игроков', choice.node, zone.node, kit.stack(button('Создать стол', async () => {
                 selectedCase = choice.input.value;

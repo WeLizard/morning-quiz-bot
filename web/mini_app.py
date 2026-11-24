@@ -953,6 +953,38 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         except PrincipalError as error:
             raise MiniAppError(error.status, error.message, code=error.code) from None
 
+    @app.get('/api/account/timezones')
+    async def account_timezones():
+        """Public read-only catalogue used by the account timezone selector."""
+        from domain.account_timezone import timezones
+        return {'timezones': sorted(timezones())}
+
+    @app.post('/api/account/timezone')
+    async def account_timezone(request: Request, identity: str | None = Query(None)):
+        """Set or clear the account-wide IANA timezone preference."""
+        from uuid import UUID
+        from domain.account_timezone import parse_timezone
+        from storage.models import Account
+        from web.principal import PrincipalError, resolve_principal
+        value = await account_json(request, {'account_id', 'timezone'}, {'account_id', 'timezone'})
+        try:
+            selected = parse_timezone(value['timezone'])
+            expected = UUID(value['account_id'])
+        except (ValueError, TypeError, AttributeError):
+            raise MiniAppError(400, 'Некорректные параметры часового пояса') from None
+        if identity == 'guest' or (identity is None and not request.cookies.get(mini_cookie)):
+            guest_access()
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                if expected != UUID(who.account_id):
+                    raise MiniAppError(409, 'Аккаунт изменился. Открой настройки заново.', code='profile_changed')
+                account = await session.get(Account, expected)
+                account.timezone = selected
+                return {'account_id': who.account_id, 'timezone': account.timezone}
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
+
     @app.get('/api/account/problem-reports/meta')
     async def problem_report_meta():
         from storage import problem_reports

@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from zoneinfo import available_timezones
 
 MANOR_HASH = 'b13ee4a05aef436603940643c20547f8d3db8dad4b7f53bc6d4b26b9d658766d'
 
@@ -59,4 +58,5 @@ class NightCaseSettings:
             if case.content_hash in self.allowed_hashes:
                 refs.add(FrozenCaseRef(case.case_id, case.case_version, case.content_hash))
         if self.enabled and not refs: raise ValueError('no configured Night Case matches pinned hashes')
-        return NightCaseRegistry(frozenset(refs), frozenset(available_timezones()), self.cursor_secret)
+        from domain.account_timezone import timezones
+        return NightCaseRegistry(frozenset(refs), timezones(), self.cursor_secret)

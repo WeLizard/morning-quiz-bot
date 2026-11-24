@@ -114,7 +114,8 @@ def test_viewer_bootstrap_and_fence_cover_reads_writes_and_cookie_replacement(mo
         account = {'a' * 43: ACCOUNT, 'b' * 43: other}.get(request.cookies.get(cookie))
         if account is None:
             raise PrincipalError('authentication', 'Требуется вход.')
-        yield object(), Principal(str(account), 'Участник', identity)
+        yield object(), Principal(str(account), 'Участник', identity,
+                                  timezone='Asia/Tokyo' if account == ACCOUNT else None)
     class Service:
         def __getattr__(self, method):
             async def call(**kwargs):
@@ -130,6 +131,7 @@ def test_viewer_bootstrap_and_fence_cover_reads_writes_and_cookie_replacement(mo
             cookies={cookie: 'a' * 43}) as client:
             bootstrap = await client.get('/api/night-case/bootstrap', params={'identity': identity})
             assert bootstrap.status_code == 200 and bootstrap.json()['viewer_account_id'] == str(ACCOUNT)
+            assert bootstrap.json()['account_timezone'] == 'Asia/Tokyo'
             client.cookies.set(cookie, 'b' * 43); calls.clear()
             command = {'command_id': str(uuid4()), 'kind': 'seen', 'params': {},
                 'window_idx': 1, 'window_seq': 1, 'actor_seq': 0}
@@ -148,6 +150,7 @@ def test_viewer_bootstrap_and_fence_cover_reads_writes_and_cookie_replacement(mo
             assert stale_bootstrap.status_code == 409 and calls == []
             fresh = await client.get('/api/night-case/bootstrap', params={'identity': identity})
             assert fresh.json()['viewer_account_id'] == str(other)
+            assert fresh.json()['account_timezone'] is None
             assert calls == [('list_cases', other)]
             accepted = await client.get(f'/api/night-case/games/{GAME}/view?identity={identity}',
                 headers={'X-Night-Expected-Viewer': str(other)})

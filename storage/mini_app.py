@@ -163,7 +163,8 @@ class MiniAppStore:
                     'score': str(user.global_score), 'answered_count': user.total_answered,
                     'address_form': effective_address_form(account.address_form if account else None),
                     'address_form_chosen': bool(account and account.address_form is not None),
-                    'contrast_mode': bool(account and account.contrast_mode)}
+                    'contrast_mode': bool(account and account.contrast_mode),
+                    'timezone': account.timezone if account else None}
 
     @staticmethod
     def own_stats(member):

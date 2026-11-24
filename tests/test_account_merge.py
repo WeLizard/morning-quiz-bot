@@ -144,6 +144,23 @@ async def farm_of(env, account_id):
 
 
 # --------------------------------------------------------------------- tests
+@pytest.mark.parametrize('main_zone', [None, 'Asia/Tokyo'])
+def test_timezone_merge_keeps_the_main_preference_or_inherits_the_other(pg_url, main_zone):
+    async def case():
+        async with environment(pg_url) as env:
+            async with env.db.transaction() as session:
+                main, _ = await make_account(session, 'Main')
+                secondary, _ = await make_account(session, 'Secondary')
+                main.timezone = main_zone
+                secondary.timezone = 'America/New_York'
+                main_id, secondary_id = main.id, secondary.id
+            await merge(env, main_id, secondary_id)
+            async with env.db.transaction() as session:
+                main = await session.get(Account, main_id)
+                assert main.timezone == (main_zone or 'America/New_York')
+    run(case())
+
+
 def test_auto_merge_empty_guest_into_telegram(pg_url):
     async def case():
         async with environment(pg_url) as env:

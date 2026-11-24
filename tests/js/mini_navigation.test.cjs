@@ -56,6 +56,14 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
     for (const page of ['home', 'chats', 'rating', 'profile']) { const b = new Element('button'); b.dataset.page = page; ids.navigation.append(b); }
     // Shell core double: records what app.js asks of QW (back target, mode, menu account) without a real DOM.
     const qw = {rootBack: null, items: [], account: null, configs: [], mode: 'hub',
+        prefs: {timezone: null, get() { return {contrast: false, timezone: this.timezone}; }, applyAccount(profile) { if (Object.hasOwn(profile || {}, 'timezone')) this.timezone = profile.timezone; },
+            setContrast() {}, formatDate(value, locales, options = {}) { return new Date(value).toLocaleString(locales, {...options, timeZone: this.timezone || 'UTC'}); },
+            timezonePicker({zones, selected, label, searchLabel, allowAuto}) {
+                const node = new Element('div'), title = new Element('span'), search = new Element('input'), input = new Element('select');
+                node.className = 'field'; title.textContent = label; search.attrs['aria-label'] = searchLabel; input.attrs['aria-label'] = label;
+                const choices = [...zones]; if (allowAuto) choices.unshift(''); input.children = choices.map(value => { const option = new Element('option'); option.value = value; option.textContent = value || 'Автоматически (по устройству)'; return option; });
+                input.value = selected || ''; node.append(title, search, input); return {node, input, search};
+            }},
         nav: {setRoot(handler, options) { qw.rootBack = handler; qw.rootOptions = options; }},
         header: {mountBack() {}, mountGear() {}}, configure(options) { qw.configs.push(options); if (options.mode) qw.mode = options.mode; qw.onHome = options.onHome; }};
     qw.menu = {register(items, title) { qw.items = items; qw.menuTitle = title; }, setAccount(value) { qw.account = value; }};
@@ -79,6 +87,7 @@ async function application(runtime = true, startParam = '', {overrides = {}, man
         '/api/guest/logout': null, '/api/account/logout': null,
         '/api/account/sessions?identity=guest': {sessions: [], telegram_sessions: 0, has_password: false, login: null, telegram_linked: false, can_reset_password: false},
         '/api/account/sessions?identity=telegram': {sessions: [], telegram_sessions: 0, has_password: false, login: null, telegram_linked: true, can_reset_password: false},
+        '/api/account/timezones': {timezones: ['UTC', 'Asia/Tokyo', 'America/Argentina/Buenos_Aires']},
         '/api/guest/rooms': {items: []},
         '/api/dev/session': {access_token: 'unit-test'}, '/api/mini/session': {access_token: 'unit-test'}, '/api/mini/session/resume': {access_token: 'unit-test'}, '/api/mini/me': {user_id: '42', account_id: 'telegram-account', display_name: 'Игрок', score: 12, answered_count: 3},
         '/api/mini/progress': {best_streak: 2, correct_including_photo: 2, current_streak: 1, achievements: [], legacy_achievements: []},
@@ -983,6 +992,24 @@ test('guest gets the same four-tab bar: games and profile are separate, no dupli
     assert.equal(app.qw.rootBack, null);
 });
 
+test('account timezone setting saves any IANA zone with its account fence and guest CSRF', async () => {
+    const accountId = '00000000-0000-4000-8000-000000000001';
+    const app = await application(true, '', {savedGuest: true, overrides: {
+        '/api/account/timezone?identity=guest:POST': options => ({status: 200, body: {account_id: accountId, timezone: 'America/Argentina/Buenos_Aires'}}),
+    }});
+    await openGuestSettings(app); await flush();
+    assert.match(app.content.textContent, /Часовой пояс аккаунта/);
+    const selector = app.content.querySelectorAll('select').find(node => node.attrs['aria-label'] === 'Часовой пояс аккаунта');
+    assert.ok(selector);
+    selector.value = 'America/Argentina/Buenos_Aires';
+    await findButton(app.content, 'Сохранить часовой пояс').click(); await flush();
+    const saved = app.requests.find(row => row.path === '/api/account/timezone?identity=guest');
+    assert.ok(saved);
+    assert.equal(saved.options.headers['X-Guest-CSRF'], '1');
+    assert.deepEqual(JSON.parse(saved.options.body), {timezone: 'America/Argentina/Buenos_Aires', account_id: accountId});
+    assert.equal(app.qw.prefs.timezone, 'America/Argentina/Buenos_Aires');
+});
+
 test('guest Chats show a Telegram stub whose button opens the linking flow', async () => {
     const app = await application(true, '', {savedGuest: true, initData: 'signed-link', offline: false, autoLogin: false});
     await app.tab('chats').click(); await flush();
@@ -1095,7 +1122,7 @@ test('home restores the heading and keeps global settings inside profile', async
     assert.equal(app.content.querySelector('h1').textContent, 'Настройки');
     assert.equal(app.tab('profile').attrs['aria-current'], 'page');
     // Account only: the theme is a segmented control, no game or schedule settings here.
-    assert.equal(app.content.querySelectorAll('select').length, 0);
+    assert.equal(app.content.querySelectorAll('select').length, 1, 'profile settings contain the searchable account timezone');
     assert.match(app.content.textContent, /Как к тебе обращаться/);
     assert.doesNotMatch(app.content.textContent, /Игра и расписание|Темы обычного квиза|Развернуть на весь экран/);
     const group = app.content.querySelectorAll('.qw-btn-group').find(node => node.attrs['aria-label'] === 'Тема оформления');

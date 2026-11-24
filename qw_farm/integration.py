@@ -129,7 +129,7 @@ def install_farm(app, database, settings, *, allowed_user_ids=None, clock=time.t
                     return await _farm_question(current_session)
 
                 service=FarmService(Unit(session,schema),Principal(who.account_id,who.display_name,who.channel,who.address_form,
-                                                                getattr(who,'contrast_mode',False)),
+                                                                contrast_mode=who.contrast_mode,timezone=who.timezone),
                                     clock=clock,speed=1,question_provider=farm_question_provider)
                 service.u.notification_url=settings.origin.rstrip('/')+'/app/farm'
                 service.telegram_user_id=getattr(who,'telegram_user_id',None)

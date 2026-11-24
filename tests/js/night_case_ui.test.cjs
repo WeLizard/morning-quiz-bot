@@ -6,6 +6,7 @@ const path = require('node:path');
 const {runInNewContext} = require('node:vm');
 const source = fs.readFileSync(path.resolve(__dirname, '../../web/mini_client/night-case-ui.js'), 'utf8');
 const api = require('../../web/mini_client/night-case-ui.js');
+const shellSource = fs.readFileSync(path.resolve(__dirname, '../../web/shell/qw-shell.js'), 'utf8');
 
 test('immutable manifest requires the server pointer, exact canonical hash and known safe files', async () => {
     const crypto = require('node:crypto');
@@ -62,11 +63,40 @@ class Node {
     prepend(...nodes) { this.children.unshift(...nodes); }
     replaceChildren(...nodes) { this.children = nodes; this._text = ''; }
     setAttribute(key, value) { this.attrs[key] = String(value); }
+    removeAttribute(key) { delete this.attrs[key]; }
     addEventListener(kind, fn) { this.events[kind] = fn; }
     click() { return this.events.click?.(); }
 }
 const find = (node, predicate) => predicate(node) ? node : node.children.map(x => x instanceof Node ? find(x, predicate) : null).find(Boolean);
 const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve)); };
+
+function shellPrefs(IntlImpl = Intl, saved = {}) {
+    const root = new Node('html'); root.style = {setProperty() {}};
+    root.classList = {toggle() {}, add() {}, remove() {}};
+    const document = {documentElement: root, head: new Node('head'), body: new Node('body'),
+        createElement(tag) { return new Node(tag); }, querySelector() { return null; }, querySelectorAll() { return []; },
+        addEventListener() {}, removeEventListener() {}};
+    const win = {document, addEventListener() {}};
+    runInNewContext(shellSource, {window: win, document, Intl: IntlImpl, localStorage: {getItem() { return null; }, setItem(_key, value) { saved.value = value; }},
+        sessionStorage: {getItem() { return null; }}, location: {search: '', hash: '', pathname: '/app'},
+        addEventListener() {}, matchMedia() { return {matches: false, addEventListener() {}}; },
+        getComputedStyle() { return {getPropertyValue() { return ''; }}; }, setTimeout, clearTimeout});
+    return {prefs: win.QW.prefs, QW: win.QW, saved};
+}
+
+test('shared shell timezone is account-scoped, formats personal dates and stays out of device preferences', () => {
+    const shell = shellPrefs(), prefs = shell.prefs;
+    prefs.applyAccount({timezone: 'Asia/Tokyo'});
+    assert.equal(prefs.resolvedTimezone(), 'Asia/Tokyo');
+    assert.equal(prefs.formatDate('2026-11-24T10:00:00Z', 'en', {hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}), '19:00');
+    shell.QW.configure({identity: 'guest'});
+    prefs.applyAccount({timezone: 'America/Argentina/Buenos_Aires'});
+    shell.QW.configure({identity: 'telegram'});
+    assert.equal(prefs.resolvedTimezone(), prefs.deviceTimezone(), 'switching profiles clears the previous account zone');
+    prefs.applyAccount({timezone: 'Asia/Tokyo'});
+    prefs.setTheme('dark');
+    assert.deepEqual(JSON.parse(shell.saved.value), {haptics: true, theme: 'dark', contrast: false});
+});
 
 const VIEWER = '70a7918e-00ad-40da-9ad8-136a4b2bbc0a';
 function controller(view, requestHook, options = {}) {
@@ -83,7 +113,8 @@ function controller(view, requestHook, options = {}) {
         header() { return {node: make('header'), set() {}}; }, timer() { return {clock: make('span'), stop() {}}; },
         loadShell() {}, useWorld() {}, seats(rows) { return wrap('seats', rows.map(row => make('span', '', row.name))); },
     };
-    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {configure() {}, menu: {register() {}}, nav: options.nav || {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle: require('node:crypto').webcrypto.subtle} };
+    const zoneApi = shellPrefs(options.Intl || Intl).prefs;
+    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {prefs: zoneApi, configure() {}, menu: {register() {}}, nav: options.nav || {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle: require('node:crypto').webcrypto.subtle} };
     const host = new Node('div');
     const listeners = new Map();
     const doc = {createElement: make, documentElement: new Node('html'), hidden: false,
@@ -102,7 +133,7 @@ function controller(view, requestHook, options = {}) {
         throw new Error('Unexpected request: ' + url);
     };
     const handle = win.NightCase.open({host, target: {roomId: 'room'}, bootstrap: {enabled: true, cases: [], viewer_account_id: VIEWER}, identity: 'guest', request, isCurrent: () => true, ...options});
-    return {host, handle, calls, nodes, intervals, doc, listeners};
+    return {host, handle, calls, nodes, intervals, doc, listeners, zoneApi};
 }
 
 test('Case entry is the game root: no Mafia, no single-case hero, companies and invitation', async () => {
@@ -137,13 +168,13 @@ test('a company is one step below the root: Back returns to the company list', a
 test('new case defaults to the device IANA zone, filters all supplied zones and falls back to UTC', async () => {
     const zones = ['UTC', 'Europe/Berlin', 'Asia/Tokyo', 'America/New_York'];
     const bootstrap = {enabled: true, viewer_account_id: VIEWER, cases: [{id: 'manor_lake_missing', version: 1, title: 'Усадьба', timezones: zones}]};
-    const deviceIntl = {DateTimeFormat: () => ({resolvedOptions: () => ({timeZone: 'Asia/Tokyo'})})};
+    const deviceIntl = {DateTimeFormat: function (_locale, options = {}) { if (options.timeZone === 'Pacific/Unknown') throw new RangeError('bad IANA zone'); return {resolvedOptions: () => ({timeZone: 'Asia/Tokyo'})}; }};
     let fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
         {target: {roomId: 'room'}, bootstrap, Intl: deviceIntl});
     await settle();
     let zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
-    let search = find(fixture.host, node => node.attrs?.['aria-label'] === 'Найти часовой пояс');
-    assert.ok(zone); assert.ok(search); assert.equal(zone.value, 'Asia/Tokyo');
+    let search = find(fixture.host, node => node.attrs?.['aria-label'] === 'Найти часовой пояс окон');
+    assert.ok(zone); assert.ok(search); assert.equal(zone.value, 'Asia/Tokyo', JSON.stringify({device: fixture.zoneApi.deviceTimezone(), resolved: fixture.zoneApi.resolvedTimezone(), values: zone.children.map(option => option.value)}));
     assert.deepEqual(zone.children.map(option => option.value), ['America/New_York', 'Asia/Tokyo', 'Europe/Berlin', 'UTC']);
     find(fixture.host, node => node.attrs?.['aria-label'] === 'Дело').value = 'manor_lake_missing:1';
     search.value = 'America/New_York'; await search.events.input();
@@ -156,10 +187,26 @@ test('new case defaults to the device IANA zone, filters all supplied zones and 
     fixture.handle.close();
 
     fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined, {target: {roomId: 'room'}, bootstrap,
-        Intl: {DateTimeFormat: () => ({resolvedOptions: () => ({timeZone: 'Pacific/Unknown'})})}});
+        Intl: {DateTimeFormat: function (_locale, options = {}) { if (options.timeZone === 'Pacific/Unknown') throw new RangeError('bad IANA zone'); return {resolvedOptions: () => ({timeZone: 'Pacific/Unknown'})}; }}});
     await settle();
     zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
     assert.equal(zone.value, 'UTC');
+    fixture.handle.close();
+
+    const savedBootstrap = {...bootstrap, account_timezone: 'America/New_York'};
+    fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
+        {target: {roomId: 'room'}, bootstrap: savedBootstrap, Intl: deviceIntl});
+    await settle();
+    zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
+    assert.equal(zone.value, 'America/New_York', 'the stored account zone beats the device zone');
+    fixture.handle.close();
+
+    fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
+        {target: {roomId: 'room'}, bootstrap: {...bootstrap, account_timezone: null}, Intl: deviceIntl});
+    fixture.zoneApi.setTimezone('America/New_York');
+    await settle();
+    zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
+    assert.equal(zone.value, 'Asia/Tokyo', 'explicit automatic mode uses this device, not a stale shell account zone');
     fixture.handle.close();
 });
 

@@ -179,6 +179,7 @@ const plantationLevel=()=>S.catalog?.plantations?.steps?.[1]?.level;
 const now=()=>Date.now()/1000+(S.offset||0);
 const el=(tag,txt,cls)=>{let n=document.createElement(tag);if(txt!==undefined&&txt!==null)n.textContent=txt;if(cls)n.className=cls;return n;};
 const icon=id=>{const n=document.createElementNS('http://www.w3.org/2000/svg','svg'),u=document.createElementNS(n.namespaceURI,'use');n.setAttribute('viewBox','0 0 48 48');n.setAttribute('aria-hidden','true');u.setAttribute('href',`/app/farm/assets/icons.svg?v=20261124-coffee-cotton#${FEST.iconId(id)}`);n.append(u);return n;};
+const displayDate=(date,options)=>globalThis.QW?.prefs?.formatDate?.(date,'ru-RU',options)??date.toLocaleString('ru-RU',options);
 function lakeDoorArt(){const n=document.createElementNS('http://www.w3.org/2000/svg','svg');n.setAttribute('class','lake-door-art');n.setAttribute('viewBox','0 0 160 68');n.setAttribute('preserveAspectRatio','xMidYMid slice');n.setAttribute('aria-hidden','true');n.setAttribute('focusable','false');n.innerHTML='<defs><clipPath id="lake-card-clip"><rect width="160" height="68" rx="13"/></clipPath><linearGradient id="lake-sky" x2="0" y2="1"><stop stop-color="#dcebd1"/><stop offset="1" stop-color="#f3eacb"/></linearGradient><linearGradient id="lake-water" x2="0" y2="1"><stop stop-color="#8ec7c1"/><stop offset="1" stop-color="#5d9d9c"/></linearGradient></defs><g clip-path="url(#lake-card-clip)"><rect width="160" height="68" fill="url(#lake-sky)"/><circle cx="125" cy="15" r="8" fill="#f6d47d" opacity=".82"/><path d="M0 34 24 16l25 19 28-22 34 24 23-15 26 17v29H0Z" fill="#9bb68b"/><path d="M0 43q25-11 48 0t47 0 65 0v34H0Z" fill="#6f966d"/><path d="M0 47q25-9 49 0t47 0 64 0v25H0Z" fill="url(#lake-water)"/><path d="M8 52q12-4 23 0t23 0m18 0q12-4 23 0t23 0m-73 9q11-3 22 0t22 0m36-7q10-3 20 0" fill="none" stroke="#d4ebe1" stroke-width="1.7" stroke-linecap="round" opacity=".85"/><path d="M8 45V29m0 11-5-7m5 4 5-7m-1 15V33m0 8 5-7m-5 4-4-6m135 12V28m0 13-5-7m5 4 5-7m-1 11V34m0 8 5-7m-5 4-4-6" fill="none" stroke="#547952" stroke-width="2" stroke-linecap="round"/><path d="M65 45q10-7 20 0-10 7-20 0Z" fill="#f0d39a" stroke="#7c795a" stroke-width="1.2"/><path d="m82 44 5-4v10l-5-4" fill="#e7c27a"/><circle cx="72" cy="45" r="1" fill="#365b4c"/><path d="M73 23q5-5 10 0m-7 5q4-4 8 0" fill="none" stroke="#fff8df" stroke-width="1.5" stroke-linecap="round" opacity=".9"/></g>';return n;}
 const button=(text,fn,cls='primary',disabled=false)=>{let b=el('button',text,cls);b.type='button';b.disabled=disabled;b.onclick=fn;return b;};
 const itemName=id=>S.catalog?.items[id]?.name||id;
@@ -453,7 +454,7 @@ function readySnapshot(){
  ]);
 }
 let panelRenderSignature='';
-function panelSnapshot(){return JSON.stringify([farmSnapshot(S.me),farmSnapshot(S.farm),S.village,S.speed,S.tab,S.selected,S.seed,readySnapshot()]);}
+function panelSnapshot(){return JSON.stringify([farmSnapshot(S.me),farmSnapshot(S.farm),S.village,S.speed,S.tab,S.selected,S.seed,readySnapshot(),globalThis.QW?.prefs?.resolvedTimezone?.()]);}
 async function refresh({render=true}={}){
  const prefsEpoch=farmContrastEpoch,viewEpoch=farmViewEpoch,requestEpoch=++refreshEpoch,identity=S.me?.id,id=S.farm?.id;
  const current=()=>viewEpoch===farmViewEpoch&&requestEpoch===refreshEpoch&&S.me?.id===identity&&S.farm?.id===id;
@@ -817,7 +818,7 @@ function renderMinigameResult(game,result,parent){
  const rewardKind=result.reward_kind||(game==='house'?'coins':'feed');
  const bonusFeed=rewardKind==='coins'&&Number(result.bonus_feed)>0?Number(result.bonus_feed):0;
  const rewardText=rewardKind==='feed'?`${reward} корма`:bonusFeed?`${reward} монет и ${bonusFeed} корм`:`${reward} монет`;
- box.append(el('strong',result.correct?`Верно! +${rewardText}`:'Ответ сохранён, но приз не получен.'),el('small',`Последняя игра · ${new Date(result.answered_at*1000).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'})}`));
+ box.append(el('strong',result.correct?`Верно! +${rewardText}`:'Ответ сохранён, но приз не получен.'),el('small',`Последняя игра · ${displayDate(new Date(result.answered_at*1000),{dateStyle:'short',timeStyle:'short'})}`));
  parent.append(box);
 }
 function renderMinigame(game,parent){
@@ -1317,7 +1318,7 @@ function renderWineAging(o,p){
 function wineAgingDate(stamp,withTime=false){
  const date=new Date(stamp*1000),options={dateStyle:'medium'};
  if(withTime)options.timeStyle='short';
- const text=el('time',date.toLocaleString('ru-RU',options));
+ const text=el('time',displayDate(date,options));
  text.dateTime=date.toISOString();
  return text;
 }
@@ -1446,7 +1447,7 @@ function renderJournal(p){
  const rewards=S.me.farm_reward_history;
  const appendEvent=(entry,parent)=>{
   const row=el('div',entry.text,'event');
-  row.append(el('small',new Date(entry.at*1000).toLocaleString('ru-RU')));
+  row.append(el('small',displayDate(new Date(entry.at*1000))));
   const actual=bulkActualDetails(entry);
   if(actual)row.append(actual);
   parent.append(row);
@@ -2078,7 +2079,7 @@ function renderSharing(p){
   const linkLine=el('p',null,'note invite-link-state');linkLine.hidden=true;
   const showLink=l=>{
    linkLine.hidden=!l;if(!l)return;
-   const until=new Date(l.expires_at*1000).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+   const until=displayDate(new Date(l.expires_at*1000),{day:'numeric',month:'long'});
    linkLine.textContent=`По ссылке вступили ${l.uses} из ${l.max_uses} · действует до ${until}`;
   };
   showLink(info.link);
@@ -2954,7 +2955,7 @@ function plantationCard(h,P){
    collect.dataset.plantationAction='harvest';
    actions.append(collect);
   }else if(h.state==='winter'){
-   const ready=new Date(h.ready_at*1000).toLocaleString('ru-RU',{dateStyle:'long',timeStyle:'short'});
+   const ready=displayDate(new Date(h.ready_at*1000),{dateStyle:'long',timeStyle:'short'});
    note(`Зимой рост останавливается. Урожай ожидается ${ready}.`,c);
   }else{
    const countdown=timer(h.ready_at);

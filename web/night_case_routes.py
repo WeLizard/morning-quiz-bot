@@ -129,7 +129,7 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
                     # Free text needs a real intent transport; a bare orchestrator only carries AI start options.
                     free_intent = orchestrator is not None and (getattr(orchestrator, 'dispatcher', None) is not None
                                                                 or getattr(orchestrator, 'transport', None) is not None)
-                    result = {**result, 'viewer_account_id': viewer, 'capabilities': {
+                    result = {**result, 'viewer_account_id': viewer, 'account_timezone': getattr(who, 'timezone', None), 'capabilities': {
                         'legacy_mafia': True, 'free_intent': free_intent, 'ai_narrator': bool(ai_enabled)}}
                 return JSONResponse(result, headers={'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization'})
         except (NightCaseError,NightAIControlError) as exc:

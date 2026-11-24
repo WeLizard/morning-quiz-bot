@@ -341,6 +341,8 @@ class AccountMergeService:
             main.display_name = secondary.display_name
         if not main.address_form and secondary.address_form:
             main.address_form = secondary.address_form
+        if main.timezone is None and secondary.timezone is not None:
+            main.timezone = secondary.timezone
         # Accessibility: if either account asked for the contrast mode, the merged one keeps it.
         main.contrast_mode = bool(main.contrast_mode or secondary.contrast_mode)
         secondary.archived = True

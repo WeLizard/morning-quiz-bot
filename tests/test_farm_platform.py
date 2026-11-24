@@ -136,6 +136,47 @@ async def receipts(env, account_id, key):
             table.c.account_id == UUID(account_id), table.c.command_id == key))).mappings().all()
 
 
+@pytest.mark.parametrize(('identity', 'zone'), [('guest', 'Asia/Tokyo'), ('telegram', 'America/New_York')])
+def test_account_timezone_is_shared_by_the_profile_and_farm(farm_pg_url, identity, zone):
+    async def scenario():
+        async with environment(farm_pg_url) as env, player(env, identity) as actor:
+            params = {'identity': identity}
+            preference = '/api/account/timezone'
+            profile = '/api/guest/me' if identity == 'guest' else '/api/mini/me'
+            catalog = await actor.client.get('/api/account/timezones')
+            assert catalog.status_code == 200 and {'UTC', zone} <= set(catalog.json()['timezones'])
+            assert (await actor.client.get(profile)).json()['timezone'] is None
+            payload = {'timezone': zone, 'account_id': actor.account_id}
+            unauthorized = await env.client.post(preference, params=params, json=payload,
+                                                 headers=GUEST_HEADERS)
+            assert unauthorized.status_code == 401
+            bad = await actor.client.post(preference, params=params, json=payload | {'timezone': 'Not/A_Zone'},
+                                          headers=GUEST_HEADERS)
+            assert bad.status_code == 400
+            stale = await actor.client.post(preference, params=params, json=payload | {'account_id': str(uuid4())},
+                                            headers=GUEST_HEADERS)
+            assert stale.status_code == 409 and stale.json()['code'] == 'profile_changed'
+            saved = await actor.client.post(preference, params=params, json=payload,
+                                            headers=GUEST_HEADERS)
+            assert saved.status_code == 200 and saved.json() == {'account_id': actor.account_id, 'timezone': zone}
+            assert (await actor.client.get(profile)).json()['timezone'] == zone
+            farm = await actor.client.get(API + '/me', params=params, headers=FARM_HEADERS)
+            assert farm.status_code == 200 and farm.json()['timezone'] == zone
+            reset = await actor.client.post(preference, params=params, json=payload | {'timezone': None},
+                                            headers=GUEST_HEADERS)
+            assert reset.status_code == 200
+            assert (await actor.client.get(profile)).json()['timezone'] is None
+            if identity == 'guest':
+                private = create_app(database=env.db, settings=MiniAppSettings(TOKEN, ORIGIN, offline=True),
+                                     clock=lambda: env.now[0], allowed_user_ids={actor.user_id})
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=private), base_url=ORIGIN,
+                                             cookies=actor.client.cookies) as client:
+                    denied = await client.post(preference, json=payload, headers=GUEST_HEADERS)
+                    assert denied.status_code == 403
+
+    asyncio.run(scenario())
+
+
 async def ledger(env, *, key=None):
     async with env.db.transaction() as session:
         table = env.schema['ledger']

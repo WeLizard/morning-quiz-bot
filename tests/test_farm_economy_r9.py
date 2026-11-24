@@ -302,6 +302,18 @@ def test_fund_contribution_validation():
     cmd(f, 'fund_contribute', {'coins': 1, 'items': {}})
 
 
+def test_fund_contribution_above_value_cap_keeps_inventory(monkeypatch):
+    f = farm()
+    f['inventory']['wheat'] = 1
+    monkeypatch.setattr(economy, 'MAX_CONTRIBUTION', 1)
+    before = deepcopy(f)
+    with pytest.raises(FarmError) as exc:
+        cmd(f, 'fund_contribute', {'coins': 1, 'items': {'wheat': 1}})
+    assert exc.value.code == 'invalid_command'
+    assert exc.value.message == 'Слишком большой вклад за один раз.'
+    assert f == before
+
+
 def test_feast_gives_ten_percent_more_xp_to_owner_commands_only_and_is_not_stacked():
     f = farm(lv=12)
     f['economy']['feast_until'] = D1 + 7200
@@ -463,20 +475,55 @@ def test_a_failed_contribution_does_not_touch_the_counter():
 
 # ---------------------------------------------------------------------------------------------- PostgreSQL
 from tests.test_farm_platform import (  # noqa: E402
-    API, FARM_HEADERS, accepted, environment, farm_pg_url, player, raw_farm, view)
+    API, FARM_HEADERS, accepted, command, environment, farm_pg_url, player, raw_farm, receipts, view)
 from tests.test_mini_app import NOW  # noqa: E402
 from qw_farm.persistence import Unit  # noqa: E402
 
 
-async def fund_ready(env, p, coins=200_000, lv=12):
+async def fund_ready(env, p, coins=200_000, lv=12, items=None):
     async with env.db.transaction() as session:
         unit = Unit(session, env.schema)
         state = await unit.by_account(p.account_id)
         before = deepcopy(state)
         state.update(coins=coins, xp=LEVELS[lv - 1])
+        if items is not None:
+            state['inventory'].update(items)
         validate_state(state)
         await unit.save(state)
         await unit.record(p.account_id, 'fixture-fund', 'fixture', before, state, env.now[0])
+
+
+def test_postgres_full_catalog_contribution_is_one_atomic_http_command(farm_pg_url):
+    async def run():
+        async with environment(farm_pg_url) as env, player(env) as p:
+            items = {key: 1 for key, item in catalog.ITEMS.items() if not item.get('bound')}
+            assert len(items) > 12
+            await fund_ready(env, p, items=items)
+            before = await raw_farm(env, p)
+            last_item = next(reversed(items))
+            rejected_key = 'fund-full-short-on-stock'
+            rejected = await command(p, 'fund_contribute', {'coins': 0, 'items': dict(items, **{last_item: 2})},
+                                     key=rejected_key)
+            assert rejected.status_code == 409 and rejected.json()['code'] == 'missing_goods'
+            assert not await receipts(env, p.account_id, rejected_key)
+            assert await raw_farm(env, p) == before
+
+            key = 'fund-full-catalog'
+            data = {'coins': 0, 'items': items}
+            first = await accepted(p, 'fund_contribute', data, key=key)
+            after = await raw_farm(env, p)
+            expected = economy.goods_value(items)
+            assert all(after['inventory'][item] == 0 for item in items)
+            assert after['economy']['stats']['fund_village'] == expected
+            assert await accepted(p, 'fund_contribute', data, key=key) == first
+            assert await raw_farm(env, p) == after
+            assert len(await receipts(env, p.account_id, key)) == 1
+            season = economy.season_of(env.now[0])
+            async with env.db.transaction() as session:
+                row = await Unit(session, env.schema).village_peek(season)
+            assert row['total'] == economy.village_value(expected, env.now[0], 0, row['goal'])
+
+    asyncio.run(run())
 
 
 def test_postgres_concurrent_contributions_are_not_lost_and_both_farms_get_the_reward(farm_pg_url):

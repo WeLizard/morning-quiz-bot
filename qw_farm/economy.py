@@ -213,18 +213,18 @@ def _grant_feast(farm, at):
 
 def contribute(farm, coins, items, at):
     """Validate and book one contribution; returns (value, notice). The caller (domain) already checked the schema."""
-    from .domain import need, inventory, unbound
+    from .domain import need, inventory_after, unbound
     lv = level(farm['xp'])
     need(lv >= FUND_LEVEL, 'locked', f'Фонд деревни открывается с {FUND_LEVEL} уровня.')
-    need(type(coins) is int and coins >= 0 and isinstance(items, dict) and len(items) <= 12, 'invalid_command', 'Некорректный вклад.', 422)
+    need(type(coins) is int and coins >= 0 and isinstance(items, dict), 'invalid_command', 'Некорректный вклад.', 422)
     need(coins <= max(0, farm['coins'] - farm['starter_credit']), 'earned_coins',
          'В фонд идут только заработанные монеты, не стартовый подарок.')
-    if items:
-        unbound([k for k in items if isinstance(k, str)])
-        inventory(farm, items, -1)           # validates ids, quantities and stock before anything is spent
+    unbound(items)
+    remaining_stock = inventory_after(farm, items, -1)
     value = coins + goods_value(items)
     need(value > 0, 'invalid_command', 'Добавь монеты или товары.', 422)
     need(value <= MAX_CONTRIBUTION, 'invalid_command', 'Слишком большой вклад за один раз.', 422)
+    farm['inventory'].update(remaining_stock)
     farm['coins'] -= coins
     e = state(farm)
     season = season_of(at)

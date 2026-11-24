@@ -48,14 +48,21 @@ def duration(seconds, speed, farm=None):
     return max(1, math.ceil(seconds / speed))
 
 
-def inventory(farm, values, direction=1):
+def inventory_after(farm, values, direction=1):
+    """Validate and return the resulting quantities for the supplied item IDs."""
+    updated = {}
     for key, qty in values.items():
         named(ITEMS, key)
         number(qty, 1, 1000000)
-        need(farm['inventory'].get(key, 0) + direction * qty >= 0,
+        amount = farm['inventory'].get(key, 0) + direction * qty
+        need(amount >= 0,
              'missing_goods', f'Не хватает: {ITEMS[key]["name"]}.')
-    for key, qty in values.items():
-        farm['inventory'][key] = farm['inventory'].get(key, 0) + direction * qty
+        updated[key] = amount
+    return updated
+
+
+def inventory(farm, values, direction=1):
+    farm['inventory'].update(inventory_after(farm, values, direction))
 
 
 def pay(farm, amount):

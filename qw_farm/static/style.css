@@ -103,21 +103,20 @@ dialog{border:0;border-radius:23px;max-width:440px;width:calc(100vw - 40px);padd
 .dye-riddle-verse{font-style:italic;line-height:1.6}
 .upkeep-total{font-size:18px;font-weight:750;margin:2px 0 6px}.debt-note,.feast-note{display:flex;flex-direction:column;gap:3px;margin:8px 0}.debt-note{background:#f6e3d4;border:1px solid #d9a97f}.feast-note{background:#f4ecc7;border:1px solid #d7c47a}
 .fund-tier{display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px dashed var(--line);font-size:12px}.fund-tier span:nth-child(2){flex:1;min-width:0}.fund-tier small{color:var(--muted,#6d7a70);white-space:nowrap}.fund-mark{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;background:#e8e6d5;font-size:12px;font-weight:700;flex-shrink:0}.fund-tier.done .fund-mark{background:#86b363;color:#fff}.fund-tier.done{opacity:.85}
-.fund-goods{display:flex;flex-direction:column;gap:10px;max-height:min(54dvh,480px);padding:0 4px 4px 0}
+.fund-goods{display:flex;flex-direction:column;gap:8px;height:min(52dvh,400px);max-height:min(52dvh,400px);padding:0 4px 4px 0}
 .fund-goods-search{display:flex;flex:none;align-items:center;min-height:48px;padding:0 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--muted)}
 .fund-goods-search input{flex:1;min-width:0;min-height:44px;border:0!important;padding:0!important;background:transparent!important;box-shadow:none!important;color:var(--ink);font-size:16px}
-.fund-goods-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:8px;min-height:0;overflow:auto;overscroll-behavior:contain}
-.fund-goods-item{display:grid;grid-template-columns:minmax(0,1fr);align-content:space-between;gap:6px;min-width:0;min-height:98px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}
+.fund-goods-list{display:flex;flex:1;flex-direction:column;gap:0;min-height:0;overflow:auto;overscroll-behavior:contain}
+.fund-goods-item{display:grid;grid-template-columns:minmax(0,1fr) 72px;align-items:center;gap:8px;min-width:0;min-height:50px;padding:2px 0;border-bottom:1px solid var(--line)}
 .fund-goods-item[hidden]{display:none}
-.fund-goods-copy{display:grid;gap:4px;min-width:0}
-.fund-goods-copy strong{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
-.fund-goods-copy small{font-size:12px;line-height:1.25;color:var(--muted)}
-.fund-goods-item input{box-sizing:border-box;width:96px;max-width:100%;height:44px;min-height:44px;justify-self:start;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:16px;padding:6px 10px}
+.fund-goods-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fund-goods-copy strong{font-size:13px;line-height:1.25;overflow-wrap:anywhere}
+.fund-goods-copy small{font-size:12px;line-height:1.2;color:var(--muted)}
+.fund-goods-item input{box-sizing:border-box;width:72px;max-width:100%;height:44px;min-height:44px;justify-self:end;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font-size:16px;padding:5px 7px}
 .fund-goods-footer{position:sticky;bottom:0;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px 0 0;background:var(--surface)}
 .fund-goods-footer button{min-height:44px;font-size:15px;padding:8px 12px}
 .fund-goods-total{min-width:0;font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.fund-goods-empty{grid-column:1/-1;margin:4px 0}
-@media(max-width:379px){.fund-goods-list{grid-template-columns:minmax(0,1fr)}.fund-goods-item{grid-template-columns:minmax(0,1fr) 112px;align-items:center;min-height:72px}}
+.fund-goods-empty{margin:4px 0}
 .tier-title{margin:14px 0 6px;font-size:12px;letter-spacing:.04em;color:var(--green2,#4f7a43)}.hud .hud-debt{cursor:pointer;color:#9a4b2a;font-weight:700}.hud .hud-debt span{white-space:nowrap}
 
 /* r9 stage 15B: fields door, field cards and the full-screen top-down minigames */

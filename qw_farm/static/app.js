@@ -2468,17 +2468,17 @@ function fundGoodsDialog(){
  for(const id of ids){
   const item=S.catalog.items[id],quantity=stock(id),unitValue=Math.floor((item.fund_price??item.price)*e.markup/100);
   const row=el('article',null,'fund-goods-item'),copy=el('div',null,'fund-goods-copy');
-  copy.append(el('strong',itemName(id)),el('small',`На складе ${fmt(quantity)} · ≈${fmt(unitValue)} мон. за штуку`));
+  copy.append(el('strong',itemName(id)),el('small',`Есть ${fmt(quantity)} · ≈${fmt(unitValue)} мон./шт.`));
   const input=el('input');input.type='number';input.inputMode='numeric';input.min='0';input.max=String(quantity);input.step='1';input.value='0';input.setAttribute('aria-label',`Количество товара «${itemName(id)}» (на складе ${fmt(quantity)})`);
   const entry={id,input,row,name:itemName(id)};rows.push(entry);row.append(copy,input);list.append(row);
  }
  w.append(list);
  const emptySearch=el('p','Ничего не найдено.','fund-goods-empty');emptySearch.hidden=true;list.append(emptySearch);
  search.addEventListener('input',()=>{const query=search.value.trim().toLocaleLowerCase('ru');let shown=0;for(const entry of rows){const visible=entry.name.toLocaleLowerCase('ru').includes(query);entry.row.hidden=!visible;if(visible)shown++;}emptySearch.hidden=shown>0||!query;});
- const summary=el('div','Выбрано: 0 · Итого: 0 мон.','fund-goods-total');summary.setAttribute('aria-live','polite');summary.setAttribute('aria-atomic','true');
+ const summary=el('div','Выбрано 0 · 0 мон.','fund-goods-total');summary.setAttribute('aria-live','polite');summary.setAttribute('aria-atomic','true');
  const contribute=button('Внести',()=>{},'primary',true);let saving=false;
  const chosenItems=()=>{const items={};for(const {id,input} of rows){const q=Math.floor(Number(input.value));if(q>0)items[id]=Math.min(q,stock(id));}return items;};
- const update=()=>{const items=chosenItems();let quantity=0,total=0;for(const [id,q] of Object.entries(items)){quantity+=q;const item=S.catalog.items[id];total+=Math.floor((item.fund_price??item.price)*q*e.markup/100);}summary.textContent=`Выбрано: ${fmt(quantity)} · Итого: ${fmt(total)} мон.`;contribute.disabled=saving||quantity===0;};
+ const update=()=>{const items=chosenItems();let quantity=0,total=0;for(const [id,q] of Object.entries(items)){quantity+=q;const item=S.catalog.items[id];total+=Math.floor((item.fund_price??item.price)*q*e.markup/100);}summary.textContent=`Выбрано ${fmt(quantity)} · ${fmt(total)}\u00a0мон.`;contribute.disabled=saving||quantity===0;};
  for(const {input,id} of rows){input.addEventListener('input',update);input.addEventListener('change',()=>{input.value=String(Math.max(0,Math.min(stock(id),Math.floor(Number(input.value)||0))));update();});}
  contribute.onclick=safe(async()=>{if(saving)return;const items=chosenItems();if(!Object.keys(items).length)return;saving=true;update();try{if(await command('fund_contribute',{coins:0,items})&&w.isConnected&&$('dialog').open)$('dialog').close();}finally{saving=false;if(w.isConnected&&$('dialog').open)update();}});
  modal('Товары в фонд деревни',w,[contribute]);

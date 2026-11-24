@@ -470,6 +470,7 @@ class ConfigHandlers:
             await self._update_config_message(query, context, context.chat_data[CTX_INPUT_PROMPT], InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Отмена", callback_data=CB_ADM_WISDOM_MENU)]]))
             return CFG_WISDOM_TIME_INPUT
         elif action == CB_ADM_WISDOM_SET_TIMEZONE:
+            context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_wisdom_menu"
             await self._send_timezone_selection_menu(query, context)
             return CFG_WISDOM_TIMEZONE_MENU
         elif action == CB_ADM_WISDOM_MENU:
@@ -484,6 +485,11 @@ class ConfigHandlers:
             # Обработка выбора часового пояса для мудрости дня
             logger.info(f"DEBUG TIMEZONE: Обрабатываем выбор часового пояса: {action}")
             selected_timezone = action.split(":", 1)[1]
+            import pytz
+            if selected_timezone not in pytz.all_timezones_set:
+                await query.answer("Неизвестный часовой пояс.", show_alert=True)
+                await self._send_wisdom_menu(query, context)
+                return CFG_WISDOM_MENU
 
             settings = await self.data_manager.get_chat_settings_async(chat_id)
             if 'daily_wisdom' not in settings:
@@ -491,6 +497,12 @@ class ConfigHandlers:
 
             # У квиза и мудрости общий часовой пояс чата.
             old_timezone = settings.get('daily_quiz', {}).get('timezone', 'Europe/Moscow')
+            if old_timezone == selected_timezone:
+                await query.answer(
+                    f"Часовой пояс уже установлен на {self._get_timezone_display_name(selected_timezone)}",
+                    show_alert=True)
+                await self._send_wisdom_menu(query, context)
+                return CFG_WISDOM_MENU
             # Используем часовой пояс от ежедневной викторины
             actual_timezone = selected_timezone
             await self.data_manager.update_chat_setting(chat_id, ["daily_quiz", "timezone"], selected_timezone)
@@ -700,6 +712,12 @@ class ConfigHandlers:
                     logger.error(f"Непредвиденная ошибка парсинга времени '{raw_value}': {e_time_parse}")
                     error_msg_unescaped = "Произошла ошибка при обработке введенного времени."
             else: error_msg_unescaped = "Неизвестное действие для типа 'time'."
+        elif val_type == 'timezone':
+            import pytz
+            if raw_value not in pytz.all_timezones_set:
+                error_msg_unescaped = "Неизвестный часовой пояс. Проверьте идентификатор IANA, например Asia/Tokyo."
+            else:
+                parsed_value = raw_value
 
         try: await update.message.delete()
         except Exception as e_del_input: logger.debug(f"Не удалось удалить сообщение с вводом: {e_del_input}")
@@ -708,7 +726,24 @@ class ConfigHandlers:
             original_prompt_text = context.chat_data.get(CTX_INPUT_PROMPT, escape_markdown_v2("Пожалуйста, введите корректное значение."))
             error_plus_prompt_text = f"{escape_markdown_v2(error_msg_unescaped)}\n\n{original_prompt_text}"
             await self._update_config_message(update, context, error_plus_prompt_text, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Отмена", callback_data=cancel_cb_data_for_current_input)]]))
+            if val_type == 'timezone':
+                return (CFG_WISDOM_TIMEZONE_MENU
+                        if menu_sender_method_name == "_send_wisdom_menu" else CFG_DAILY_TIMEZONE_MENU)
             return CFG_INPUT_VALUE
+
+        if parsed_value is not None and key_path == ["daily_quiz", "timezone"]:
+            current_settings = await self.data_manager.get_chat_settings_async(chat_id)
+            current_timezone = current_settings.get("daily_quiz", {}).get("timezone", "Europe/Moscow")
+            if parsed_value == current_timezone:
+                same_zone_prompt = (f"Часовой пояс уже установлен: {escape_markdown_v2(parsed_value)}.\n\n"
+                                    "Отправь другой идентификатор зоны IANA или нажми «Отмена».")
+                context.chat_data[CTX_INPUT_PROMPT] = same_zone_prompt
+                await self._update_config_message(
+                    update, context, same_zone_prompt,
+                    InlineKeyboardMarkup([[InlineKeyboardButton(
+                        "⬅️ Отмена", callback_data=cancel_cb_data_for_current_input)]]))
+                return (CFG_WISDOM_TIMEZONE_MENU
+                        if menu_sender_method_name == "_send_wisdom_menu" else CFG_DAILY_TIMEZONE_MENU)
 
         if parsed_value is not None:
             await self.data_manager.update_chat_setting(chat_id, key_path, parsed_value)
@@ -717,6 +752,13 @@ class ConfigHandlers:
             await self._safe_reschedule_job_for_chat(chat_id)
         elif key_path and key_path[0].startswith("daily_quiz") and self.daily_quiz_scheduler_ref:
             asyncio.create_task(self._safe_reschedule_job_for_chat(chat_id))
+        if (key_path == ["daily_quiz", "timezone"] and not self.data_manager.postgres_storage
+                and self.wisdom_scheduler_ref):
+            settings = await self.data_manager.get_chat_settings_async(chat_id)
+            wisdom = settings.get('daily_wisdom', {})
+            if wisdom.get('enabled', False):
+                self.wisdom_scheduler_ref.schedule_wisdom_for_chat(
+                    str(chat_id), wisdom.get('time', '09:00'), parsed_value)
 
         await fallback_menu_sender_method(update, context)
         return fallback_state_after_input
@@ -904,12 +946,14 @@ class ConfigHandlers:
         # Форматируем текущие настройки
         enabled = wisdom_settings.get('enabled', False)
         time_str = wisdom_settings.get('time', '09:00')
+        timezone_id = settings.get('daily_quiz', {}).get('timezone', 'Europe/Moscow')
 
         status_emoji = "✅" if enabled else "❌"
         header_text = f"*{escape_markdown_v2('🧠 Настройки мудрости дня')}*"
         status_text = f"{status_emoji} *Статус:* {'Включено' if enabled else 'Выключено'}"
         time_text = f"⏰ *Время отправки:* `{escape_markdown_v2(time_str)}`"
-        timezone_note = f"🌍 *Часовой пояс:* Используется тот же, что и для ежедневной викторины"
+        timezone_note = (f"🌍 *Часовой пояс:* `{escape_markdown_v2(timezone_id)}` "
+                         "(общий с ежедневной викториной)")
 
         text = f"{header_text}\n\n{status_text}\n{time_text}\n{timezone_note}\n\n{escape_markdown_v2('Выберите действие:')}"
 
@@ -1314,25 +1358,8 @@ class ConfigHandlers:
         await self._update_config_message(query, context, final_text, InlineKeyboardMarkup(kb))
 
     def _get_timezone_display_name(self, timezone: str) -> str:
-        """Возвращает отображаемое название часового пояса"""
-        timezone_names = {
-            "America/New_York": "Нью-Йорк (UTC-5)",
-            "America/Sao_Paulo": "Сан-Паулу (UTC-3)",
-            "Atlantic/Azores": "Азорские о-ва (UTC-2)",
-            "Atlantic/South_Georgia": "Южная Георгия (UTC-1)",
-            "Europe/London": "Лондон (UTC+0)",
-            "Europe/Paris": "Париж (UTC+1)",
-            "Europe/Kaliningrad": "Калининград (UTC+2)",
-            "Europe/Moscow": "Москва (UTC+3)",
-            "Asia/Dubai": "Дубай (UTC+4)",
-            "Asia/Tashkent": "Ташкент (UTC+5)",
-            "Europe/Berlin": "Берлин (UTC+1)",
-            "America/Los_Angeles": "Лос-Анджелес (UTC-8)",
-            "Asia/Tokyo": "Токио (UTC+9)",
-            "Asia/Shanghai": "Шанхай (UTC+8)",
-            "Australia/Sydney": "Сидней (UTC+10)",
-        }
-        return timezone_names.get(timezone, f"{timezone}")
+        """Keep the IANA ID visible instead of showing a possibly stale UTC offset."""
+        return timezone
 
     async def handle_daily_times_menu_callbacks(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
         query = update.callback_query
@@ -1397,12 +1424,18 @@ class ConfigHandlers:
             await self._send_daily_times_menu(query, context)
             return CFG_DAILY_TIMES_MENU
         elif action == CB_ADM_DAILY_TIME_SET_TIMEZONE:
+            context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_daily_times_menu"
             await self._send_timezone_selection_menu(query, context)
             return CFG_DAILY_TIMEZONE_MENU
         elif action.startswith(f"{CB_ADM_DAILY_TIME_SET_TIMEZONE}:"):
             # Обработка выбора часового пояса
             try:
                 selected_timezone = action.split(":", 1)[1]
+                import pytz
+                if selected_timezone not in pytz.all_timezones_set:
+                    await query.answer("Неизвестный часовой пояс.", show_alert=True)
+                    await self._send_daily_times_menu(query, context)
+                    return CFG_DAILY_TIMES_MENU
 
                 # Получаем текущий часовой пояс перед изменением
                 current_timezone = daily_settings.get("timezone", "Europe/Moscow")
@@ -1449,63 +1482,32 @@ class ConfigHandlers:
         if current_menu == "_send_wisdom_menu":
             # Контекст мудрости дня
             current_timezone = settings.get("daily_quiz", {}).get("timezone", "Europe/Moscow")
-            timezone_callback_prefix = CB_ADM_WISDOM_SET_TIMEZONE
             back_callback = CB_ADM_WISDOM_MENU
             title = "🌍 Выбор часового пояса для мудрости дня"
         else:
             # Контекст ежедневной викторины
             daily_settings = settings.setdefault("daily_quiz", {})
             current_timezone = daily_settings.get("timezone", "Europe/Moscow")
-            timezone_callback_prefix = CB_ADM_DAILY_TIME_SET_TIMEZONE
             back_callback = CB_ADM_DAILY_TIME_BACK_TO_LIST
             title = "🌍 Выбор часового пояса для викторины"
-        
-        text_lines = [
-            f"*{escape_markdown_v2(title)}*",
-            "",
-            f"Текущий часовой пояс: *{escape_markdown_v2(self._get_timezone_display_name(current_timezone))}*",
-            "",
-            "Выберите новый часовой пояс:"
-        ]
-        
-        # Создаём клавиатуру с часовыми поясами (полный диапазон UTC-5 до UTC+5)
+        prompt = (f"{escape_markdown_v2(title)}\n\n"
+                  f"Текущая зона: {escape_markdown_v2(current_timezone)}\n\n"
+                  "Отправь идентификатор зоны IANA, например "
+                  f"{escape_markdown_v2('Asia/Tokyo')} или "
+                  f"{escape_markdown_v2('America/Argentina/Buenos_Aires')}. "
+                  "Поддерживаются все зоны из базы IANA.")
+        context.chat_data[CTX_INPUT_TARGET_KEY_PATH] = ["daily_quiz", "timezone"]
+        context.chat_data[CTX_INPUT_CONSTRAINTS] = {"type": "timezone"}
+        context.chat_data[CTX_INPUT_PROMPT] = prompt
+        context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = (
+            "_send_wisdom_menu" if current_menu == "_send_wisdom_menu" else "_send_daily_times_menu")
+        context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = back_callback
         kb = []
-        timezones = [
-            ("America/New_York", "🇺🇸 Нью-Йорк (UTC-5)"),
-            ("America/Sao_Paulo", "🇧🇷 Сан-Паулу (UTC-3)"),
-            ("Atlantic/Azores", "🇵🇹 Азорские о-ва (UTC-2)"),
-            ("Atlantic/South_Georgia", "🇬🇸 Южная Георгия (UTC-1)"),
-            ("Europe/London", "🇬🇧 Лондон (UTC+0)"),
-            ("Europe/Paris", "🇫🇷 Париж (UTC+1)"),
-            ("Europe/Kaliningrad", "🇷🇺 Калининград (UTC+2)"),
-            ("Europe/Moscow", "🇷🇺 Москва (UTC+3)"),
-            ("Asia/Dubai", "🇦🇪 Дубай (UTC+4)"),
-            ("Asia/Tashkent", "🇺🇿 Ташкент (UTC+5)"),
-        ]
-        
-        # Размещаем кнопки по 2 в ряд
-        for i in range(0, len(timezones), 2):
-            row = []
-            row.append(InlineKeyboardButton(
-                timezones[i][1],
-                callback_data=f"{timezone_callback_prefix}:{timezones[i][0]}"
-            ))
-            if i + 1 < len(timezones):
-                row.append(InlineKeyboardButton(
-                    timezones[i + 1][1],
-                    callback_data=f"{timezone_callback_prefix}:{timezones[i + 1][0]}"
-                ))
-            kb.append(row)
-        
         # Кнопка "Назад"
         back_button_text = "⬅️ Назад к меню мудрости дня" if current_menu == "_send_wisdom_menu" else "⬅️ Назад к временам"
         kb.append([InlineKeyboardButton(back_button_text, callback_data=back_callback)])
-        
-        final_text = "\n".join(text_lines)
-        context.chat_data[CTX_CURRENT_MENU_SENDER_CB_NAME] = "_send_timezone_selection_menu"
-        context.chat_data[CTX_INPUT_CANCEL_CB_DATA] = back_callback
-        
-        await self._update_config_message(query, context, final_text, InlineKeyboardMarkup(kb))
+
+        await self._update_config_message(query, context, prompt, InlineKeyboardMarkup(kb))
 
     async def handle_confirm_reset_callbacks(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
         query = update.callback_query
@@ -1617,6 +1619,7 @@ class ConfigHandlers:
                     CallbackQueryHandler(self.handle_daily_menu_callbacks, pattern=f"^{CB_ADM_BACK_TO_DAILY_MENU}$")
                 ],
                 CFG_DAILY_TIMEZONE_MENU: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_input_value),
                     CallbackQueryHandler(self.handle_daily_times_menu_callbacks, pattern=f"^{CB_ADM_DAILY_TIME_}"),
                     CallbackQueryHandler(self.handle_daily_times_menu_callbacks, pattern=f"^{CB_ADM_DAILY_TIME_SET_TIMEZONE}:"),
                     CallbackQueryHandler(self.handle_daily_menu_callbacks, pattern=f"^{CB_ADM_BACK_TO_DAILY_MENU}$")
@@ -1633,6 +1636,7 @@ class ConfigHandlers:
                     CallbackQueryHandler(self.handle_main_menu_callbacks, pattern=f"^{CB_ADM_WISDOM_BACK_TO_MAIN}$")
                 ],
                 CFG_WISDOM_TIMEZONE_MENU: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_input_value),
                     CallbackQueryHandler(self.handle_main_menu_callbacks, pattern=f"^{CB_ADM_WISDOM_}"),
                     CallbackQueryHandler(self.handle_main_menu_callbacks, pattern=f"^{CB_ADM_BACK_TO_MAIN}$"),
                     CallbackQueryHandler(self.handle_main_menu_callbacks, pattern=f"^{CB_ADM_WISDOM_BACK_TO_MAIN}$"),

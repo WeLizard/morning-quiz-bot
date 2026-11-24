@@ -88,7 +88,7 @@ function controller(view, requestHook, options = {}) {
     const listeners = new Map();
     const doc = {createElement: make, documentElement: new Node('html'), hidden: false,
         addEventListener(kind, listener, {signal} = {}) { listeners.set(kind, listener); signal?.addEventListener('abort', () => listeners.delete(kind)); }};
-    runInNewContext(source, {window: win, document: doc, AbortController, setTimeout, clearTimeout, TextEncoder,
+    runInNewContext(source, {window: win, document: doc, AbortController, setTimeout, clearTimeout, TextEncoder, Intl: options.Intl || Intl,
         setInterval(fn) { intervals.add(fn); return fn; }, clearInterval(fn) { intervals.delete(fn); }});
     const request = async (url, init) => {
         calls.push({url, body: init.body, expectedViewer: init.expectedViewer, signal: init.signal});
@@ -131,6 +131,35 @@ test('a company is one step below the root: Back returns to the company list', a
     assert.deepEqual(stack.map(item => item.id), []);
     assert.ok(fixture.calls.some(call => call.url === '/api/guest/rooms'));
     assert.ok(find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Пятничная компания'));
+    fixture.handle.close();
+});
+
+test('new case defaults to the device IANA zone, filters all supplied zones and falls back to UTC', async () => {
+    const zones = ['UTC', 'Europe/Berlin', 'Asia/Tokyo', 'America/New_York'];
+    const bootstrap = {enabled: true, viewer_account_id: VIEWER, cases: [{id: 'manor_lake_missing', version: 1, title: 'Усадьба', timezones: zones}]};
+    const deviceIntl = {DateTimeFormat: () => ({resolvedOptions: () => ({timeZone: 'Asia/Tokyo'})})};
+    let fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
+        {target: {roomId: 'room'}, bootstrap, Intl: deviceIntl});
+    await settle();
+    let zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
+    let search = find(fixture.host, node => node.attrs?.['aria-label'] === 'Найти часовой пояс');
+    assert.ok(zone); assert.ok(search); assert.equal(zone.value, 'Asia/Tokyo');
+    assert.deepEqual(zone.children.map(option => option.value), ['America/New_York', 'Asia/Tokyo', 'Europe/Berlin', 'UTC']);
+    find(fixture.host, node => node.attrs?.['aria-label'] === 'Дело').value = 'manor_lake_missing:1';
+    search.value = 'America/New_York'; await search.events.input();
+    assert.deepEqual(zone.children.map(option => option.value), ['Asia/Tokyo', 'America/New_York']);
+    zone.value = 'America/New_York'; await zone.events.change();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Создать стол').click(); await settle();
+    const create = fixture.calls.find(call => call.url.endsWith('/lobby'));
+    assert.ok(create, JSON.stringify(fixture.calls.map(call => call.url)));
+    assert.equal(create.body.params.timezone, 'America/New_York');
+    fixture.handle.close();
+
+    fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined, {target: {roomId: 'room'}, bootstrap,
+        Intl: {DateTimeFormat: () => ({resolvedOptions: () => ({timeZone: 'Pacific/Unknown'})})}});
+    await settle();
+    zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
+    assert.equal(zone.value, 'UTC');
     fixture.handle.close();
 });
 

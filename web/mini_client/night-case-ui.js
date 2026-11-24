@@ -192,6 +192,23 @@ function open(options) {
         if (value != null) select.value = value;
         return {input: select, node: put(el('label', 'ncase-field'), el('span', null, label), select)};
     };
+    const chooseTimezone = (zones, preferred) => {
+        const search = el('input', 'nc-field'); search.type = 'search'; search.setAttribute('aria-label', 'Найти часовой пояс');
+        search.placeholder = 'Например, Asia/Tokyo';
+        const select = el('select', 'nc-field'); select.setAttribute('aria-label', 'Часовой пояс окон');
+        let selected = zones.includes(preferred) ? preferred : zones.includes('UTC') ? 'UTC' : zones[0];
+        const update = () => {
+            const query = search.value.trim().toLocaleLowerCase();
+            const visible = zones.filter(zone => !query || zone.toLocaleLowerCase().includes(query));
+            const choices = selected && !visible.includes(selected) ? [selected, ...visible] : visible;
+            select.replaceChildren(...choices.map(zone => { const option = el('option', null, zone); option.value = zone; return option; }));
+            select.value = selected;
+        };
+        select.addEventListener('change', () => { selected = select.value; });
+        search.addEventListener('input', update);
+        update();
+        return {input: select, node: put(el('div', 'ncase-field'), el('span', null, 'Часовой пояс окон'), search, select)};
+    };
     const displayName = row => row?.title || row?.name || 'Участник';
     // Older lobbies stored the seat id («seat02») for a player without a free name: show «Игрок 2» instead.
     const seatName = row => /^seat\d\d$/.test(row?.name || '') ? `Игрок ${Number(row.name.slice(4))}` : row?.name || 'Игрок';
@@ -571,8 +588,10 @@ function open(options) {
         const cases = arr(boot?.cases);
         if (!cases.length) return frame([panel('Дело пока недоступно', p('Проверенные дела ещё не открыты для этой компании.'))], room?.title || 'Компания');
         const choice = choose('Дело', cases.map(item => ({id: `${item.id}:${item.version}`, label: item.title})), selectedCase);
-        const zones = [...new Set(cases.flatMap(item => arr(item.timezones)))];
-        const zone = choose('Часовой пояс окон', zones.map(value => ({id: value, label: value})), zones[0]);
+        const zones = [...new Set(cases.flatMap(item => arr(item.timezones)))].sort();
+        let deviceZone = 'UTC';
+        try { deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch {}
+        const zone = chooseTimezone(zones, deviceZone);
         frame([kit.scene({shell: 'rooms', title: room.title || 'Компания', text: 'Выбери дело. Каждый в компании отдельно присоединяется к сбору.'}),
             panel('Начать сбор игроков', choice.node, zone.node, kit.stack(button('Создать стол', async () => {
                 selectedCase = choice.input.value;

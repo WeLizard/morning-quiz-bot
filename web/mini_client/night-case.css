@@ -11,7 +11,8 @@
 .ncase-field {display:flex;flex-direction:column;gap:var(--qw-s-2);font-size:var(--qw-fs-body);color:var(--qw-game-text)}
 .ncase-field .nc-field {width:100%;min-height:var(--qw-btn-h);box-sizing:border-box;font:inherit;color:var(--qw-game-text);border-radius:var(--qw-r-control)}
 .ncase-field textarea {min-height:7rem;resize:vertical}
-.ncase-field select {background:var(--nc-field,var(--qw-game-surface));padding:var(--qw-s-3)}
+.ncase-field :is(select,input[type=search]) {background:var(--nc-field,var(--qw-game-surface));padding:var(--qw-s-3)}
+.ncase-field input[type=search] {border:var(--qw-outline-w) solid var(--qw-game-line)}
 .ncase-checkbox {display:flex;align-items:center;gap:var(--qw-s-3);min-height:var(--qw-btn-h);font-size:var(--qw-fs-body);cursor:pointer}
 .ncase-checkbox input {width:24px;height:24px;flex:none;accent-color:var(--qw-game-accent)}
 .ncase-group {display:flex;flex-direction:column;gap:var(--qw-s-2)}

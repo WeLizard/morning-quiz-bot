@@ -17,7 +17,9 @@ from tests.test_postgres_reads_settings import DEFAULTS, data_manager
 from handlers.config_handlers import (
     ConfigHandlers, CTX_ADMIN_CFG_CHAT_ID, CTX_INPUT_TARGET_KEY_PATH,
     CTX_INPUT_CONSTRAINTS, CTX_CURRENT_MENU_SENDER_CB_NAME,
-    CB_ADM_DAILY_TIME_REMOVE, CFG_DAILY_TIMES_MENU,
+    CTX_INPUT_PROMPT, CTX_INPUT_CANCEL_CB_DATA,
+    CB_ADM_DAILY_TIME_REMOVE, CFG_DAILY_TIMES_MENU, CFG_DAILY_TIMEZONE_MENU,
+    CFG_WISDOM_TIMEZONE_MENU, CFG_WISDOM_MENU,
 )
 from handlers.daily_quiz_scheduler import DailyQuizScheduler
 from handlers.wisdom_scheduler import WisdomScheduler
@@ -342,6 +344,118 @@ def test_chat_menu_adds_time_once_and_keeps_last_enabled_time(pg_env):
             assert await handlers.handle_daily_times_menu_callbacks(SimpleNamespace(callback_query=query), context) == CFG_DAILY_TIMES_MENU
             assert await SettingsService(db).get(CHAT) == before
             assert "Сначала отключите" in query.answer.call_args.args[0]
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("menu_sender", "expected_back"), [
+    ("_send_daily_times_menu", "admcfg_daily_time_back_to_times_list"),
+    ("_send_wisdom_menu", "admcfg_wisdom_menu"),
+])
+def test_timezone_menu_accepts_any_iana_id_without_static_offset_choices(menu_sender, expected_back):
+    async def run():
+        handlers = ConfigHandlers.__new__(ConfigHandlers)
+        handlers.data_manager = SimpleNamespace(get_chat_settings_async=AsyncMock(return_value={
+            "daily_quiz": {"timezone": "Europe/Moscow"},
+        }))
+        handlers._update_config_message = AsyncMock()
+        context = SimpleNamespace(chat_data={
+            CTX_ADMIN_CFG_CHAT_ID: CHAT,
+            CTX_CURRENT_MENU_SENDER_CB_NAME: menu_sender,
+        })
+        await handlers._send_timezone_selection_menu(SimpleNamespace(), context)
+        args = handlers._update_config_message.await_args.args
+        prompt, markup = args[2], args[3]
+        assert "Asia/Tokyo" in prompt and "America/Argentina/Buenos" in prompt and "Aires" in prompt
+        assert "UTC+" not in prompt and "UTC-" not in prompt
+        assert [button.callback_data for row in markup.inline_keyboard for button in row] == [expected_back]
+        assert context.chat_data[CTX_INPUT_TARGET_KEY_PATH] == ["daily_quiz", "timezone"]
+        assert context.chat_data[CTX_INPUT_CONSTRAINTS] == {"type": "timezone"}
+        assert context.chat_data[CTX_INPUT_CANCEL_CB_DATA] == expected_back
+    asyncio.run(run())
+
+
+def test_timezone_text_input_saves_valid_iana_id_and_rejects_unknown_id():
+    async def run():
+        handlers = ConfigHandlers.__new__(ConfigHandlers)
+        handlers.data_manager = SimpleNamespace(
+            postgres_storage=True,
+            update_chat_setting=AsyncMock(),
+            get_chat_settings_async=AsyncMock(return_value={"daily_wisdom": {"enabled": False}}),
+        )
+        handlers._safe_reschedule_job_for_chat = AsyncMock()
+        handlers._update_config_message = AsyncMock()
+        handlers._send_daily_times_menu = AsyncMock()
+
+        def update_with(text):
+            return SimpleNamespace(message=SimpleNamespace(
+                text=text, from_user=SimpleNamespace(id=123), delete=AsyncMock()))
+
+        def context_for():
+            return SimpleNamespace(chat_data={
+                CTX_ADMIN_CFG_CHAT_ID: CHAT,
+                CTX_INPUT_TARGET_KEY_PATH: ["daily_quiz", "timezone"],
+                CTX_INPUT_CONSTRAINTS: {"type": "timezone"},
+                CTX_INPUT_PROMPT: "Введите IANA-зону.",
+                CTX_INPUT_CANCEL_CB_DATA: "back",
+                CTX_CURRENT_MENU_SENDER_CB_NAME: "_send_daily_times_menu",
+            })
+
+        bad_context = context_for()
+        assert await handlers.handle_input_value(update_with("Not/AZone"), bad_context) == CFG_DAILY_TIMEZONE_MENU
+        handlers.data_manager.update_chat_setting.assert_not_awaited()
+        assert "Неизвестный часовой пояс" in handlers._update_config_message.await_args.args[2]
+
+        handlers._update_config_message.reset_mock()
+        good_context = context_for()
+        assert await handlers.handle_input_value(update_with("America/Argentina/Buenos_Aires"), good_context) == CFG_DAILY_TIMES_MENU
+        handlers.data_manager.update_chat_setting.assert_awaited_once_with(
+            CHAT, ["daily_quiz", "timezone"], "America/Argentina/Buenos_Aires")
+        handlers._safe_reschedule_job_for_chat.assert_awaited_once_with(CHAT)
+        handlers._send_daily_times_menu.assert_awaited_once()
+
+        handlers.data_manager.update_chat_setting.reset_mock()
+        handlers._safe_reschedule_job_for_chat.reset_mock()
+        handlers.data_manager.get_chat_settings_async.return_value = {
+            "daily_quiz": {"timezone": "America/Argentina/Buenos_Aires"}}
+        same_context = context_for()
+        assert await handlers.handle_input_value(
+            update_with("America/Argentina/Buenos_Aires"), same_context) == CFG_DAILY_TIMEZONE_MENU
+        handlers.data_manager.update_chat_setting.assert_not_awaited()
+        handlers._safe_reschedule_job_for_chat.assert_not_awaited()
+        assert "установлен" in handlers._update_config_message.await_args.args[2]
+    asyncio.run(run())
+
+
+def test_legacy_timezone_change_reschedules_wisdom_without_daily_scheduler():
+    async def run():
+        handlers = ConfigHandlers.__new__(ConfigHandlers)
+        handlers.data_manager = SimpleNamespace(
+            postgres_storage=False,
+            update_chat_setting=AsyncMock(),
+            get_chat_settings_async=AsyncMock(return_value={
+                "daily_wisdom": {"enabled": True, "time": "08:45"},
+            }),
+        )
+        handlers.daily_quiz_scheduler_ref = None
+        handlers.wisdom_scheduler_ref = Mock()
+        handlers._safe_reschedule_job_for_chat = AsyncMock()
+        handlers._send_wisdom_menu = AsyncMock()
+        update = SimpleNamespace(message=SimpleNamespace(
+            text="Asia/Tokyo", from_user=SimpleNamespace(id=123), delete=AsyncMock()))
+        context = SimpleNamespace(chat_data={
+            CTX_ADMIN_CFG_CHAT_ID: CHAT,
+            CTX_INPUT_TARGET_KEY_PATH: ["daily_quiz", "timezone"],
+            CTX_INPUT_CONSTRAINTS: {"type": "timezone"},
+            CTX_INPUT_PROMPT: "Введите IANA-зону.",
+            CTX_INPUT_CANCEL_CB_DATA: "back",
+            CTX_CURRENT_MENU_SENDER_CB_NAME: "_send_wisdom_menu",
+        })
+        assert await handlers.handle_input_value(update, context) == CFG_WISDOM_MENU
+        handlers.data_manager.update_chat_setting.assert_awaited_once_with(
+            CHAT, ["daily_quiz", "timezone"], "Asia/Tokyo")
+        handlers.wisdom_scheduler_ref.schedule_wisdom_for_chat.assert_called_once_with(
+            str(CHAT), "08:45", "Asia/Tokyo")
+        handlers._safe_reschedule_job_for_chat.assert_not_awaited()
     asyncio.run(run())
 
 

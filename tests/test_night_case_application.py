@@ -206,6 +206,24 @@ class NightApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         results=await asyncio.gather(create(),create())
         self.assertEqual(results[0],results[1])
 
+    async def test_lobby_persists_the_selected_device_timezone(self):
+        from dataclasses import replace
+        from application.night_case import NightCaseError
+        from config.night_case import NightCaseSettings
+
+        runtime_zones = NightCaseSettings(cursor_secret=self.registry.cursor_secret).registry().allowed_timezones
+        self.registry = replace(self.registry, allowed_timezones=runtime_zones)
+        params = {'case_id': self.ref.case_id, 'case_version': self.ref.case_version}
+        async with self.db.transaction() as session:
+            with self.assertRaises(NightCaseError):
+                await self.service(session).create_lobby(account_id=self.owner, room_id=self.room,
+                    command=self.lobby_command(params=params | {'timezone': 'Not/A_Real_Zone'}))
+        async with self.db.transaction() as session:
+            created = await self.service(session).create_lobby(account_id=self.owner, room_id=self.room,
+                command=self.lobby_command(params=params | {'timezone': 'Asia/Tokyo'}))
+            game = await session.get(NightGameSealed, created['view']['game_id'])
+            self.assertEqual(game.rules['timezone'], 'Asia/Tokyo')
+
     async def test_interrupted_blocks_start_leave_and_merge_until_explicit_close(self):
         from application.night_case import NightCaseError
         from application.account_merge import AccountMergeService

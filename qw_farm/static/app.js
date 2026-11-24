@@ -289,8 +289,9 @@ function closeNeighborGift(){
 $('dialog').addEventListener('close',closeNeighborGift);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)showNeighborGifts();});
 
-let autoFarmRewards=false,farmRewardNotice='';
+let farmRewardNotice='';
 const confirmedFarmRewards=new Set();
+const shownFarmRewards=new Set();
 function farmRewards(){return (S.me?.farm_rewards||[]).filter(reward=>!confirmedFarmRewards.has(reward.id));}
 function renderFarmRewards(list){
  const rewards=farmRewards(),signature=JSON.stringify(rewards);
@@ -319,7 +320,8 @@ function renderFarmRewards(list){
  }
 }
 function showFarmRewards(automatic=false){
- if(!farmRewards().length||document.hidden||document.querySelector('dialog[open]')||
+ const rewards=farmRewards();
+ if(!rewards.length||document.hidden||document.querySelector('dialog[open]')||
     farmMenuOpen||QW?.menu.isOpen()||QW?.report?.isOpen()||S.fieldGame||S.placing||
     dashaGameOpen||olegGameOpen||ballistaGameOpen||pieGameOpen||santaGameOpen||(automatic&&(S.busy||S.pending)))return false;
  const box=el('div'),list=el('div'),status=el('p',null,'note');
@@ -336,18 +338,19 @@ function showFarmRewards(automatic=false){
  box.append(list,status,retry);
  renderFarmRewardStatus(box);
  modal('Награды фермы',box);
- autoFarmRewards=false;
+ for(const reward of rewards)shownFarmRewards.add(reward.id);
  return true;
 }
 function syncFarmRewardsDialog(){
  const box=$('dialog').open&&$('dialog-body').querySelector('[data-farm-rewards]');
  if(box){
-  if(farmRewards().length){renderFarmRewards(box.querySelector('[data-farm-reward-list]'));renderFarmRewardStatus(box);}
+  const rewards=farmRewards();
+  if(rewards.length){
+   renderFarmRewards(box.querySelector('[data-farm-reward-list]'));renderFarmRewardStatus(box);
+   for(const reward of rewards)shownFarmRewards.add(reward.id);
+  }
   else $('dialog').close();
- }else if(autoFarmRewards){
-  if(!farmRewards().length)autoFarmRewards=false;
-  else showFarmRewards(true);
- }
+ }else if(farmRewards().some(reward=>!shownFarmRewards.has(reward.id)))showFarmRewards(true);
 }
 function renderFarmRewardStatus(box){
  const status=box.querySelector('[data-farm-reward-status]'),retry=box.querySelector('[data-farm-reward-retry]');
@@ -542,18 +545,17 @@ function scheduleRateRecovery(){
 async function enter(){
  const epoch=++farmViewEpoch;
  try{let data=await request(API+'/start',{method:'POST',...(S.invite?{data:{invite:S.invite}}:{})});if(epoch!==farmViewEpoch)return;if(['guest','telegram'].includes(data.identity))mode=data.identity;S.form=data.address_form||'n';try{globalThis.QW?.prefs?.applyAccount?.(data);}catch{}S.me=S.farm=data.farm;S.lastRun=loadLastRun(S.me.id);S.catalog=data.catalog;S.village=data.village||null;S.speed=data.speed;S.offset=S.me.server_time-Date.now()/1000;resetVillageView();
-  autoFarmRewards=false;confirmedFarmRewards.clear();
+  shownFarmRewards.clear();confirmedFarmRewards.clear();
   // A direct invite URL may bypass the main-app launcher. Once this session
   // has entered Farm, returning to /app must not launch the same invite again.
   if(S.invite)try{sessionStorage.setItem('qw-farm.launch-consumed',S.invite);}catch{}
   try{S.pending=JSON.parse(sessionStorage.getItem(pendingKey(S.me.id))||'null');if(S.pending&&S.pending.actor!==S.me.id)S.pending=null;}catch{S.pending=null;}
  document.body.classList.remove('farm-login');$('game').hidden=false;$('login').hidden=true;if(S.invite&&S.invite!==S.me.id){S.tab='neighbors';showPanel();}renderRail();updateHUD();scene.set(S.farm,S.catalog);scene.resize();scene.fit();renderSeeds();renderPanel();updateReady();connection(S.config.demo?`Локальный сервер · темп ×${S.speed}`:'Сохранено в QuizzyWizzy',!!S.pending);queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();orchardNotices();if(S.pending)setTimeout(()=>sendPending().catch(()=>{}),300);
-  autoFarmRewards=farmRewards().length>0;
   renewPlatformSession().catch(()=>{});
  }catch(e){if(epoch!==farmViewEpoch)return;if(e.status===401)showLogin(SESSION_ENDED);else{showLogin(e.message);toast(e.message,true);}}
 }
 function showLogin(message=''){
- autoFarmRewards=false;confirmedFarmRewards.clear();
+ shownFarmRewards.clear();confirmedFarmRewards.clear();
  closeFarmMenu();const lakeDoor=$('lake-door');if(lakeDoor)lakeDoor.hidden=true;
  // Keep an unknown command's receipt under its original actor for the next login.
  if(S.pending)savePending();
@@ -2557,7 +2559,7 @@ function villageWalk(target,done,instant=false,key){
  villageWalkRaf=requestAnimationFrame(frame);
 }
 // Mouse click walks there first; keyboard / scripted click (detail 0) jumps and opens at once. The button's data attribute names its graph approach point.
-function villageGo(target,open,e){const d=e?.currentTarget?.dataset||{},key=d.villageNpc||(d.villageMerchant?'merchant':d.villagePlace?'place:'+d.villagePlace:d.villageSpot!==undefined?'visitor:'+d.villageSpot:d.villageGate?'gate':d.villageTownhall?'hall':undefined);if(!e||!e.detail){villageWalk(target,open,true,key);return;}villageWalk(target,open,false,key);}
+function villageGo(target,open,e){const d=e?.currentTarget?.dataset||{},key=d.villageNpc||(d.villageMerchant?'merchant':d.villagePlace?'place:'+d.villagePlace:d.villageGate?'gate':d.villageTownhall?'hall':undefined);if(!e||!e.detail){villageWalk(target,open,true,key);return;}villageWalk(target,open,false,key);}
 function villageBindWorld(root){
  if(!root.addEventListener||root.dataset.villageBound)return;root.dataset.villageBound='1';let drag=null;
  root.addEventListener('pointerdown',e=>{villageDragged=false;if(e.pointerType!=='mouse'||e.button!==0)return;drag={x:e.clientX,y:e.clientY,l:root.scrollLeft,t:root.scrollTop};});
@@ -2589,8 +2591,8 @@ function villagePlaces(){
  const layer=el('div',null,'village-places');
  for(const [id,label,ic,x,y,tab] of VILLAGE_PLACES){const b=button(null,e=>id==='post'?villageGo([x,y+2.4],()=>openVillageBulletin('post'),e):id==='market'&&typeof CONSTR!=='undefined'&&CONSTR.rowsOpen()?villageGo([x,y+2.4],()=>openVillageConstruction('rows'),e):villageGo([x,y+2.4],()=>selectTab(tab),e),'village-place');b.style.left=id==='market'?`calc(${x}% - 4px)`:`${x}%`;b.style.top=`${y}%`;b.dataset.villagePlace=id;b.setAttribute('aria-label',label);b.title=label;b.append(icon(ic));layer.append(b);}
  for(const [id,label,x,y] of VILLAGE_SITES){const t=button(typeof CONSTR==='undefined'?`Скоро · ${label}`:CONSTR.siteLabel(id,label),e=>villageGo([x,y+3.2],()=>openVillageConstruction('site:'+id),e),'village-site village-site-btn');t.dataset.villageSite=id;t.dataset.siteName=label;t.style.left=`${x}%`;t.style.top=`${id==='greenhouse'?23.8:id==='tavern'?72.5:id==='fairground'?78.4:y}%`;layer.append(t);}
- villageVisitorsToday().forEach(({v,spot},i)=>{const [id,name,face]=v,b=button(null,e=>villageGo([spot[0],spot[1]+1.6],()=>openVillageVisitor(id),e),'village-visitor va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;b.dataset.villageVisitor=id;b.dataset.villageSpot=String(VILLAGE_VISITOR_SPOTS.indexOf(spot));b.setAttribute('aria-label',`${name}: гость деревни`);villageVars(b,{'--wx':`${i?-40:40}px`,'--wy':`${i?20:-20}px`,'--d':`${i*3}s`,'--cycle':`${19+i*4}s`,'--td':`${2+i*5}s`});
-  const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(el('span',face,'village-visitor-face'));b.append(walker);const say=el('span','💬','village-thought');say.setAttribute('aria-hidden','true');b.append(say);layer.append(b);});
+ villageVisitorsToday().forEach(({v,spot},i)=>{const [id,name,face]=v,b=button(null,()=>{villageWalkStop();openVillageVisitor(id);},'village-visitor va');b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;b.dataset.villageVisitor=id;b.setAttribute('aria-label',`${name}: гость деревни`);villageVars(b,{'--wx':`${i?-40:40}px`,'--wy':`${i?20:-20}px`,'--d':`${i*3}s`,'--cycle':`${19+i*4}s`,'--td':`${2+i*5}s`});
+  const walker=el('span',null,'village-walker');walker.setAttribute('aria-hidden','true');walker.append(el('span',face,'village-visitor-face'),el('span','💬','village-thought'));b.append(walker);layer.append(b);});
  layer.append(villageCartButton());
  return layer;
 }
@@ -2752,7 +2754,7 @@ function syncVillageScene(){
  const focused=document.activeElement?.dataset?.villageNpc||document.activeElement?.dataset?.villageTownhall;
  const world=villageWorldEl,actors=world.children.find?world.children.find(n=>n.className==='village-actors'):world.querySelector('.village-actors'),parts=[];
  const festival=el('div',null,`village-festival stage-${stage===null?'locked':stage}`);festival.setAttribute('aria-hidden','true');festival.append(el('span',null,'village-flags'),el('span',null,'village-flowers'),el('span',null,'village-lights'),el('span',null,'village-balloons'));
- const badge=el('div',null,'village-stage-badge');if(stage===null)badge.append(el('b',eco()?.fund_open?'Праздник: ждём данные':`Праздник с ${ECON().fund_level} ур.`));else{badge.append(el('b',`Праздник ${stage+1}/4`),el('small',VILLAGE_STAGES[stage]));const pips=el('span',null,'village-pips');for(let i=0;i<4;i++)pips.append(el('i',null,i<=stage?'on':''));badge.append(pips);}festival.append(badge);parts.push(festival);
+ const badge=el('div',null,`village-stage-badge stage-${stage===null?'locked':stage}`);if(stage===null)badge.append(el('b',eco()?.fund_open?'Праздник: ждём данные':`Праздник с ${ECON().fund_level} ур.`));else{badge.append(el('b',`Праздник ${stage+1}/4`),el('small',VILLAGE_STAGES[stage]));const pips=el('span',null,'village-pips');pips.setAttribute('aria-hidden','true');for(let i=0;i<4;i++)pips.append(el('i',null,i<=stage?'on':''));badge.append(pips);}parts.push(festival);
  for(const [idx,npc] of names.entries()){
   const figure=VILLAGE_RESIDENT_FIGURES[npc];if(!figure)continue;
   const [foot,roamingArt]=figure,spot=npcSpot(npc),orders=villageOrders(npc),quest=villageQuest(npc),ready=orders.some(villageReady)||!!(quest&&villageQuestPhase(npc)==='active'&&enough({[quest.item]:quest.qty})),selected=villageSheet==='resident'&&npc===villageResident;
@@ -2800,7 +2802,7 @@ function syncVillageScene(){
  dot('vm-mark vm-hall',VILLAGE_HALL);dot('vm-mark vm-gate',VILLAGE_GATE);
  for(const npc of names){const spot=npcSpot(npc);if(spot)dot(`vm-mark vm-npc${villageOrders(npc).length?' has-order':''}`,spot,npc);}
  const frame=el('i',null,'vm-frame'),me=dot('vm-mark vm-player',villagePos);mini.append(frame);villageMini={frame,player:me};
- hud.replaceChildren(sky,back,mini);villageFrame();
+ hud.replaceChildren(sky,back,badge,mini);villageFrame();
 }
 function appendDashaAction(parent){
  const w=S.me?.wager;if(!own())return;

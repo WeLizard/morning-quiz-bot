@@ -70,6 +70,32 @@ test('the reward dialog shows claim errors and allows retrying an unconfirmed co
  assert.equal(status.textContent,'Подтверждаем действие…');
 });
 
+test('a gift arriving on an open farm gets one automatic presentation',()=>{
+ const source=read('app.js'),start=source.indexOf('function syncFarmRewardsDialog(');
+ const rewards=[],shownFarmRewards=new Set();
+ let blocked=true, attempts=0;
+ const ctx=vm.createContext({
+  $:()=>({open:false}),farmRewards:()=>rewards,shownFarmRewards,
+  showFarmRewards(automatic){
+   assert.equal(automatic,true);attempts++;
+   if(!blocked)for(const reward of rewards)shownFarmRewards.add(reward.id);
+  },
+ });
+ vm.runInContext(source.slice(start,source.indexOf('function renderFarmRewardStatus(',start)),ctx);
+ ctx.syncFarmRewardsDialog();
+ assert.equal(attempts,0);
+ rewards.push({id:'first'});
+ ctx.syncFarmRewardsDialog();
+ assert.equal(attempts,1);
+ blocked=false;
+ ctx.syncFarmRewardsDialog();
+ ctx.syncFarmRewardsDialog();
+ assert.equal(attempts,2);
+ rewards.push({id:'later'});
+ ctx.syncFarmRewardsDialog();
+ assert.equal(attempts,3);
+});
+
 test('a decor gift bypasses the price and level for its available copies only',async()=>{
  const N=await load();
  const sample={...catalog,buildings:{flowerbed:{id:'flowerbed',name:'Клумба',decor:true,w:1,h:1,cost:50,level:12}}};

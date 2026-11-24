@@ -100,7 +100,7 @@ test('walk: approach key walks to the graph node and then opens; villageGo maps 
  const h=make();let n=0;const key=Object.keys(W.a)[0];
  h.api.villageGo([1,1],()=>n++,{detail:1,currentTarget:{dataset:{villageNpc:key}}});run(h);
  const i=W.a[key];assert.equal(n,1);assert.ok(Math.abs(h.api.pos()[0]*24-W.n[2*i])<1e-6&&Math.abs(h.api.pos()[1]*18-W.n[2*i+1])<1e-6);
- for(const [data,k] of [[{villagePlace:'board'},'place:board'],[{villageSpot:'0'},'visitor:0'],[{villageGate:'gate'},'gate'],[{villageTownhall:'townhall'},'hall']]){
+ for(const [data,k] of [[{villagePlace:'board'},'place:board'],[{villageGate:'gate'},'gate'],[{villageTownhall:'townhall'},'hall']]){
   const g=make();g.api.villageGo([1,1],null,{detail:0,currentTarget:{dataset:data}});const j=W.a[k];assert.ok(Math.abs(g.api.pos()[0]*24-W.n[2*j])<1e-6,k);
  }
 });

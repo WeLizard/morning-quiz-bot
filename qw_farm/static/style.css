@@ -601,6 +601,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-hud[hidden]{display:none!important}
 .village-hud>*{pointer-events:auto}
 .village-hud>.village-sky{pointer-events:none}
+.village-hud>.village-stage-badge{position:absolute;right:64px;top:10px;max-width:calc(100% - 188px);pointer-events:none}
 .village-sky{position:absolute;left:0;right:0;top:0;height:96px;display:none}
 :root[data-farm-theme=night] .village-sky{display:block}
 .vs-stars{position:absolute;inset:0;background:radial-gradient(1.6px 1.6px at 9% 30%,#fff,transparent),radial-gradient(1.2px 1.2px at 21% 62%,#fff,transparent),radial-gradient(1.8px 1.8px at 34% 22%,#fff6c8,transparent),radial-gradient(1.2px 1.2px at 47% 70%,#fff,transparent),radial-gradient(1.6px 1.6px at 58% 18%,#fff,transparent),radial-gradient(1.2px 1.2px at 69% 58%,#fff6c8,transparent),radial-gradient(1.6px 1.6px at 77% 34%,#fff,transparent),radial-gradient(1.2px 1.2px at 90% 66%,#fff,transparent),radial-gradient(1.2px 1.2px at 15% 82%,#fff,transparent),radial-gradient(1.2px 1.2px at 96% 14%,#fff,transparent);mask-image:linear-gradient(#000 40%,transparent)}
@@ -664,6 +665,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-site.village-site-btn[data-village-site=stalls]{margin-top:-84px}
 .village-visitor{position:absolute;box-sizing:border-box;width:48px;height:48px;margin:-24px 0 0 -24px;padding:0;background:transparent;border:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .village-visitor-face{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#fff6dc;border:2px solid #d9c58e;box-shadow:0 3px 4px #52643c35;font-size:21px;line-height:1}
+.village-visitor .village-thought{visibility:hidden;pointer-events:auto}
 :root[data-farm-theme=night] :is(.village-place,.village-site){background:var(--float);border-color:var(--line);color:var(--ink)}
 @media(max-width:480px){.village-minimap{width:112px;right:8px;bottom:calc(8px + var(--qw-safe-bottom))}}
 @media(prefers-reduced-motion:no-preference){
@@ -673,11 +675,11 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  .is-walking{animation:vp-hop .28s ease-in-out infinite alternate}
  @keyframes vp-hop{from{margin-top:0}to{margin-top:-3px}}
 }
-.village-stage-badge{position:absolute;left:50%;top:95%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px 5px;background:#fff8dcf2;border:1px solid #e0d19b;border-radius:12px;box-shadow:0 3px 9px #5a4a2a33;font-size:12px;line-height:1.15;color:#5b4a2a;white-space:nowrap;z-index:2}
+.village-stage-badge{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px 5px;background:#fff8dcf2;border:1px solid #e0d19b;border-radius:12px;box-shadow:0 3px 9px #5a4a2a33;font-size:12px;line-height:1.15;color:#5b4a2a;text-align:center}
 .village-stage-badge small{font-size:12px;color:#7c6a3e}
 .village-pips{display:flex;gap:3px}.village-pips i{width:14px;height:5px;border-radius:3px;background:#e6dcb6}.village-pips i.on{background:#e0a24d}
-.stage-locked .village-stage-badge{background:#eef0e4f0;border-color:#cdd5bb;color:#5a6a55}
-.stage-3 .village-stage-badge{background:#fff0b0;border-color:#e3b84f}
+.village-stage-badge.stage-locked{background:#eef0e4f0;border-color:#cdd5bb;color:#5a6a55}
+.village-stage-badge.stage-3{background:#fff0b0;border-color:#e3b84f}
 .map-chip.village-door{display:inline-flex;align-items:center;gap:5px;padding:5px 11px 5px 9px;color:#4f7a3a;font-size:12px}
 .compact .map-chip.village-door{display:inline-flex;width:auto;min-width:44px;height:44px;min-height:44px;padding:0 10px 0 8px;gap:4px;place-items:unset;border-radius:12px}
 :root[data-farm-theme=night] :is(.village-stage-badge,.village-thought){background:var(--float);border-color:var(--line);color:var(--ink)}
@@ -704,7 +706,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
   20%,24%,28%,32%,54%,58%,62%,66%{translate:0 -1.5px}
  }
  .village-thought{animation:v-think var(--cycle,18s) ease-out infinite;animation-delay:calc(var(--td,0s) - var(--e,0s))}
- @keyframes v-think{0%,5%{opacity:0;transform:scale(.4) translateY(6px)}8%,17%{opacity:1;transform:none}20%,100%{opacity:0;transform:scale(.7) translateY(-4px)}}
+ @keyframes v-think{0%,5%{visibility:hidden;opacity:0;transform:scale(.4) translateY(6px)}8%,17%{visibility:visible;opacity:1;transform:none}20%,100%{visibility:hidden;opacity:0;transform:scale(.7) translateY(-4px)}}
  .village-order.is-ready{animation:v-pulse 1.8s ease-in-out infinite}
  @keyframes v-pulse{50%{transform:scale(1.12)}}
  .village-order:not(.is-ready){animation:v-nudge 2.6s ease-in-out infinite}

@@ -290,7 +290,7 @@ test('login and new account reset the old resident, sheet and scene state',()=>{
 
 test('placing town hall decor returns to the farm before entering placement mode',()=>{
  const h=setup();h.ctx.selectTab('village');h.ctx.openVillageTownHall();h.ctx.renderPlacement=()=>{};
- const start=source.indexOf('function beginPlacement('),end=source.indexOf('\n',start);
+ const start=source.indexOf('const decorGiftQty='),end=source.indexOf('function cancelPlacement(',start);
  vm.runInContext(source.slice(start,end)+'\nthis.beginPlacement=beginPlacement',h.ctx);const spec={id:'flowerbed',w:1,h:1};h.ctx.beginPlacement(spec);
  assert.equal(h.S.tab,'orders');assert.equal(h.pause.at(-1),false);assert.equal(h.S.placing.spec,spec);assert.equal(h.nodes.get('farm-canvas').inert,false);
 });

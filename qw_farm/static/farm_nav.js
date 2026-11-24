@@ -6,7 +6,7 @@ import {categoryOf} from './scene_map.js';
 
 // Menu: sections in a fixed order. `art` items are picture cards (За околицей); `when` hides an item that is not live.
 export const MENU=[
- {id:'farm',title:'Хозяйство',items:[['orders','orders','Заказы'],['inventory','shop','Склад'],['team','tractor','Команда'],['land','home','Участок']]},
+ {id:'farm',title:'Хозяйство',items:[['orders','orders','Заказы'],['inventory','shop','Склад'],['team','tractor','Команда'],['land','home','Участок'],['farm-rewards','gift','Награды','farmRewards']]},
  {id:'production',title:'Производство',items:[['production','workshop','Мастерские'],['orchard','orchard','Сад'],['dyeworks','dyed_linen','Красильня','dyeworks']]},
  {id:'outside',title:'За околицей',art:true,items:[['forest','forest','Лес'],['lake','lake','Озеро'],['fields','tractor','Поля'],['plantations','grape','План\u00adтации','plantations']]},
  {id:'village',title:'Деревня и соседи',items:[['village','coin','Деревня'],['neighbors','friends','Соседи'],['festival','coin','Праздник','festival']]},
@@ -23,6 +23,7 @@ export function menuSections(f={}){
   orders:f.ordersReady?`${f.ordersReady} можно сдать`:f.orders?`${f.orders} ${plural(f.orders,'заказ','заказа','заказов')} на доске`:'',
   inventory:f.goods?`${f.goods} шт. · лавка`:'и лавка',
   team:'техника и помощники',
+  'farm-rewards':f.farmRewards?`можно забрать: ${f.farmRewards}`:'',
   land:f.size?`${f.size} × ${f.size}${f.canExpand?' · можно расширить':''}`:'',
   production:f.readyWorkshop?(f.workshopsReady>1?`готово: ${f.workshopsReady}`:`${f.readyWorkshop} · готово`):f.workshopsBusy?`в работе: ${f.workshopsBusy}`:'',
   orchard:f.saplings?(f.saplings===1?'саженец ждёт посадки':`ждут посадки: ${f.saplings}`):f.trees?`${f.trees} ${plural(f.trees,'дерево','дерева','деревьев')}`:'',
@@ -37,12 +38,12 @@ export function menuSections(f={}){
   secrets:f.secretsTotal?`${f.secretsFound||0} из ${f.secretsTotal}`:'',
   journal:'что было на ферме'
  };
- const badge={orders:f.ordersReady||0,production:f.workshopsReady||0,orchard:f.saplings||0,neighbors:f.requests||0};
+ const badge={orders:f.ordersReady||0,production:f.workshopsReady||0,orchard:f.saplings||0,neighbors:f.requests||0,'farm-rewards':f.farmRewards||0};
  const locked={fields:!!f.fieldsLocked,plantations:!!f.plantationsLocked};
  return MENU.map(s=>({...s,items:s.items.filter(([, , ,when])=>!when||f[when]).map(([id,icon,label])=>({id,icon,label,status:status[id]||'',badge:badge[id]||0,locked:!!locked[id]}))}));
 }
 /** The number on the phone «Меню» button: things that wait for the player. */
-export const menuTotal=f=>(f.ordersReady||0)+(f.workshopsReady||0)+(f.saplings||0)+(f.requests||0);
+export const menuTotal=f=>(f.ordersReady||0)+(f.workshopsReady||0)+(f.saplings||0)+(f.requests||0)+(f.farmRewards||0);
 
 // Steps are keyed by purchase order. Each can add more than one independently managed hectare.
 export function nextPlantationStep(steps,hectares){
@@ -79,10 +80,11 @@ export function catalogEntries(catalog,me,objects=[],orchardRows=[]){
  for(const b of specs){
   if(b.curio&&!(me.merchant?.curios||[]).includes(b.id))continue;
   const section=sectionOf(b.id,catalog);if(!section)continue;
-  const secret=!!b.secret&&!(me.secrets||[]).includes(b.secret),reward=!!b.reward&&!(me.economy?.unlocked||[]).includes(b.id),low=(b.level||1)>me.level;
+  const giftQty=b.decor?(me.farm_reward_decor?.[b.id]||0):0;
+  const secret=!!b.secret&&!(me.secrets||[]).includes(b.secret),reward=!giftQty&&!!b.reward&&!(me.economy?.unlocked||[]).includes(b.id),low=!giftQty&&(b.level||1)>me.level;
   const lock=low?`С ${b.level} ур.`:secret?'Найди в «Находках»':reward?`Награда фонда деревни${b.source?`: ${b.source}`:''}`:'';
   out.push({key:'b:'+b.id,kind:b.id==='plot'?'plot':'building',section,id:b.id,name:b.name,cost:b.cost,level:b.level||1,w:b.w||1,h:b.h||1,
-   have:placed[b.id]||0,locked:low||secret||reward,lock,poor:!low&&!secret&&!reward&&b.cost>me.coins,spec:b});
+   have:placed[b.id]||0,giftQty,locked:low||secret||reward,lock,poor:!giftQty&&!low&&!secret&&!reward&&b.cost>me.coins,spec:b});
  }
  for(const r of orchardRows){
   const waiting=r.options.filter(o=>o.voucher&&o.qty).reduce((n,o)=>n+(o.voucher==='free'?o.qty:0),0);
@@ -188,6 +190,7 @@ export function entryInfo(e,catalog,me,h={}){
  info.lead=b.id==='plot'?'Грядка для любой культуры':b.id==='road'?'Дорожка':b.decor?'Декор':animals.length?'Дом для животных':recipes.length?'Мастерская':'Постройка';
  const purpose=h.purpose?h.purpose(b.id):[];if(purpose.length)info.lead=purpose.join(' ');
  fact('Размер',`${b.w||1}×${b.h||1}`);fact('Цена',b.cost!=null?`${b.cost} мон.`:null);fact('Открывается',`с ${b.level||1} ур.`);
+ if(e.giftQty)fact('Подарок',`бесплатно ×${e.giftQty}`);
  if(e.have)fact('На ферме',String(e.have));
  if(b.decor)fact('Содержание','не стоит ничего');
  if(b.source)fact('Откуда',b.source);

@@ -529,7 +529,12 @@ class AccountMergeService:
             earned -= coins - MAX_COINS
             coins = MAX_COINS
         farm['coins'] = coins
-        from qw_farm import wine_aging
+        from qw_farm import farm_rewards, wine_aging
+        from qw_farm.domain import FarmError
+        try:
+            farm_rewards.merge(farm, theirs)
+        except FarmError as error:
+            raise MiniAppError(409, 'Не удалось объединить награды ферм.', code='merge_unavailable') from error
         inventory = dict(farm.get('inventory') or {})
         transferred_stock = dict(theirs.get('inventory') or {})
         for item, quantity in wine_aging.merge(farm, theirs, farm_now).items():

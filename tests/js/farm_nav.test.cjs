@@ -3,6 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const vm=require('node:vm');
 const {pathToFileURL}=require('node:url');
 const STATIC=path.join(__dirname,'../../qw_farm/static');
 const read=name=>fs.readFileSync(path.join(STATIC,name),'utf8');
@@ -28,12 +29,57 @@ const rows=[{id:'apple',name:'Яблоня',sapling:'Саженец яблони
 test('the menu has five sections in the approved order with one entry per place',async()=>{
  const N=await load();
  assert.deepEqual(N.MENU.map(s=>s.title),['Хозяйство','Производство','За околицей','Деревня и соседи','Сведения']);
- assert.deepEqual(N.MENU_TABS,['orders','inventory','team','land','production','orchard','dyeworks','forest','lake','fields','plantations','village','neighbors','festival','secrets','journal']);
+ assert.deepEqual(N.MENU_TABS,['orders','inventory','team','land','farm-rewards','production','orchard','dyeworks','forest','lake','fields','plantations','village','neighbors','festival','secrets','journal']);
  assert.equal(new Set(N.MENU_TABS).size,N.MENU_TABS.length,'no place twice');
  for(const gone of ['build','more','settings','objects'])assert.ok(!N.MENU_TABS.includes(gone),`${gone} is not a menu place`);
  const plain=N.menuSections({});assert.ok(!plain.flatMap(s=>s.items).some(i=>i.id==='festival'),'«Праздник» only while a festival runs');
  assert.ok(N.menuSections({festival:'Посиделки'}).flatMap(s=>s.items).some(i=>i.id==='festival'));
  assert.equal(N.menuSections({}).find(s=>s.id==='outside').art,true,'За околицей are picture cards');
+});
+
+test('pending rewards can be reopened from the farm menu and count toward the menu badge',async()=>{
+ const N=await load();
+ const reward=f=>N.menuSections(f).find(s=>s.id==='farm').items.find(i=>i.id==='farm-rewards');
+ assert.equal(reward({}),undefined);
+ assert.equal(reward({farmRewards:2}).status,'можно забрать: 2');
+ assert.equal(reward({farmRewards:2}).badge,2);
+ assert.equal(N.menuTotal({farmRewards:2,ordersReady:1}),3);
+});
+
+test('the reward dialog shows claim errors and allows retrying an unconfirmed command',()=>{
+ const source=read('app.js');
+ const code=source.slice(source.indexOf('function renderFarmRewardStatus('),source.indexOf('function safe('));
+ const status={textContent:''},retry={},claim={};
+ const S={busy:false,pending:null};
+ const ctx=vm.createContext({S,farmRewardNotice:'На складе нет места.',rateSeconds:()=>0});
+ vm.runInContext(code,ctx);
+ const box={querySelector:selector=>selector.includes('status')?status:retry,querySelectorAll:()=>[claim]};
+ ctx.renderFarmRewardStatus(box);
+ assert.equal(status.textContent,'На складе нет места.');
+ assert.equal(retry.hidden,true);
+ assert.equal(claim.disabled,false);
+ S.pending={command_id:'receipt'};
+ ctx.renderFarmRewardStatus(box);
+ assert.match(status.textContent,/Можно повторить запрос/);
+ assert.equal(retry.hidden,false);
+ assert.equal(retry.disabled,false);
+ assert.equal(claim.disabled,true);
+ S.busy=true;
+ ctx.renderFarmRewardStatus(box);
+ assert.equal(retry.disabled,true);
+ assert.equal(status.textContent,'Подтверждаем действие…');
+});
+
+test('a decor gift bypasses the price and level for its available copies only',async()=>{
+ const N=await load();
+ const sample={...catalog,buildings:{flowerbed:{id:'flowerbed',name:'Клумба',decor:true,w:1,h:1,cost:50,level:12}}};
+ const entry=account=>N.catalogEntries(sample,account).find(e=>e.id==='flowerbed');
+ const account={...me,coins:0,level:1};
+ const gift=entry({...account,farm_reward_decor:{flowerbed:2}});
+ assert.equal(gift.giftQty,2);assert.equal(gift.locked,false);assert.equal(gift.poor,false);
+ assert.equal(entry(account).locked,true);
+ assert.equal(entry({...account,level:12}).poor,true);
+ assert.equal(entry({...account,level:12,coins:50}).poor,false);
 });
 
 test('plantations appear with the catalog feature and advance by purchased hectares',async()=>{

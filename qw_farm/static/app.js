@@ -18,7 +18,7 @@ import {createFriendRequests} from './friend_requests.js';
 import {createConstruction,clearOfHeader,cashBonusText} from './construction.js?v=20261116-building-effects';
 import {VILLAGE_BUILDING_EFFECTS} from './village_building_effects_manifest.js?v=20261116-approved';
 import {renderBulletin} from './village_bulletin.js';
-import * as NAV from './farm_nav.js?v=20261106-compost';
+import * as NAV from './farm_nav.js?v=20261124-farm-rewards';
 import {drawPlotCard} from './lumberjack_art.js';
 import {openTripGame,canPlay,finalOutputs,bonusLine,quality as tripQuality,grams as tripGrams} from './trip_game.js?v=20261030c';
 import {CLASS_LABEL,LONG_HINT,seedStats,sortSeeds,planMachine,planRepeat,planTap,remember} from './farm_runs.js';
@@ -288,6 +288,76 @@ function closeNeighborGift(){
 }
 $('dialog').addEventListener('close',closeNeighborGift);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)showNeighborGifts();});
+
+let autoFarmRewards=false,farmRewardNotice='';
+const confirmedFarmRewards=new Set();
+function farmRewards(){return (S.me?.farm_rewards||[]).filter(reward=>!confirmedFarmRewards.has(reward.id));}
+function renderFarmRewards(list){
+ const rewards=farmRewards(),signature=JSON.stringify(rewards);
+ if(list.dataset.rewards===signature)return;
+ list.dataset.rewards=signature;
+ list.replaceChildren();
+ for(const reward of rewards){
+  const entry=card(reward.title,null,'gift');
+  if(reward.message)note(reward.message,entry);
+  if(reward.coins>0)entry.append(el('p',`+${fmt(reward.coins)} монет`,'reward'));
+  if(Object.keys(reward.items).length)entry.append(goods(reward.items,false));
+  if(reward.decor.length){
+   note(reward.decor.map(id=>S.catalog.buildings[id]?.name||id).join(', '),entry);
+   note('Подаренный декор ждёт в каталоге «Всё» → «Декор».',entry);
+  }
+  const claim=button('Забрать',safe(async()=>{
+   if(!S.me||S.busy||S.pending)return;
+   farmRewardNotice='';
+   await command('claim_farm_reward',{reward:reward.id});
+   syncFarmRewardsDialog();
+  }),'primary wide');
+  claim.dataset.farmRewardClaim='';
+  claim.setAttribute('aria-label',`Забрать награду «${reward.title}»`);
+  entry.append(claim);
+  list.append(entry);
+ }
+}
+function showFarmRewards(automatic=false){
+ if(!farmRewards().length||document.hidden||document.querySelector('dialog[open]')||
+    farmMenuOpen||QW?.menu.isOpen()||QW?.report?.isOpen()||S.fieldGame||S.placing||
+    dashaGameOpen||olegGameOpen||ballistaGameOpen||pieGameOpen||santaGameOpen||(automatic&&(S.busy||S.pending)))return false;
+ const box=el('div'),list=el('div'),status=el('p',null,'note');
+ box.dataset.farmRewards='';list.dataset.farmRewardList='';status.dataset.farmRewardStatus='';
+ status.setAttribute('role','status');
+ const retry=button('Повторить',safe(async()=>{
+  if(S.busy||!S.pending||rateSeconds('write'))return;
+  pendingRetryAttempt=0;
+  await sendPending();
+ }),'secondary');
+ retry.dataset.farmRewardRetry='';
+ farmRewardNotice='';
+ renderFarmRewards(list);
+ box.append(list,status,retry);
+ renderFarmRewardStatus(box);
+ modal('Награды фермы',box);
+ autoFarmRewards=false;
+ return true;
+}
+function syncFarmRewardsDialog(){
+ const box=$('dialog').open&&$('dialog-body').querySelector('[data-farm-rewards]');
+ if(box){
+  if(farmRewards().length){renderFarmRewards(box.querySelector('[data-farm-reward-list]'));renderFarmRewardStatus(box);}
+  else $('dialog').close();
+ }else if(autoFarmRewards){
+  if(!farmRewards().length)autoFarmRewards=false;
+  else showFarmRewards(true);
+ }
+}
+function renderFarmRewardStatus(box){
+ const status=box.querySelector('[data-farm-reward-status]'),retry=box.querySelector('[data-farm-reward-retry]');
+ const wait=rateSeconds('write'),pending=!!S.pending;
+ const message=S.busy?'Подтверждаем действие…':wait?`Можно повторить через ${wait} с.`:
+  pending?'Не удалось подтвердить действие. Можно повторить запрос.':farmRewardNotice;
+ if(status.textContent!==message)status.textContent=message;
+ retry.hidden=!pending;retry.disabled=S.busy||wait>0;
+ for(const claim of box.querySelectorAll('[data-farm-reward-claim]'))claim.disabled=S.busy||pending||wait>0;
+}
 function safe(fn){return async()=>{try{await fn();}catch(e){if(!e.sessionEnded)toast(e.message,true);}};}
 function url(path){return path+(mode&&path.startsWith(API)?`${path.includes('?')?'&':'?'}identity=${encodeURIComponent(mode)}`:'');}
 let authRecovery=null,lastSessionRenewal=0;
@@ -360,7 +430,7 @@ let farmContrastPending=false,farmContrastEpoch=0;
 function farmSnapshot(farm){if(!farm)return null;const {server_time,...state}=farm;return state;}
 function sceneSnapshot(){return JSON.stringify(farmSnapshot(S.farm));}
 function hudSnapshot(){return JSON.stringify([S.me?.coins,S.me?.level,S.me?.xp,S.me?.xp_bonus,S.me?.economy_status?.debt,S.farm?.id,S.farm?.name,S.farm?.level,S.farm?.is_owner]);}
-function seedsSnapshot(){return JSON.stringify([S.farm?.is_owner,S.me?.level,S.speed,!!S.me?.fert_beds,S.me?fertStock():0,hasHeap()]);}
+function seedsSnapshot(){return JSON.stringify([S.farm?.is_owner,S.me?.level,S.speed,!!S.me?.fert_beds,S.me?fertStock():0,hasHeap(),S.me?.farm_reward_decor]);}
 function upkeepCatalogSnapshot(catalog){const e=catalog?.economy;if(!e)return null;return JSON.stringify([e.upkeep_revision??0,e.upkeep_level,e.land_rate_pct,e.plot_upkeep,e.building_rate_pct,e.field_per_hectare??e.field_upkeep,e.tree_rate_per_extra_tree]);}
 // A deadline can change the visible action without changing a revision. Timers
 // update in place; only deadline transitions need to rebuild their buttons.
@@ -426,9 +496,35 @@ function schedulePendingRetry(e){
 async function sendPending(){
  if(!S.me||!S.pending||S.pending.actor!==S.me.id||S.busy)return false;clearTimeout(pendingRetryTimer);pendingRetryTimer=null;S.busy=true;connection('Сохраняем действие…');document.body.classList.add('is-saving');
  let payload=S.pending,rejectedWagerRoundId=null,bulkView=S.me;
- try{let r=await request(API+'/commands',{method:'POST',data:payload});rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;if(!S.me)return true;if(!r.neighbor_reward_paid)toast(localizeWagerNotice(r.notice,gf));await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});if(['repeat_once','fill_queues'].includes(payload.kind)&&S.me?.id===payload.actor&&S.me===bulkView)S.bulkAwaitingRefresh={actor:payload.actor,view:bulkView};return true;}
- catch(e){if(e.sessionEnded)return false;if(!e.unknown&&!e.rateBucket){S.pending=null;savePending(payload.actor);if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;}connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);if(e.rateBucket){if(S.pending)scheduleRateRecovery();}else if(S.pending)schedulePendingRetry(e);else toast(payload.kind==='field_cancel'?REFUND.cancelErrorText(e):e.code==='stale_visit'?MERCH.STALE_TEXT:e.message,true);if(!S.pending)await refresh({render:false}).catch(()=>{});return false;}
- finally{S.busy=false;document.body.classList.remove('is-saving');updateRepeat();dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
+ const rewardClaim=payload.kind==='claim_farm_reward';
+ try{
+  if(rewardClaim)syncFarmRewardsDialog();
+  const r=await request(API+'/commands',{method:'POST',data:payload});
+  rememberMachineCommand(payload);S.pending=null;savePending(payload.actor);rateRecoveryAttempt=0;
+  if(!S.me)return true;
+  if(rewardClaim&&S.me.id===payload.actor){
+   farmRewardNotice=r.notice||'Награда получена.';
+   confirmedFarmRewards.add(payload.data.reward);syncMenuBadges();
+  }
+  if(!r.neighbor_reward_paid)toast(localizeWagerNotice(r.notice,gf));
+  await refresh({render:false}).catch(e=>{if(e.sessionEnded)return;connection('Сохранено; обновление экрана ожидает сети',true);if(e.rateBucket)scheduleRateRecovery();});
+  if(['repeat_once','fill_queues'].includes(payload.kind)&&S.me?.id===payload.actor&&S.me===bulkView)S.bulkAwaitingRefresh={actor:payload.actor,view:bulkView};
+  return true;
+ }catch(e){
+  if(e.sessionEnded)return false;
+  if(!e.unknown&&!e.rateBucket){
+   S.pending=null;savePending(payload.actor);
+   if(payload.kind==='wager_choose')rejectedWagerRoundId=payload.data.round_id;
+   if(rewardClaim&&S.me?.id===payload.actor)farmRewardNotice=e.message;
+  }
+  connection(S.pending?'Нужно подтвердить результат':'Действие не выполнено',true);
+  if(e.rateBucket){if(S.pending)scheduleRateRecovery();}
+  else if(S.pending)schedulePendingRetry(e);
+  else toast(payload.kind==='field_cancel'?REFUND.cancelErrorText(e):e.code==='stale_visit'?MERCH.STALE_TEXT:e.message,true);
+  if(!S.pending)await refresh({render:false}).catch(()=>{});
+  return false;
+ }
+ finally{S.busy=false;document.body.classList.remove('is-saving');if(rewardClaim)syncFarmRewardsDialog();updateRepeat();dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();if(rejectedWagerRoundId)dashaGame?.choiceRejected(rejectedWagerRoundId);if(S.me&&!S.pending&&!S.placing)renderPanel();}
 }
 // After a real 429 the game recovers by itself: wait out Retry-After, then replay the unconfirmed command with the SAME id
 // (the server is idempotent) or just refresh the screen. No reload is needed.
@@ -446,15 +542,18 @@ function scheduleRateRecovery(){
 async function enter(){
  const epoch=++farmViewEpoch;
  try{let data=await request(API+'/start',{method:'POST',...(S.invite?{data:{invite:S.invite}}:{})});if(epoch!==farmViewEpoch)return;if(['guest','telegram'].includes(data.identity))mode=data.identity;S.form=data.address_form||'n';try{globalThis.QW?.prefs?.applyAccount?.(data);}catch{}S.me=S.farm=data.farm;S.lastRun=loadLastRun(S.me.id);S.catalog=data.catalog;S.village=data.village||null;S.speed=data.speed;S.offset=S.me.server_time-Date.now()/1000;resetVillageView();
+  autoFarmRewards=false;confirmedFarmRewards.clear();
   // A direct invite URL may bypass the main-app launcher. Once this session
   // has entered Farm, returning to /app must not launch the same invite again.
   if(S.invite)try{sessionStorage.setItem('qw-farm.launch-consumed',S.invite);}catch{}
   try{S.pending=JSON.parse(sessionStorage.getItem(pendingKey(S.me.id))||'null');if(S.pending&&S.pending.actor!==S.me.id)S.pending=null;}catch{S.pending=null;}
  document.body.classList.remove('farm-login');$('game').hidden=false;$('login').hidden=true;if(S.invite&&S.invite!==S.me.id){S.tab='neighbors';showPanel();}renderRail();updateHUD();scene.set(S.farm,S.catalog);scene.resize();scene.fit();renderSeeds();renderPanel();updateReady();connection(S.config.demo?`Локальный сервер · темп ×${S.speed}`:'Сохранено в QuizzyWizzy',!!S.pending);queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();orchardNotices();if(S.pending)setTimeout(()=>sendPending().catch(()=>{}),300);
+  autoFarmRewards=farmRewards().length>0;
   renewPlatformSession().catch(()=>{});
  }catch(e){if(epoch!==farmViewEpoch)return;if(e.status===401)showLogin(SESSION_ENDED);else{showLogin(e.message);toast(e.message,true);}}
 }
 function showLogin(message=''){
+ autoFarmRewards=false;confirmedFarmRewards.clear();
  closeFarmMenu();const lakeDoor=$('lake-door');if(lakeDoor)lakeDoor.hidden=true;
  // Keep an unknown command's receipt under its original actor for the next login.
  if(S.pending)savePending();
@@ -504,7 +603,7 @@ function navFacts(){
   fieldsLocked:fieldsLevel&&me.level<fieldsLevel?fieldsLevel:0,
   plantations:!!plantationsLevel,plantationsLocked:plantationsLevel&&me.level<plantationsLevel?plantationsLevel:0,
   plantationHectares:me.plantations?.length||0,
-  requests:FRIEND_REQUESTS.count(),festival:festivalTab()?festivalStatus(festivalView()):'',
+  requests:FRIEND_REQUESTS.count(),festival:festivalTab()?festivalStatus(festivalView()):'',farmRewards:farmRewards().length,
   secretsFound:(me.secrets||[]).length,secretsTotal:Object.keys(S.catalog.secrets||{}).length,
   dyeworks:!!me.dyeworks,dyeLearned:me.dyeworks?.recipes?.length||0};
 }
@@ -567,6 +666,7 @@ function trapFarmMenu(ev){
 }
 async function openMenuTab(id){
  const wasOpen=farmMenuOpen;closeFarmMenu();if(!S.me)return;if(!own())await backHome();
+ if(id==='farm-rewards'){showFarmRewards();return;}
  selectTab(id);
  if(wasOpen)$('farm-menu-button')?.focus({preventScroll:true});
 }
@@ -586,7 +686,7 @@ function renderSeeds(){const bar=$('seedbar'),parent=$('seed-track'),scroll=pare
  for(const k of MERCH.seedPacks(S.catalog,stock,S.me.level)){const b=button(null,()=>{S.seed=k.id;renderSeeds();document.body.classList.remove('panel-open');},`seed ${S.seed===k.id?'active':''} cls-pack`);b.dataset.seedPack=k.id;const d=el('small',null,'seed-details');d.append(el('span','из пакета'),el('span',`осталось ${k.left}`));b.append(icon(k.id),el('span',k.name),d);b.setAttribute('aria-label',`${k.name}: посадить из пакета, осталось ${k.left}`);parent.append(b);}
  // «Недавнее»: the last placed buildings, trees, decor and roads, one tap back to placement (E1 variant B).
  const recent=recentEntries();
- if(recent.length){parent.append(el('i',null,'seed-divider'));for(const e of recent){const b=button(null,()=>placeEntry(e),'seed seed-recent',entryDisabled(e));b.dataset.entry=e.key;b.dataset.qwCrumb='seed-recent';const d=el('small',null,'seed-details');d.append(el('span',e.locked?e.lock:e.kind==='tree'&&!NAV.bestOption(e.row)?.price?'саженец':`${fmt(e.kind==='tree'?NAV.bestOption(e.row)?.price??e.cost:e.cost)} мон.`));b.append(entryPicture(e,'seed-thumb',72,54),el('span',e.name),d);b.setAttribute('aria-label',`Недавнее: ${e.name}, ${entryLine(e)}`);bindInfoPress(b,()=>e);parent.append(b);}}
+ if(recent.length){parent.append(el('i',null,'seed-divider'));for(const e of recent){const b=button(null,()=>placeEntry(e),'seed seed-recent',entryDisabled(e));b.dataset.entry=e.key;b.dataset.qwCrumb='seed-recent';const d=el('small',null,'seed-details');d.append(el('span',e.locked?e.lock:e.giftQty?'Подарок':e.kind==='tree'&&!NAV.bestOption(e.row)?.price?'саженец':`${fmt(e.kind==='tree'?NAV.bestOption(e.row)?.price??e.cost:e.cost)} мон.`));b.append(entryPicture(e,'seed-thumb',72,54),el('span',e.name),d);b.setAttribute('aria-label',`Недавнее: ${e.name}, ${entryLine(e)}`);bindInfoPress(b,()=>e);parent.append(b);}}
  // «Всё»: pinned at the right edge of the strip (sticky), opens the catalogue of everything that goes on the map.
  const all=button(null,()=>openCatalog(),'seed seed-all');all.id='catalog-button';all.dataset.qwCrumb='seed-all';all.setAttribute('aria-label','Всё: каталог грядок, деревьев, построек и декора');
  all.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>';all.append(el('span','Всё'));bar.append(all);
@@ -617,7 +717,7 @@ function tapMachine(id){const plan=planTap(id,S.lastRun,S.me,S.catalog,now());
  const [w,replant]=checkbox('Сразу пересеять те же культуры',true);box.append(w,el('p','Уберёт готовые зерновые (до 24 грядок за рейс). В следующий раз машина по нажатию повторит этот рейс сама.','note'));
  modal(spec.name,box,[button('Отправить комбайн',safe(async()=>{const plan=planMachine({machine:id,crop:'',replant:replant.checked},S.me,S.catalog,now());if(!plan.ok){toast(plan.why,true);return;}$('dialog').close();await runPlan(plan);}),'primary')]);}
 let readiness='';
-function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(['fields','plantations'].includes(S.tab)&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>(o.crop&&o.crop.ready_at<=now())||ORCH.ripe(o,now())).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);updateWineAgingDeadline();}
+function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(['fields','plantations'].includes(S.tab)&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>(o.crop&&o.crop.ready_at<=now())||ORCH.ripe(o,now())).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);updateWineAgingDeadline();syncFarmRewardsDialog();}
 function clickObject(o,cell){hideStoneSpeech();
  if(S.placing){
   const p=S.placing;if(p.committing)return;
@@ -900,6 +1000,7 @@ const entrySpec=e=>e.kind==='tree'?{species:e.id}:{type:e.id,w:e.w,h:e.h};
 function entryPicture(e,cls,w,h){if(e.kind==='crop'){const n=el('span',null,`${cls} is-icon`);n.append(icon(e.id));return n;}return thumbCanvas(entrySpec(e),cls,w,h);}
 function entryLine(e){
  if(e.locked)return e.lock;
+ if(e.giftQty)return `Подарок ×${e.giftQty} · ${e.w}×${e.h}`;
  if(e.kind==='crop'){const c=S.catalog.crops[e.id],st=seedStats(c,S.catalog.items[c.id].price,S.speed,S.catalog.crop_classes);return `${fmt(c.cost)} мон. · ${seedTimeText(st.seconds)}`;}
  if(e.kind==='tree'){const o=NAV.bestOption(e.row);return o&&!o.price?'саженец есть · 1×1':`${fmt(o?.price??e.cost)} мон. · 1×1`;}
  return `${fmt(e.cost)} мон. · ${e.w}×${e.h}`;
@@ -1114,7 +1215,8 @@ function confirmUproot(o){
   if(await command('demolish',{object:o.id,revision:o.revision})){S.selected=null;scene.selected=null;scene.dirty=true;S.tab='orchard';renderRail();renderPanel();}
  }),'primary')]);
 }
-function beginPlacement(spec,obj=null){if(villageVisible())exitVillage();S.placing={spec,obj,cell:null};scene.placement={spec,ignore:obj?.id};closePanel();renderPlacement();}
+const decorGiftQty=id=>S.me?.farm_reward_decor?.[id]||0;
+function beginPlacement(spec,obj=null){if(villageVisible())exitVillage();S.placing={spec,obj,cell:null,gift:!obj&&decorGiftQty(spec.id)>0};scene.placement={spec,ignore:obj?.id};closePanel();renderPlacement();}
 function cancelPlacement(){S.placing=null;scene.placement=null;$('placement').hidden=true;}
 // Beds and decor can be placed one after another: the mode stays open until «Готово», Esc, or the money/limit runs out.
 const repeatable=spec=>!!spec&&!spec.obj&&(spec.id==='plot'||!!S.catalog.buildings[spec.id]?.decor);
@@ -1124,7 +1226,8 @@ function renderPlacement(){let n=$('placement'),p=S.placing;if(!p){n.hidden=true
  const head=el('header',null,'placement-head'),copy=el('span',null,'placement-copy');
  const spec=p.obj?(p.obj.type==='tree'?{species:p.obj.species}:{type:p.obj.type,w:p.obj.w,h:p.obj.h}):tree?{species:tree.id}:p.spec.id&&S.catalog.buildings[p.spec.id]||p.spec.id==='plot'?{type:p.spec.id,w:p.spec.w||1,h:p.spec.h||1}:null;
  if(spec)head.append(thumbCanvas(spec,'placement-thumb',96,72));
- const sub=p.obj?'Перемещение бесплатно':tree?`Дерево · ${p.spec.cost?`${fmt(p.spec.cost)} мон.`:'саженец'} · 1×1`:`${p.spec.w||1}×${p.spec.h||1} · ${fmt(p.spec.cost||0)} мон.`;
+ const gift=decorGiftQty(p.spec.id),payment=p.gift?(gift?`Подарок ×${gift} · бесплатно`:'Подарок'):`${fmt(p.spec.cost||0)} мон.`;
+ const sub=p.obj?'Перемещение бесплатно':tree?`Дерево · ${p.spec.cost?`${fmt(p.spec.cost)} мон.`:'саженец'} · 1×1`:`${p.spec.w||1}×${p.spec.h||1} · ${payment}`;
  copy.append(el('strong',p.obj?`Переместить: ${objName(p.obj)}`:tree?tree.name:p.spec.name),el('small',sub));head.append(copy);
  n.replaceChildren(head);
  const purpose=!p.obj&&!tree&&p.spec.id?buildingPurpose(p.spec.id,S.catalog):[];if(purpose.length)n.append(el('p',purpose.join(' '),'note placement-purpose'));
@@ -1134,13 +1237,15 @@ function renderPlacement(){let n=$('placement'),p=S.placing;if(!p){n.hidden=true
  n.append(el('p',hint,'note'));
  let row=el('div',null,'placement-actions');row.append(button(p.count?'Готово':'Отмена',()=>{cancelPlacement();renderPanel();},'secondary',p.committing),button(p.committing?'Сохраняем…':tree&&!p.obj?'Посадить':'Поставить',safe(()=>commitPlacement(p)),'primary',!p.cell||p.committing));n.append(row);}
 async function commitPlacement(p){if(!p.cell||S.placing!==p||p.committing)return;const cell={x:p.cell.x,y:p.cell.y};p.committing=true;renderPlacement();let ok=false;
- try{if(p.spec.tree)ok=await command(...ORCH.plantCommand(p.spec,cell));else{const data=p.obj?{object:p.obj.id,x:cell.x,y:cell.y,revision:p.obj.revision}:{type:p.spec.id,x:cell.x,y:cell.y};ok=await command(p.obj?'move':'build',data);}}
+ try{if(p.spec.tree)ok=await command(...ORCH.plantCommand(p.spec,cell));else{const data=p.obj?{object:p.obj.id,x:cell.x,y:cell.y,revision:p.obj.revision}:{type:p.spec.id,x:cell.x,y:cell.y};if(p.gift)data.gift=true;ok=await command(p.obj?'move':'build',data);}}
  finally{p.committing=false;if(S.placing===p)renderPlacement();}
- if(!ok||S.placing!==p){if(S.placing===p)renderPlacement();return;}
+ if(S.placing!==p)return;
+ if(!ok){if(p.gift&&!decorGiftQty(p.spec.id)){cancelPlacement();renderPanel();}return;}
  if(!p.obj){rememberPlaced(p.spec);renderSeeds();}
  const again=repeatable(p.spec);
- if(again&&S.me.coins>=p.spec.cost&&S.me.level>=(p.spec.level||1)){p.count=(p.count||0)+1;p.cell=null;scene.placement.cell=null;scene.dirty=true;renderPlacement();}
- else{if(again)toast('Монет на следующую не хватает — режим закрыт.');cancelPlacement();renderPanel();}}
+ const canRepeat=p.gift?decorGiftQty(p.spec.id)>0:S.me.coins>=p.spec.cost&&S.me.level>=(p.spec.level||1);
+ if(again&&canRepeat){p.count=(p.count||0)+1;p.cell=null;scene.placement.cell=null;scene.dirty=true;renderPlacement();}
+ else{if(again&&!p.gift)toast('Монет на следующую не хватает — режим закрыт.');cancelPlacement();renderPanel();}}
 function renderProduction(p){heading('Мастерские','СЫРЬЁ СТАНОВИТСЯ ЧЕМ-ТО БОЛЬШИМ');note('Работа в очередях продолжается с закрытой вкладкой. Готовые товары ждут на полке, не пропадая.',p);bulkCard(p);for(let o of S.me.objects.filter(o=>o.type!=='plot'&&o.type!=='tree'&&!['house','barn'].includes(o.type)&&!S.catalog.buildings[o.type]?.decor))p.append(objectButton(o));}
 // On phones the panel is a sheet over the map: report how many canvas pixels it covers so the camera aims above it.
 function sheetInset(){const p=$('panel').getBoundingClientRect(),c=$('farm-canvas').getBoundingClientRect();return matchMedia('(max-width:850px)').matches&&p.height&&p.top<c.bottom?Math.max(0,c.bottom-p.top):0;}

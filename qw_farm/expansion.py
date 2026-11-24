@@ -11,7 +11,7 @@ from .catalog import (tick, VERSION, CROPS, ITEMS, RECIPES, ANIMALS, EQUIPMENT, 
                       level, animal_batch, animal_xp, ANIMAL_XP_LEGACY, queue_slots, effective_level, RECIPE_SPEED, land_bound, GROUPS,
                       MAX_SHIFT_ACTIONS, SHIFT_INTERVAL, route_level, trip_kind)
 from .domain import need, named, find, number, duration, inventory, pay, event
-from . import catalog, market, progression, economy, fields, projects, trip_games, swans, festivals, horseman, textile, merchant, orchard, meadow, fertilizer, plantations
+from . import catalog, market, progression, economy, fields, projects, trip_games, swans, festivals, horseman, textile, merchant, orchard, meadow, fertilizer, plantations, farm_rewards
 
 GRAINS = frozenset({'wheat', 'corn', 'oat', 'rye', 'rice', 'buckwheat'})
 ROOTS = frozenset({'carrot', 'beet', 'potato'})
@@ -44,6 +44,7 @@ SCHEMAS.update(trip_games.SCHEMAS)  # trip minigames: trip_play
 SCHEMAS.update(swans.SCHEMAS)  # lake swans: feed_swans
 SCHEMAS.update(festivals.SCHEMAS)  # festivals: festival_task, festival_buy
 SCHEMAS.update(horseman.SCHEMAS)
+SCHEMAS.update(farm_rewards.SCHEMAS)
 SCHEMAS.update(textile.SCHEMAS)  # lessons of Кошка Соня: lesson_deliver
 SCHEMAS.update(merchant.SCHEMAS)  # Сорока-коробейница: merchant_buy, merchant_sell
 SCHEMAS.update(orchard.SCHEMAS)  # fruit orchard: plant_tree, tree_care
@@ -802,6 +803,10 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_c
     lv = level(farm['xp'])
     if kind in horseman.SCHEMAS:
         text = horseman.claim(farm, now)
+        event(farm, now, text, kind)
+        return text
+    if kind in farm_rewards.SCHEMAS:
+        text = farm_rewards.claim(farm, data['reward'], now)
         event(farm, now, text, kind)
         return text
     if kind in textile.SCHEMAS:

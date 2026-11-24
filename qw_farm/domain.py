@@ -280,7 +280,7 @@ SCHEMAS={
  'list':{'item','qty','unit_price'},'buy':{'listing'},'cancel_listing':{'listing'},
  'pay_upkeep':set(),'fund_contribute':{'coins','items'},
 }
-OPTIONAL_KEYS={'forget_recipe':{'recipe'},'settings':{'allow_requests','notify_requests'}}  # forget one remembered recipe; without it the most recent one
+OPTIONAL_KEYS={'build':{'gift'},'forget_recipe':{'recipe'},'settings':{'allow_requests','notify_requests'}}
 SOCIAL={'request_neighbor','accept_neighbor','claim_neighbor_reward','remove_neighbor','block','unblock','help','prank','gift','buy'}
 
 
@@ -296,8 +296,8 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         need(me['id']==other['id'], 'not_owner', 'Это не твоя ферма.',403)
         text=expansion.apply_extension(me,kind,data,now,command_id,speed,form,upkeep_config)
         progression.touch(me,now)  # r9: a successful command of the actor is activity (M2 pool, Moscow-day roll)
-        if kind != 'claim_horseman_gift':
-            economy.bill(me,now,upkeep_config)   # Free gift does not trigger a bill.
+        if kind not in {'claim_horseman_gift', 'claim_farm_reward'}:
+            economy.bill(me,now,upkeep_config)   # Free gifts do not trigger a bill.
         return text
     need(kind in SCHEMAS, 'unknown_command', 'Неизвестное действие.', 422)
     need(isinstance(data,dict) and SCHEMAS[kind]<=set(data)<=SCHEMAS[kind]|OPTIONAL_KEYS.get(kind,set()), 'invalid_command', 'Некорректные параметры действия.',422)
@@ -431,6 +431,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         j=obj.get('animal_job');need(j and j['ready_at']<=now,'not_ready','Животные ещё не приготовили продукцию.')
         expansion.take_animal(me,obj,now,owner=True);text='Продукция животных собрана.'
     elif kind=='build':
+        from . import farm_rewards
         typ=data['type']
         if typ=='plot':
             c=dict(cost=35,level=1,w=1,h=1)
@@ -439,23 +440,35 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         if typ=='compost_heap':
             need(not any(o['type']=='compost_heap' for o in me['objects']),
                  'compost_heap_limit','На ферме может быть только одна компостная куча.')
-        need(lv>=c['level'],'locked',f'Нужен уровень {c["level"]}.')
+        gift_credit = typ in farm_rewards.decor_credits(me)
+        gift_only = data.get('gift',False)
+        need(type(gift_only) is bool,'invalid_command','Некорректный режим размещения.',422)
+        need(not gift_only or gift_credit,'farm_reward_decor_unavailable','Этот подарок уже размещён.')
+        need(gift_credit or lv>=c['level'],'locked',f'Нужен уровень {c["level"]}.')
         need(not c.get('secret') or c['secret'] in me['secrets'],'secret_locked','Этот декор нужно сначала найти в кабинете находок.')
-        need(not c.get('reward') or economy.reward_allowed(me,typ),'reward_locked','Этот декор выдаётся наградой фонда деревни.')
+        need(gift_credit or not c.get('reward') or economy.reward_allowed(me,typ),
+             'reward_locked','Этот декор выдаётся наградой фонда деревни.')
         if c.get('curio'):
             from . import merchant
             need(merchant.owns_curio(me,typ),'curio_locked','Эту диковинку продаёт Сорока-коробейница.')
             need(not any(o['type']==typ for o in me['objects']),'curio_placed','Эта диковинка уже стоит на ферме.')
         need(len(me['objects'])<object_limit(me['size']),'object_limit','Достигнут лимит объектов для этого участка.')
         place(me,data['x'],data['y'],c['w'],c['h'])
-        free=c.get('decor') and not c.get('secret') and expansion.market.free_decor(me,typ)  # r8: caravan gift
-        if free:expansion.market.take_decor(me,typ)
-        else:paid_gift=pay(me,c['cost']);economy.note_decor_spend(me,typ,c['cost'])
-        if free:paid_gift=0
+        free_caravan = not gift_credit and c.get('decor') and not c.get('secret') and expansion.market.free_decor(me,typ)
+        if gift_credit:
+            farm_rewards.take_decor(me,typ)
+            paid_gift=0
+        elif free_caravan:
+            expansion.market.take_decor(me,typ)
+            paid_gift=0
+        else:
+            paid_gift=pay(me,c['cost'])
+            economy.note_decor_spend(me,typ,c['cost'])
         built=dict(id=command_id,type=typ,x=data['x'],y=data['y'],w=c['w'],h=c['h'],
            revision=0,level=1,jobs=[],animal=None,animal_job=None,**({'crop':None} if typ=='plot' else {}))
         # E27 D1: what was paid (0 for a caravan gift), when and from which part of the starter gift, so that a demolition gives back exactly that
-        built.update(paid=0 if free else c['cost'],built_at=now,gift=paid_gift)
+        built.update(paid=0 if gift_credit or free_caravan else c['cost'],
+                     built_at=now,gift=paid_gift)
         me['objects'].append(built)
         me['stats']['builds']+=1;built_xp=progression.grant_xp(me,5,'build',now,True)
         built['build_xp']=built_xp
@@ -648,12 +661,13 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
 
 def validate_state(farm):
     from .expansion import validate_expansion
-    from . import minigames, oleg, daily_bonus, dyeworks
+    from . import minigames, oleg, daily_bonus, dyeworks, farm_rewards
     validate_expansion(farm)
     dyeworks.validate(farm)
     minigames.validate(farm)
     oleg.validate(farm)
     daily_bonus.validate(farm)
+    farm_rewards.validate(farm)
     from application import farm_village_games
     farm_village_games.validate(farm)
     progression.validate(farm)
@@ -695,8 +709,10 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
     need(can_visit(visitor,farm),'private_farm','Ферма недоступна.',404)
     if own:
         result=deepcopy(farm)
-        from . import daily_bonus
+        from . import daily_bonus, farm_rewards
         result['daily_cash_bonus']=daily_bonus.public(farm,now)
+        result['farm_rewards']=farm_rewards.pending(farm)
+        result['farm_reward_decor']=farm_rewards.decor_credits(farm)
         from . import dyeworks
         result['dyeworks']=dyeworks.public(farm)
         result.pop('tavern',None)  # exposed only as the current-day village_build projection

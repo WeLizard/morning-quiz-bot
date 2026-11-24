@@ -469,6 +469,9 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
         text=orchard.uproot(me,obj,now,speed)
     elif kind=='demolish':
         need(obj['type'] not in {'house','barn'},'cannot_demolish','Дом и склад нельзя снести.')
+        if obj['type']=='cellar' and (me.get('wine_aging') or {}).get('batch'):
+            need(any(b['type']=='cellar' and b['id']!=obj['id'] for b in me['objects']),
+                 'wine_shelf_busy','Сначала забери партию с полки «Семейный запас».')
         need(not (obj.get('crop') or obj.get('jobs') or obj.get('animal_job') or obj.get('animal')),
              'object_busy','Сначала освободи объект от урожая, производства или животных.')
         from . import undo
@@ -712,6 +715,11 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
             result['plantations']=plantations.owner_view(farm,now)
         else:
             result.pop('plantations',None)
+        from . import wine_aging
+        result.pop('wine_aging',None)
+        aging=wine_aging.public(farm,now)
+        if aging is not None:
+            result['wine_aging']=aging
         from . import meadow
         result['meadow_view']=meadow.view(farm,now)
         result['home_projects']=projects.owner_state(farm)

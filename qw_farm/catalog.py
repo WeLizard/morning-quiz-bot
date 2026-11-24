@@ -14,6 +14,7 @@ VERSION = 'farm-2026-10-r9'
 PLANTATIONS_WIRED = True  # Controls entry and plantation commands. Stock and recipes remain readable if switched off.
 PLANTATION_UPKEEP = 1200
 PLANTATION_WINTER_UPKEEP = 600
+WINE_AGING_STARTS_ENABLED = True
 TEA_LEAF_ITEM = dict(id='tea_leaf', name='Свежий чайный лист', price=28, color='#77a654', kind='product')
 CROPS = {}
 # id, title, seed cost, seconds, yield, unit NPC value, XP, level, tint
@@ -1506,3 +1507,16 @@ def _register_plantation_processing():
 
 
 _register_plantation_processing()
+
+for _wine_id, _wine_name in (
+    ('wine_aged', 'Выдержанное вино 0%'),
+    ('wine_reserve', 'Погребной резерв 0%'),
+    ('wine_collectors', 'Коллекционное вино 0%'),
+):
+    ITEMS[_wine_id] = {**ITEMS['wine_zero'], 'id': _wine_id, 'name': _wine_name}
+
+_chest = RECIPES['cellar_chest']
+RECIPES['cellar_chest_reserve'] = {
+    **_chest, 'id': 'cellar_chest_reserve', 'name': 'Собрать сундучок с погребным резервом',
+    'inputs': {**{item: qty for item, qty in _chest['inputs'].items() if item != 'cider_zero'}, 'wine_reserve': 1},
+}

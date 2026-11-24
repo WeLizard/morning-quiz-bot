@@ -529,8 +529,12 @@ class AccountMergeService:
             earned -= coins - MAX_COINS
             coins = MAX_COINS
         farm['coins'] = coins
+        from qw_farm import wine_aging
         inventory = dict(farm.get('inventory') or {})
-        for key, qty in (theirs.get('inventory') or {}).items():
+        transferred_stock = dict(theirs.get('inventory') or {})
+        for item, quantity in wine_aging.merge(farm, theirs, farm_now).items():
+            transferred_stock[item] = transferred_stock.get(item, 0) + quantity
+        for key, qty in transferred_stock.items():
             total = int(inventory.get(key, 0)) + int(qty)
             if total > MAX_QTY:
                 summary['truncated'].append({'what': 'item:' + key, 'lost': total - MAX_QTY})
@@ -548,4 +552,4 @@ class AccountMergeService:
         await unit.record(main.id, 'merge:' + str(secondary.id), 'account_merge', before, farm, self.clock())
         summary['farm'] = {'merged': True, 'coins_added': earned,
                            'starter_credit_not_moved': min(int(theirs['coins']), int(theirs.get('starter_credit') or 0)),
-                           'items_added': {k: int(v) for k, v in (theirs.get('inventory') or {}).items()}}
+                           'items_added': {k: int(v) for k, v in transferred_stock.items()}}

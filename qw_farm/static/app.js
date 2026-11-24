@@ -8,7 +8,7 @@ import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame} from './field_overlay.js?v=20261030c';
 import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261030c';
-import * as FEST from './festivals.js?v=20261116-building-effects';
+import * as FEST from './festivals.js?v=20261124-wine-aging';
 import {horsemanDisplay,openHorsemanDialog,renderHorsemanCard} from './horseman.js';
 import * as MERCH from './merchant.js';
 import * as ORCH from './orchard.js';
@@ -390,7 +390,8 @@ async function refresh({render=true}={}){
  if(!current())return false;
  const beforeScene=sceneSnapshot(),beforeHUD=hudSnapshot(),beforeSeeds=seedsSnapshot(),prevLevel=S.me?.level??null;
  const plantationsChanged=!!catalog&&JSON.stringify(catalog.plantations)!==JSON.stringify(S.catalog?.plantations);
- const catalogChanged=!!catalog&&(plantationsChanged||upkeepCatalogSnapshot(catalog)!==upkeepCatalogSnapshot(S.catalog));
+ const cellarRecipeChanged=!!catalog&&Boolean(catalog.recipes?.cellar_chest_reserve)!==Boolean(S.catalog?.recipes?.cellar_chest_reserve);
+ const catalogChanged=!!catalog&&(cellarRecipeChanged||plantationsChanged||upkeepCatalogSnapshot(catalog)!==upkeepCatalogSnapshot(S.catalog));
  if(catalogChanged)S.catalog=catalog;
  S.form=me.address_form||'n';try{if(!farmContrastPending&&prefsEpoch===farmContrastEpoch)globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();
  queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();syncMenuBadges();orchardNotices(prevLevel);
@@ -615,7 +616,7 @@ function tapMachine(id){const plan=planTap(id,S.lastRun,S.me,S.catalog,now());
  const [w,replant]=checkbox('Сразу пересеять те же культуры',true);box.append(w,el('p','Уберёт готовые зерновые (до 24 грядок за рейс). В следующий раз машина по нажатию повторит этот рейс сама.','note'));
  modal(spec.name,box,[button('Отправить комбайн',safe(async()=>{const plan=planMachine({machine:id,crop:'',replant:replant.checked},S.me,S.catalog,now());if(!plan.ok){toast(plan.why,true);return;}$('dialog').close();await runPlan(plan);}),'primary')]);}
 let readiness='';
-function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(['fields','plantations'].includes(S.tab)&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>(o.crop&&o.crop.ready_at<=now())||ORCH.ripe(o,now())).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);}
+function updateReady(){updateRateFeedback();if(!S.farm)return;updateRepeat();let stamp=readySnapshot();if(stamp!==readiness){readiness=stamp;if(['fields','plantations'].includes(S.tab)&&own()&&!S.fieldGame)poll();if(['object','forest','lake','team','objects','production','village'].includes(S.tab)&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)&&!S.busy&&!S.placing&&!$('dialog').open)renderPanel();}let count=S.farm.objects.filter(o=>(o.crop&&o.crop.ready_at<=now())||ORCH.ripe(o,now())).length;$('harvest-all').querySelector('span').textContent=count?`Собрать урожай · ${count}`:'Урожай растёт';$('harvest-all').disabled=!count||S.busy||!!rateSeconds('write');document.querySelectorAll('[data-until]').forEach(updateTime);document.querySelectorAll('[data-progress-until]').forEach(updateGrowthMeter);updateWineAgingDeadline();}
 function clickObject(o,cell){hideStoneSpeech();
  if(S.placing){
   const p=S.placing;if(p.committing)return;
@@ -816,6 +817,7 @@ function renderOrders(p){heading('Доска заказов','ДЕЛА НА СЕ
   const body=el('div',null,'qw-action-row order-body'),info=el('div',null,'order-info'),rw=el('span',`+${coins} `,'reward');rw.append(el('small',`+${xp} XP${r.bonus?` · репутация +${r.bonus}%`:''}`));info.append(g,rw);
   body.append(info,button('Доставить',()=>command('order',{order:o.id}),'primary order-go',!enough(o.needs)));c.append(body);
   const links=el('div',null,'order-links');FRIEND_REQUESTS.missing(links,o.needs);links.append(button('Другой заказ',()=>command('skip_order',{order:o.id}),'text-button order-skip'));c.append(links);p.append(c);}
+ renderWineAgingOrders(p);
  residentsCard(p);
  const claimedQuests=S.me.claimed_quests||[],workshopGoals=(S.catalog.workshop_goals||[]).filter(q=>q.level<=S.me.level&&!claimedQuests.includes(q.id));
  if(workshopGoals.length){p.append(el('h3','Развитие мастерских','subheading'));
@@ -1173,6 +1175,71 @@ function renderObjects(p){
  if(!rows.length)note(f.ready?'Готового пока нет — всё ещё в работе.':'Здесь пока пусто.',p);
  for(const r of rows)p.append(objectButton(r.o,r));
 }
+function renderWineAging(o,p){
+ const aging=S.me.wine_aging;
+ if(!aging)return;
+ p.append(el('h3','Семейный запас','subheading'));
+ const batch=aging.batch;
+ const c=card(batch?`${itemName(batch.item)} ×2`:'Свободная полка',null,batch?.item||'wine_zero');
+ if(batch){
+  const next=batch.next_at;
+  const collect=button('Забрать две бутылки',()=>{
+   if(next!=null&&next<=now()){updateWineAgingDeadline();return;}
+   command('wine_age_collect',{batch:batch.id,item:batch.item});
+  },'primary wide');
+  if(next!=null){
+   const copy=el('p',null,'note');
+   copy.dataset.wineAgingNext=next;
+   copy.append(el('span',`Следующая выдержка · ${itemName(batch.next_item)} · `),wineAgingDate(next,true));
+   c.append(copy,collect);
+   if(next<=now())markWineAgingDue(copy);
+  }else c.append(collect);
+ }else{
+  const needs={wine_zero:2};
+  note('Одна партия на всю ферму. Выдержка меняется через 7, 14 и 30 реальных дней. Забрать бутылки можно в любой момент.',c);
+  c.append(goods(needs),button('Поставить на выдержку',()=>command('wine_age_start',{object:o.id}),'primary wide',!aging.can_start||!enough(needs)));
+ }
+ if(aging.label_at!=null){
+  const label=el('p',null,'note');
+  label.append(el('strong','Долгожитель'),el('span',' · '),wineAgingDate(aging.label_at));
+  c.append(label);
+ }
+ p.append(c);
+}
+function wineAgingDate(stamp,withTime=false){
+ const date=new Date(stamp*1000),options={dateStyle:'medium'};
+ if(withTime)options.timeStyle='short';
+ const text=el('time',date.toLocaleString('ru-RU',options));
+ text.dateTime=date.toISOString();
+ return text;
+}
+function markWineAgingDue(status){
+ const card=status.parentElement;
+ card.querySelector('.card-header strong').textContent='Партия на полке';
+ card.querySelector('button').disabled=true;
+ status.textContent='Обновляем срок выдержки…';
+}
+function updateWineAgingDeadline(){
+ if(S.tab!=='object'||!own()||!S.me.wine_aging?.batch)return;
+ const status=$('panel-content').querySelector('[data-wine-aging-next]');
+ if(!status||status.dataset.refreshRequested||Number(status.dataset.wineAgingNext)>now())return;
+ markWineAgingDue(status);
+ status.dataset.refreshRequested='1';
+ poll();
+}
+function renderWineAgingOrders(p){
+ const orders=own()&&S.me.wine_aging?.orders;
+ if(!orders?.length)return;
+ p.append(el('h3','Заказы на выдержанное вино','subheading'));
+ for(const order of orders){
+  const needs={[order.item]:order.quantity},c=card(order.name,null,order.item);
+  const body=el('div',null,'qw-action-row order-body'),info=el('div',null,'order-info');
+  info.append(goods(needs),el('span',`+${fmt(order.coins)} монет`,'reward'));
+  body.append(info,button('Доставить',()=>command('wine_age_order',{item:order.item}),'primary order-go',!enough(needs)));
+  c.append(body);
+  p.append(c);
+ }
+}
 function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){S.tab='orders';renderPanel();return;}heading(objName(o),own()?'ТВОЁ ХОЗЯЙСТВО':'В ГОСТЯХ У СОСЕДА');
  if(o.type==='plot'){
   let c=o.crop;if(c){let box=card(itemName(c.id),`Урожай ×${c.yield_qty}`,c.id);box.append(timer(c.ready_at));box.append(growthMeter(c.planted_at,c.ready_at));if(c.fert===1)note('Грядка подкормлена: урожай будет больше на четверть.',box);if(own()){const acts=el('div',null,'qw-btn-row plot-actions');acts.append(button('Выкопать',()=>confirmDigUp(o),'secondary',c.ready_at<=now()),button('Собрать',()=>command('harvest',{object:o.id,revision:o.revision}),'primary',c.ready_at>now()));box.append(acts);}else if(S.farm.permissions.allow_help)box.append(button(c.helped?'Сосед уже помог':'Полить грядку',()=>command('help',{object:o.id,revision:o.revision},S.farm.id),'primary wide',c.helped||c.ready_at<=now()));p.append(box);}else if(own()){note('Выбери семена внизу и нажми грядку — или посади выбранную культуру здесь.',p);p.append(button(`Посадить: ${itemName(S.seed)}`,()=>command('plant',{object:o.id,crop:S.seed,revision:o.revision}),'primary wide'));}else note('Грядка отдыхает до следующего посева.',p);
@@ -1182,6 +1249,7 @@ function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){
  else if(o.type==='barn'){note('Здесь сохраняется весь урожай. Ограничения вместимости нет: улучшенный склад приносит больше монет при продаже.',p);renderMinigame('barn',p);renderProjectBarnShelf(p);p.append(button('Открыть склад',()=>selectTab('inventory'),'primary wide'));upgradeCard(o,p);}
  else {
   const purpose=buildingPurpose(o.type,S.catalog);if(purpose.length)note(purpose.join(' '),p);
+  if(o.type==='cellar')renderWineAging(o,p);
   let animal=Object.values(S.catalog.animals).find(a=>a.building===o.type);
   if(animal){let c=card(animal.name,'Помощник может повторять кормление на активной смене.',Object.keys(animal.outputs)[0]);if(!o.animal)c.append(button(`Поселить за ${animal.cost} монет`,()=>command('buy_animal',{object:o.id,animal:animal.id}),'primary wide',S.me.coins<animal.cost));else{const repeatOn=o.animal_repeat??true,repeat=repeatToggle(`кормления ${animal.name.toLowerCase()}`,repeatOn,()=>command('set_animal_repeat',{object:o.id,enabled:!repeatOn})),usesGrass=!!animal.inputs?.feed;if(usesGrass){const [wrap,toggle]=checkbox('Кормить травой',o.grass_feed!==false);wrap.classList.add('grass-feed-toggle');toggle.onchange=()=>command('grass_feed',{object:o.id,enabled:toggle.checked});c.append(wrap);}if(o.animal_job){c.append(el('p','Продукция будет готова через:','note'),timer(o.animal_job.ready_at),goods(o.animal_job.outputs,false));const actions=el('div',null,'qw-btn-row animal-production-actions');actions.append(repeat,button('Забрать продукцию',()=>command('collect_animal',{object:o.id}),'primary',o.animal_job.ready_at>now()));c.append(actions);}else{let bt=batchOf(animal,o),feed=bt.inputs.feed||0,grassUsed=usesGrass&&o.grass_feed!==false?Math.min(feed,Math.floor(stock('grass')/2)):0,needs={...bt.inputs};if(grassUsed)needs.feed=feed-grassUsed;c.append(goods(bt.inputs));if(grassUsed)c.append(el('p',`Луговая трава ×${grassUsed*2} заменит зерносмесь ×${grassUsed}.`,'note'));c.append(el('p',`Одна порция: ${duration(bt.seconds)} → ${Object.entries(bt.outputs).map(([id,q])=>`${itemName(id)} ×${q}`).join(', ')}`,'note'));const actions=el('div',null,'qw-btn-row animal-production-actions');actions.append(repeat,button('Накормить',()=>command('feed',{object:o.id}),'primary',!enough(needs)));c.append(actions);}note('Повтор выполняет помощник-животновод на активной смене; без него настройка ждёт.',c);}p.append(c);upgradeCard(o,p);}
   const recipes=Object.values(S.catalog.recipes).filter(r=>r.building===o.type);
@@ -1197,7 +1265,8 @@ function renderObject(p){let o=S.farm.objects.find(o=>o.id===S.selected);if(!o){
  }
  if(own()){
   const move=button('Переместить объект',()=>beginPlacement({w:o.w,h:o.h,name:objName(o)},o),'text-button');
-  const reason=o.type==='house'||o.type==='barn'?'Дом и склад нельзя снести.':o.crop?'Сначала освободи грядку от урожая.':o.jobs?.length?'Сначала забери или отмени работу в очереди.':o.animal_job?'Сначала забери продукцию животных.':o.animal?'В домике есть животные — убрать его пока нельзя.':null;
+  const lastCellarWithBatch=o.type==='cellar'&&S.me.wine_aging?.batch&&S.me.objects.filter(obj=>obj.type==='cellar').length===1;
+  const reason=o.type==='house'||o.type==='barn'?'Дом и склад нельзя снести.':o.crop?'Сначала освободи грядку от урожая.':o.jobs?.length?'Сначала забери или отмени работу в очереди.':o.animal_job?'Сначала забери продукцию животных.':o.animal?'В домике есть животные — убрать его пока нельзя.':lastCellarWithBatch?'Сначала забери бутылки из семейного запаса.':null;
   const label=o.type==='road'?'Убрать дорогу':o.type==='plot'?'Убрать грядку':'Снести постройку';
   const remove=button(label,()=>confirmDemolish(o),'text-button danger',!!reason);
   if(reason){remove.title=reason;note(reason,p);}

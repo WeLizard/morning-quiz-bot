@@ -34,7 +34,11 @@ export const ICON_FALLBACK={
  // Тыквенная ночь
  fest_pn_lantern:'fest_posid_basket',fest_pn_glow:'fest_posid_window',fest_pn_bat:'fest_posid_snowman',fest_pn_thing:'fest_posid_lantern',fest_pn_web:'fest_posid_wreath',fest_pn_lanterns:'fest_posid_lights',fest_pn_scarecrow:'fest_posid_basket',fest_pn_owl:'fest_posid_socks',
 };
-export function iconId(id){return Object.prototype.hasOwnProperty.call(ICON_FALLBACK,id)?ICON_FALLBACK[id]:id;}
+const ITEM_ICON_ALIASES={wine_aged:'wine_zero',wine_reserve:'wine_zero',wine_collectors:'wine_zero'};
+export function iconId(id){
+ if(Object.hasOwn(ITEM_ICON_ALIASES,id))return ITEM_ICON_ALIASES[id];
+ return Object.hasOwn(ICON_FALLBACK,id)?ICON_FALLBACK[id]:id;
+}
 
 function readPref(key,store){try{return (store||globalThis.localStorage).getItem(key);}catch{return null;}}
 // Decorations are shown by default; the player may hide them (device setting, like the lighting mode).

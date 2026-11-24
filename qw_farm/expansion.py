@@ -50,6 +50,9 @@ SCHEMAS.update(orchard.SCHEMAS)  # fruit orchard: plant_tree, tree_care
 
 
 def command_schema(kind):
+    from . import wine_aging
+    if kind in wine_aging.SCHEMAS:
+        return wine_aging.SCHEMAS[kind]
     if catalog.PLANTATIONS_WIRED and kind in plantations.SCHEMAS:
         return plantations.SCHEMAS[kind]
     return SCHEMAS.get(kind)
@@ -791,6 +794,11 @@ def _bulk(farm, kind, data, now, speed, command_id):
 
 
 def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_config=None):
+    from . import wine_aging
+    if kind in wine_aging.SCHEMAS:
+        text = wine_aging.apply(farm, kind, data, now, command_id)
+        event(farm, now, text, kind)
+        return text
     lv = level(farm['xp'])
     if kind in horseman.SCHEMAS:
         text = horseman.claim(farm, now)
@@ -1014,6 +1022,8 @@ def validate_expansion(farm):
     merchant.validate(farm)
     orchard.validate(farm)
     plantations.validate(farm)
+    from . import wine_aging
+    wine_aging.validate(farm)
     fertilizer.validate(farm)
     projects.validate(farm)
     need(set(farm.get('equipment', {})) <= set(EQUIPMENT) and set(farm.get('helpers', {})) <= set(HELPERS),

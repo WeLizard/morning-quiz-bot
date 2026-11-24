@@ -1,0 +1,24 @@
+.field-game.plantation-game{padding:calc(var(--fw-safe-t) + 12px) calc(var(--fw-safe-r) + 12px) calc(var(--fw-safe-b) + 12px) calc(var(--fw-safe-l) + 12px)}
+.plantation-game-frame{display:grid;align-content:start;gap:8px;width:min(100%,560px);margin:auto}
+.plantation-game-header{justify-content:space-between;align-items:center}
+.plantation-game-header h2{margin:0;font-size:clamp(18px,4vw,24px)}
+.plantation-game-hint,.plantation-game-summary{margin:0;line-height:1.35;font-size:14px}
+.plantation-game-summary{min-height:4.1em;font-weight:650}
+.plantation-game-stage{position:relative;width:min(100%,43dvh,460px);min-width:min(240px,100%);aspect-ratio:1;margin-inline:auto;overflow:hidden;border:2px solid var(--line);border-radius:12px;background:var(--soil)}
+.plantation-game-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);touch-action:manipulation}
+.plantation-game-cell{position:relative;display:grid;place-items:center;border:1px solid rgb(255 255 255 / .18);background:rgb(32 45 27 / .10);cursor:pointer}
+.plantation-game-cell svg{width:80%;height:80%;pointer-events:none}
+.plantation-game-cell:not(:first-child):not([data-target]) svg{filter:grayscale(.9);opacity:.58}
+.plantation-game-cell[data-target="harvest"]{background:rgb(238 214 140 / .40)}
+.plantation-game-cell[data-target="prune"]::after{content:"";position:absolute;right:10%;top:20%;width:34%;height:19%;border-radius:2px;background:#f5ca6a;border:1px solid #6b4f2c}
+.plantation-game-cell.is-current{outline:3px solid #ffd665;outline-offset:-3px;z-index:1}
+.plantation-game-cell.is-used{background:rgb(32 45 27 / .10)}
+.plantation-game-cell.is-used svg,.plantation-game-cell.is-used::after{visibility:hidden}
+.plantation-game-controls{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:12px;align-items:center}
+.plantation-game-dpad{display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));grid-template-areas:". up ." "left down right";gap:8px}
+.plantation-game-dpad [data-move="U"]{grid-area:up}
+.plantation-game-dpad [data-move="L"]{grid-area:left}
+.plantation-game-dpad [data-move="D"]{grid-area:down}
+.plantation-game-dpad [data-move="R"]{grid-area:right}
+.plantation-game-controls .qw-btn,.plantation-game-header .qw-btn{min-width:44px;min-height:44px}
+.plantation-game-dpad .qw-btn{padding:0;font-size:19px}

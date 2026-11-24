@@ -1,7 +1,7 @@
 """Perennial plantations. Each purchased hectare has its own cycle and revision."""
 from datetime import datetime, timedelta, timezone
 
-from . import market, progression
+from . import market, plantation_game, progression
 from .catalog import ITEMS, PLANTATION_UPKEEP, PLANTATION_WINTER_UPKEEP, level
 from .domain import duration, find, inventory, named, need, number, pay
 from .economy import DAY, TZ_OFFSET
@@ -25,6 +25,8 @@ YOUNG_HARVESTS = 3
 YOUNG_PCT = 60
 AUTO_QUALITY = 90
 XP_MULTIPLIER = 8
+PRUNE_HARVESTS = 4
+PRUNE_BONUS = 15
 MOSCOW = timezone(timedelta(seconds=TZ_OFFSET))
 
 SCHEMAS = {
@@ -32,6 +34,8 @@ SCHEMAS = {
     'plant_plantation': {'plantation', 'revision', 'crop'},
     'uproot_plantation': {'plantation', 'revision'},
     'plantation_auto': {'plantation', 'revision'},
+    'plantation_start': {'plantation', 'revision', 'op'},
+    'plantation_finish': {'plantation', 'run', 'path'},
 }
 
 
@@ -76,15 +80,15 @@ def new_cycle(spec, at, harvests, speed=1, farm=None):
                 yield_qty=spec['yield_qty'], base_xp=spec['xp'] * XP_MULTIPLIER, maturity_pct=maturity)
 
 
-def cycle_reward(cycle, quality=AUTO_QUALITY):
+def cycle_reward(cycle, quality=AUTO_QUALITY, yield_adjustment=0):
     """Quantity (half up) and base XP for the frozen cycle, before XP bonuses."""
-    qty = (cycle['yield_qty'] * cycle['maturity_pct'] * quality + 5_000) // 10_000
+    qty = (cycle['yield_qty'] * cycle['maturity_pct'] * quality * (100 + yield_adjustment) + 500_000) // 1_000_000
     xp = cycle['base_xp'] * quality // 100
     return qty, xp
 
 
 def public_catalog():
-    return dict(steps=STEPS, cultures=CULTURES, upkeep=PLANTATION_UPKEEP, auto_quality=AUTO_QUALITY,
+    return dict(steps=STEPS, cultures=CULTURES, upkeep=PLANTATION_UPKEEP, auto_quality=AUTO_QUALITY, manual_work=True,
                 vineyard_winter_upkeep=PLANTATION_WINTER_UPKEEP,
                 young_harvests=YOUNG_HARVESTS, young_pct=YOUNG_PCT, xp_multiplier=XP_MULTIPLIER)
 
@@ -94,6 +98,16 @@ def products_in_reach(farm):
     available = {spec['item'] for spec in CULTURES.values() if stock.get(spec['item'], 0) > 0}
     return available | {CULTURES[hectare['crop']]['item'] for hectare in farm.get('plantations', [])
                         if hectare['harvests'] > 0}
+
+
+def _prune_ready(hectare):
+    return hectare['harvests'] >= hectare.get('pruned_after', 0) + PRUNE_HARVESTS
+
+
+def _prune_remaining(hectare):
+    if 'pruned_after' not in hectare:
+        return 0
+    return max(0, hectare['pruned_after'] + PRUNE_HARVESTS - hectare['harvests'])
 
 
 def owner_view(farm, now):
@@ -110,13 +124,74 @@ def owner_view(farm, now):
                 state = 'young'
             else:
                 state = 'growing'
+        run = hectare.get('run')
+        if run is not None and now >= run['expires_at']:
+            run = None
         result.append(dict(id=hectare['id'], revision=hectare['revision'], crop=crop,
                            harvests=hectare['harvests'], state=state,
-                           ready_at=cycle['ready_at'] if cycle is not None else None))
+                           ready_at=cycle['ready_at'] if cycle is not None else None,
+                           run=plantation_game.public(run) if run else None,
+                           prune_ready=_prune_ready(hectare), prune_remaining=_prune_remaining(hectare)))
     return result
 
 
-def apply(farm, kind, data, now, speed):
+def _require_ripe(hectare, now):
+    need(hectare['cycle'] is not None and hectare['cycle']['ready_at'] <= now,
+         'not_ready', 'На плантации пока нет спелого урожая.')
+
+
+def _harvest(farm, hectare, now, speed, quality, next_penalty):
+    spec, ripe_cycle = CULTURES[hectare['crop']], hectare['cycle']
+    harvests = hectare['harvests']
+    adjustment = (PRUNE_BONUS if _prune_remaining(hectare) else 0) - hectare.get('harvest_penalty', 0)
+    qty, xp = cycle_reward(ripe_cycle, quality, adjustment)
+    cycle = new_cycle(spec, now, harvests + 1, speed, farm)
+    inventory(farm, {spec['item']: qty})
+    progression.grant_xp(farm, xp, 'harvest', now, True, ripe_cycle['season_seconds'])
+    market.count(farm, 'h:' + spec['item'], qty)
+    hectare.update(harvests=harvests + 1, cycle=cycle)
+    if next_penalty:
+        hectare['harvest_penalty'] = next_penalty
+    else:
+        hectare.pop('harvest_penalty', None)
+    hectare.pop('run', None)
+    return f'{ITEMS[spec["item"]]["name"]} ×{qty}, качество {quality}%.'
+
+
+def _start_run(farm, hectare, op, now, command_id):
+    need(type(op) is str and op in plantation_game.LIMITS, 'invalid_command', 'Некорректный вид работы.', 422)
+    run = hectare.get('run')
+    need(run is None or now >= run['expires_at'], 'plantation_run_open', 'На плантации уже начата работа.')
+    if op == 'harvest':
+        _require_ripe(hectare, now)
+    else:
+        need(_prune_ready(hectare), 'prune_not_ready', 'Плантация пока не готова к обрезке.')
+    hectare['run'] = plantation_game.new_run(farm['id'], hectare, op, command_id, now)
+    return 'Ручной сбор начат.' if op == 'harvest' else 'Обрезка начата.'
+
+
+def _finish_run(farm, hectare, run_id, path, now, speed):
+    run = hectare.get('run')
+    need(run is not None and run['id'] == run_id and run['revision'] == hectare['revision'],
+         'stale_plantation_run', 'Работа на плантации изменилась. Обнови ферму.')
+    need(now < run['expires_at'], 'plantation_run_expired', 'Время вышло. Начни работу заново.')
+    result = plantation_game.replay(run, path)
+    if run['op'] == 'harvest':
+        _require_ripe(hectare, now)
+        harvest = _harvest(farm, hectare, now, speed, result['quality'], result['penalty'])
+        if result['penalty']:
+            harvest += f' Следующий урожай: −{result["penalty"]}% за промахи.'
+        return f'Урожай собран: {harvest}'
+
+    need(_prune_ready(hectare), 'prune_not_ready', 'Плантация пока не готова к обрезке.')
+    del hectare['run']
+    if not result['success']:
+        return 'Не хватило точных срезов. Обрезку можно повторить.'
+    hectare['pruned_after'] = hectare['harvests']
+    return f'Обрезка завершена. Следующие {PRUNE_HARVESTS} урожая: +{PRUNE_BONUS}%.'
+
+
+def apply(farm, kind, data, now, speed, command_id):
     if kind == 'buy_plantation':
         step = number(data['step'], high=len(STEPS))
         spec = STEPS[step]
@@ -133,9 +208,14 @@ def apply(farm, kind, data, now, speed):
         return f'Куплена земля для плантации: {spec["ha"]} га.'
 
     hectare = find(farm.get('plantations', []), number(data['plantation'], high=MAX_HECTARES))
-    need(type(data['revision']) is int and hectare['revision'] == data['revision'],
-         'stale_object', 'Плантация изменилась. Обнови ферму.')
-    if kind == 'plant_plantation':
+    if kind != 'plantation_finish':
+        need(type(data['revision']) is int and hectare['revision'] == data['revision'],
+             'stale_object', 'Плантация изменилась. Обнови ферму.')
+    if kind == 'plantation_start':
+        text = _start_run(farm, hectare, data['op'], now, command_id)
+    elif kind == 'plantation_finish':
+        text = _finish_run(farm, hectare, data['run'], data['path'], now, speed)
+    elif kind == 'plant_plantation':
         need(hectare['crop'] is None, 'plantation_occupied', 'Сначала выкорчуй старую посадку.')
         crop = data['crop']
         spec = named(CULTURES, crop)
@@ -147,19 +227,12 @@ def apply(farm, kind, data, now, speed):
     elif kind == 'uproot_plantation':
         need(hectare['crop'] is not None, 'plantation_empty', 'На гектаре пока ничего не посажено.')
         hectare.update(crop=None, cycle=None, harvests=0)
+        for key in ('run', 'pruned_after', 'harvest_penalty'):
+            hectare.pop(key, None)
         text = 'Посадка выкорчевана. Можно посадить новую культуру.'
     else:
-        need(hectare['cycle'] is not None and hectare['cycle']['ready_at'] <= now,
-             'not_ready', 'На плантации пока нет спелого урожая.')
-        spec, ripe_cycle = CULTURES[hectare['crop']], hectare['cycle']
-        harvests = hectare['harvests']
-        qty, xp = cycle_reward(ripe_cycle)
-        cycle = new_cycle(spec, now, harvests + 1, speed, farm)
-        inventory(farm, {spec['item']: qty})
-        progression.grant_xp(farm, xp, 'harvest', now, True, ripe_cycle['season_seconds'])
-        market.count(farm, 'h:' + spec['item'], qty)
-        hectare.update(harvests=harvests + 1, cycle=cycle)
-        text = f'Бригада собрала урожай: {ITEMS[spec["item"]]["name"]} ×{qty}, качество {AUTO_QUALITY}%.'
+        _require_ripe(hectare, now)
+        text = 'Бригада собрала урожай: ' + _harvest(farm, hectare, now, speed, AUTO_QUALITY, 0)
     hectare['revision'] += 1
     return text
 
@@ -177,7 +250,8 @@ def validate(farm):
               type(hectare['harvests']) is int and 0 <= hectare['harvests'] <= hectare['revision'])
         crop, cycle = hectare['crop'], hectare['cycle']
         if crop is None:
-            valid(cycle is None and hectare['harvests'] == 0)
+            valid(cycle is None and hectare['harvests'] == 0
+                  and not {'run', 'pruned_after', 'harvest_penalty'} & set(hectare))
             continue
         valid(type(crop) is str and crop in CULTURES and type(cycle) is dict and
               type(cycle.get('winter_pause')) is bool and
@@ -187,3 +261,11 @@ def validate(farm):
               type(cycle.get('maturity_pct')) is int and 0 < cycle['maturity_pct'] <= 100)
         young_until = cycle.get('young_until', cycle['started_at'])
         valid(type(young_until) is int and cycle['started_at'] <= young_until <= cycle['ready_at'])
+        if 'run' in hectare:
+            valid(plantation_game.valid_run(hectare['run'], hectare['revision']))
+        if 'pruned_after' in hectare:
+            pruned_after = hectare['pruned_after']
+            valid(type(pruned_after) is int and PRUNE_HARVESTS <= pruned_after <= hectare['harvests'])
+        if 'harvest_penalty' in hectare:
+            penalty = hectare['harvest_penalty']
+            valid(type(penalty) is int and penalty in (5, 10, 15, 20) and hectare['harvests'] > 0)

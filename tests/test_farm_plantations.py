@@ -87,7 +87,7 @@ def test_planting_revision_and_owner_projection():
     assert 'plantations' not in project(state, visitor, T0)
     view = project(state, state, T0)['plantations']
     assert view == [dict(id=1, revision=1, crop='vineyard', harvests=0, state='young',
-                         ready_at=T0 + 8 * economy.DAY)]
+                         ready_at=T0 + 8 * economy.DAY, run=None, prune_ready=False, prune_remaining=0)]
     assert project(state, state, T0 + 6 * economy.DAY)['plantations'][0]['state'] == 'growing'
     error('stale_object', cmd, state, 'plant_plantation', data)
     error('plantation_occupied', cmd, state, 'plant_plantation', {**data, 'revision': 1})

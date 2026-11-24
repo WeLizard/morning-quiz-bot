@@ -7,6 +7,7 @@ import {mountSantaBattle,calmBattle,playerLook,CALM_KEY} from './santa-battle.js
 import {FarmScene,farmLightingAt} from './scene.js';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame} from './field_overlay.js?v=20261030c';
+import {openPlantationGame} from './plantation_overlay.js?v=20261124-plantation-work';
 import {yieldQty,growthPermille,sprayBonus} from './tractor_game.js?v=20261030c';
 import * as FEST from './festivals.js?v=20261124-wine-aging';
 import {horsemanDisplay,openHorsemanDialog,renderHorsemanCard} from './horseman.js';
@@ -369,7 +370,7 @@ function readySnapshot(){
   (S.farm?.objects||[]).map(o=>[(o.jobs||[]).map(j=>[due(j.starts_at),due(j.ready_at)]),due(o.animal_job?.ready_at),due(o.crop?.ready_at),due(o.fruit?.ready_at)]),
   (S.me?.trips||[]).map(trip=>[due(trip.ready_at),due(trip.started_at+(S.catalog?.undo?.window||60))]),
   (S.me?.fields||[]).map(f=>[due(f.crop?.ready_at),due(f.run?.done_at),due(f.run?.expires_at),(()=>{const c=REFUND.cancelSowing(S.catalog,f,t);return c?c.kind:null;})()]),
-  (S.me?.plantations||[]).map(h=>due(h.ready_at)),
+  (S.me?.plantations||[]).map(h=>[due(h.ready_at),due(h.run?.expires_at)]),
   due(S.me?.economy_status?.feast_until),
   S.tab==='village'?Math.max(0,Math.ceil(((S.me?.economy_status?.season_ends_at||t)-t)/86400)):null,
   due(S.me?.market?.caravan_next_at),due(S.me?.swans?.next_at),
@@ -2809,14 +2810,24 @@ function plantationCard(h,P){
   }
   note('Выбери культуру для посадки.',c);
  }else{
+  const activeRun=h.run&&h.run.expires_at>now()?h.run:null;
+  const manual=(label,op,kind='secondary')=>{
+   const b=button(label,()=>startPlantationWork(h,op),`qw-btn ${kind} wide`);
+   b.dataset.plantationWork=op;
+   actions.append(b);
+  };
+  if(activeRun)manual(activeRun.op==='prune'?'Продолжить обрезку':'Продолжить сбор',activeRun.op,'primary');
+  else if(h.state==='ready'&&P.manual_work)manual('Собрать вручную','harvest','primary');
+  if(h.prune_ready&&!activeRun)manual('Обрезать кусты','prune');
+  if(h.prune_remaining)note(`Обрезка · +15% к урожаю. Осталось сборов: ${h.prune_remaining}.`,c);
   if(h.state==='ready'){
    note(`Сбор бесплатный · качество ${P.auto_quality} %.`,c);
-   const collect=button('Собрать бригадой',()=>command('plantation_auto',data),'qw-btn primary wide');
+   const collect=button('Собрать бригадой',()=>command('plantation_auto',data),`qw-btn ${P.manual_work?'secondary':'primary'} wide`);
    collect.dataset.plantationAction='harvest';
    actions.append(collect);
   }else if(h.state==='winter'){
    const ready=new Date(h.ready_at*1000).toLocaleString('ru-RU',{dateStyle:'long',timeStyle:'short'});
-   note(`Зимой виноград не растёт. Урожай ожидается ${ready}.`,c);
+   note(`Зимой рост останавливается. Урожай ожидается ${ready}.`,c);
   }else{
    const countdown=timer(h.ready_at);
    countdown.dataset.untilDone='Проверяем готовность…';
@@ -2839,6 +2850,26 @@ function plantationCard(h,P){
  }
  c.append(actions);
  return c;
+}
+
+async function startPlantationWork(h,op){
+ if(S.fieldGame)return;
+ const current=()=>(S.me?.plantations||[]).find(x=>x.id===h.id);
+ if(!h.run||h.run.expires_at<=now()){
+  if(!await command('plantation_start',{plantation:h.id,revision:h.revision,op}))return;
+ }
+ const run=current()?.run;
+ if(!run||run.op!==op||run.expires_at<=now()||S.fieldGame)return;
+ const spec=S.catalog.plantations.cultures[h.crop];
+ S.fieldGame={};syncScenePause();
+ try{
+  S.fieldGame=openPlantationGame({run,serverNow:now,currentRun:()=>current()?.run,
+   title:`${op==='prune'?'Обрезка':'Ручной сбор'} · ${spec.name}`,
+   itemIcon:(item=spec.item)=>icon(item),
+   finish:path=>command('plantation_finish',{plantation:h.id,run:run.id,path}),
+   onClose:()=>{S.fieldGame=null;syncScenePause();navPop('minigame');if(S.tab==='plantations'){renderPanel();document.querySelector(`[data-plantation-id="${h.id}"] button`)?.focus({preventScroll:true});}}});
+  navPush('minigame',()=>S.fieldGame?.requestClose?.()??true);
+ }catch(error){S.fieldGame=null;syncScenePause();throw error;}
 }
 
 function renderPlantations(p){

@@ -821,7 +821,7 @@ def apply_extension(farm, kind, data, now, command_id, speed, form='n', upkeep_c
         event(farm, now, text, kind)
         return text
     if kind in plantations.SCHEMAS:
-        text = plantations.apply(farm, kind, data, now, speed)
+        text = plantations.apply(farm, kind, data, now, speed, command_id)
         event(farm, now, text, kind)
         return text
     if kind == 'fert_toggle':

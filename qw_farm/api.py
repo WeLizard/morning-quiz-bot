@@ -14,7 +14,7 @@ ASSETS={'village.svg','app.js','scene.js','style.css','field_overlay.js','field_
 CSP="default-src 'none'; script-src 'self' https://telegram.org; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
 
 
-ASSETS.update({'village-building-effects.svg','village_building_effects_manifest.js'})
+ASSETS.update({'village-building-effects.svg','village_building_effects_manifest.js','plantation_overlay.js','plantation_overlay.css'})
 # Developer performance overlay (docs/FARM_PERF_DEBUG.md): app.js imports it only with ?debug=perf.
 ASSETS.update({'perf_debug.js','perf_debug.css','scene_profiler.js'})
 

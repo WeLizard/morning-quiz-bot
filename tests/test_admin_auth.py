@@ -132,6 +132,8 @@ def test_remote_http_is_rejected_and_request_size_and_content_type_are_bounded()
 
 
 def test_plain_http_from_the_docker_bridge_passes_only_inside_the_dev_container(monkeypatch):
+    monkeypatch.delenv('MQB_DEV_CONTAINER', raising=False)
+
     async def run():
         app = application(AdminAuth(TOKEN, hosts=["admin.lan", "127.0.0.1"]))
         bridge = httpx.ASGITransport(app, client=("172.23.0.1", 40000))

@@ -234,3 +234,21 @@ Workstreams 2–3 предшествуют финальному cutover. Game su
   start/current/image/answer/stop и Telegram effects через outbox. Alembic 0011
   переносит активные legacy Photo snapshots и удаляет их из `quiz_sessions`.
   Контейнерный gate после среза: 444 passed.
+- 2026-11-24 — на `bfb5dd5` прошли 14 браузерных проверок запуска хаба,
+  фермы и «Алхимии» на локальном dev-стенде, 170 тестов навигации и
+  синхронизации и 17 проверок Git gates. `scripts/check_alchemy_build.py`
+  подтвердил воспроизводимость сборки. Профиль, прогресс, «Алхимия» и ферма
+  отклонили запросы без сессии, а со штатной dev-сессией вернули HTTP 200.
+  Эти проверки не закрывают живую приёмку привязки аккаунта, квизов и прогресса
+  в Telegram.
+- 2026-11-24 — `scripts/Test-LocalMilestone.ps1` на `bfb5dd5` в локальном Docker.
+  Чистая `morning_quiz_test` мигрировала до `20261116_0050`, `alembic check`
+  прошёл. Тест восстановления синтетического дампа и тест конкурентного сбора
+  плантации прошли. Общий результат: 3539 успешных, 3 падения, 36 пропущенных,
+  1 неожиданный проход ожидаемо падающего теста. Отчёт в `.local/acceptance/tests.xml`.
+  После изоляции `MQB_DEV_CONTAINER` в общем тесте админки повторно прошли
+  все 11 тестов `tests/test_admin_auth.py` в Docker. Полный набор повторно не запускался.
+  Открыты `test_admin_section_answers_through_the_dev_container_port_mapping`
+  (та же предпосылка окружения) и
+  `test_terminal_merge_revokes_old_principal_and_drops_inflight_body`
+  (команда `forfeit` получила `action_unavailable`). Оба в тестах ИИ «Ночного города».

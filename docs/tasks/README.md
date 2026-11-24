@@ -6,6 +6,12 @@
 
 Актуальные правила разработки и выпуска: [DEVELOPMENT](../engineering/DEVELOPMENT.md), [RELEASE_CRITERIA](../engineering/RELEASE_CRITERIA.md), [FARM_CONCEPT](../engineering/FARM_CONCEPT.md) и [AGENTS.md](../../AGENTS.md). Концепт фермы — предложение для обсуждения, не обязательный scope.
 
+## Распределение работы на 2026-11-24
+
+- «Усадьбу» ведёт Клод. Для интерфейса действуют уже принятые макеты. [MQB-012](MQB-012-night-city-full-release.md)
+- Codex ведёт отдельные задачи фермы и подготовку выпуска платформы. Ближайшие проверки фермы — кнопки из отчётов №6 и №7 на телефоне в Telegram и действующий цикл винограда и чая. [Плантации](FARM_PLANTATIONS.md)
+- Подготовка выпуска начинается с локального прогона PostgreSQL, миграций и восстановления. Отдельно нужна живая приёмка входа, квизов и «Алхимии». [Критерии выпуска](../engineering/RELEASE_CRITERIA.md)
+
 ## Текущие задачи
 
 | ID | Задача | Статус | Приоритет | Обновлена |
@@ -41,7 +47,7 @@ MQB автоматически: перед изменением сверяй д�
 | Ферма: поле, этапы 2B/2C | [FARM_FIELD_SPRAY_AND_TRANSFER](FARM_FIELD_SPRAY_AND_TRANSFER.md) | Опрыскиватель, урон/ремонт, экономика 85–125/90, частичная перекачка для новых заходов `rules=3`; chain не включён |
 | Привязка и перенос аккаунтов | [ACCOUNT_LINKING_PLAN](ACCOUNT_LINKING_PLAN.md), [ACCOUNT_FIRST_MIGRATION](ACCOUNT_FIRST_MIGRATION.md) | Живая проверка Telegram и миграции на целевых базах |
 | «Ночной город»: первая обкатка и AI | [MQB-010](MQB-010-night-city-weekly-stages.md), [runbook](night_city/NIGHT_CASE_REHEARSAL_RUNBOOK.md), [AI-контракт](night_city/NIGHT_CASE_AI_ACCESS.md) | Авторское дело в rehearsal, первый HTTPS-цикл четырёх игроков проверен; человеческая неделя и подключение моделей остаются в работе |
-| Текущий локальный срез | [FARM_FEEDBACK_2026-10-21](FARM_FEEDBACK_2026-10-21.md), [MQB-011](MQB-011-address-form.md) | `git status`: E1/E8/контрастный режим ещё не закоммичены |
+| Меню, каталог «Всё» и контрастный режим | [FARM_FEEDBACK_2026-10-21](FARM_FEEDBACK_2026-10-21.md) | E1/E8 и контрастный режим в `b51c3ff`, выкладка зафиксирована в `266dd4b`. Проверка кнопок в реальном Telegram остаётся открытой |
 
 ## Известные расхождения статусов
 

@@ -101,11 +101,20 @@ def test_journal_includes_a_preexisting_claim_at_its_original_time():
     expected = {'at': NOW + 10, 'text': 'Получена награда «Опора деревни»: Садовые часы (декор).',
                 'kind': 'claim_farm_reward'}
     for _ in range(2):
-        journal = project(state, state, NOW + 20)['events']
+        view = project(state, state, NOW + 20)
+        journal = view['events']
         assert journal[0]['kind'] == 'merchant' and journal[1] == expected
         assert [entry for entry in journal if entry['kind'] == 'claim_farm_reward'] == [expected]
+        assert view['farm_reward_history'] == [expected]
     assert state == before
     assert 'events' not in project(state, visitor, NOW + 20)
+    assert 'farm_reward_history' not in project(state, visitor, NOW + 20)
+
+    for offset in range(81):
+        event(state, NOW + 30 + offset, 'Свежая запись.')
+    view = project(state, state, NOW + 120)
+    assert len(view['events']) == 80 and all(entry['kind'] != 'claim_farm_reward' for entry in view['events'])
+    assert view['farm_reward_history'] == [expected]
 
 
 def test_merge_deduplicates_pending_and_preserves_claimed_and_spent_decor():

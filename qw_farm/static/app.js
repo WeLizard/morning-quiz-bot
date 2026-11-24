@@ -1441,7 +1441,28 @@ async function updateNeighbors(){
 function renderNeighbors(p){heading(own()?'Соседи':'В гостях','МАЛЕНЬКИЕ ПОСТУПКИ СОЗДАЮТ ИСТОРИИ');if(!own()){renderVisit(p);return;}FRIEND_REQUESTS.renderNeighbors(p);neighborGiftNotice=el('div',null,'neighbor-gift-notice');neighborGiftNotice.hidden=true;p.append(neighborGiftNotice);renderSharing(p);let c=card('Код твоей фермы','Это публичный адрес, не секретный ключ','friends');c.append(el('div',S.me.id,'code'),button('Скопировать код',safe(async()=>{try{await navigator.clipboard.writeText(S.me.id);toast('Код фермы скопирован.');}catch{modal('Код твоей фермы',el('div',S.me.id,'code'));}}),'text-button'));p.append(c);
  const form=el('form'),[w,input]=field('Пригласить соседа по коду фермы');input.placeholder='Код фермы или ссылка из Telegram';input.required=true;let b=button('Пригласить',()=>{},'primary wide');b.type='submit';form.append(w,b);form.onsubmit=async e=>{e.preventDefault();let hint=parseInviteHint(input.value);if(!hint){toast('Вставь код фермы или ссылку-приглашение.',true);return;}if(parseInvite(hint))await command('request_neighbor',{},hint);else await safe(()=>acceptSharedInvite(hint))();};p.append(form);
  neighborList=el('div');neighborSnapshot=null;neighborGeneration++;p.append(neighborList);updateNeighbors().catch(e=>{if(S.tab==='neighbors'&&neighborList?.parentNode===p)note(e.message,neighborList);});}
-function renderJournal(p){heading('Журнал фермы','ЧТО ПРОИСХОДИЛО У КАЛИТКИ');note('История последних событий. Полный экономический журнал хранится отдельно на сервере.',p);for(let e of S.me.events){let n=el('div',e.text,'event');n.append(el('small',new Date(e.at*1000).toLocaleString('ru-RU')));const actual=bulkActualDetails(e);if(actual)n.append(actual);p.append(n);}p.append(button('Показать движения ресурсов',safe(async()=>{let r=await request(API+'/ledger'),wrap=el('div');for(let x of r.entries.slice(0,25)){let n=el('div',`${x.kind} · ${x.coins_delta>=0?'+':''}${x.coins_delta} мон. · ${x.xp_delta>=0?'+':''}${x.xp_delta} XP`,'event');n.append(el('small',Object.entries(x.inventory_delta).map(([id,q])=>`${itemName(id)} ${q>0?'+':''}${q}`).join(', ')||'Без изменения склада'));wrap.append(n);}modal('Последние операции',wrap);}),'secondary wide'));}
+function renderJournal(p){
+ heading('Журнал фермы','ЧТО ПРОИСХОДИЛО У КАЛИТКИ');
+ const rewards=S.me.farm_reward_history;
+ const appendEvent=(entry,parent)=>{
+  const row=el('div',entry.text,'event');
+  row.append(el('small',new Date(entry.at*1000).toLocaleString('ru-RU')));
+  const actual=bulkActualDetails(entry);
+  if(actual)row.append(actual);
+  parent.append(row);
+ };
+ if(rewards?.length){
+  const section=el('section');
+  section.append(el('h3','Полученные награды','subheading'));
+  for(const entry of rewards)appendEvent(entry,section);
+  p.append(section,el('h3','Последние события','subheading'));
+ }
+ note('История последних событий. Полный экономический журнал хранится отдельно на сервере.',p);
+ for(const entry of S.me.events){
+  if(!rewards?.length||entry.kind!=='claim_farm_reward')appendEvent(entry,p);
+ }
+ p.append(button('Показать движения ресурсов',safe(async()=>{let r=await request(API+'/ledger'),wrap=el('div');for(let x of r.entries.slice(0,25)){let n=el('div',`${x.kind} · ${x.coins_delta>=0?'+':''}${x.coins_delta} мон. · ${x.xp_delta>=0?'+':''}${x.xp_delta} XP`,'event');n.append(el('small',Object.entries(x.inventory_delta).map(([id,q])=>`${itemName(id)} ${q>0?'+':''}${q}`).join(', ')||'Без изменения склада'));wrap.append(n);}modal('Последние операции',wrap);}),'secondary wide'));
+}
 function renderSettings(p){heading('Твоя ферма','ЛЮДИ, ПРАВА И НЕМНОГО УЮТА');renderViewSettings(p);const form=el('form'),[nw,name]=field('Название фермы','text',S.me.name);name.minLength=2;name.maxLength=24;name.required=true;let[vw,v]=field('Кто может смотреть','select');for(let [id,title]of [['friends','Только принятые соседи'],['private','Только я'],['public','Все игроки этого сервера']]){let o=el('option',title);o.value=id;v.append(o);}v.value=S.me.settings.visibility;form.append(nw,vw);let flags={};for(let [id,title]of [['allow_help','Соседи могут помогать с урожаем'],['allow_gifts','Принимать подарки от соседей'],['allow_requests','Просьбы соседей'],['allow_trade','Показывать лавку и принимать покупки'],['allow_pranks','Разрешить безвредные гусиные проделки']]){let[w,input]=checkbox(title,S.me.settings[id]);flags[id]=input;form.append(w);}let b=button('Сохранить настройки',()=>{},'primary wide');b.type='submit';form.append(b);form.onsubmit=async e=>{e.preventDefault();await command('settings',{name:name.value,visibility:v.value,...Object.fromEntries(Object.entries(flags).map(([k,i])=>[k,i.checked]))});};p.append(form);
  if(S.me.pranks.some(g=>g.until>now()))p.append(button('Проводить гуся за калитку',()=>command('clear_prank'),'secondary wide'));
  note('Урожай не увядает. Животные не гибнут. Деньги фермы не превращаются в баллы квиза. Сетевой сбой не подтверждает награду.',p);

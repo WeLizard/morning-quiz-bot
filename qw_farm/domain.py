@@ -717,6 +717,7 @@ def project(farm, visitor, now, upkeep_config=None, tower=None):
         result['farm_rewards']=farm_rewards.pending(farm)
         result['farm_reward_decor']=farm_rewards.decor_credits(farm)
         reward_events=farm_rewards.journal_events(farm)
+        result['farm_reward_history']=sorted(reward_events,key=lambda entry:entry['at'],reverse=True)
         if reward_events:
             other_events=[entry for entry in result['events'] if entry['kind']!='claim_farm_reward']
             result['events']=sorted(reward_events+other_events,key=lambda entry:entry['at'],reverse=True)[:JOURNAL_LIMIT]

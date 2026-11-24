@@ -20,6 +20,10 @@ CULTURES = {
                      yield_qty=98, item='grape', xp=80, winter_pause=True),
     'tea_garden': dict(name='Чайный куст', level=32, cost=30_000, juvenile=2, seconds=DAY,
                        yield_qty=95, item='tea_leaf', xp=40, winter_pause=False),
+    'coffee_grove': dict(name='Кофейное дерево', level=38, cost=60_000, juvenile=4, seconds=3 * DAY,
+                         yield_qty=135, item='coffee_cherry', xp=120, winter_pause=False),
+    'cotton_field': dict(name='Хлопчатник', level=41, cost=25_000, juvenile=1, seconds=2 * DAY,
+                         yield_qty=155, item='cotton', xp=80, winter_pause=True),
 }
 YOUNG_HARVESTS = 3
 YOUNG_PCT = 60

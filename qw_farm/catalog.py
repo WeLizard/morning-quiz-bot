@@ -567,12 +567,13 @@ REP_POINTS=[0,2,5,10,18,30]          # delivered orders needed for each level
 REP_BONUS=5                          # percent of coins/XP per level (max 25)
 REP_SPECIAL_LEVEL=2                  # from «Приятель» a resident asks for favourite goods
 NPC_TASTES={
- 'Филиныч':('tea','mint_tea','jam','honey','pie','cherry_tincture'),
+ 'Филиныч':('tea','mint_tea','jam','honey','pie','cherry_tincture','coffee_beans','espresso'),
  'Агата':('bouquet','pie','gingerbread','berry_jam','bread','charlotte'),
  'Почтальон Ёж':('mushroom_soup','chanterelle','hazelnut','wildberry','pancake','dried_apples'),
  'Механик Крот':('soup','potato','vegetable_stew','bread','pickles','pear_kvass'),
- 'Кошка Кая':('milk','cheese','omelet','berry_milk','goat_cheese'),
- 'Кошка Соня':('pillow','down_blanket','scarf','mohair_plaid','mittens','wool_plaid','down_shawl','quilt','silk_quilt'),
+ 'Кошка Кая':('milk','cheese','omelet','berry_milk','goat_cheese','latte'),
+ 'Кошка Соня':('pillow','down_blanket','scarf','mohair_plaid','mittens','wool_plaid','down_shawl','quilt','silk_quilt',
+               'cotton_yarn','chintz','shirt','sundress'),
  'Суслик Игорь':('sunflower','oat_cookie','porridge','corn','pumpkin','prunes','dried_apricot'),
  'Неведома Зверушка':('truffle','saffron','lavender','peacock_feather','truffle_tart','apricot_five_star'),
  'Медведь Пух':('berry_charge','honey_charge','forest_charge','honey','gingerbread','mead_zero'),
@@ -1106,7 +1107,8 @@ TEXTILE_BUILDING_IDS=frozenset(r[0] for r in TEXTILE_BUILDING_ROWS)
 # project that waits for the owner's answers (question 4); nothing of it is defined here on purpose, so that no empty building is for sale.
 # Finished clothes, blankets and decorations (not food): the special-request caption of a resident reads «любимая вещь» for them.
 WEARABLE_ITEM_IDS=frozenset({'pillow','scarf','mittens','mohair_plaid','down_blanket','wool_plaid','down_shawl','socks','quilt','robe','silk_quilt',
-                             'sundress','alpaca_coat','felt_boots','silk_scarf','bouquet','plume_bouquet','feather_fan','golden_fan','hop_wreath'})
+                             'sundress','shirt','chintz','cotton_yarn','alpaca_coat','felt_boots','silk_scarf',
+                             'bouquet','plume_bouquet','feather_fan','golden_fan','hop_wreath'})
 # Lessons of «Кошка Соня» (FARM_VILLAGE_MINIGAMES.md 3.3): a delivered step lets listed recipes open ``early`` levels sooner.
 # The base chain never needs a lesson; recipes with ``teach`` are also opened by their plain level. The dyeing recipes with Сорока's dyes (dye_*) are defined in the merchant block
 # at the end of this file; the PATTERN recipes of Соня (rugs, tapestries) are still NOT defined (FARM_TEXTILE_CHAIN.md section 8, FARM_VILLAGE_MINIGAMES.md 3.3).
@@ -1520,3 +1522,29 @@ RECIPES['cellar_chest_reserve'] = {
     **_chest, 'id': 'cellar_chest_reserve', 'name': 'Собрать сундучок с погребным резервом',
     'inputs': {**{item: qty for item, qty in _chest['inputs'].items() if item != 'cider_zero'}, 'wine_reserve': 1},
 }
+
+# Coffee and cotton. Recipes use the standard workshop value law and never change existing item prices.
+ITEMS['coffee_cherry'] = dict(id='coffee_cherry', name='Кофейные ягоды', price=60, color='#b84347', kind='product')
+ITEMS['cotton'] = dict(id='cotton', name='Хлопок-сырец', price=35, color='#ece2c8', kind='product')
+BUILDINGS['coffee_roastery'] = dict(id='coffee_roastery', name='Обжарочная', cost=18_000, level=38, w=2, h=2, decor=False)
+for _item, _name, _recipe, _building, _inputs, _qty, _minutes, _lv, _color in (
+    ('coffee_beans', 'Кофе в зёрнах', 'Обжарить кофейные зёрна', 'coffee_roastery', {'coffee_cherry': 4}, 2, 20, 38, '#80533b'),
+    ('espresso', 'Эспрессо', 'Сварить эспрессо', 'teahouse', {'coffee_beans': 1}, 1, 10, 38, '#684235'),
+    ('latte', 'Латте', 'Сварить латте', 'teahouse', {'coffee_beans': 1, 'milk': 2}, 1, 15, 38, '#c39a72'),
+    ('cotton_yarn', 'Хлопковая пряжа', 'Спрясть хлопковую пряжу', 'spinnery', {'cotton': 4}, 2, 12, 41, '#dac9a8'),
+    ('chintz', 'Ситец', 'Соткать ситец', 'weavery', {'cotton_yarn': 2}, 1, 25, 41, '#9db3ba'),
+    ('shirt', 'Рубашка', 'Сшить ситцевую рубашку', 'tailor', {'chintz': 1}, 1, 30, 41, '#a9bec4'),
+):
+    _seconds = _minutes * 60
+    _value_in = sum(ITEMS[key]['price'] * quantity for key, quantity in _inputs.items())
+    # Round AV in tenths to avoid overcharging when a whole-coin AV lands above the float boundary.
+    _value_added = (_minutes * (25 + _lv) + 9) // 10
+    _price = (_value_in + _value_added + _qty - 1) // _qty
+    ITEMS[_item] = dict(id=_item, name=_name, price=_price, color=_color, kind='product')
+    RECIPES[_item] = dict(id=_item, name=_recipe, building=_building, inputs=_inputs, outputs={_item: _qty},
+                          seconds=_seconds, level=_lv, xp=_xp_r9(_building, _seconds))
+
+# The shared output keeps its original price. This cotton route earns the same AV as any L41 workshop.
+RECIPES['sundress_chintz'] = dict(id='sundress_chintz', name='Сшить ситцевый сарафан', building='tailor',
+                                inputs={'chintz': 1, 'cotton_yarn': 1}, outputs={'sundress': 1},
+                                seconds=38 * 60, level=41, xp=_xp_r9('tailor', 38 * 60))

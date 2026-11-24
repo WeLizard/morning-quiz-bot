@@ -1,5 +1,5 @@
 import {drawTeamZones,teamSprites,smallAnimal,specialDecor,machineAt,resetWalkingGeese,reactWalkingGeese,releaseWalkingGeese,drawTeaArbor,resetLivestock,livestockMoves} from './scene_expansion.js';
-import {drawBuilding,drawUpgrade,drawBadge,drawRoad,drawBirdhouse} from './scene_buildings.js';
+import {drawBuilding,drawUpgrade,drawBadge,drawRoad,drawBirdhouse} from './scene_buildings.js?v=20261124-coffee-cotton';
 import {drawTree} from './scene_orchard.js';
 import {Minimap,viewRect,overlaps,objectBounds,panToCenter,clampWorldPoint,sortByDepth,spriteSlots,compareDepth,isoInverse} from './scene_map.js';
 const LATE_CROPS={zucchini:['leaf','#8fb86a'],beans:['pod','#a9c079'],currant:['berry','#4b3f6b'],ginger:['root','#d9b87a'],broccoli:['leaf','#6fa65a'],turnip:['root','#e6d9a8'],gooseberry:['berry','#a8c96a'],barley:['grain','#d7bf74'],celery:['stalk','#8fc07a'],apple:['tree','#d9534f'],cherry:['tree','#b3263e'],millet:['grain','#e2c35a'],leek:['stalk','#a7cf8a'],pear:['tree','#c6cf5a'],rosehip:['berry','#d0453c'],chickpea:['pod','#d8b878'],kohlrabi:['root','#b7d68a'],plum:['tree','#6b4a8c'],sea_buckthorn:['berry','#f09a2a'],ginseng:['root','#d8c49a'],asparagus:['stalk','#9bc872'],apricot:['tree','#f0a64a'],viburnum:['berry','#c4232f'],pomegranate:['tree','#b3262f'],artichoke:['leaf','#8fae6a'],peach:['tree','#f2a07a']};

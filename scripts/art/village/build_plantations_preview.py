@@ -1,4 +1,4 @@
-"""Reproducible wave-1 vector artwork and review.
+"""Reproducible plantation artwork and review.
 
 python scripts/art/village/build_plantations_preview.py --out F:/.../plantations-preview
 Use --install only after owner approval; --assets-only skips review screenshots.
@@ -18,10 +18,15 @@ import harness
 
 ITEMS = [('tea_leaf', 'Чайный лист'), ('green_tea', 'Зелёный чай'),
          ('black_tea', 'Чёрный чай'), ('wine_zero', 'Вино 0 %'), ('raisin', 'Изюм')]
+COFFEE_COTTON_ITEMS = [
+    ('coffee_cherry', 'Кофейные ягоды'), ('coffee_beans', 'Обжаренные зёрна'),
+    ('espresso', 'Эспрессо'), ('latte', 'Латте'), ('cotton', 'Хлопок-сырец'),
+    ('cotton_yarn', 'Хлопковая пряжа'), ('chintz', 'Ситец'), ('shirt', 'Рубашка')]
+ALL_ITEMS = ITEMS + COFFEE_COTTON_ITEMS
 STAGES = [('young', 'Саженцы'), ('adult', 'Взрослые'), ('ripe', 'Спелые')]
 SPRITE_NAMES = [('card','plantation-card')]+[(f'{kind}-{stage}',f'{kind}-{stage}')
-    for kind in ['vineyard','tea_garden'] for stage in ['young','adult','ripe']]+[
-    ('vineyard-winter','vineyard-winter'),('plantation-empty','plantation-empty')]
+    for kind in ['vineyard','tea_garden','coffee_grove','cotton_field'] for stage in ['young','adult','ripe']]+[
+    ('vineyard-winter','vineyard-winter'),('cotton_field-winter','cotton_field-winter'),('plantation-empty','plantation-empty')]
 
 
 def symbol(svg, ident):
@@ -33,7 +38,7 @@ def symbol(svg, ident):
 def runtime_sprites(assets, out, install):
     sprite='<svg xmlns="http://www.w3.org/2000/svg">\n'+''.join(
         symbol(assets[name],ident)+'\n' for name,ident in SPRITE_NAMES)+'</svg>\n'
-    icons='\n'.join(symbol(assets[name],name) for name,_ in ITEMS)
+    icons='\n'.join(symbol(assets[name],name) for name,_ in ALL_ITEMS)
     (out/'plantations-art.svg').write_text(sprite,encoding='utf-8')
     (out/'plantations-icons.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg">'+icons+'</svg>\n',encoding='utf-8')
     if install:
@@ -48,11 +53,11 @@ def runtime_sprites(assets, out, install):
             current=current[:a]+block+current[b:]
         else:
             existing={n.attrib.get('id') for n in ET.fromstring(current).iter()}
-            assert not existing.intersection(name for name,_ in ITEMS),'Unmanaged plantation icon already exists'
+            assert not existing.intersection(name for name,_ in ALL_ITEMS),'Unmanaged plantation icon already exists'
             pos=current.rindex('</svg>')
             current=current[:pos]+block+'\n'+current[pos:]
         ET.fromstring(current)
-        for name,_ in ITEMS:
+        for name,_ in ALL_ITEMS:
             assert sum(n.attrib.get('id')==name for n in ET.fromstring(current).iter())==1,name
         path.write_text(current,encoding='utf-8')
     return {'symbols':len(SPRITE_NAMES),'bytes':len(sprite.encode()),'installed':install}
@@ -68,6 +73,35 @@ def card(name, label):
 
 def products():
     return '<div class="products">'+''.join(f'<div>{img(k)}<span>{label}</span></div>' for k,label in ITEMS)+'</div>'
+
+
+def coffee_cotton_review(night=False, details=False):
+    def panel(asset, label):
+        return f'<section><h2>{label}</h2>{img(asset, "art-tone")}</section>'
+
+    pair = (panel('reference', 'Ферма сейчас') + panel('coffee_context', 'Ферма с обжарочной'))
+    fields = panel('coffee_grove-ripe', 'Кофейная роща') + panel('cotton_field-ripe', 'Хлопковое поле')
+    if details:
+        pair = ''.join(panel(f'{kind}-{stage}', f'{label} · {title.lower()}')
+                       for kind,label in [('coffee_grove','Кофе'),('cotton_field','Хлопок')]
+                       for stage,title in STAGES)
+        fields = panel('cotton_field-winter','Хлопок зимой') + panel('roastery','Обжарочная · 2 × 2')
+    items = ''.join(f'<figure>{img(key, "art-tone")}<figcaption>{label}</figcaption></figure>'
+                    for key,label in COFFEE_COTTON_ITEMS)
+    title = 'Стадии посадки' if details else 'Кофе и хлопок'
+    body = (f'<main><h1>{title}</h1><div class="scenes">{pair}{fields}</div>'
+            f'<div class="goods">{items}</div></main>')
+    style = """main{max-width:1380px;margin:auto;padding:16px}h1{font-size:24px;margin:0 0 10px}
+      .scenes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      section{background:#e5ead4;border-radius:12px;overflow:hidden}
+      section h2{font-size:16px;padding:6px 12px}section img{width:100%;height:200px;display:block;object-fit:contain}
+      .goods{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-top:10px}
+      figure{margin:0;text-align:center}figure img{width:44px;height:44px}figcaption{font-size:13px}
+      .night section{background:#293c31}
+      @media(max-width:600px){main{padding:10px}h1{font-size:20px}.scenes section img{height:114px}
+      section h2{font-size:13px;padding:6px}.goods{grid-template-columns:repeat(4,1fr)}
+      figure img{width:40px;height:40px}figcaption{font-size:12px}}"""
+    return document(body, style, night)
 
 
 CSS = '''*{box-sizing:border-box}body{margin:0;background:#f3f1e5;color:#334d36;font:15px/1.45 system-ui,sans-serif}h1,h2,h3,p{margin:0}h1{font-size:32px;letter-spacing:-.035em}h2{font-size:20px}h3{font-size:16px}small,.muted{color:#65725b}.page{padding:32px;max-width:1600px;margin:auto}.eyebrow{font-size:12px;font-weight:750;letter-spacing:.12em;color:#7b8669}.intro{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}.tag{border:1px solid #b9c5a3;border-radius:30px;padding:8px 14px;font-size:13px;background:#e6ebd5}.pair{display:grid;grid-template-columns:1fr 1fr;gap:24px}.panel{background:#e5ead4;border:1px solid #c5d0af;border-radius:18px;overflow:hidden}.panel h2,.panel h3{padding:14px 18px 0}.panel>img{display:block;width:100%;height:auto}.panel>p{padding:0 18px 14px}.strip{display:grid;grid-template-columns:1.15fr 1fr 1.35fr;gap:24px;margin:24px 0}.sub{padding:16px;border-radius:18px;background:#e9ecd9;border:1px solid #ccd5b8}.row{display:flex;gap:12px;align-items:center;margin-top:12px}.destination{width:160px;flex:none;position:relative}.destination img{display:block;width:160px;height:68px;border-radius:12px}.destination span{display:block;font-size:13px;font-weight:700;margin-top:5px}.products{display:flex;justify-content:space-around;gap:8px;margin-top:16px}.products>div{text-align:center;flex:1}.products img{display:block;width:48px;height:48px;margin:auto}.products span{font-size:12px;display:block;margin-top:5px}.factory-line{display:flex;align-items:center;gap:8px}.factory-line img:first-child{width:155px;height:122px}.factory-line .mini{width:64px;height:64px;object-fit:contain;border:1px solid #b5c3a2;background:#dce6cb;border-radius:12px}.note{font-size:13px;color:#65725b;margin-top:14px}.stage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:16px 0 24px}.stage-grid .panel h3{font-size:16px}.stage-grid img{width:100%;display:block}.contact-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.contact-bottom .products{flex-wrap:wrap}.contact-bottom .products>div{min-width:70px}.night{background:#1c2a25;color:#e6ebd5}.night .panel,.night .sub{background:#293c31;border-color:#4b6048}.night .muted,.night small,.night .note,.night .eyebrow{color:#b6c3a8}.night .art-tone{filter:brightness(.64) saturate(.78)}.night .tag{background:#344a37;border-color:#667858}.night .destination span{color:#e6ebd5}'''
@@ -117,7 +151,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out',type=Path,required=True)
     p.add_argument('--first-frame',action='store_true',help='Build assets and hero only')
-    p.add_argument('--install',action='store_true',help='Install the owner-approved sprite and five icons')
+    p.add_argument('--install',action='store_true',help='Install the owner-approved sprite and icons')
+    p.add_argument('--coffee-cotton',action='store_true',help='Render the coffee and cotton review sheets')
     p.add_argument('--assets-only',action='store_true',help='Validate and generate vector assets without screenshots')
     args=p.parse_args()
     os.environ['TEMP']=os.environ['TMP']=r'F:\Temp'
@@ -133,7 +168,7 @@ def main():
         assert 'data:image' not in svg and 'NaN' not in svg and 'Infinity' not in svg,name
         plants=root.findall('.//{http://www.w3.org/2000/svg}g')
         count=sum((n.attrib.get('class','').startswith('plant row-')) for n in plants)
-        if name.startswith(('vineyard-','tea_garden-')):
+        if name.startswith(('vineyard-','tea_garden-','coffee_grove-','cotton_field-')):
             assert count==64,(name,count)
         (out/f'{name}.svg').write_text(svg,encoding='utf-8')
         checks[name]={'sha256':hashlib.sha256(svg.encode()).hexdigest(),'bytes':len(svg.encode()),'image_nodes':0,'plants':count}
@@ -142,10 +177,11 @@ def main():
     runtime=runtime_sprites(result['assets'],out,args.install)
     (out/'native-factory.png').write_bytes(result['native_factory'])
     (out/'native-thumbnail.png').write_bytes(result['native_thumbnail'])
+    (out/'roastery-thumbnail.png').write_bytes(result['roastery_thumbnail'])
     validation={'runtime_sprite':runtime,'deterministic':True,'assets':checks,'bounds':result['bounds'],
                 'geometry':result['geometry'],'native_canvas_and_thumbnail':True,
                 'runtime_sprite_sha256':hashlib.sha256((out/'plantations-art.svg').read_bytes()).hexdigest(),
-                'icon_ids':[name for name,_ in ITEMS],
+                'icon_ids':[name for name,_ in ALL_ITEMS],
                 'note':'Native renderer and external SVG-use are art checks; live app acceptance is separate.'}
     (out/'art-validation.json').write_text(json.dumps(validation,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     print(json.dumps({'runtime_art':runtime},ensure_ascii=False),flush=True)
@@ -162,10 +198,21 @@ def main():
             vb='0 0 160 68' if name=='card' else '0 0 640 370'
             external+=f'<section class="panel"><h3>{ident}</h3><svg viewBox="{vb}" style="width:100%;height:200px"><use href="/static/plantations-art.svg#{ident}"/></svg></section>'
         external+='</div><div class="row"><img src="native-factory.png" width="240" alt="Настоящий Canvas"><img src="native-thumbnail.png" width="80" alt="FarmScene.thumb">'
-        for ident,_ in ITEMS:
+        for ident,_ in ALL_ITEMS:
             external+=f'<svg viewBox="0 0 48 48" width="64" height="64"><use href="/static/icons.svg#{ident}"/></svg>'
         external+='</div></main>'
         shot('runtime-art-check',document(external),(1280,1100))
+    if args.coffee_cotton:
+        shot('coffee-cotton', coffee_cotton_review(), (1280,660))
+        shot('stages', coffee_cotton_review(details=True), (1280,1140))
+        for w,h in [(375,812),(390,844),(1280,800)]:
+            for night in [False,True]:
+                shot(f'coffee-cotton-{w}x{h}-'+('night' if night else 'day'),
+                     coffee_cotton_review(night=night), (w,h))
+        for asset in ['coffee_grove-ripe','cotton_field-ripe','cotton_field-winter','roastery']:
+            shot('closeup-'+asset,document(img(asset),'img{width:100%;height:100vh;display:block;object-fit:contain}'), (960,600))
+        print(f'COFFEE_COTTON={out/"coffee-cotton.png"}', flush=True)
+        return
     shot('hero',hero(),(1440,1210))
     print(f'FIRST_FRAME={out/"hero.png"}',flush=True)
     if args.first_frame:

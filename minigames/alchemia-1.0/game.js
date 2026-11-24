@@ -118,20 +118,41 @@ function pushUndo(){undoStack.push(clone(state.bench));if(undoStack.length>30)un
 function applySettings(){
  document.body.dataset.world=state.settings.world||'origins';
  syncShellColor();
- document.body.classList.toggle('reduced-motion',!state.settings.motion);
  renderEpochHeading();
  $('sortSelect').value=state.settings.sort;
- $('soundBtn').innerHTML=icon(state.settings.sound?'volume':'muted');
- $('soundBtn').title=state.settings.sound?'Выключить звук':'Включить звук';
- $('soundBtn').setAttribute('aria-label',$('soundBtn').title);
- $('soundBtn').setAttribute('aria-pressed',String(state.settings.sound));
+ applyGamePreferences();
 }
-function toggleSound(){state.settings.sound=!state.settings.sound;applySettings();persist();if(state.settings.sound)playSound('select');if(modalPage==='settings')showSettings(false);}
+const systemMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const alchemyHasAccount=()=>location.protocol!=='file:'&&!!window.QW?.prefs?.hasAccount?.();
+function alchemySoundEnabled(){
+ const shared=alchemyHasAccount()?window.QW.prefs.get().gamePreferences?.sound_effects:undefined;
+ return shared??state.settings.sound;
+}
+function alchemyAnimationsEnabled(){
+ if(systemMotion.matches)return false;
+ return alchemyHasAccount()?window.QW.prefs.animationsEnabled(state.settings.motion):state.settings.motion;
+}
+function applyGamePreferences(){
+ const sound=alchemySoundEnabled(),soundBtn=$('soundBtn'),motion=alchemyAnimationsEnabled();
+ document.body.classList.toggle('reduced-motion',!motion);
+ if(!motion)stopParticles();
+ soundBtn.hidden=alchemyHasAccount();
+ soundBtn.innerHTML=icon(sound?'volume':'muted');
+ soundBtn.title=sound?'Выключить звук':'Включить звук';
+ soundBtn.setAttribute('aria-label',soundBtn.title);
+ soundBtn.setAttribute('aria-pressed',String(sound));
+}
+function toggleLocalPreference(key){
+ if(alchemyHasAccount()||!['sound','motion'].includes(key))return;
+ state.settings[key]=!state.settings[key];applyGamePreferences();persist();
+ if(key==='sound'&&alchemySoundEnabled())playSound('select');
+ if(modalPage==='settings')showSettings(true);
+}
 
 /* Audio: one reusable context; all short-lived oscillator/gain nodes are bounded. */
 let audio=null;
 function playSound(type){
- if(!state.settings.sound||document.hidden)return;
+ if(!alchemySoundEnabled()||document.hidden)return;
  try{
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   if(!audio)audio=new AC();
@@ -151,7 +172,7 @@ const canvas=$('fxCanvas'),ctx=canvas.getContext('2d');
 function sizeCanvas(){const dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(board.clientWidth*dpr));canvas.height=Math.max(1,Math.round(board.clientHeight*dpr));canvas.style.width=board.clientWidth+'px';canvas.style.height=board.clientHeight+'px';ctx?.setTransform(dpr,0,0,dpr,0,0);}
 function stopParticles(){if(fxFrame)cancelAnimationFrame(fxFrame);fxFrame=0;particles=[];ctx?.clearRect(0,0,board.clientWidth,board.clientHeight);}
 function burst(x,y,isNew){
- if(!ctx||!state.settings.motion||document.hidden)return;
+ if(!ctx||!alchemyAnimationsEnabled()||document.hidden)return;
  const count=isNew?28:10;
  for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=35+Math.random()*100;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-25,t:0,life:.5+Math.random()*.7,size:1+Math.random()*2,color:i%3?'#ddcc92':'#bcd9a4'});}
  if(particles.length>130)particles.splice(0,particles.length-130);
@@ -517,22 +538,10 @@ function journalRows(){
 function showJournal(){
  openModal('Дневник опытов','Последние '+HISTORY_LIMIT+' опытов · новые записи сверху',`<div class="stat-grid"><div class="stat-box"><strong>${state.attempts}</strong><span>всего экспериментов</span></div><div class="stat-box"><strong>${tried.size}</strong><span>разных сочетаний</span></div><div class="stat-box"><strong>${knownRecipes.size}</strong><span>удачных рецептов</span></div></div><div class="modal-toolbar">${[['all','Все опыты'],['success','Удачные'],['new','Новые открытия']].map(([k,l])=>`<button class="chip ${journalFilter===k?'active':''}" data-journal-filter="${k}">${l}</button>`).join('')}<button class="text-btn" data-action="achievements" style="margin-left:auto">${icon('star')} Достижения</button></div><div id="journalEntries">${journalRows()}</div>`,'journal');
 }
-function alchemyContrastAvailable(){return window.MQBAlchemySync?.contrastAvailable?.()??(!!window.QW?.prefs&&location.protocol!=='file:');}
-function alchemyContrastEnabled(){return window.MQBAlchemySync?.contrastEnabled?.()??!!window.QW?.prefs?.get?.().contrast;}
-function syncAlchemyContrastControl(){
- const control=$('alchemyContrast');if(control){control.setAttribute('aria-checked',String(alchemyContrastEnabled()));control.disabled=!alchemyContrastAvailable()||!!window.MQBAlchemySync?.isContrastPending?.();}
-}
-async function toggleAlchemyContrast(){
- const control=$('alchemyContrast');if(!control||control.disabled||!alchemyContrastAvailable())return;
- const on=!alchemyContrastEnabled();control.disabled=true;
- try{await window.MQBAlchemySync?.setAccountContrast(on);}
- catch(error){showToast('Режим не сохранён',error.message,null,'failure');}
- finally{control.disabled=false;syncAlchemyContrastControl();}
-}
-try{globalThis.addEventListener?.('qw:contrast',syncAlchemyContrastControl)}catch{}
 function showSettings(keepScroll=false){
  const scroll=keepScroll?$('modalBody').scrollTop:0;
- const content=`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Контрастный режим</strong><small>${alchemyContrastAvailable()?'Дополнительный режим для текста, рамок и сцены. Сохраняется в профиле и действует в обеих играх.':'Доступно в приложении'}</small></div><button id="alchemyContrast" class="switch" role="switch" aria-label="Контрастный режим" aria-checked="${alchemyContrastEnabled()}" data-action="contrast" ${!alchemyContrastAvailable()||window.MQBAlchemySync?.isContrastPending?.()?'disabled':''}></button></div><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section><section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
+ const localControls=alchemyHasAccount()?'':`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section>`;
+ const content=`${localControls}<section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
  openModal('Настройки','Настрой уют, не отвлекаясь от чудес',content,'settings');if(keepScroll)$('modalBody').scrollTop=scroll;
 }
 function showHelp(){
@@ -614,7 +623,6 @@ async function importSave(file){
 function action(name){
  switch(name){
   case'home':closeModal();break;
-  case'contrast':void toggleAlchemyContrast();break;
   case'help':showHelp();break;
   case'atlas':showAtlas();break;
   case'chapters':showChapters();break;
@@ -624,7 +632,7 @@ function action(name){
   case'journal':showJournal();break;
   case'achievements':showAchievements();break;
   case'settings':showSettings();break;
-  case'sound':toggleSound();break;
+  case'sound':toggleLocalPreference('sound');break;
   case'dismiss-toast':dismissToast();break;
   case'deselect':selected=null;renderSelection();break;
   case'clear':clearBench();break;
@@ -660,7 +668,7 @@ listen(document,'click',e=>{
  if(el.dataset.loadRecipe){loadPair(el.dataset.loadRecipe);return;}
  if(el.dataset.locked){showLocked(el.dataset.locked);return;}
  if(el.dataset.journalFilter){journalFilter=el.dataset.journalFilter;showJournal();return;}
- if(el.dataset.setting){const key=el.dataset.setting;state.settings[key]=!state.settings[key];applySettings();if(!state.settings.motion)stopParticles();persist();showSettings(true);if(key==='sound'&&state.settings.sound)playSound('select');}
+ if(el.dataset.setting)toggleLocalPreference(el.dataset.setting);
 });
 /* Полоса категорий шире панели и без видимой прокрутки: пальцу хватает нативного жеста,
  * а мыши нужны колесо и перетаскивание. */
@@ -843,17 +851,23 @@ function initShell(){
   const host=$('topActions')||old?.parentElement;
   if(host){QW.header.mountGear(host);old?.remove();}
   const helpHidden=()=>{const b=$('helpBtn');return Boolean(b&&b.offsetParent!==null);};
-  const soundHidden=()=>{const b=$('soundBtn');return Boolean(b&&b.offsetParent!==null);};
+  const soundHidden=()=>alchemyHasAccount()||$('soundBtn').offsetParent!==null;
   QW.menu.register([
-   {id:'alchemy-sound',icon:'sound',label:'Звуки превращений',hidden:soundHidden,toggle:()=>state.settings.sound,onSelect:()=>toggleSound()},
+   {id:'alchemy-sound',icon:'sound',label:'Звуки превращений',hidden:soundHidden,toggle:alchemySoundEnabled,onSelect:()=>toggleLocalPreference('sound')},
    {id:'alchemy-help',icon:'help',label:'Как играть',hidden:helpHidden,onSelect:()=>showHelp()},
-   {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'контраст, анимации, экспорт, сброс',onSelect:()=>showSettings()}
+   {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'сохранения и резервная копия',onSelect:()=>showSettings()}
   ],'Alchemia');
   syncShellColor();
  }catch(err){console.warn('QW shell init failed',err);}
 }
 initShell();
 updateAchievements();applySettings();renderAll();sizeCanvas();
+const refreshGamePreferences=()=>{
+ applyGamePreferences();
+ if(modalPage==='settings')showSettings(true);
+};
+window.addEventListener('qw:game-preferences',refreshGamePreferences);
+if(!window.QW?.prefs?.animationsEnabled)systemMotion.addEventListener?.('change',refreshGamePreferences);
 if(!loaded)arrangeBench(false);
 else if(phone.matches&&benchCrowded())arrangeBench(false); // a table saved on a tall board would pile up on the compact phone table
 lastBoardSize={w:board.clientWidth,h:board.clientHeight};

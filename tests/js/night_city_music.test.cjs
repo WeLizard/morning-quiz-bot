@@ -28,7 +28,7 @@ class FakeAudio {
     emit(type) { for (const handler of this.listeners[type] || []) handler({}); }
 }
 
-function player({saved = null, hidden = false, shell = ['music_shell_1.m4a', 'music_shell_2.m4a'], packs = {}} = {}) {
+function player({saved = null, hidden = false, shell = ['music_shell_1.m4a', 'music_shell_2.m4a'], packs = {}, blockFirstPlay = false} = {}) {
     const store = saved == null ? {} : {'nc-music': JSON.stringify(saved)};
     const audios = [], timers = [], docListeners = {};
     const clock = {t: 1_000_000};
@@ -36,7 +36,12 @@ function player({saved = null, hidden = false, shell = ['music_shell_1.m4a', 'mu
     const env = {
         storage: () => ({getItem: key => store[key] ?? null, setItem: (key, value) => { store[key] = value; }}),
         AudioContext: () => null, now: () => clock.t, random: () => 0.9, doc,
-        makeAudio: url => { const audio = new FakeAudio(url); audios.push(audio); return audio; },
+        makeAudio: url => {
+            const audio = new FakeAudio(url);
+            if (blockFirstPlay && !audios.length) audio.play = () => Promise.reject({name: 'NotAllowedError'});
+            audios.push(audio);
+            return audio;
+        },
         setInterval: fn => { timers.push(fn); return timers.length; }, clearInterval: () => {},
         shellMusic: () => shell, loadShell: () => Promise.resolve(null), shellBase: '/app/night/shell/', worldBase: '/app/night/worlds/',
         packOf: id => packs[id] || null,
@@ -63,35 +68,37 @@ test('music is off by default: nothing is fetched or played until the player tur
     assert.equal(broken.music.enabled, false);
 });
 
-test('the switch turns music on from the tap, keeps the choice, fades out when turned off', () => {
-    const p = player({packs: PACKS});
+test('account preferences override the old local choice, wait for a gesture, and fade out', () => {
+    const p = player({saved: {on: false, vol: 0.3}, packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'day'});
-    p.music.setEnabled(true);
+    p.music.applyPreferences({music: true, music_volume: 70});
+    assert.equal(p.audios.length, 0);
+    p.gesture();
     assert.equal(p.audios.length, 1);
     assert.equal(p.audios[0].src, url('manor_lake', 'day'));
-    assert.deepEqual(JSON.parse(p.store['nc-music']), {on: true, vol: 0.7});
+    assert.deepEqual(JSON.parse(p.store['nc-music']), {on: false, vol: 0.3});
     p.advance(0.5);
     const mid = p.audios[0].volume;
     assert.ok(mid > 0 && mid < 0.7 * 0.7 * 0.99, 'fading in: ' + mid);
     p.advance(1.5);
     assert.ok(Math.abs(p.audios[0].volume - 0.49) < 0.01, 'full level is the volume squared: ' + p.audios[0].volume);
-    p.music.setEnabled(false);
-    assert.equal(JSON.parse(p.store['nc-music']).on, false);
+    p.music.applyPreferences({music: false, music_volume: 50});
+    assert.equal(p.music.volume, 0.5);
     p.advance(0.7);
     assert.equal(p.music.state().voices, 0);
     assert.equal(p.audios[0].paused, true);
-    // the volume steps 70 → 100 → 30 → 50 → 70 and is kept
-    p.music.stepVolume(); assert.equal(p.music.volume, 1);
-    p.music.stepVolume(); assert.equal(p.music.volume, 0.3);
-    p.music.stepVolume(); assert.equal(p.music.volume, 0.5);
-    assert.equal(JSON.parse(p.store['nc-music']).vol, 0.5);
+    p.music.applyPreferences({});
+    assert.equal(p.music.enabled, false);
+    assert.equal(p.music.volume, 0.3);
     assert.equal(player({saved: {on: true, vol: 0.5}}).music.volume, 0.5, 'restored');
 });
 
 test('track by phase: day for lobby / day / voting, night at night (no night → day), finale once, then silence', () => {
     const p = player({packs: PACKS});
-    p.music.setEnabled(true);
+    p.music.applyPreferences({music: true});
     const key = () => p.music.state().key;
+    p.music.follow({world: 'manor_lake', status: 'lobby'});
+    p.gesture();
     for (const [status, slot] of [['lobby', 'day'], ['day', 'day'], ['voting', 'day'], ['night', 'night'], ['day', 'day'], ['finished', 'finale']]) {
         p.music.follow({world: 'manor_lake', status});
         assert.equal(key(), `manor_lake/${slot}`, status);
@@ -129,6 +136,18 @@ test('track by phase: day for lobby / day / voting, night at night (no night →
     assert.equal(p.live().at(-1).src, '/app/night/shell/music_shell_2.m4a');
 });
 
+test('music retries on the next gesture when the browser rejects the first play', async () => {
+    const p = player({packs: PACKS, blockFirstPlay: true});
+    p.music.applyPreferences({music: true});
+    p.music.follow({world: 'manor_lake', status: 'day'});
+    p.gesture();
+    await Promise.resolve();
+    assert.equal(p.music.state().key, null);
+    p.gesture();
+    assert.equal(p.music.state().key, 'manor_lake/day');
+    assert.equal(p.live().length, 1);
+});
+
 test('sound waits for a tap when it was on last time', () => {
     const p = player({saved: {on: true, vol: 0.7}, packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'lobby'});
@@ -143,7 +162,8 @@ test('sound waits for a tap when it was on last time', () => {
 test('a change of track is a smooth 1.5 s crossfade, not a cut', () => {
     const p = player({packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'day'});
-    p.music.setEnabled(true);
+    p.music.applyPreferences({music: true});
+    p.gesture();
     p.advance(2);
     const day = p.audios[0];
     p.music.follow({world: 'manor_lake', status: 'night'});
@@ -161,7 +181,8 @@ test('a change of track is a smooth 1.5 s crossfade, not a cut', () => {
 test('a loop is crossfaded with itself 2.5 s before its end: no gap, no pile-up', () => {
     const p = player({packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'day'});
-    p.music.setEnabled(true);
+    p.music.applyPreferences({music: true});
+    p.gesture();
     p.advance(2);
     const first = p.audios[0];
     first.currentTime = 160;                     // 10 s left: the next lap is fetched early, not started
@@ -190,7 +211,8 @@ test('a loop is crossfaded with itself 2.5 s before its end: no gap, no pile-up'
 test('a hidden tab pauses the music, coming back resumes it from the same place', () => {
     const p = player({packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'night'});
-    p.music.setEnabled(true);
+    p.music.applyPreferences({music: true});
+    p.gesture();
     p.advance(2);
     const audio = p.audios[0];
     audio.currentTime = 33;
@@ -213,7 +235,8 @@ test('a hidden tab pauses the music, coming back resumes it from the same place'
 test('a load error is silence: no exception, no retry storm, the game goes on', () => {
     const p = player({packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'day'});
-    p.music.setEnabled(true);
+    p.music.applyPreferences({music: true});
+    p.gesture();
     p.audios[0].emit('error');
     assert.equal(p.music.state().key, null);
     p.music.follow({world: 'manor_lake', status: 'day'});
@@ -225,17 +248,16 @@ test('a load error is silence: no exception, no retry storm, the game goes on', 
     const bare = kit.createMusic({storage: () => null, AudioContext: () => null, now: () => 0, random: () => 0, doc: null, setInterval: () => 1, clearInterval() {},
         makeAudio: () => { throw new Error('no Audio'); }, shellMusic: () => [], loadShell: () => null, shellBase: '', worldBase: '/w/', packOf: id => PACKS[id]});
     bare.follow({world: 'manor_lake', status: 'day'});
-    assert.doesNotThrow(() => bare.setEnabled(true));
+    assert.doesNotThrow(() => bare.applyPreferences({music: true}));
     assert.equal(bare.state().key, null);
 });
 
-test('the player does not look at prefers-reduced-motion and the menu has the switch and the volume step', () => {
+test('music and volume are profile settings independent of reduced motion', () => {
     const start = SOURCE.indexOf('/* --- music'), end = SOURCE.indexOf('/* --- the persistent game header');
     assert.ok(start > 0 && end > start);
     assert.doesNotMatch(SOURCE.slice(start, end).replace(/^\/\*[\s\S]*?\*\//, ''), /reduced|matchMedia/i, 'only the header comment mentions it');
-    assert.match(SOURCE, /id: 'nc-music', label: 'Музыка'[^\n]*toggle: \(\) => kit\.music\.enabled/);
-    assert.match(SOURCE, /id: 'nc-music-volume', label: 'Громкость музыки'[^\n]*\n?[^\n]*keepOpen: true/);
-    assert.equal((SOURCE.match(/\.\.\.musicItems\(\)/g) || []).length, 4, 'entry, expired, the table menu (twice via tableMenu / lists)');
+    assert.match(SOURCE, /qw:game-preferences/);
+    assert.doesNotMatch(SOURCE, /id: 'nc-music/);
 });
 
 test('shipped music: every world has day / night / finale files, AAC in m4a, durations match', () => {

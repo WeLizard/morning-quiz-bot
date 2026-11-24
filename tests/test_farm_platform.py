@@ -136,6 +136,37 @@ async def receipts(env, account_id, key):
             table.c.account_id == UUID(account_id), table.c.command_id == key))).mappings().all()
 
 
+@pytest.mark.parametrize('identity', ['guest', 'telegram'])
+def test_shared_game_preferences_are_saved_and_read_by_profile_and_farm(farm_pg_url, identity):
+    async def scenario():
+        async with environment(farm_pg_url) as env, player(env, identity) as actor:
+            params = {'identity': identity}
+            preference = '/api/account/game-preferences'
+            profile = '/api/guest/me' if identity == 'guest' else '/api/mini/me'
+
+            async def save(patch, account_id=actor.account_id):
+                return await actor.client.post(preference, params=params, headers=GUEST_HEADERS,
+                                               json={'account_id': account_id, 'game_preferences': patch})
+
+            assert (await actor.client.get(profile)).json()['game_preferences'] == {}
+            missing_csrf = await actor.client.post(preference, params=params,
+                                                   json={'account_id': actor.account_id, 'game_preferences': {}})
+            assert missing_csrf.status_code == 403
+            assert (await save({'music_volume': True})).status_code == 400
+            stale = await save({'animations': False}, str(uuid4()))
+            assert stale.status_code == 409 and stale.json()['code'] == 'profile_changed'
+            saved = await save({'animations': False, 'sound_effects': True, 'music_volume': 50})
+            assert saved.status_code == 200
+            changed = await save({'sound_effects': None, 'music': True})
+            expected = {'animations': False, 'music': True, 'music_volume': 50}
+            assert changed.json() == {'account_id': actor.account_id, 'game_preferences': expected}
+            assert (await actor.client.get(profile)).json()['game_preferences'] == expected
+            farm = await actor.client.get(API + '/me', params=params, headers=FARM_HEADERS)
+            assert farm.status_code == 200 and farm.json()['game_preferences'] == expected
+
+    asyncio.run(scenario())
+
+
 @pytest.mark.parametrize(('identity', 'zone'), [('guest', 'Asia/Tokyo'), ('telegram', 'America/New_York')])
 def test_account_timezone_is_shared_by_the_profile_and_farm(farm_pg_url, identity, zone):
     async def scenario():

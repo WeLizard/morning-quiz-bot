@@ -164,7 +164,8 @@ class MiniAppStore:
                     'address_form': effective_address_form(account.address_form if account else None),
                     'address_form_chosen': bool(account and account.address_form is not None),
                     'contrast_mode': bool(account and account.contrast_mode),
-                    'timezone': account.timezone if account else None}
+                    'timezone': account.timezone if account else None,
+                    'game_preferences': dict(account.game_preferences or {}) if account else {}}
 
     @staticmethod
     def own_stats(member):

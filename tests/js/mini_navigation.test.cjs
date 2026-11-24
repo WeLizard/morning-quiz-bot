@@ -648,7 +648,7 @@ test('leaving: a seat in an unstarted table, or the room itself; during a game t
         [ncq(`${NCB}/mafia/lobby/unseat`) + ':POST']: {status: 200, body: {lobby: ncLobby({is_host: false, joined: false})}},
     }, ncRoom({role: 'member'}))});
     await ncTable(seated);
-    assert.deepEqual(Array.from(seated.qw.items, item => item.id), ['nc-rules', 'nc-contrast', 'nc-music', 'nc-music-volume', 'nc-unseat', 'nc-leave']);
+    assert.deepEqual(Array.from(seated.qw.items, item => item.id), ['nc-rules', 'nc-unseat', 'nc-leave']);
     seated.qw.items.find(item => item.id === 'nc-unseat').onSelect(); await flush();
     assert.match(seated.content.textContent, /Место освободится/);
     await findButton(seated.content, 'Покинуть стол').click(); await flush();
@@ -936,7 +936,7 @@ test('Night City runs in game mode: no hub chrome, back leads to the main menu, 
     assert.equal(app.content.querySelector('h1').textContent, 'Ночной город');
     assert.match(app.content.textContent, /Ночной город · Дело 01/);
     assert.equal(app.content.querySelectorAll('button').some(b => /К играм|К комнатам/.test(b.textContent)), false);
-    assert.ok(app.qw.items.some(item => item.id === 'nc-rules') && app.qw.items.some(item => item.id === 'nc-contrast'));
+    assert.deepEqual(Array.from(app.qw.items, item => item.id), ['nc-rules']);
     await app.ui.back(); await flush(); await flush();
     assert.equal(app.qw.mode, 'hub', 'the main menu is a hub screen');
     assert.equal(app.content.dataset.page, 'home');
@@ -1121,8 +1121,8 @@ test('home restores the heading and keeps global settings inside profile', async
     findButton(app.content, 'Настройки').click(); await flush();
     assert.equal(app.content.querySelector('h1').textContent, 'Настройки');
     assert.equal(app.tab('profile').attrs['aria-current'], 'page');
-    // Account only: the theme is a segmented control, no game or schedule settings here.
-    assert.equal(app.content.querySelectorAll('select').length, 1, 'profile settings contain the searchable account timezone');
+    assert.equal(app.content.querySelector('.account-timezone-setting').querySelectorAll('select').length, 1);
+    assert.equal(app.content.querySelector('.game-preferences').querySelectorAll('select').length, 3);
     assert.match(app.content.textContent, /Как к тебе обращаться/);
     assert.doesNotMatch(app.content.textContent, /Игра и расписание|Темы обычного квиза|Развернуть на весь экран/);
     const group = app.content.querySelectorAll('.qw-btn-group').find(node => node.attrs['aria-label'] === 'Тема оформления');
@@ -1307,6 +1307,25 @@ test('guest probe failure keeps Telegram first start closed and allows retry', a
     assert.equal(app.content.dataset.page, 'first-start');
     assert.equal(app.requests.filter(r => r.path === '/api/mini/session').length, 0);
     assert.equal(app.requests.filter(r => r.path === '/api/guest/resume').length, 0);
+});
+
+test('profile settings links preserve the originating identity with both sessions present', async () => {
+    for (const [identity, opposite, page] of [['guest', 'telegram', 'guest-settings'], ['telegram', 'guest', 'settings']]) {
+        const app = await application(true, '', {savedGuest: true, miniCookie: true, autoLogin: false,
+            sessionValues: {'mqb-auth-choice': opposite}, locationSearch: '?identity=' + identity, locationHash: '#settings'});
+        assert.equal(app.content.dataset.page, page);
+        assert.equal(app.requests.some(request => request.path === '/api/guest/resume'), identity === 'guest');
+    }
+});
+
+test('explicit settings can open without a session check in the other channel', async () => {
+    const guest = await application(true, '', {savedGuest: true, autoLogin: false,
+        sessionValues: {'mqb-telegram-logged-out': '1'}, locationSearch: '?identity=guest', locationHash: '#settings'});
+    assert.equal(guest.content.dataset.page, 'guest-settings');
+    const telegram = await application(true, '', {miniCookie: true, autoLogin: false,
+        overrides: {'/api/guest/me': {status: 503}}, locationSearch: '?identity=telegram', locationHash: '#settings'});
+    assert.equal(telegram.content.dataset.page, 'settings');
+    assert.equal(telegram.requests.some(request => request.path === '/api/guest/me'), false);
 });
 
 test('explicit Telegram logout suppresses automatic resume on reload', async () => {

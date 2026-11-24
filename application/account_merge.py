@@ -343,6 +343,8 @@ class AccountMergeService:
             main.address_form = secondary.address_form
         if main.timezone is None and secondary.timezone is not None:
             main.timezone = secondary.timezone
+        from domain.account_game_preferences import merge_game_preferences
+        main.game_preferences = merge_game_preferences(main.game_preferences, secondary.game_preferences)
         # Accessibility: if either account asked for the contrast mode, the merged one keeps it.
         main.contrast_mode = bool(main.contrast_mode or secondary.contrast_mode)
         secondary.archived = True

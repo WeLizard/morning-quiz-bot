@@ -169,7 +169,22 @@ const VILLAGE_VISITOR_SPOTS=[[44.8,74.5],[49.4,57.3],[20.2,48.4],[28.1,60.3]];
 const VILLAGE_STAGES=['Подготовка','Флажки','Цветы','Праздник!'];
 const villageT0=Date.now();
 function villageVars(n,vars){for(const [k,v] of Object.entries(vars)){if(n.style.setProperty)n.style.setProperty(k,v);else n.style[k]=v;}return n;}
-const villageReduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function farmAnimationsFallback(){
+ let enabled=!(typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+ try{if(localStorage.getItem('qw-farm.reduced-motion')==='true')enabled=false;}catch{}
+ return enabled;
+}
+function farmAnimationsEnabled(){
+ const prefs=globalThis.QW?.prefs,fallback=farmAnimationsFallback(),game=prefs?.get?.().gamePreferences;
+ if(typeof prefs?.animationsEnabled==='function')return prefs.animationsEnabled(fallback);
+ if(prefs?.hasAccount?.()&&typeof game?.animations==='boolean')return game.animations;
+ return fallback;
+}
+function syncFarmMotion(){
+ const enabled=farmAnimationsEnabled();if(scene.motion===enabled)return;
+ scene.motion=enabled;scene.dirty=true;scene.syncLoop?.();
+}
+const villageReduced=()=>!farmAnimationsEnabled();
 const villageClamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 let villageIO=null,villageWorldEl=null,villageVisBound=false;
 
@@ -428,7 +443,6 @@ async function requestRaw(path,{method='GET',data}={}){
 function pendingKey(id=S.pending?.actor||S.me?.id){return `qw-farm.pending.${id||''}`;}
 function savePending(id){try{if(S.pending)sessionStorage.setItem(pendingKey(id),JSON.stringify(S.pending));else sessionStorage.removeItem(pendingKey(id));}catch{}}
 let farmViewEpoch=0,refreshEpoch=0;
-let farmContrastPending=false,farmContrastEpoch=0;
 // server_time is a clock sample, not a state change. Keep all other fields,
 // including permissions and server-computed rewards, in the comparison.
 function farmSnapshot(farm){if(!farm)return null;const {server_time,...state}=farm;return state;}
@@ -456,7 +470,7 @@ function readySnapshot(){
 let panelRenderSignature='';
 function panelSnapshot(){return JSON.stringify([farmSnapshot(S.me),farmSnapshot(S.farm),S.village,S.speed,S.tab,S.selected,S.seed,readySnapshot(),globalThis.QW?.prefs?.resolvedTimezone?.()]);}
 async function refresh({render=true}={}){
- const prefsEpoch=farmContrastEpoch,viewEpoch=farmViewEpoch,requestEpoch=++refreshEpoch,identity=S.me?.id,id=S.farm?.id;
+ const viewEpoch=farmViewEpoch,requestEpoch=++refreshEpoch,identity=S.me?.id,id=S.farm?.id;
  const current=()=>viewEpoch===farmViewEpoch&&requestEpoch===refreshEpoch&&S.me?.id===identity&&S.farm?.id===id;
  let me;try{me=await request(API+'/me');}catch(e){if(!current())return false;throw e;}if(!current())return false;
  if(me.farm.id!==identity){showLogin('Сессия сменилась. Открой ферму заново.');return false;}
@@ -468,7 +482,7 @@ async function refresh({render=true}={}){
  const cellarRecipeChanged=!!catalog&&Boolean(catalog.recipes?.cellar_chest_reserve)!==Boolean(S.catalog?.recipes?.cellar_chest_reserve);
  const catalogChanged=!!catalog&&(cellarRecipeChanged||plantationsChanged||upkeepCatalogSnapshot(catalog)!==upkeepCatalogSnapshot(S.catalog));
  if(catalogChanged)S.catalog=catalog;
- S.form=me.address_form||'n';try{if(!farmContrastPending&&prefsEpoch===farmContrastEpoch)globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();
+ S.form=me.address_form||'n';try{globalThis.QW?.prefs?.applyAccount?.(me);}catch{}S.me=me.farm;S.village=me.village||null;S.speed=me.speed;S.offset=S.me.server_time-Date.now()/1000;S.farm=lostAccess?S.me:farm;syncFarmMotion();dashaGame?.render();olegGame?.render();ballistaGame?.render();pieGame?.render();santaGame?.render();
  queueNeighborGifts(S.me);FRIEND_REQUESTS.notify();syncMenuBadges();orchardNotices(prevLevel);
  if(lostAccess){farmViewEpoch++;S.tab='neighbors';toast(gf('Хозяин закрыл доступ. Ты вернулся на свою ферму.','Хозяин закрыл доступ. Ты вернулась на свою ферму.','Доступ закрыт владельцем. Открыта твоя ферма.'));}
  if(beforeScene!==sceneSnapshot()||catalogChanged)scene.set(S.farm,S.catalog);
@@ -545,7 +559,7 @@ function scheduleRateRecovery(){
 }
 async function enter(){
  const epoch=++farmViewEpoch;
- try{let data=await request(API+'/start',{method:'POST',...(S.invite?{data:{invite:S.invite}}:{})});if(epoch!==farmViewEpoch)return;if(['guest','telegram'].includes(data.identity))mode=data.identity;S.form=data.address_form||'n';try{globalThis.QW?.prefs?.applyAccount?.(data);}catch{}S.me=S.farm=data.farm;S.lastRun=loadLastRun(S.me.id);S.catalog=data.catalog;S.village=data.village||null;S.speed=data.speed;S.offset=S.me.server_time-Date.now()/1000;resetVillageView();
+ try{let data=await request(API+'/start',{method:'POST',...(S.invite?{data:{invite:S.invite}}:{})});if(epoch!==farmViewEpoch)return;if(['guest','telegram'].includes(data.identity))mode=data.identity;try{globalThis.QW?.configure?.({identity:mode});}catch{}S.form=data.address_form||'n';try{globalThis.QW?.prefs?.applyAccount?.(data);}catch{}S.me=S.farm=data.farm;syncFarmMotion();S.lastRun=loadLastRun(S.me.id);S.catalog=data.catalog;S.village=data.village||null;S.speed=data.speed;S.offset=S.me.server_time-Date.now()/1000;resetVillageView();
   shownFarmRewards.clear();confirmedFarmRewards.clear();
   // A direct invite URL may bypass the main-app launcher. Once this session
   // has entered Farm, returning to /app must not launch the same invite again.
@@ -556,6 +570,7 @@ async function enter(){
  }catch(e){if(epoch!==farmViewEpoch)return;if(e.status===401)showLogin(SESSION_ENDED);else{showLogin(e.message);toast(e.message,true);}}
 }
 function showLogin(message=''){
+ try{globalThis.QW?.prefs?.clearAccount?.();}catch{}
  shownFarmRewards.clear();confirmedFarmRewards.clear();
  closeFarmMenu();const lakeDoor=$('lake-door');if(lakeDoor)lakeDoor.hidden=true;
  // Keep an unknown command's receipt under its original actor for the next login.
@@ -2138,36 +2153,21 @@ function quizzyLoginLink(){
  link.setAttribute('aria-label','Войти через QuizzyWizzy');mark.setAttribute('aria-hidden','true');
  link.append(mark,el('span','Войти через QuizzyWizzy'));return link;
 }
-function syncFarmContrastControl(){
- const input=$('farm-contrast-mode');if(input){input.checked=!!globalThis.QW?.prefs?.get?.().contrast;input.disabled=farmContrastPending;}
-}
-async function saveFarmContrast(input){
- if(farmContrastPending)return;
- const prefs=globalThis.QW?.prefs,previous=!!prefs?.get?.().contrast,on=input.checked,identity=S.me?.id,channel=mode;
- if(!prefs||!identity||!['guest','telegram'].includes(channel)){input.checked=previous;toast('Войди в аккаунт, чтобы сохранить контрастный режим.',true);return;}
- farmContrastPending=true;farmContrastEpoch++;prefs.setContrast(on);syncFarmContrastControl();
- try{
-  const result=await requestRaw(`/api/account/contrast-mode?identity=${channel}`,{method:'POST',data:{enabled:on}});
-  if(S.me?.id===identity&&mode===channel&&prefs.get().contrast===on)prefs.applyAccount(result);
- }catch(error){
-  if(S.me?.id===identity&&mode===channel){if(prefs.get().contrast===on)prefs.setContrast(previous);toast(error.message,true);}
- }finally{farmContrastPending=false;farmContrastEpoch++;syncFarmContrastControl();}
-}
-try{globalThis.addEventListener?.('qw:contrast',()=>{farmContrastEpoch++;syncFarmContrastControl();})}catch{}
 function renderViewSettings(p){
  p.append(el('h3','Экран и управление','subheading'));
- const [contrastWrap,contrast]=checkbox('Контрастный режим',!!globalThis.QW?.prefs?.get?.().contrast);
- contrast.id='farm-contrast-mode';contrast.disabled=farmContrastPending;contrast.onchange=()=>saveFarmContrast(contrast);p.append(contrastWrap);
- note('Дополнительный режим для текста, рамок и сцены. Сохраняется в профиле и действует в обеих играх.',p);
+ if(globalThis.QW?.prefs?.hasAccount?.())note('Контраст и анимации настраиваются в профиле через меню ⚙.',p);
  const [lw,lighting]=field('Свет на ферме','select');
  for(const [value,label]of [['auto','По времени'],['day','Всегда день'],['night','Всегда ночь']]){const option=el('option',label);option.value=value;lighting.append(option);}
  lighting.id='farm-lighting-mode';lighting.value=lightingMode;lighting.onchange=()=>setLightingMode(lighting.value);p.append(lw);
  note('По времени — по часам твоего устройства: рассвет с 05:00, день с 08:00, сумерки с 17:00, ночь с 21:00.',p);
  let [cw,compact]=checkbox('Компактный интерфейс без большого заголовка',document.body.classList.contains('compact'));compact.onchange=()=>{document.body.classList.toggle('compact',compact.checked);try{localStorage.setItem('qw-farm.compact',String(compact.checked));}catch{}scene.resize();};
- let [mw,motion]=checkbox('Спокойный режим: меньше анимаций',!scene.motion);motion.onchange=()=>{scene.motion=!motion.checked;try{localStorage.setItem('qw-farm.reduced-motion',String(motion.checked));}catch{}};
+ if(!globalThis.QW?.prefs?.hasAccount?.()){
+  let [mw,motion]=checkbox('Спокойный режим: меньше анимаций',!scene.motion);
+  motion.onchange=()=>{try{localStorage.setItem('qw-farm.reduced-motion',String(motion.checked));}catch{}syncFarmMotion();motion.checked=!scene.motion;};p.append(mw);
+ }
  // «Битва с Сантой» §4: the calm battle has no accuracy bar, every hit is plain (the battles are won without the bonus)
  let [bw,battleCalm]=checkbox('Спокойный бой с Сантой: без полоски меткости',calmBattle());battleCalm.onchange=()=>{try{localStorage.setItem(CALM_KEY,String(battleCalm.checked));}catch{}santaGame?.render();};
- p.append(cw,mw,bw,el('p','Полный экран и режим «Только ферма и счётчики» — в меню ⚙. Управление и подсказки — там же.','note'));
+ p.append(cw,bw,el('p','Полный экран и режим «Только ферма и счётчики» — в меню ⚙. Управление и подсказки — там же.','note'));
 }
 // «Управление и подсказки» (⚙ menu): the former hint paragraphs of the settings tab.
 function showControlsHelp(){
@@ -2191,6 +2191,8 @@ async function toggleFullscreen(){
 }
 
 const scene=new FarmScene($('farm-canvas'),{iconId:FEST.iconId,click:clickObject,cancel:cancelPlacement,minimap:$('minimap'),frame:()=>{if(S.stoneSpeech&&!S.stoneSpeech.hidden)placeStoneSpeech()}});
+try{globalThis.addEventListener?.('qw:game-preferences',syncFarmMotion)}catch{}
+syncFarmMotion();
 updateFarmLighting();
 $('lighting-toggle').onclick=()=>setLightingMode({auto:'day',day:'night',night:'auto'}[lightingMode]);
 // Mouse wheel over the seed strip scrolls it sideways (only when it can move, so the page keeps its own wheel otherwise).
@@ -2316,7 +2318,7 @@ QW?.boot({mode:'game',gameId:'farm',title:'Весёлый фермер',home:'/a
  onFullscreenFailed:()=>toast('Telegram не поддерживает полный экран в этом клиенте.',true)});
 QW?.header.mountGear($('header-actions'));
 QW?.menu.register([
- {id:'farm-settings',icon:'sliders',label:'Настройки фермы',hint:'контраст, название, соседи',hidden:()=>!S.me,disabled:()=>!!S.fieldGame,onSelect:()=>{if(!own())backHome();selectTab('settings');}},
+ {id:'farm-settings',icon:'sliders',label:'Настройки фермы',hint:'экран, название, соседи',hidden:()=>!S.me,disabled:()=>!!S.fieldGame,onSelect:()=>{if(!own())backHome();selectTab('settings');}},
  {id:'farm-light',icon:'sun',label:'Свет на ферме',value:()=>LIGHT_LABELS[lightingMode],onSelect:()=>setLightingMode({auto:'day',day:'night',night:'auto'}[lightingMode])},
  {id:'farm-immersive',icon:'layers',label:'Только ферма и счётчики · H',hidden:()=>!S.me,disabled:()=>!!S.fieldGame,toggle:()=>document.body.classList.contains('immersive'),onSelect:toggleImmersive},
  {id:'farm-help',icon:'help',label:'Управление и подсказки',onSelect:showControlsHelp},
@@ -2324,7 +2326,6 @@ QW?.menu.register([
 ],'Весёлый фермер');
 document.addEventListener('fullscreenchange',()=>{syncFullscreenState();scheduleSceneResize();});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(farmMenuOpen&&!phoneLayout())closeFarmMenu();if(S.me)renderRail();scene.resize();villageCullHeaderControls();},100);});
-try{if(localStorage.getItem('qw-farm.reduced-motion')==='true')scene.motion=false;}catch{}
 const RENEW_AFTER=8*60*1000;let sessionRenewing=null;
 async function renewPlatformSession(){
  if(!S.me||S.config?.demo||!['telegram','guest'].includes(mode))return true;

@@ -87,6 +87,9 @@ class Account(ModerationMixin, TimestampMixin, Base):
     contrast_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     # Optional IANA timezone selected in the account profile; NULL keeps the device-derived default.
     timezone: Mapped[Optional[str]] = mapped_column(String(64))
+    # Sparse account-wide sound and motion preferences; absent keys defer to each game's legacy setting.
+    game_preferences: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False)
 
     __table_args__ = (
         CheckConstraint("merged_into_id IS NULL OR merged_into_id <> id",

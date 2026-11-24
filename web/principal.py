@@ -30,6 +30,7 @@ class Principal:
     address_form: str = 'n'  # 'm' | 'f' | 'n'; Account-level, see domain/address.py
     contrast_mode: bool = False  # Account-level «Контрастный режим» (docs/design/UI_RULES.md §16)
     timezone: str | None = None  # Optional account-level IANA timezone preference.
+    game_preferences: dict | None = None  # Sparse account-wide sound and motion preferences.
 
 
 @asynccontextmanager
@@ -67,7 +68,8 @@ async def resolve_principal(request, *, database, guest_store, mini_store, lock=
             yield session, Principal(str(account.id), account.display_name, 'guest',
                                      address_form=effective_address_form(account.address_form),
                                      contrast_mode=bool(getattr(account, 'contrast_mode', False)),
-                                     timezone=getattr(account, 'timezone', None))
+                                     timezone=getattr(account, 'timezone', None),
+                                     game_preferences=dict(getattr(account, 'game_preferences', None) or {}))
         return
     if not telegram:
         raise PrincipalError('authentication', 'Сначала войди через QuizzyWizzy.')
@@ -86,4 +88,5 @@ async def resolve_principal(request, *, database, guest_store, mini_store, lock=
         yield session, Principal(str(account.id), account.display_name, 'telegram', user.id,
                                  effective_address_form(account.address_form),
                                  bool(getattr(account, 'contrast_mode', False)),
-                                 getattr(account, 'timezone', None))
+                                 getattr(account, 'timezone', None),
+                                 dict(getattr(account, 'game_preferences', None) or {}))

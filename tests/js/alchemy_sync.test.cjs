@@ -33,7 +33,14 @@ function bridge({token = 'x'.repeat(32), guestId = null, local = {}, session = {
     const sandbox = {
         window: {
             MQB_ALCHEMY_GUEST_ID: guestId,
-            QW: shell ? {prefs: {contrast, get() { return {contrast:this.contrast}; }, setContrast(on) {this.contrast=!!on;}, appliedProfiles: [], applyAccount(profile) { this.appliedProfiles.push(profile);if(typeof profile.contrast_mode==='boolean')this.contrast=profile.contrast_mode; }}} : undefined,
+            QW: shell ? {prefs: {contrast, gamePreferences: {}, appliedProfiles: [], clearCount: 0,
+                applyAccount(profile) {
+                    this.appliedProfiles.push(profile);
+                    if(typeof profile.contrast_mode==='boolean')this.contrast=profile.contrast_mode;
+                    this.gamePreferences=profile.game_preferences||{};
+                },
+                clearAccount() {this.clearCount++;this.gamePreferences={};},
+            }} : undefined,
             Alchemia: {catalogRevision, setServerStatus: value => statuses.push(value), applyRemoteState: remote => { applied.push(remote); return {added: Array.isArray(remote.discovered) ? remote.discovered.length : 0}; }},
         },
         localStorage: localStore,
@@ -479,35 +486,59 @@ test('direct guest entry rejects a changed cookie owner before applying preferen
  await env.listeners.load();assert.equal(env.window.QW.prefs.appliedProfiles.length,0);assert.equal(env.calls.length,0);assert.equal(env.statuses.at(-1),'profile-changed');
 });
 
-test('in-game contrast switches save the shared Account preference for guest and Telegram with CSRF',async()=>{
+test('guest and Telegram load account game preferences before syncing',async()=>{
+ const profile={contrast_mode:true,game_preferences:{animations:false,sound_effects:true}};
  for(const guestId of ['11111111-1111-4111-8111-111111111111',null]){
-  const env=bridge({guestId,request:async(url,options)=>url.startsWith('/api/account/')?reply({contrast_mode:JSON.parse(options.body).enabled}):reply({})});
-  await env.listeners.load();await env.window.MQBAlchemySync.setAccountContrast(true);
-  const call=env.calls.find(c=>c.url.startsWith('/api/account/'));assert.equal(call.url,`/api/account/contrast-mode?identity=${guestId?'guest':'telegram'}`);assert.equal(call.options.headers['X-Guest-CSRF'],'1');assert.deepEqual(JSON.parse(call.options.body),{enabled:true});assert.equal(env.window.QW.prefs.contrast,true);
-  await env.window.MQBAlchemySync.setAccountContrast(false);assert.equal(env.window.QW.prefs.contrast,false);
- }
-});
-test('in-game contrast rolls back a rejected save and a file cannot claim account persistence',async()=>{
- const env=bridge({request:async(url)=>url.startsWith('/api/account/')?reply({detail:'offline'},503):reply({})});await env.listeners.load();
- await assert.rejects(()=>env.window.MQBAlchemySync.setAccountContrast(true),/offline/);assert.equal(env.window.QW.prefs.contrast,false);
- const offline=bridge({protocol:'file:',profileRequest:async()=>{throw Error('no API');}});await assert.rejects(()=>offline.window.MQBAlchemySync.setAccountContrast(true),/Доступно в приложении/);assert.equal(offline.window.QW.prefs.contrast,false);assert.equal(offline.calls.length,0);
-});
-test('saved in-game contrast is loaded on repeat entry for either identity',async()=>{
- for(const guestId of ['11111111-1111-4111-8111-111111111111',null]){
-  let saved=false;
-  const options={guestId,guestProfile:async()=>reply({account_id:guestId,contrast_mode:saved}),profileRequest:async()=>reply({user_id:'42',contrast_mode:saved}),request:async(url,o)=>{if(url.startsWith('/api/account/')){saved=JSON.parse(o.body).enabled;return reply({contrast_mode:saved});}return reply({});}};
-  const first=bridge(options);await first.listeners.load();await first.window.MQBAlchemySync.setAccountContrast(true);assert.equal(saved,true);
-  const second=bridge({...options,contrast:false});await second.listeners.load();assert.equal(second.window.QW.prefs.contrast,true);
+  const env=bridge({guestId,guestProfile:async()=>reply({account_id:guestId,...profile}),profileRequest:async()=>reply({user_id:'42',...profile}),request:async()=>{
+   assert.deepEqual(env.window.QW.prefs.gamePreferences,profile.game_preferences);
+   return reply({});
+  }});
+  await env.listeners.load();
+  assert.equal(env.window.QW.prefs.appliedProfiles.length,1);
  }
 });
 
-test('real file entry without QW shell shows an unavailable switch without writing attributes or preferences',async()=>{
- const env=bridge({protocol:'file:',shell:false});assert.equal(env.window.QW,undefined);assert.equal(env.window.MQBAlchemySync.contrastEnabled(),false);assert.equal(env.window.MQBAlchemySync.contrastAvailable(),false);
- const control={attrs:{},disabled:false,setAttribute(k,v){this.attrs[k]=v;}},game=readFileSync(join(__dirname,'../../minigames/alchemia-1.0/game.js'),'utf8');
- const context={window:env.window,location:{protocol:'file:'},$:()=>control,addEventListener(){},showToast:()=>assert.fail('disabled toggle does nothing')};
- runInNewContext(game.slice(game.indexOf('function alchemyContrastAvailable('),game.indexOf('function showSettings(')),context);
- context.syncAlchemyContrastControl();assert.equal(control.disabled,true);assert.equal(control.attrs['aria-checked'],'false');
- await context.toggleAlchemyContrast();assert.equal(env.document.documentElement.attrs['data-qw-contrast'],undefined);assert.equal(env.calls.length,0);assert.deepEqual(env.localStore.dump(),{});
- await assert.rejects(()=>env.window.MQBAlchemySync.setAccountContrast(true),/Доступно в приложении/);
- assert.match(game,/alchemyContrastAvailable\(\)\?[^:]+:'Доступно в приложении'/);assert.doesNotMatch(source,/standalone-contrast|setStandaloneContrast|setAttribute\('data-qw-contrast'/);
+test('an expired Alchemy session clears loaded game preferences',async()=>{
+ const env=bridge({profileRequest:async()=>reply({user_id:'42',game_preferences:{sound_effects:true}}),request:async()=>reply({},401)});
+ await env.listeners.load();
+ assert.equal(env.window.QW.prefs.clearCount,1);
+ assert.deepEqual(env.window.QW.prefs.gamePreferences,{});
+ assert.equal(env.statuses.at(-1),'unauthorized');
+});
+
+test('Alchemy applies explicit account values and falls back to local controls without a loaded account',()=>{
+ const game=readFileSync(join(__dirname,'../../minigames/alchemia-1.0/game.js'),'utf8');
+ const body={classList:{toggle(key,value){assert.equal(key,'reduced-motion');body.reduced=value;}}};
+ const button={setAttribute(){}},motion={matches:false},state={settings:{sound:false,motion:true}};
+ let hasAccount=false;
+ let gamePreferences={sound_effects:true,animations:false};
+ const env={document:{body},window:{QW:{prefs:{hasAccount:()=>hasAccount,get:()=>({gamePreferences}),animationsEnabled:fallback=>gamePreferences.animations??fallback}}},
+  location:{protocol:'https:'},$:()=>button,icon:id=>id,state,matchMedia:()=>motion,stopParticles(){},persist(){},playSound(){},modalPage:null};
+ runInNewContext(game.slice(game.indexOf('const systemMotion='),game.indexOf('/* Audio:')),env);
+ env.applyGamePreferences();
+ assert.equal(button.hidden,false);
+ assert.equal(button.innerHTML,'muted');
+ assert.equal(body.reduced,false);
+ env.toggleLocalPreference('sound');
+ assert.equal(state.settings.sound,true);
+ hasAccount=true;
+ gamePreferences={sound_effects:false,animations:false};
+ env.applyGamePreferences();
+ assert.equal(button.hidden,true);
+ assert.equal(button.innerHTML,'muted');
+ assert.equal(body.reduced,true);
+ env.toggleLocalPreference('sound');
+ assert.equal(state.settings.sound,true,'account values never write the local save');
+ gamePreferences={};
+ env.applyGamePreferences();
+ assert.equal(button.innerHTML,'volume');
+ assert.equal(body.reduced,false);
+ motion.matches=true;
+ env.applyGamePreferences();
+ assert.equal(body.reduced,true);
+ env.location.protocol='file:';
+ env.applyGamePreferences();
+ assert.equal(button.hidden,false);
+ assert.doesNotMatch(game,/alchemyContrast|toggleAlchemyContrast/);
+ assert.doesNotMatch(source,/setAccountContrast|api\/account\/contrast-mode/);
 });

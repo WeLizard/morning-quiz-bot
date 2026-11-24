@@ -279,7 +279,7 @@ def test_profile_uses_stored_values_and_session_survives_app_restart(pg_env):
             assert profile.json() == {'user_id': str(USER), 'account_id': profile.json()['account_id'],
                                       'display_name': f'Player {USER}', 'score': '12.250', 'answered_count': 0,
                                       'address_form': 'n', 'address_form_chosen': False,
-                                      'contrast_mode': False}
+                                      'contrast_mode': False, 'timezone': None, 'game_preferences': {}}
             assert 'PRIVATE_METADATA' not in profile.text
             assert profile.headers['cache-control'] == 'no-store'
             assert not profile.cookies and 'set-cookie' not in profile.headers

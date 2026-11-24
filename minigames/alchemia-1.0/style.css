@@ -241,6 +241,8 @@ body .bottomnav{padding-bottom:calc(6px + var(--qw-safe-bottom,0px))}
 @media(max-width:340px){body .brand{display:none}body .work-tools{padding-inline:4px}body .work-tools .hint-button{padding:0 8px;gap:5px;font-size:12px}}
 @media(max-width:370px){body .hud-era{font-size:16px;padding:0 8px}body .hud-path{padding:0 8px;gap:5px}body .hud-bar{display:none}body .collection-grid{padding-inline:10px}}
 
+.top-actions #soundBtn[hidden]{display:none}
+
 /* «Контрастный режим» (docs/design/UI_RULES.md §16): the shell sets <html data-qw-contrast="1"> from the player's
    profile. Only additions: lighter secondary text, solid surfaces, 2px outlines ≥ 3:1, captions +2px, a clear selection. */
 :root[data-qw-contrast="1"]{--a-fs-min:14px}

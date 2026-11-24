@@ -130,6 +130,7 @@
         if (response.status === 401 || (response.status === 409 && error.code === 'profile_changed')) {
             sessionGeneration += 1;
             telegramSession = false;
+            window.QW?.prefs?.clearAccount?.();
             if (guestId) staleGuest = true;
             else if (response.status === 409) staleMini = true;
             status(response.status === 409 ? 'profile-changed' : 'unauthorized');
@@ -146,11 +147,14 @@
     let renewTimer = 0, lastRenew = Date.now();
     async function renewSession() {
         if (guestId || document.hidden || !telegramSession) return;
+        const generation = sessionGeneration;
         lastRenew = Date.now();
         try {
             const response = await fetch('/api/mini/session/renew', {method: 'POST', credentials: 'same-origin',
                 headers: {'Content-Type': 'application/json', 'X-Mini-CSRF': '1'}, body: '{}'});
+            if (generation !== sessionGeneration) return;
             if (response.status === 401 || response.status === 403) { clearInterval(renewTimer); renewTimer = 0; }
+            if (response.status === 401) authFailure(response);
         } catch {}
     }
     function keepSessionAlive() {
@@ -158,6 +162,7 @@
         renewTimer = setInterval(renewSession, 8 * 60 * 1000);
     }
     async function establishSession() {
+        const generation = sessionGeneration;
         if (guestId) {
             if (staleGuest) return false;
             if (guestProfileLoaded) return true;
@@ -165,20 +170,24 @@
             sessionAttempt = (async () => {
                 try {
                     const response = await fetch('/api/guest/me', {credentials: 'same-origin'});
+                    if (generation !== sessionGeneration) return false;
                     if (!response.ok) {
-                        if (!authFailure(response, await errorBody(response))) status('offline');
+                        const error = await errorBody(response);
+                        if (generation === sessionGeneration && !authFailure(response, error)) status('offline');
                         return false;
                     }
                     const profile = await response.json();
+                    if (generation !== sessionGeneration) return false;
                     // Validate the cookie owner before applying its preferences to this account-scoped game.
                     if (profile.account_id !== guestId) {
                         authFailure({status: 409}, {code: 'profile_changed'});
                         return false;
                     }
+                    window.QW?.configure?.({identity: 'guest'});
                     window.QW?.prefs?.applyAccount?.(profile);
                     guestProfileLoaded = true;
                     return true;
-                } catch { status('offline'); return false; }
+                } catch { if (generation === sessionGeneration) status('offline'); return false; }
             })();
             try { return await sessionAttempt; } finally { sessionAttempt = null; }
         }
@@ -188,23 +197,24 @@
         sessionAttempt = (async () => {
             try {
                 const response = await fetch('/api/mini/me', {credentials: 'same-origin'});
-                telegramSession = response.ok;
+                if (generation !== sessionGeneration) return false;
                 if (response.ok) {
                     const profile = await response.json();
-                    // The Account's «Контрастный режим» (UI_RULES §16) wins over this device's cache.
-                    window.QW?.prefs?.applyAccount?.(profile);
+                    if (generation !== sessionGeneration) return false;
                     const userId = String(profile.user_id || 'session');
                     if (miniUserId !== null && miniUserId !== userId) {
-                        sessionGeneration += 1;
-                        staleMini = true; telegramSession = false; status('profile-changed');
-                        banner('Профиль изменился. Открой игру заново из приложения.');
+                        authFailure({status: 409}, {code: 'profile_changed'});
                         return false;
                     }
                     miniUserId = userId;
                     hadSession = true;
+                    telegramSession = true;
+                    window.QW?.configure?.({identity: 'telegram'});
+                    window.QW?.prefs?.applyAccount?.(profile);
                     status('connecting');
-                } else status(hadSession ? 'unauthorized' : 'local');
-            } catch { status(location.protocol === 'file:' && !hadSession ? 'local' : 'offline'); }
+                } else if (hadSession && response.status === 401) authFailure(response);
+                else status(hadSession ? 'unauthorized' : 'local');
+            } catch { if (generation === sessionGeneration) status(location.protocol === 'file:' && !hadSession ? 'local' : 'offline'); }
             return telegramSession;
         })();
         try { return await sessionAttempt; } finally { sessionAttempt = null; }
@@ -213,31 +223,33 @@
         if (busy || staleGuest) return;
         if (!(await establishSession())) return;
         busy = true;
+        const generation = sessionGeneration;
         try {
-            const generation = sessionGeneration;
             const response = await fetch(API + 'sync', {method: 'POST', credentials: 'same-origin',
                 headers: headers(), body: JSON.stringify(summary(readState() || {}))});
             if (generation !== sessionGeneration) return;
             if (!response.ok) {
-                if (authFailure(response, await errorBody(response))) return;
+                const error = await errorBody(response);
+                if (generation !== sessionGeneration || authFailure(response, error)) return;
                 status('offline'); return;
             }
             const data = await response.json();
             if (generation !== sessionGeneration) return;
             restore(data);
-        } catch { status('offline'); } finally { busy = false; }
+        } catch { if (generation === sessionGeneration) status('offline'); } finally { busy = false; }
     }
     function verifyCraft(ingredientA, ingredientB) {
         craftQueue = craftQueue.then(async () => {
             if (!(await establishSession())) return;
+            const generation = sessionGeneration;
             try {
-                const generation = sessionGeneration;
                 const response = await fetch(API + 'craft', {method: 'POST', credentials: 'same-origin',
                     headers: headers(), body: JSON.stringify({command_id: commandId(),
                         ingredient_a: ingredientA, ingredient_b: ingredientB})});
                 if (generation !== sessionGeneration) return;
                 if (!response.ok) {
-                    if (authFailure(response, await errorBody(response))) return;
+                    const error = await errorBody(response);
+                    if (generation !== sessionGeneration || authFailure(response, error)) return;
                     status('offline'); return;
                 }
                 const result = await response.json();
@@ -249,7 +261,7 @@
                     unverifiedNoticeShown = true;
                     banner('Старые открытия сохранены. Для подтверждения награды получи элементы заново из базовых стихий.');
                 }
-            } catch { status('offline'); }
+            } catch { if (generation === sessionGeneration) status('offline'); }
         });
         return craftQueue;
     }
@@ -265,13 +277,14 @@
                 savePending(pending);
             }
             const command = pending[stageId];
+            const generation = sessionGeneration;
             try {
-                const generation = sessionGeneration;
                 const response = await fetch(API + 'claim-stage', {method: 'POST', credentials: 'same-origin',
                     headers: headers(), body: JSON.stringify(command)});
                 if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                 if (!response.ok) {
                     const error = await errorBody(response);
+                    if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                     if (authFailure(response, error)) return {ok: false, message: 'Доступ к профилю потерян. Локальное сохранение осталось.'};
                     // A definitive rejection cannot have granted this command. Unknown server
                     // failures retain the exact command for a safe retry, including its revision.
@@ -279,6 +292,7 @@
                         delete pending[stageId]; savePending(pending);
                     }
                     if (response.status === 409) await sync();
+                    if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                     if (error.code === 'catalog_changed') status('catalog-mismatch');
                     else if (response.status !== 409) status('offline');
                     return {ok: false, message: typeof error.detail === 'string' ? error.detail
@@ -296,6 +310,7 @@
                 delete pending[stageId]; savePending(pending);
                 return {ok: true, data};
             } catch {
+                if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                 status('offline');
                 return {ok: false, message: 'Нет связи. Результат неизвестен; повтор отправит ту же команду без двойной награды.'};
             }
@@ -304,36 +319,7 @@
         attempt.finally(() => claimsInFlight.delete(stageId));
         return attempt;
     }
-    let contrastPending = false;
-    const contrastEnabled = () => !!window.QW?.prefs?.get?.().contrast;
-    const contrastAvailable = () => location.protocol !== 'file:' && !!window.QW?.prefs;
-    async function setAccountContrast(enabled) {
-        const prefs = window.QW?.prefs;
-        if (contrastPending) return false;
-        if (!contrastAvailable()) throw new Error('Доступно в приложении');
-        if (!(await establishSession())) throw new Error('Войди в аккаунт, чтобы сохранить контрастный режим.');
-        if (contrastPending) return false;
-        const previous = !!prefs.get().contrast, on = !!enabled, generation = sessionGeneration;
-        contrastPending = true; prefs.setContrast(on);
-        try {
-            const response = await fetch(`/api/account/contrast-mode?identity=${guestId ? 'guest' : 'telegram'}`, {
-                method: 'POST', credentials: 'same-origin', headers: {...headers(), 'X-Guest-CSRF': '1'}, body: JSON.stringify({enabled: on})});
-            if (generation !== sessionGeneration) return false;
-            if (!response.ok) {
-                const error = await errorBody(response);
-                if (prefs.get().contrast === on) prefs.setContrast(previous);
-                authFailure(response, error);
-                throw new Error(typeof error.detail === 'string' ? error.detail : 'Не удалось сохранить контрастный режим.');
-            }
-            const result = await response.json();
-            if (generation === sessionGeneration && prefs.get().contrast === on) prefs.applyAccount(result);
-            return true;
-        } catch (error) {
-            if (generation === sessionGeneration && prefs.get().contrast === on) prefs.setContrast(previous);
-            throw error;
-        } finally { contrastPending = false; }
-    }
-    window.MQBAlchemySync = Object.freeze({verifyCraft, claimStage, hasPendingClaim, setAccountContrast, contrastEnabled, contrastAvailable, isContrastPending: () => contrastPending});
+    window.MQBAlchemySync = Object.freeze({verifyCraft, claimStage, hasPendingClaim});
     status('connecting');
     addEventListener('load', async () => {
         if (await establishSession()) await sync();

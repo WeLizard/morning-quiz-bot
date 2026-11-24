@@ -86,7 +86,12 @@
     let openSettingsOnLoad = typeof location !== 'undefined' && location.hash === '#settings';
     function consumeSettingsHash() {
         openSettingsOnLoad = false;
-        try { if (location.hash === '#settings') history.replaceState(history.state, '', location.pathname + location.search); } catch {}
+        try {
+            if (location.hash !== '#settings') return;
+            const params = new URLSearchParams(location.search);
+            params.delete('identity');
+            history.replaceState(history.state, '', location.pathname + (params.size ? '?' + params : ''));
+        } catch {}
     }
     function setHubTitle(title) {
         if (hubTitle) { hubTitle.hidden = !title; hubTitle.textContent = title || ''; }
@@ -291,16 +296,18 @@
         content.append(box);
     }
     async function bootstrapEntry() {
-        try { if (localStorage.getItem('mqb-telegram-logged-out') === '1') { loginScreen(); return; } } catch {}
+        const requested = openSettingsOnLoad ? new URLSearchParams(location.search).get('identity') : null;
+        try { if (requested !== 'guest' && localStorage.getItem('mqb-telegram-logged-out') === '1') { loginScreen(); return; } } catch {}
         let choice = ''; try { choice = sessionStorage.getItem('mqb-auth-choice') || ''; } catch {}
-        const saved = guestAllowed ? await guestRequest('/api/guest/me').catch(error => {
+        const saved = guestAllowed && requested !== 'telegram' ? await guestRequest('/api/guest/me').catch(error => {
             if (error.status === 401) return null;
             throw error;
         }) : null;
-        if (saved?.authentication === 'guest' && choice !== 'telegram') {
+        if (saved?.authentication === 'guest' && (requested === 'guest' || (requested !== 'telegram' && choice !== 'telegram'))) {
             state.guest = await guestRequest('/api/guest/resume', 'POST');
             guestHome(); return;
         }
+        if (requested === 'guest') { loginScreen('Войди в гостевой профиль, чтобы открыть его настройки.'); return; }
         let telegramProfile;
         try { telegramProfile = await request('/api/mini/me'); }
         catch (error) { if (error.status !== 401) throw error; }
@@ -313,7 +320,7 @@
             }
         }
         if (!telegramProfile) {
-            if (saved?.authentication === 'guest') {
+            if (requested !== 'telegram' && saved?.authentication === 'guest') {
                 state.guest = await guestRequest('/api/guest/resume', 'POST');
                 guestHome(); return;
             }
@@ -1051,7 +1058,7 @@
             } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
         }, 'danger'));
         box.append(guestExit);
-        guestMain.append(box, timezoneSetting('guest'), appearanceCard('guest'), farmRequestNotificationsCard('guest'));
+        guestMain.append(box, timezoneSetting('guest'), appearanceCard('guest'), gamePreferencesCard('guest'), farmRequestNotificationsCard('guest'));
         if (focusLink) { linkAnchor.scrollIntoView?.({block: 'center'}); linkAnchor.nextElementSibling?.focus?.(); }
     }
     // Guest «Чаты» / «Рейтинг»: both depend on Telegram chats, so a guest sees one clear step instead of an empty list.
@@ -1849,8 +1856,8 @@
         window.NightCity.open({host: content, target, identity, gm, botUsername: state.botUsername,
             isCurrent: () => version === generation,
             groups: state.authenticated ? state.chats.filter(chat => ['group', 'supergroup'].includes(chat.type)) : [],
-            telegram: () => (tg?.initData ? tg : null),
-            setContrast: on => saveContrast(identity, on).catch(error => { feedback.textContent = error.message; })});
+            telegram: () => (tg?.initData ? tg : null)
+        });
     }
     // Chat page: segments «Играть · Рейтинг · Статистика · Настройки». Settings are editable for admins and read-only for others.
     function scheduleCard(details) {
@@ -2100,6 +2107,78 @@
         preferences.append(contrastSetting(channel));
         return preferences;
     }
+    const savingGamePreferences = new Set();
+    function gamePreferencesCard(channel) {
+        const profile = () => channel === 'guest' ? state.guest : state.me;
+        const account = profile()?.account_id;
+        const card = el('section', undefined, 'card game-preferences');
+        card.append(el('h2', 'Настройки игр'));
+        const form = el('form', undefined, 'form');
+        const toggles = {};
+        for (const [key, title] of [['sound_effects', 'Звуковые эффекты'], ['music', 'Фоновая музыка'], ['animations', 'Анимации']]) {
+            const label = el('label', title, 'field'), select = el('select');
+            for (const [value, caption] of [['', 'По настройкам игры'], ['true', 'Включено'], ['false', 'Выключено']]) {
+                const option = el('option', caption);
+                option.value = value;
+                select.append(option);
+            }
+            select.name = key;
+            label.append(select);
+            form.append(label);
+            toggles[key] = select;
+        }
+        const volume = el('input');
+        volume.name = 'music_volume';
+        volume.type = 'number';
+        volume.min = '5'; volume.max = '100'; volume.step = '1';
+        volume.placeholder = 'По настройкам игры';
+        const volumeLabel = el('label', 'Громкость музыки, %', 'field');
+        volumeLabel.append(volume);
+        const save = el('button', 'Сохранить', 'qw-btn primary');
+        save.type = 'submit';
+        const status = el('p', '', 'muted');
+        status.setAttribute('role', 'status');
+        form.append(volumeLabel, save, status);
+        card.append(form);
+
+        let shownPreferences;
+        function fill(values) {
+            shownPreferences = {...values};
+            for (const [key, select] of Object.entries(toggles)) select.value = String(values[key] ?? '');
+            volume.value = values.music_volume ?? '';
+        }
+        fill(profile()?.game_preferences || {});
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            if (!account || profile()?.account_id !== account || save.disabled) return;
+            if (savingGamePreferences.has(account)) { status.textContent = 'Предыдущее изменение ещё сохраняется.'; return; }
+            const changes = Object.fromEntries(Object.entries(toggles)
+                .map(([key, select]) => [key, select.value === '' ? null : select.value === 'true']));
+            changes.music_volume = volume.value === '' ? null : volume.valueAsNumber;
+            const patch = Object.fromEntries(Object.entries(changes).filter(([key, value]) => value !== (shownPreferences[key] ?? null)));
+            if (!Object.keys(patch).length) { status.textContent = 'Настройки сохранены.'; return; }
+            const controls = [...Object.values(toggles), volume, save];
+            savingGamePreferences.add(account);
+            for (const control of controls) control.disabled = true;
+            const path = `/api/account/game-preferences?identity=${channel}`;
+            const options = {headers: {'Content-Type': 'application/json', 'X-Guest-CSRF': '1'},
+                body: JSON.stringify({account_id: account, game_preferences: patch})};
+            try {
+                const result = channel === 'guest' ? await guestRequest(path, 'POST', options) : await request(path, {...options, method: 'POST'});
+                if (profile()?.account_id !== account) return;
+                profile().game_preferences = result.game_preferences;
+                if ((state.authenticated ? 'telegram' : 'guest') === channel) QW.prefs?.applyAccount(result);
+                fill(result.game_preferences);
+                status.textContent = 'Настройки сохранены.';
+            } catch (error) {
+                status.textContent = error.message;
+            } finally {
+                savingGamePreferences.delete(account);
+                for (const control of controls) control.disabled = false;
+            }
+        });
+        return card;
+    }
     // Notification preferences have one entry point: Profile → Settings, for both sign-in methods.
     function farmRequestNotificationsCard(identity) {
         const version = generation, account = (identity === 'guest' ? state.guest : state.me)?.account_id;
@@ -2142,7 +2221,7 @@
         const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
         row.append(copy, el('span', '✓', 'badge')); via.append(row);
         content.append(via, devicesSection('telegram'));
-        content.append(timezoneSetting('telegram'), appearanceCard('telegram'), farmRequestNotificationsCard('telegram'));
+        content.append(timezoneSetting('telegram'), appearanceCard('telegram'), gamePreferencesCard('telegram'), farmRequestNotificationsCard('telegram'));
         const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}
@@ -2368,7 +2447,7 @@
         await telegramReady;
         state.demo = info?.demo === true;
         if (state.demo) { const banner = document.getElementById('environment'); banner.hidden = false; banner.textContent = info?.synthetic_player ? 'DEV · Тестовый игрок. Без отправки сообщений в Telegram.' : 'DEV · Просмотр твоего профиля из локальной БД.'; }
-        if ((state.gameModes || []).some(mode => mode.id === 'farm' && mode.status === 'development') && farmLaunchHint()) {
+        if (!openSettingsOnLoad && (state.gameModes || []).some(mode => mode.id === 'farm' && mode.status === 'development') && farmLaunchHint()) {
             await bootstrapFarmInvite().catch(error => bootstrapError(error, bootstrapFarmInvite));
             return;
         }

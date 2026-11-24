@@ -154,3 +154,15 @@
 :root[data-qw-contrast="1"] .qw-switch{box-shadow:inset 0 0 0 2px var(--qw-game-text)}
 :root[data-qw-contrast="1"] .qw-avatar-empty{box-shadow:inset 0 0 0 2px var(--qw-game-line)}
 :root[data-qw-contrast="1"] .qw-report-foot,:root[data-qw-contrast="1"] .qw-danger-zone{border-top-width:var(--qw-outline-w)}
+
+/* Finish transitions and animation callbacks without showing movement. */
+:root[data-qw-reduced-motion] *,
+:root[data-qw-reduced-motion] *::before,
+:root[data-qw-reduced-motion] *::after {
+    scroll-behavior: auto !important;
+    animation-delay: 0s !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: 0s !important;
+    transition-duration: .01ms !important;
+}

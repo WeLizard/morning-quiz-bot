@@ -985,6 +985,32 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         except PrincipalError as error:
             raise MiniAppError(error.status, error.message, code=error.code) from None
 
+    @app.post('/api/account/game-preferences')
+    async def account_game_preferences(request: Request, identity: str | None = Query(None)):
+        """Patch sparse cross-game sound and motion preferences on the authenticated account."""
+        from uuid import UUID
+        from domain.account_game_preferences import apply_game_preferences_patch, parse_game_preferences_patch
+        from storage.models import Account
+        from web.principal import PrincipalError, resolve_principal
+        value = await account_json(request, {'account_id', 'game_preferences'}, {'account_id', 'game_preferences'})
+        try:
+            expected = UUID(value['account_id'])
+            patch = parse_game_preferences_patch(value['game_preferences'])
+        except (ValueError, TypeError, AttributeError):
+            raise MiniAppError(400, 'Некорректные игровые настройки') from None
+        if identity == 'guest' or (identity is None and not request.cookies.get(mini_cookie)):
+            guest_access()
+        try:
+            async with resolve_principal(request, database=database, guest_store=guest_store,
+                                         mini_store=store, lock=True, identity=identity) as (session, who):
+                if expected != UUID(who.account_id):
+                    raise MiniAppError(409, 'Аккаунт изменился. Открой настройки заново.', code='profile_changed')
+                account = await session.get(Account, expected)
+                account.game_preferences = apply_game_preferences_patch(account.game_preferences, patch)
+                return {'account_id': who.account_id, 'game_preferences': dict(account.game_preferences)}
+        except PrincipalError as error:
+            raise MiniAppError(error.status, error.message, code=error.code) from None
+
     @app.get('/api/account/problem-reports/meta')
     async def problem_report_meta():
         from storage import problem_reports

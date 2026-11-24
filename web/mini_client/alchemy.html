@@ -7,8 +7,8 @@
 <title>Alchemia — мастерская открытий</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='18' fill='%23183428'/%3E%3Cpath d='M40 12 67 63H13Z' fill='none' stroke='%23dbc18a' stroke-width='3'/%3E%3Ccircle cx='40' cy='44' r='15' fill='none' stroke='%23dbc18a' stroke-width='3'/%3E%3C/svg%3E">
 <!-- QuizzyWizzy shell (UI_RULES.md). Outside the app these files are absent: the game then runs on its own palette and menu. -->
-<link rel="stylesheet" href="/app/shell/qw-tokens.css"><link rel="stylesheet" href="/app/shell/qw-shell.css">
-<script src="/app/shell/qw-shell.js?v=20261124-account-timezone"></script>
+<link rel="stylesheet" href="/app/shell/qw-tokens.css"><link rel="stylesheet" href="/app/shell/qw-shell.css?v=20261124-account-game-preferences">
+<script src="/app/shell/qw-shell.js?v=20261124-account-game-preferences"></script>
 <style>/* Alchemia · an illustrated, touch-first little laboratory. No external fonts. */
 :root{--bg:#183428;--deep:#10291f;--panel:#203d30;--surface:#294737;--soft:#35513f;--line:#4e634b;--text:#f0ead3;--muted:#b2bea1;--faint:#879d81;--gold:#dbc18a;--green:#b6d294;--red:#dfa59a;--radius:18px;--serif:Georgia,'Times New Roman',serif;--sans:system-ui,-apple-system,'Segoe UI',sans-serif;--shadow:0 18px 60px #07160f40;color-scheme:dark}
 *{box-sizing:border-box}html,body{margin:0;height:100%;overscroll-behavior:none}body{background:var(--bg);color:var(--text);font:14px/1.45 var(--sans);overflow:hidden;-webkit-tap-highlight-color:transparent}button,input,select{font:inherit}button{color:inherit;cursor:pointer;border:0}button:disabled{cursor:default;opacity:.45}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:4px}button,input,select{touch-action:manipulation}button{user-select:none}h1,h2,h3,h4,p{margin:0}button svg{pointer-events:none}.sprite{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}.ui-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.art{width:68px;height:68px;overflow:visible;flex-shrink:0;pointer-events:none}.eyebrow{text-transform:uppercase;font-size:var(--a-fs-min);font-weight:650;letter-spacing:2px;color:var(--muted)}.serif{font-family:var(--serif);font-weight:400}.muted{color:var(--muted)}.gold{color:var(--gold)}.hidden,[hidden]{display:none!important}.pill{border:1px solid #b4c09335;padding:3px 8px;border-radius:20px;font-size:var(--a-fs-min);color:var(--muted)}.ico-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:38px;min-height:38px;background:transparent;border:1px solid transparent;border-radius:10px;color:var(--muted)}.ico-btn:hover:not(:disabled,[aria-disabled="true"]){background:#ffffff09;color:var(--text);border-color:#bfcfa225}.text-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border-radius:9px;background:transparent;color:var(--muted);font-size:var(--a-fs-min);border:1px solid transparent}.text-btn:hover:not(:disabled,[aria-disabled="true"]){background:#cbd8ab0c;color:var(--text)}.text-btn.outlined{border-color:#b8c79833}.primary{padding:11px 17px;background:var(--gold);color:#243929;border:1px solid #f0dbac70;border-radius:10px;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:8px}.primary:hover:not(:disabled,[aria-disabled="true"]){background:#e6cfa0}.secondary{padding:10px 15px;background:var(--surface);border:1px solid #a3ba8d40;border-radius:10px;color:var(--text);display:inline-flex;align-items:center;justify-content:center;gap:8px}.secondary:hover:not(:disabled,[aria-disabled="true"]){background:#3a5642}.danger{color:#e6aca0;border-color:#d5907b44}.chip{white-space:nowrap;padding:6px 12px;font-size:var(--a-fs-min);border:1px solid #b7c39326;border-radius:20px;color:var(--muted);background:transparent}.chip.active{color:var(--text);background:#b9c38b20;border-color:#bdcb9b65}.chip:hover{background:#b9c38b15}.count-badge{background:#b6c79417;border-radius:8px;padding:3px 8px;font:var(--a-fs-min) var(--sans);color:var(--gold)}
@@ -251,6 +251,8 @@ body .bottomnav{padding-bottom:calc(6px + var(--qw-safe-bottom,0px))}
 @media(max-width:760px){body .work-tools .hint-button{white-space:nowrap}}
 @media(max-width:340px){body .brand{display:none}body .work-tools{padding-inline:4px}body .work-tools .hint-button{padding:0 8px;gap:5px;font-size:12px}}
 @media(max-width:370px){body .hud-era{font-size:16px;padding:0 8px}body .hud-path{padding:0 8px;gap:5px}body .hud-bar{display:none}body .collection-grid{padding-inline:10px}}
+
+.top-actions #soundBtn[hidden]{display:none}
 
 /* «Контрастный режим» (docs/design/UI_RULES.md §16): the shell sets <html data-qw-contrast="1"> from the player's
    profile. Only additions: lighter secondary text, solid surfaces, 2px outlines ≥ 3:1, captions +2px, a clear selection. */
@@ -31770,20 +31772,41 @@ function pushUndo(){undoStack.push(clone(state.bench));if(undoStack.length>30)un
 function applySettings(){
  document.body.dataset.world=state.settings.world||'origins';
  syncShellColor();
- document.body.classList.toggle('reduced-motion',!state.settings.motion);
  renderEpochHeading();
  $('sortSelect').value=state.settings.sort;
- $('soundBtn').innerHTML=icon(state.settings.sound?'volume':'muted');
- $('soundBtn').title=state.settings.sound?'Выключить звук':'Включить звук';
- $('soundBtn').setAttribute('aria-label',$('soundBtn').title);
- $('soundBtn').setAttribute('aria-pressed',String(state.settings.sound));
+ applyGamePreferences();
 }
-function toggleSound(){state.settings.sound=!state.settings.sound;applySettings();persist();if(state.settings.sound)playSound('select');if(modalPage==='settings')showSettings(false);}
+const systemMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const alchemyHasAccount=()=>location.protocol!=='file:'&&!!window.QW?.prefs?.hasAccount?.();
+function alchemySoundEnabled(){
+ const shared=alchemyHasAccount()?window.QW.prefs.get().gamePreferences?.sound_effects:undefined;
+ return shared??state.settings.sound;
+}
+function alchemyAnimationsEnabled(){
+ if(systemMotion.matches)return false;
+ return alchemyHasAccount()?window.QW.prefs.animationsEnabled(state.settings.motion):state.settings.motion;
+}
+function applyGamePreferences(){
+ const sound=alchemySoundEnabled(),soundBtn=$('soundBtn'),motion=alchemyAnimationsEnabled();
+ document.body.classList.toggle('reduced-motion',!motion);
+ if(!motion)stopParticles();
+ soundBtn.hidden=alchemyHasAccount();
+ soundBtn.innerHTML=icon(sound?'volume':'muted');
+ soundBtn.title=sound?'Выключить звук':'Включить звук';
+ soundBtn.setAttribute('aria-label',soundBtn.title);
+ soundBtn.setAttribute('aria-pressed',String(sound));
+}
+function toggleLocalPreference(key){
+ if(alchemyHasAccount()||!['sound','motion'].includes(key))return;
+ state.settings[key]=!state.settings[key];applyGamePreferences();persist();
+ if(key==='sound'&&alchemySoundEnabled())playSound('select');
+ if(modalPage==='settings')showSettings(true);
+}
 
 /* Audio: one reusable context; all short-lived oscillator/gain nodes are bounded. */
 let audio=null;
 function playSound(type){
- if(!state.settings.sound||document.hidden)return;
+ if(!alchemySoundEnabled()||document.hidden)return;
  try{
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   if(!audio)audio=new AC();
@@ -31803,7 +31826,7 @@ const canvas=$('fxCanvas'),ctx=canvas.getContext('2d');
 function sizeCanvas(){const dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(board.clientWidth*dpr));canvas.height=Math.max(1,Math.round(board.clientHeight*dpr));canvas.style.width=board.clientWidth+'px';canvas.style.height=board.clientHeight+'px';ctx?.setTransform(dpr,0,0,dpr,0,0);}
 function stopParticles(){if(fxFrame)cancelAnimationFrame(fxFrame);fxFrame=0;particles=[];ctx?.clearRect(0,0,board.clientWidth,board.clientHeight);}
 function burst(x,y,isNew){
- if(!ctx||!state.settings.motion||document.hidden)return;
+ if(!ctx||!alchemyAnimationsEnabled()||document.hidden)return;
  const count=isNew?28:10;
  for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=35+Math.random()*100;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-25,t:0,life:.5+Math.random()*.7,size:1+Math.random()*2,color:i%3?'#ddcc92':'#bcd9a4'});}
  if(particles.length>130)particles.splice(0,particles.length-130);
@@ -32169,22 +32192,10 @@ function journalRows(){
 function showJournal(){
  openModal('Дневник опытов','Последние '+HISTORY_LIMIT+' опытов · новые записи сверху',`<div class="stat-grid"><div class="stat-box"><strong>${state.attempts}</strong><span>всего экспериментов</span></div><div class="stat-box"><strong>${tried.size}</strong><span>разных сочетаний</span></div><div class="stat-box"><strong>${knownRecipes.size}</strong><span>удачных рецептов</span></div></div><div class="modal-toolbar">${[['all','Все опыты'],['success','Удачные'],['new','Новые открытия']].map(([k,l])=>`<button class="chip ${journalFilter===k?'active':''}" data-journal-filter="${k}">${l}</button>`).join('')}<button class="text-btn" data-action="achievements" style="margin-left:auto">${icon('star')} Достижения</button></div><div id="journalEntries">${journalRows()}</div>`,'journal');
 }
-function alchemyContrastAvailable(){return window.MQBAlchemySync?.contrastAvailable?.()??(!!window.QW?.prefs&&location.protocol!=='file:');}
-function alchemyContrastEnabled(){return window.MQBAlchemySync?.contrastEnabled?.()??!!window.QW?.prefs?.get?.().contrast;}
-function syncAlchemyContrastControl(){
- const control=$('alchemyContrast');if(control){control.setAttribute('aria-checked',String(alchemyContrastEnabled()));control.disabled=!alchemyContrastAvailable()||!!window.MQBAlchemySync?.isContrastPending?.();}
-}
-async function toggleAlchemyContrast(){
- const control=$('alchemyContrast');if(!control||control.disabled||!alchemyContrastAvailable())return;
- const on=!alchemyContrastEnabled();control.disabled=true;
- try{await window.MQBAlchemySync?.setAccountContrast(on);}
- catch(error){showToast('Режим не сохранён',error.message,null,'failure');}
- finally{control.disabled=false;syncAlchemyContrastControl();}
-}
-try{globalThis.addEventListener?.('qw:contrast',syncAlchemyContrastControl)}catch{}
 function showSettings(keepScroll=false){
  const scroll=keepScroll?$('modalBody').scrollTop:0;
- const content=`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Контрастный режим</strong><small>${alchemyContrastAvailable()?'Дополнительный режим для текста, рамок и сцены. Сохраняется в профиле и действует в обеих играх.':'Доступно в приложении'}</small></div><button id="alchemyContrast" class="switch" role="switch" aria-label="Контрастный режим" aria-checked="${alchemyContrastEnabled()}" data-action="contrast" ${!alchemyContrastAvailable()||window.MQBAlchemySync?.isContrastPending?.()?'disabled':''}></button></div><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section><section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
+ const localControls=alchemyHasAccount()?'':`<section class="settings-section"><h3>Твоя лаборатория</h3><div class="setting-row"><div class="setting-copy"><strong>Звуки превращений</strong><small>Короткие ноты, без фоновой музыки и зацикливания.</small></div><button class="switch" role="switch" aria-label="Звуки превращений" aria-checked="${state.settings.sound}" data-setting="sound"></button></div><div class="setting-row"><div class="setting-copy"><strong>Анимации и искры</strong><small>Можно отключить для спокойствия или экономии батареи.</small></div><button class="switch" role="switch" aria-label="Анимации и искры" aria-checked="${state.settings.motion}" data-setting="motion"></button></div></section>`;
+ const content=`${localControls}<section class="settings-section"><h3>Сохранения</h3><p>${storageOK?'Прогресс сохраняется автоматически в этом браузере после каждого изменения.':'Автосохранение недоступно в этом браузере. Используй экспорт, чтобы не потерять открытия.'} Очистка данных браузера удалит локальное сохранение. Для переноса на другой телефон или компьютер выгрузи файл и загрузи его там.</p><div class="button-row"><button class="primary" data-action="export">${icon('download')} Сохранить файлом</button><button class="secondary" data-action="import">${icon('upload')} Загрузить файл</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:10px">Импорт заменит текущий прогресс только после подтверждения. Оригинальное сохранение старой игры не изменяется.</p></section><section class="settings-section"><h3>Резервная копия</h3><p>При автосохранении сохраняется предыдущий исправный снимок. Перенос из версий 1–5 выполняется только при отсутствии нового сохранения и доступе к тому же хранилищу браузера; старые записи не удаляются.</p><button class="secondary" data-action="restore-backup">Восстановить предыдущий снимок</button></section><section class="settings-section"><h3>Начать заново</h3><p>Только полный сброс удаляет открытия, избранное, журнал и достижения. Кнопка «Очистить стол» этого не делает.</p><div class="button-row"><button class="secondary danger" data-action="reset">${icon('trash')} Сбросить весь прогресс</button></div></section><div class="button-row"><button class="secondary" data-action="help">${icon('help')} Как играть</button><button class="secondary" data-action="achievements">${icon('star')} Достижения</button></div><p style="font-size:var(--a-fs-min,12px);margin-top:22px">Alchemia · Доводка 5.1 · ${E.size} иллюстрированных элементов · ${R.size} рецептов · ${(DATA.chapters||[]).length} глав, ${(DATA.worlds||[]).length||1} эпох и ${((DATA.campaigns||[]).length)} кампаний · без рекламы, регистрации, аналитики и внешних зависимостей. Названия и рецепты — игровые ассоциации, не научная модель. На смартфоне открывай игру в браузере; предпросмотр HTML в приложении «Файлы» может не выполнять JavaScript.</p>`;
  openModal('Настройки','Настрой уют, не отвлекаясь от чудес',content,'settings');if(keepScroll)$('modalBody').scrollTop=scroll;
 }
 function showHelp(){
@@ -32266,7 +32277,6 @@ async function importSave(file){
 function action(name){
  switch(name){
   case'home':closeModal();break;
-  case'contrast':void toggleAlchemyContrast();break;
   case'help':showHelp();break;
   case'atlas':showAtlas();break;
   case'chapters':showChapters();break;
@@ -32276,7 +32286,7 @@ function action(name){
   case'journal':showJournal();break;
   case'achievements':showAchievements();break;
   case'settings':showSettings();break;
-  case'sound':toggleSound();break;
+  case'sound':toggleLocalPreference('sound');break;
   case'dismiss-toast':dismissToast();break;
   case'deselect':selected=null;renderSelection();break;
   case'clear':clearBench();break;
@@ -32312,7 +32322,7 @@ listen(document,'click',e=>{
  if(el.dataset.loadRecipe){loadPair(el.dataset.loadRecipe);return;}
  if(el.dataset.locked){showLocked(el.dataset.locked);return;}
  if(el.dataset.journalFilter){journalFilter=el.dataset.journalFilter;showJournal();return;}
- if(el.dataset.setting){const key=el.dataset.setting;state.settings[key]=!state.settings[key];applySettings();if(!state.settings.motion)stopParticles();persist();showSettings(true);if(key==='sound'&&state.settings.sound)playSound('select');}
+ if(el.dataset.setting)toggleLocalPreference(el.dataset.setting);
 });
 /* Полоса категорий шире панели и без видимой прокрутки: пальцу хватает нативного жеста,
  * а мыши нужны колесо и перетаскивание. */
@@ -32632,17 +32642,23 @@ function initShell(){
   const host=$('topActions')||old?.parentElement;
   if(host){QW.header.mountGear(host);old?.remove();}
   const helpHidden=()=>{const b=$('helpBtn');return Boolean(b&&b.offsetParent!==null);};
-  const soundHidden=()=>{const b=$('soundBtn');return Boolean(b&&b.offsetParent!==null);};
+  const soundHidden=()=>alchemyHasAccount()||$('soundBtn').offsetParent!==null;
   QW.menu.register([
-   {id:'alchemy-sound',icon:'sound',label:'Звуки превращений',hidden:soundHidden,toggle:()=>state.settings.sound,onSelect:()=>toggleSound()},
+   {id:'alchemy-sound',icon:'sound',label:'Звуки превращений',hidden:soundHidden,toggle:alchemySoundEnabled,onSelect:()=>toggleLocalPreference('sound')},
    {id:'alchemy-help',icon:'help',label:'Как играть',hidden:helpHidden,onSelect:()=>showHelp()},
-   {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'контраст, анимации, экспорт, сброс',onSelect:()=>showSettings()}
+   {id:'alchemy-settings',icon:'sliders',label:'Настройки лаборатории',hint:'сохранения и резервная копия',onSelect:()=>showSettings()}
   ],'Alchemia');
   syncShellColor();
  }catch(err){console.warn('QW shell init failed',err);}
 }
 initShell();
 updateAchievements();applySettings();renderAll();sizeCanvas();
+const refreshGamePreferences=()=>{
+ applyGamePreferences();
+ if(modalPage==='settings')showSettings(true);
+};
+window.addEventListener('qw:game-preferences',refreshGamePreferences);
+if(!window.QW?.prefs?.animationsEnabled)systemMotion.addEventListener?.('change',refreshGamePreferences);
 if(!loaded)arrangeBench(false);
 else if(phone.matches&&benchCrowded())arrangeBench(false); // a table saved on a tall board would pile up on the compact phone table
 lastBoardSize={w:board.clientWidth,h:board.clientHeight};
@@ -32784,6 +32800,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         if (response.status === 401 || (response.status === 409 && error.code === 'profile_changed')) {
             sessionGeneration += 1;
             telegramSession = false;
+            window.QW?.prefs?.clearAccount?.();
             if (guestId) staleGuest = true;
             else if (response.status === 409) staleMini = true;
             status(response.status === 409 ? 'profile-changed' : 'unauthorized');
@@ -32800,11 +32817,14 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
     let renewTimer = 0, lastRenew = Date.now();
     async function renewSession() {
         if (guestId || document.hidden || !telegramSession) return;
+        const generation = sessionGeneration;
         lastRenew = Date.now();
         try {
             const response = await fetch('/api/mini/session/renew', {method: 'POST', credentials: 'same-origin',
                 headers: {'Content-Type': 'application/json', 'X-Mini-CSRF': '1'}, body: '{}'});
+            if (generation !== sessionGeneration) return;
             if (response.status === 401 || response.status === 403) { clearInterval(renewTimer); renewTimer = 0; }
+            if (response.status === 401) authFailure(response);
         } catch {}
     }
     function keepSessionAlive() {
@@ -32812,6 +32832,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         renewTimer = setInterval(renewSession, 8 * 60 * 1000);
     }
     async function establishSession() {
+        const generation = sessionGeneration;
         if (guestId) {
             if (staleGuest) return false;
             if (guestProfileLoaded) return true;
@@ -32819,20 +32840,24 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
             sessionAttempt = (async () => {
                 try {
                     const response = await fetch('/api/guest/me', {credentials: 'same-origin'});
+                    if (generation !== sessionGeneration) return false;
                     if (!response.ok) {
-                        if (!authFailure(response, await errorBody(response))) status('offline');
+                        const error = await errorBody(response);
+                        if (generation === sessionGeneration && !authFailure(response, error)) status('offline');
                         return false;
                     }
                     const profile = await response.json();
+                    if (generation !== sessionGeneration) return false;
                     // Validate the cookie owner before applying its preferences to this account-scoped game.
                     if (profile.account_id !== guestId) {
                         authFailure({status: 409}, {code: 'profile_changed'});
                         return false;
                     }
+                    window.QW?.configure?.({identity: 'guest'});
                     window.QW?.prefs?.applyAccount?.(profile);
                     guestProfileLoaded = true;
                     return true;
-                } catch { status('offline'); return false; }
+                } catch { if (generation === sessionGeneration) status('offline'); return false; }
             })();
             try { return await sessionAttempt; } finally { sessionAttempt = null; }
         }
@@ -32842,23 +32867,24 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         sessionAttempt = (async () => {
             try {
                 const response = await fetch('/api/mini/me', {credentials: 'same-origin'});
-                telegramSession = response.ok;
+                if (generation !== sessionGeneration) return false;
                 if (response.ok) {
                     const profile = await response.json();
-                    // The Account's «Контрастный режим» (UI_RULES §16) wins over this device's cache.
-                    window.QW?.prefs?.applyAccount?.(profile);
+                    if (generation !== sessionGeneration) return false;
                     const userId = String(profile.user_id || 'session');
                     if (miniUserId !== null && miniUserId !== userId) {
-                        sessionGeneration += 1;
-                        staleMini = true; telegramSession = false; status('profile-changed');
-                        banner('Профиль изменился. Открой игру заново из приложения.');
+                        authFailure({status: 409}, {code: 'profile_changed'});
                         return false;
                     }
                     miniUserId = userId;
                     hadSession = true;
+                    telegramSession = true;
+                    window.QW?.configure?.({identity: 'telegram'});
+                    window.QW?.prefs?.applyAccount?.(profile);
                     status('connecting');
-                } else status(hadSession ? 'unauthorized' : 'local');
-            } catch { status(location.protocol === 'file:' && !hadSession ? 'local' : 'offline'); }
+                } else if (hadSession && response.status === 401) authFailure(response);
+                else status(hadSession ? 'unauthorized' : 'local');
+            } catch { if (generation === sessionGeneration) status(location.protocol === 'file:' && !hadSession ? 'local' : 'offline'); }
             return telegramSession;
         })();
         try { return await sessionAttempt; } finally { sessionAttempt = null; }
@@ -32867,31 +32893,33 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         if (busy || staleGuest) return;
         if (!(await establishSession())) return;
         busy = true;
+        const generation = sessionGeneration;
         try {
-            const generation = sessionGeneration;
             const response = await fetch(API + 'sync', {method: 'POST', credentials: 'same-origin',
                 headers: headers(), body: JSON.stringify(summary(readState() || {}))});
             if (generation !== sessionGeneration) return;
             if (!response.ok) {
-                if (authFailure(response, await errorBody(response))) return;
+                const error = await errorBody(response);
+                if (generation !== sessionGeneration || authFailure(response, error)) return;
                 status('offline'); return;
             }
             const data = await response.json();
             if (generation !== sessionGeneration) return;
             restore(data);
-        } catch { status('offline'); } finally { busy = false; }
+        } catch { if (generation === sessionGeneration) status('offline'); } finally { busy = false; }
     }
     function verifyCraft(ingredientA, ingredientB) {
         craftQueue = craftQueue.then(async () => {
             if (!(await establishSession())) return;
+            const generation = sessionGeneration;
             try {
-                const generation = sessionGeneration;
                 const response = await fetch(API + 'craft', {method: 'POST', credentials: 'same-origin',
                     headers: headers(), body: JSON.stringify({command_id: commandId(),
                         ingredient_a: ingredientA, ingredient_b: ingredientB})});
                 if (generation !== sessionGeneration) return;
                 if (!response.ok) {
-                    if (authFailure(response, await errorBody(response))) return;
+                    const error = await errorBody(response);
+                    if (generation !== sessionGeneration || authFailure(response, error)) return;
                     status('offline'); return;
                 }
                 const result = await response.json();
@@ -32903,7 +32931,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
                     unverifiedNoticeShown = true;
                     banner('Старые открытия сохранены. Для подтверждения награды получи элементы заново из базовых стихий.');
                 }
-            } catch { status('offline'); }
+            } catch { if (generation === sessionGeneration) status('offline'); }
         });
         return craftQueue;
     }
@@ -32919,13 +32947,14 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
                 savePending(pending);
             }
             const command = pending[stageId];
+            const generation = sessionGeneration;
             try {
-                const generation = sessionGeneration;
                 const response = await fetch(API + 'claim-stage', {method: 'POST', credentials: 'same-origin',
                     headers: headers(), body: JSON.stringify(command)});
                 if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                 if (!response.ok) {
                     const error = await errorBody(response);
+                    if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                     if (authFailure(response, error)) return {ok: false, message: 'Доступ к профилю потерян. Локальное сохранение осталось.'};
                     // A definitive rejection cannot have granted this command. Unknown server
                     // failures retain the exact command for a safe retry, including its revision.
@@ -32933,6 +32962,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
                         delete pending[stageId]; savePending(pending);
                     }
                     if (response.status === 409) await sync();
+                    if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                     if (error.code === 'catalog_changed') status('catalog-mismatch');
                     else if (response.status !== 409) status('offline');
                     return {ok: false, message: typeof error.detail === 'string' ? error.detail
@@ -32950,6 +32980,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
                 delete pending[stageId]; savePending(pending);
                 return {ok: true, data};
             } catch {
+                if (generation !== sessionGeneration) return {ok: false, message: 'Сессия изменилась. Открой игру заново из приложения.'};
                 status('offline');
                 return {ok: false, message: 'Нет связи. Результат неизвестен; повтор отправит ту же команду без двойной награды.'};
             }
@@ -32958,36 +32989,7 @@ if(migrated>0)showToast('Старые открытия переехали',`${fo
         attempt.finally(() => claimsInFlight.delete(stageId));
         return attempt;
     }
-    let contrastPending = false;
-    const contrastEnabled = () => !!window.QW?.prefs?.get?.().contrast;
-    const contrastAvailable = () => location.protocol !== 'file:' && !!window.QW?.prefs;
-    async function setAccountContrast(enabled) {
-        const prefs = window.QW?.prefs;
-        if (contrastPending) return false;
-        if (!contrastAvailable()) throw new Error('Доступно в приложении');
-        if (!(await establishSession())) throw new Error('Войди в аккаунт, чтобы сохранить контрастный режим.');
-        if (contrastPending) return false;
-        const previous = !!prefs.get().contrast, on = !!enabled, generation = sessionGeneration;
-        contrastPending = true; prefs.setContrast(on);
-        try {
-            const response = await fetch(`/api/account/contrast-mode?identity=${guestId ? 'guest' : 'telegram'}`, {
-                method: 'POST', credentials: 'same-origin', headers: {...headers(), 'X-Guest-CSRF': '1'}, body: JSON.stringify({enabled: on})});
-            if (generation !== sessionGeneration) return false;
-            if (!response.ok) {
-                const error = await errorBody(response);
-                if (prefs.get().contrast === on) prefs.setContrast(previous);
-                authFailure(response, error);
-                throw new Error(typeof error.detail === 'string' ? error.detail : 'Не удалось сохранить контрастный режим.');
-            }
-            const result = await response.json();
-            if (generation === sessionGeneration && prefs.get().contrast === on) prefs.applyAccount(result);
-            return true;
-        } catch (error) {
-            if (generation === sessionGeneration && prefs.get().contrast === on) prefs.setContrast(previous);
-            throw error;
-        } finally { contrastPending = false; }
-    }
-    window.MQBAlchemySync = Object.freeze({verifyCraft, claimStage, hasPendingClaim, setAccountContrast, contrastEnabled, contrastAvailable, isContrastPending: () => contrastPending});
+    window.MQBAlchemySync = Object.freeze({verifyCraft, claimStage, hasPendingClaim});
     status('connecting');
     addEventListener('load', async () => {
         if (await establishSession()) await sync();

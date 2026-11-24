@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
-const refreshCode=source=>source.slice(source.indexOf('function upkeepCatalogSnapshot('),source.indexOf('function readySnapshot('))+source.slice(source.indexOf('function syncFarmContrastControl('),source.indexOf('function renderViewSettings('))+source.slice(source.indexOf('async function refresh('),source.indexOf('async function command('));
+const refreshCode=source=>source.slice(source.indexOf('function upkeepCatalogSnapshot('),source.indexOf('function readySnapshot('))+source.slice(source.indexOf('async function refresh('),source.indexOf('async function command('));
 const css=read('qw_farm/static/style.css');
 const block=css.slice(css.indexOf('/* ==== «Контрастный режим»'));
 const declarations=selector=>Object.fromEntries([...block.match(new RegExp(selector+'\\{([^}]+)\\}'))[1].matchAll(/(--[\w-]+):([^;}]+)/g)].map(m=>[m[1],m[2]]));
@@ -43,35 +43,37 @@ test('both Profile switches persist account contrast and roll back a failed save
  }
 });
 test('farm boot and refresh apply the Account value from /start and /me',()=>{
- const app=read('qw_farm/static/app.js');assert.match(app,/S.form=data.address_form\|\|'n';try\{globalThis.QW\?\.prefs\?\.applyAccount\?\.\(data\)/);assert.match(app,/if\(!farmContrastPending&&prefsEpoch===farmContrastEpoch\)globalThis.QW\?\.prefs\?\.applyAccount\?\.\(me\)/);
- const service=read('qw_farm/service.py');assert.ok(service.includes("{'contrast_mode':bool(self.p.contrast_mode)}"));assert.equal((service.match(/\*\*self\._account_prefs\(\)/g)||[]).length,2);
+ const app=read('qw_farm/static/app.js');assert.match(app,/S.form=data.address_form\|\|'n';try\{globalThis.QW\?\.prefs\?\.applyAccount\?\.\(data\)/);assert.match(app,/S\.form=me\.address_form\|\|'n';try\{globalThis\.QW\?\.prefs\?\.applyAccount\?\.\(me\);\}catch\{\}S\.me=me\.farm[^\n]*syncFarmMotion\(\)/);
+ assert.match(app,/QW\?\.configure\?\.\(\{identity:mode\}\)/);assert.match(app,/prefs\?\.clearAccount\?\.\(\)/);
+ const service=read('qw_farm/service.py');assert.ok(service.includes("'game_preferences':dict(self.p.game_preferences or {})"));assert.equal((service.match(/\*\*self\._account_prefs\(\)/g)||[]).length,2);
 });
 
-test('farm settings switch saves shared account preference, follows shell events and rolls back errors',async()=>{
- const source=read('qw_farm/static/app.js'),code=source.slice(source.indexOf('function syncFarmContrastControl('),source.indexOf('function renderViewSettings('));
- for(const channel of ['guest','telegram']){
-  const input={checked:true},prefs={contrast:false,get(){return{contrast:this.contrast};},setContrast(on){this.contrast=on;},applyAccount(r){this.contrast=r.contrast_mode;}};
-  const calls=[],messages=[];let fail=false,listener;
-  const context={S:{me:{id:'farm-a'}},mode:channel,farmContrastPending:false,farmContrastEpoch:0,$:()=>input,QW:{prefs},requestRaw:async(url,o)=>{calls.push([url,o]);if(fail)throw Error('offline');return{contrast_mode:o.data.enabled};},toast:m=>messages.push(m),addEventListener:(name,fn)=>{listener=fn;}};
-  vm.createContext(context);vm.runInContext(code,context);await context.saveFarmContrast(input);assert.equal(prefs.contrast,true);assert.equal(input.disabled,false);assert.equal(calls[0][0],`/api/account/contrast-mode?identity=${channel}`);assert.equal(calls[0][1].data.enabled,true);
-  fail=true;input.checked=false;await context.saveFarmContrast(input);assert.equal(prefs.contrast,true);assert.equal(input.checked,true);assert.equal(messages.at(-1),'offline');
-  prefs.contrast=false;listener();assert.equal(input.checked,false);assert.equal(context.farmContrastEpoch,5);
- }
+test('farm animation preference follows the account and retains standalone fallback',()=>{
+ const source=read('qw_farm/static/app.js'),code=source.slice(source.indexOf('function farmAnimationsFallback('),source.indexOf('const villageReduced='));
+ const makeContext=({account=false,animations,legacy='false',reduced=false}={})=>{
+  const attrs=new Map([['qw-farm.reduced-motion',legacy]]),writes=[];
+  const context={matchMedia:()=>({matches:reduced}),localStorage:{getItem:k=>attrs.get(k)||null,setItem:(k,v)=>{attrs.set(k,v);writes.push([k,v]);}},
+   scene:{motion:true,dirty:false,syncLoop(){this.synced=true;}},QW:{prefs:{hasAccount:()=>account,get:()=>({gamePreferences:typeof animations==='boolean'?{animations}:{}}),animationsEnabled:fallback=>typeof animations==='boolean'?animations:fallback}}};
+  vm.createContext(context);vm.runInContext(code,context);return{context,attrs,writes};
+ };
+ assert.equal(makeContext({reduced:true}).context.farmAnimationsEnabled(),false,'device reduced-motion is the standalone default');
+ assert.equal(makeContext({legacy:'true'}).context.farmAnimationsEnabled(),false,'legacy local calm preference remains a fallback');
+ const enabled=makeContext({account:true,animations:true,legacy:'true'});assert.equal(enabled.context.farmAnimationsEnabled(),true,'explicit account choice overrides legacy local setting');
+ const disabled=makeContext({account:true,animations:false});assert.equal(disabled.context.farmAnimationsEnabled(),false,'explicit account choice disables animation');
+ disabled.context.syncFarmMotion();assert.equal(disabled.context.scene.motion,false);assert.equal(disabled.context.scene.dirty,true);assert.equal(disabled.context.scene.synced,true);
 });
-test('a /me response started before an in-game contrast save cannot undo its confirmed value',async()=>{
- const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100};let reply,externalContrast;
- const prefs={contrast:false,get(){return{contrast:this.contrast};},setContrast(v){this.contrast=v;},applyAccount(v){this.contrast=v.contrast_mode;}};
- const input={checked:true},context={S:{me:own,farm:own,config:{demo:false}},mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
- QW:{prefs},$:()=>input,request:()=>new Promise(r=>{reply=r;}),requestRaw:async()=>({contrast_mode:true}),toast(){},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateReady(){},connection(){},addEventListener:(type,fn)=>{externalContrast=fn;}};
- vm.createContext(context);vm.runInContext(refreshCode(source),context);
- const polling=context.refresh({render:false});await context.saveFarmContrast(input);reply({farm:own,contrast_mode:false});await polling;assert.equal(prefs.contrast,true);assert.equal(input.checked,true);
- prefs.contrast=false;const oldPoll=context.refresh({render:false});prefs.contrast=true;externalContrast();reply({farm:own,contrast_mode:false});await oldPoll;assert.equal(prefs.contrast,true,'an external Alchemy/profile event fences an older /me response');assert.equal(input.checked,true);
+test('authenticated farm delegates visual preferences to profile and responds to account changes',()=>{
+ const app=read('qw_farm/static/app.js'),settings=app.slice(app.indexOf('function renderViewSettings('),app.indexOf('// «Управление и подсказки»'));
+ assert.doesNotMatch(app,/farm-contrast-mode|saveFarmContrast|farmContrastEpoch|farmContrastPending/);
+ assert.match(settings,/if\(!globalThis\.QW\?\.prefs\?\.hasAccount\?\.\(\)\)\{/);
+ assert.match(app,/addEventListener\?\.\('qw:game-preferences',syncFarmMotion\)/);
+ const html=read('qw_farm/static/index.html');assert.match(html,/qw-shell\.js\?v=20261124-account-game-preferences/);assert.match(html,/qw-shell\.css\?v=20261124-account-game-preferences/);assert.match(html,/farm\/assets\/app\.js\?v=20261124-account-game-preferences/);
 });
 test('refresh applies a new farm upkeep catalog revision and redraws the open view without changing selection',async()=>{
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100},oldCatalog={economy:{upkeep_revision:4,building_rate_pct:1}},nextCatalog={economy:{upkeep_revision:5,building_rate_pct:3}};
  const renders={panel:0,seeds:0,scene:0},context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',seed:'wheat',config:{demo:false}},
- mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
- request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},
+ mode:'guest',farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
+ request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},syncFarmMotion(){},
  sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){renders.scene++;}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
  queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateHUD(){},renderSeeds(){renders.seeds++;},updateReady(){},renderPanel(){renders.panel++;},connection(){}};
  vm.createContext(context);vm.runInContext(refreshCode(source),context);
@@ -80,8 +82,8 @@ test('refresh applies a new farm upkeep catalog revision and redraws the open vi
 test('refresh applies effective upkeep rates at Moscow midnight when the scheduled revision stays the same',async()=>{
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100},oldCatalog={economy:{upkeep_revision:5,upkeep_level:10,land_rate_pct:100,plot_upkeep:{10:100},building_rate_pct:1,field_per_hectare:1500,field_upkeep:1500,tree_rate_per_extra_tree:25}},
   nextCatalog={economy:{...oldCatalog.economy,land_rate_pct:150,plot_upkeep:{10:150},building_rate_pct:3}};
- let panels=0;const context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',config:{demo:false}},mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
- request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
+ let panels=0;const context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',config:{demo:false}},mode:'guest',farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
+ request:async()=>({farm:own,catalog:nextCatalog,address_form:'n',speed:1}),showLogin(){},QW:{prefs:{applyAccount(){}}},syncFarmMotion(){},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
  queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateHUD(){},renderSeeds(){},updateReady(){},renderPanel(){panels++;},connection(){}};
  vm.createContext(context);vm.runInContext(refreshCode(source),context);
  assert.equal(oldCatalog.economy.upkeep_revision,nextCatalog.economy.upkeep_revision,'the active config keeps the revision assigned when the settings were scheduled');
@@ -89,16 +91,9 @@ test('refresh applies effective upkeep rates at Moscow midnight when the schedul
 });
 test('a stale /me reply cannot install an old upkeep catalog revision',async()=>{
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100},oldCatalog={economy:{upkeep_revision:4}},staleCatalog={economy:{upkeep_revision:5}};let reply;
- const context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',config:{demo:false}},mode:'guest',farmContrastPending:false,farmContrastEpoch:0,farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
+ const context={S:{me:own,farm:own,catalog:oldCatalog,tab:'economy',selected:'upkeep',config:{demo:false}},mode:'guest',farmViewEpoch:0,refreshEpoch:0,API:'/api/farm/v1',
  request:()=>new Promise(resolve=>{reply=resolve;}),showLogin(){},QW:{prefs:{applyAccount(){}}},sceneSnapshot:()=>'',hudSnapshot:()=>'',seedsSnapshot:()=>'',scene:{set(){assert.fail('stale response must not redraw');}},dashaGame:null,olegGame:null,ballistaGame:null,pieGame:null,santaGame:null,santaGameOpen:false,
  queueNeighborGifts(){},FRIEND_REQUESTS:{notify(){}},syncMenuBadges(){},orchardNotices(){},updateHUD(){},renderSeeds(){assert.fail('stale response must not redraw');},updateReady(){},renderPanel(){assert.fail('stale response must not redraw');},connection(){}};
- vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function syncFarmContrastControl('),source.indexOf('function renderViewSettings('))+source.slice(source.indexOf('async function refresh('),source.indexOf('async function command(')),context);
+ vm.createContext(context);vm.runInContext(source.slice(source.indexOf('async function refresh('),source.indexOf('async function command(')),context);
  const pending=context.refresh({render:false});context.farmViewEpoch++;reply({farm:own,catalog:staleCatalog,address_form:'n',speed:1});assert.equal(await pending,false);assert.equal(context.S.catalog,oldCatalog);
-});
-test('Alchemy settings include a separate switch that follows the shared preference and saves via the account bridge',async()=>{
- const source=read('minigames/alchemia-1.0/game.js'),control={attrs:{},disabled:false,setAttribute(k,v){this.attrs[k]=v;}};let on=false,listener;
- const context={location:{protocol:'https:'},$:()=>control,window:{QW:{prefs:{get:()=>({contrast:on})}},MQBAlchemySync:{isContrastPending:()=>false,setAccountContrast:async v=>{on=v;}}},addEventListener:(event,fn)=>{listener=fn;},showToast:()=>assert.fail('save succeeds')};
- vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function alchemyContrastAvailable('),source.indexOf('function showSettings(')),context);
- assert.match(source,/id="alchemyContrast"[^>]+role="switch"[^>]+data-action="contrast"/);assert.match(source,/case'contrast':void toggleAlchemyContrast\(\)/);
- await context.toggleAlchemyContrast();assert.equal(on,true);assert.equal(control.attrs['aria-checked'],'true');assert.equal(control.disabled,false);on=false;listener();assert.equal(control.attrs['aria-checked'],'false');
 });

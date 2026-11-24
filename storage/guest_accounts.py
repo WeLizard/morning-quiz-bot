@@ -48,6 +48,7 @@ class GuestAccounts:
                 'address_form_chosen': account.address_form is not None,
                 'contrast_mode': bool(account.contrast_mode),
                 'timezone': account.timezone,
+                'game_preferences': dict(account.game_preferences or {}),
                 'capabilities': ['guest-profile']}
 
     async def projection_in(self, session, account, row):

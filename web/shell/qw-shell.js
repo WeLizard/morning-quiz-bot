@@ -160,7 +160,28 @@
     }
 
     /* ---------------- theme and preferences (hub palette; games keep their own) ---------------- */
-    const prefs = {haptics: true, theme: 'system', contrast: false, timezone: null};
+    const prefs = {haptics: true, theme: 'system', contrast: false, timezone: null, gamePreferences: {}};
+    let hasAccountPreferences = false;
+    const motionMedia = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
+    function animationsEnabled(fallback = true) {
+        return !motionMedia()?.matches && (prefs.gamePreferences.animations ?? fallback);
+    }
+    function applyGamePreferences(value) {
+        const next = value && typeof value === 'object' ? value : {};
+        const hasAccount = value != null;
+        if (hasAccount === hasAccountPreferences && Object.keys(next).length === Object.keys(prefs.gamePreferences).length
+            && Object.keys(next).every(key => next[key] === prefs.gamePreferences[key])) return;
+        hasAccountPreferences = hasAccount;
+        prefs.gamePreferences = {...next};
+        if (next.animations === false) root.setAttribute('data-qw-reduced-motion', '1');
+        else root.removeAttribute('data-qw-reduced-motion');
+        call(() => dispatchEvent(new CustomEvent('qw:game-preferences')));
+        menu.refresh();
+    }
+    function clearAccount() {
+        prefs.timezone = null;
+        applyGamePreferences(null);
+    }
     try {
         const saved = JSON.parse(localStorage.getItem('mqb-ui-preferences') || '{}');
         if (typeof saved.haptics === 'boolean') prefs.haptics = saved.haptics;
@@ -370,7 +391,9 @@
     function openProfile() {
         menu.close();
         if (config.onProfile) { config.onProfile(); return; }
-        location.assign(config.profileUrl);
+        const url = new URL(config.profileUrl, location.href);
+        if (['guest', 'telegram'].includes(config.identity)) url.searchParams.set('identity', config.identity);
+        location.assign(url.pathname + url.search + url.hash);
     }
 
     /* ---------------- header controls (§4) ---------------- */
@@ -491,9 +514,10 @@
         else { avatar.classList.add('qw-avatar-empty'); avatar.innerHTML = svg('user'); }
         const text = document.createElement('span');
         text.className = 'qw-grow';
-        text.textContent = account?.name || 'Твой профиль';
+        const gameSettings = config.mode === 'game' && hasAccountPreferences;
+        text.textContent = account?.name || (gameSettings ? 'Настройки профиля' : 'Твой профиль');
         const sub = document.createElement('small');
-        sub.textContent = account?.subtitle || 'Профиль и настройки';
+        sub.textContent = gameSettings && account?.name ? 'Настройки профиля' : account?.subtitle || 'Профиль и настройки';
         text.append(sub);
         acct.append(avatar, text);
         acct.insertAdjacentHTML('beforeend', svg('chevron'));
@@ -1196,6 +1220,7 @@
         document.addEventListener('fullscreenchange', onViewportChange);
         addEventListener('resize', () => { if (!isTelegram()) call(() => config.onResize?.()); });
         matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
+        motionMedia()?.addEventListener?.('change', () => call(() => dispatchEvent(new CustomEvent('qw:game-preferences'))));
         writeInsets();
         applyTheme();
         syncBack();
@@ -1230,7 +1255,7 @@
         boot,
         /** Changes options after boot, e.g. the hub switching into game mode for Night City. */
         configure(options) {
-            if (Object.hasOwn(options || {}, 'identity') && options.identity !== config.identity) prefs.timezone = null;
+            if (Object.hasOwn(options || {}, 'identity') && options.identity !== config.identity) clearAccount();
             Object.assign(config, options);
             root.classList.toggle('qw-mode-game', config.mode === 'game');
             root.classList.toggle('qw-mode-hub', config.mode !== 'game');
@@ -1246,17 +1271,21 @@
         header, menu, nav, fullscreen, session, haptic, report, errors,
         goHome, openProfile, icon: svg,
         prefs: {
-            get() { return {...prefs}; },
+            get() { return {...prefs, gamePreferences: {...prefs.gamePreferences}}; },
             setTheme(value) { if (['system', 'dark', 'light'].includes(value)) { prefs.theme = value; savePrefs(); applyTheme(); } },
             setHaptics(value) { prefs.haptics = Boolean(value); savePrefs(); return prefs.haptics; },
             /** Applies «Контрастный режим» on this device at once; the hub stores it on the Account (POST /api/account/contrast-mode). */
             setContrast(value) { return setContrast(value); },
-            /** Applies the server value from a profile response ({contrast_mode}); a missing field changes nothing. */
+            /** Applies the shared settings included in a server profile response. */
             applyAccount(profile) {
                 if (typeof profile?.contrast_mode === 'boolean') setContrast(profile.contrast_mode);
                 if (Object.hasOwn(profile || {}, 'timezone')) prefs.timezone = typeof profile.timezone === 'string' ? profile.timezone : null;
+                if (Object.hasOwn(profile || {}, 'game_preferences')) applyGamePreferences(profile.game_preferences);
                 return prefs.contrast;
             },
+            clearAccount,
+            hasAccount() { return hasAccountPreferences; },
+            animationsEnabled,
             resolvedTimezone,
             deviceTimezone,
             formatDate,

@@ -888,7 +888,9 @@
         const me = state.guest, saved = Boolean(me?.login), viaTelegram = Boolean(me?.telegram_user_id);
         const card = el('section', undefined, 'card player-card'), who = el('div', undefined, 'player-who'), title = el('h1', me?.display_name || 'Гость');
         who.append(title, el('small', saved ? `Профиль QuizzyWizzy · ${me.login}` : viaTelegram ? 'Профиль QuizzyWizzy · Telegram связан' : 'Гостевой профиль'));
-        card.append(el('span', initialOf(me?.display_name || 'Гость'), 'qw-avatar'), who, button('Настройки', () => guestSettings(), 'secondary settings-open'));
+        card.append(el('span', initialOf(me?.display_name || 'Гость'), 'qw-avatar'), who,
+            button('История игр', () => guestHistory(), 'secondary'),
+            button('Настройки', () => guestSettings(), 'secondary settings-open'));
         content.append(card);
         if (!saved && !viaTelegram) note(content, 'Прогресс пока хранится только в этом браузере. Логин, пароль и привязка Telegram — в «Настройках».');
         nameImport?.then(profile => {
@@ -1077,6 +1079,7 @@
     function guestNavigate(page) {
         window.QuizTelegram.selection();
         if (page === 'profile') return guestProfile();
+        if (page === 'history') return guestHistory();
         if (page === 'rating') return guestRating().catch(error => { feedback.textContent = error.message; });
         if (page === 'chats') return guestStub(page);
         return guestHome();
@@ -2196,7 +2199,10 @@
     }
     async function historyPage(version) {
         content.append(el('span', 'Твой прогресс', 'eyebrow'), el('h1', 'История'));
-        const data = await request('/api/mini/history');
+        const [data, roomHistory] = await Promise.all([
+            request('/api/mini/history'),
+            request('/api/account/game-history?identity=telegram'),
+        ]);
         if (version !== generation) return;
         const modes = {classic: 'Квиз', photo: 'Фото-загадки', mafia: 'Мафия'};
         content.append(el('h2', 'Последние игры'));
@@ -2210,6 +2216,7 @@
             card.append(el('small', parts.join(' · ')));
             content.append(card);
         }
+        renderRoomGames(roomHistory.games);
         content.append(el('h2', 'Последние ответы'));
         if (!data.answers.length) note(content, 'Отдельные ответы начнут записываться после перехода на PostgreSQL.', 'empty');
         else {
@@ -2224,6 +2231,37 @@
             note(content, `${chat.title}: ответов ${chat.answered}, правильных ${chat.correct}, очков ${chat.score}${when}`);
         }
         content.append(button('Обновить', () => navigate('history'), 'quiet'));
+    }
+
+    function renderRoomGames(games) {
+        content.append(el('h2', 'Квизы в комнатах'));
+        if (!games.length) { note(content, 'В комнатах пока нет сыгранных партий.', 'empty'); return; }
+        const modes = {classic: 'Квиз', photo: 'Фото-загадки'};
+        for (const game of games) {
+            const card = el('section', undefined, 'card');
+            card.append(el('strong', `${modes[game.mode] || game.mode} · ${game.room_title}`));
+            const parts = [{stopped: 'остановлена', interrupted: 'прервана'}[game.status] || 'завершена'];
+            if (game.ended_at) parts.push(new Date(game.ended_at).toLocaleString('ru-RU'));
+            parts.push(`мои ответы: ${game.my_correct}/${game.my_answers}`, `очки: ${game.my_score}`);
+            card.append(el('p', parts.join(' · '), 'muted'));
+            content.append(card);
+        }
+    }
+
+    async function guestHistory() {
+        stopRoomClassic();
+        const version = ++generation;
+        window.QuizPlay?.stop(); showGuestTab('profile'); feedback.textContent = '';
+        content.replaceChildren(); content.dataset.page = 'guest-history'; shell({page: 'history'});
+        try {
+            const data = await guestRequest('/api/account/game-history?identity=guest');
+            if (version !== generation) return;
+            content.append(el('h1', 'История'));
+            renderRoomGames(data.games || []);
+            content.append(button('Обновить', () => guestHistory(), 'quiet'));
+        } catch (error) {
+            if (version === generation) note(content, error.message, 'error');
+        }
     }
     async function alchemyTop(version) {
         content.append(el('span', 'Атлас маленьких чудес', 'eyebrow'), el('h1', 'Рейтинг атласа'));

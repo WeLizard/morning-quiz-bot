@@ -1882,6 +1882,16 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         # Личная история: последние игры, ответы и агрегаты по чатам.
         return await store.history(credential(request), limit=limit)
 
+    @app.get('/api/account/game-history')
+    async def account_game_history_route(
+        request: Request, limit: int = Query(20, ge=1, le=50), identity: str | None = Query(None),
+    ):
+        """Account-wide Classic/Photo history for standalone browser rooms."""
+        identity = room_identity(request, identity)
+        async with room_principal(request, identity) as (session, who):
+            from application.game_history import account_game_history
+            return {'games': await account_game_history(session, who.account_id, limit=limit)}
+
     @app.get('/api/mini/leaderboard')
     async def global_leaderboard(request: Request, limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0, le=10000)):
         return await store.global_leaderboard(credential(request), limit=limit, offset=offset)

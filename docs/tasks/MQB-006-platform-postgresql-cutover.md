@@ -252,3 +252,10 @@ Workstreams 2–3 предшествуют финальному cutover. Game su
   (та же предпосылка окружения) и
   `test_terminal_merge_revokes_old_principal_and_drops_inflight_body`
   (команда `forfeit` получила `action_unavailable`). Оба в тестах ИИ «Ночного города».
+- 2026-11-24 — полный локальный прогон для миграции сессий. Чистая
+  `morning_quiz_test` дошла до `20261124_0051`, Alembic не нашёл расхождений.
+  Результат Python: 3 580 прошли, 2 упали, 36 пропущены, 1 XPASS.
+  Сбой подписи обжарочной исправлен в `1d81a4d`, затем 85 связанных тестов прошли.
+  Остался `test_admin_section_answers_through_the_dev_container_port_mapping`
+  (HTTP 200 вместо 403). Восстановление и откат схемы отдельно прошли на
+  изолированной копии БД песочницы. [Детали миграции](ACCOUNT_FIRST_MIGRATION.md)

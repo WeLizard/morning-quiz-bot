@@ -597,7 +597,7 @@ GENITIVE = dict(
     juicery='соковарни', noodle_shop='макаронной мастерской', oil_press='маслобойни', sausage_shop='колбасного цеха',
     smokehouse='коптильни', soapery='мыловарни', syrupery='сироповарни', tailor='швейной мастерской',
     teahouse='чайной беседки', spinnery='прядильни', weavery='ткацкой', dryer='сушильни', cellar='погребка',
-    compost_heap='компостной кучи', tea_factory='чайной фабрики')
+    compost_heap='компостной кучи', tea_factory='чайной фабрики', coffee_roastery='обжарочной')
 
 
 def craft_text(rows):

@@ -30,7 +30,6 @@ body.pie-game-open .workspace>#rail,body.pie-game-open .workspace>.scene-area,bo
 #pie-game-view .pie-cut{pointer-events:none}
 :root[data-farm-theme="night"] #pie-game-view .pie-alt{background:#1d3128e6;color:#edf1df}
 #pie-game-view :focus-visible{outline:3px solid var(--qw-game-accent,#5b883c);outline-offset:3px}
-html.qw-telegram #pie-game-view .pie-back{display:none}
 :root[data-qw-contrast="1"] #pie-game-view .pie-stage-card,:root[data-qw-contrast="1"] #pie-game-view .pie-controls{border-width:2px}
 :root[data-qw-contrast="1"] #pie-game-view .pie-scene svg{filter:saturate(1.12) contrast(1.08)}
 :root[data-qw-contrast="1"][data-farm-theme="night"] #pie-game-view .pie-scene svg{filter:brightness(1.55) contrast(1.18) saturate(1.1)}

@@ -30,7 +30,6 @@ body.ballista-game-open .workspace>#rail,body.ballista-game-open .workspace>.sce
 #ballista-game-view .ballista-actions button{min-height:48px;font-size:var(--qw-fs-control)}
 #ballista-game-view .ballista-rules{font-size:var(--qw-fs-small);line-height:1.5}
 #ballista-game-view :focus-visible{outline:3px solid var(--qw-game-accent,#5b883c);outline-offset:3px}
-html.qw-telegram #ballista-game-view .ballista-back{display:none}
 :root[data-qw-contrast="1"] #ballista-game-view .ballista-stage-card,:root[data-qw-contrast="1"] #ballista-game-view .ballista-controls{border-width:2px}
 :root[data-qw-contrast="1"] #ballista-game-view .ballista-scene .ballista-target{stroke:#172300;stroke-width:8;fill:#fff39cbb;filter:none}
 :root[data-qw-contrast="1"][data-farm-theme="night"] #ballista-game-view .ballista-scene svg{filter:brightness(1.55) contrast(1.18) saturate(1.1)}

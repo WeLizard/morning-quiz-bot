@@ -242,7 +242,7 @@ CONTENT = {
             _g('fest_posid_voucher', 'Талон сада со скидкой 25%', 'voucher', 'orchard', 10, 2, note='ждёт сад'),
             _g('fest_posid_snowman', 'Снеговик в шарфе', 'mascot', 'mascot', 12, 200, seller='sonya'),
             _g('fest_posid_lantern', 'Заморский фонарик-клубок', 'curio', 'farm1', 10, 250, seller='magpie',
-               note='диковинка Сороки; красители dye_* — TODO, когда они появятся в каталоге'),
+               note='диковинка Сороки'),  # TODO: Сорокины красители dye_*, когда они появятся в каталоге
             # earned by tasks (source 'task:<id>'), not sold
             _g('fest_posid_basket', 'Корзинка с пряжей', 'decor', 'farm1', 5, 60, source='task:yarn'),
             _g('fest_posid_bunting', 'Гирлянда из носочков', 'wall', 'fence', 5, 60, source='task:warm'),
@@ -282,7 +282,7 @@ CONTENT['new_year'] = dict(
         _g('fest_ny_scroll', 'Свиток «Варежки и шарф с оленями»', 'scroll', 'none', 7, 25, seller='sonya',
            note='рецепт узора; откроется в портновской, когда его подключат'),
         _g('fest_ny_ball', 'Заморский шар-диковинка', 'curio', 'farm1', 10, 250, seller='magpie',
-           note='диковинка Сороки; семена «Зимний перец» — TODO, когда появятся в каталоге заморских культур'),
+           note='диковинка Сороки'),  # TODO: семена «Зимний перец», когда появятся в каталоге заморских культур
         # earned by tasks, not sold
         _g('fest_ny_cap', 'Снежная шапка с флажком', 'roof', 'roof', 6, 60, source='task:table'),
         _g('fest_ny_mitten_garland', 'Гирлянда из варежек', 'wall', 'fence', 7, 60, source='task:warm'),
@@ -337,7 +337,7 @@ CONTENT['spring_flowers'] = dict(
         _g('fest_flw_graft', 'Прививка «Яблоня в цвету»', 'graft', 'orchard', 16, 10, note='облик дерева; ждёт сад', wired=ORCHARD_WIRED),
         _g('fest_flw_gift', 'Букет в праздничной упаковке', 'decor', 'farm1', 7, 80, seller='sonya'),
         _g('fest_flw_bulb', 'Заморская луковица «Огненный тюльпан»', 'curio', 'farm1', 10, 250, seller='magpie',
-           note='диковинка Сороки; сама заморская культура — TODO, когда появится в каталоге'),
+           note='диковинка Сороки'),  # TODO: сама заморская культура, когда появится в каталоге
         _g('fest_flw_vase', 'Ваза на рынке', 'village', 'village', 7, 60, source='task:bouquet', note='ячейка площади'),
         _g('fest_flw_ribbons', 'Ленточки на грядки', 'wall', 'fence', 6, 60, source='task:ribbons'),
         _g('fest_flw_gear', 'Вечная шестерёнка', 'decor', 'farm1', 4, 60, source='task:gear'),
@@ -508,7 +508,7 @@ CONTENT['cucumber_day'] = dict(
         _g('fest_cuc_scroll', 'Свиток «Огурцы с мёдом»', 'scroll', 'none', 7, 25, seller='host',
            note='рецепт; откроется, когда его подключат'),
         _g('fest_cuc_bumpy', 'Заморский «Пупырчатый огурец»', 'curio', 'farm1', 10, 250, seller='magpie',
-           note='диковинка Сороки; сама заморская культура — TODO, когда появится в каталоге'),
+           note='диковинка Сороки'),  # TODO: сама заморская культура, когда появится в каталоге
         _g('fest_cuc_jars', 'Банки солений на веранде', 'decor', 'farm1', 3, 60, source='task:pickle'),
         _g('fest_cuc_vines', 'Огуречные плети на заборе', 'wall', 'fence', 2, 60, source='task:crunch'),
         _g('fest_cuc_arch', 'Огуречная арка на рынке', 'village', 'village', 6, 60, source='task:ties', note='ячейка площади'),

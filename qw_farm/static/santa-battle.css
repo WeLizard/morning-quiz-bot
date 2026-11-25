@@ -71,7 +71,6 @@ body.santa-game-open .workspace>#rail,body.santa-game-open .workspace>.scene-are
 #santa-game-view .sb-bar-run{position:absolute;top:-2px;bottom:-2px;left:0;width:6px;margin-left:-3px;background:#1d2433;border-radius:3px}
 #santa-game-view .sb-rules{font-size:var(--qw-fs-small);line-height:1.5}
 #santa-game-view :focus-visible{outline:3px solid var(--qw-game-accent,#5b883c);outline-offset:3px}
-html.qw-telegram #santa-game-view .sb-back{display:none}
 :root[data-farm-theme="night"] #santa-game-view .sb-intents{background:#3b3014;color:#fff3c4}
 :root[data-farm-theme="night"] #santa-game-view .sb-chip{background:#26364a;color:#e7eef6}
 :root[data-farm-theme="night"] #santa-game-view .sb-hp{background:#33402f;border-color:#6d7c66}

@@ -687,3 +687,11 @@ def test_task_modes_follow_the_calendar():
     assert 'late' not in modes['fisher_day'] and 'late' not in modes['posidelki']  # the fair is the last day
     assert modes['maslenitsa'] == {'fair'}                                 # the whole week is the fair
     assert F.task_mode(None, ts(2027, 5, 20)) is None
+
+
+def test_player_facing_festival_texts_carry_no_developer_notes():
+    # Names and notes are shown in the fair shops; a «TODO» or an item id there is a leaked developer note.
+    for fid in F.CONTENT:
+        for g in F.content(fid)['goods']:
+            for text in (g['name'], g['note'] or ''):
+                assert 'TODO' not in text and '_*' not in text, (fid, g['id'], text)

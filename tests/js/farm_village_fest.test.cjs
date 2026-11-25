@@ -38,9 +38,29 @@ for(const [id,[file,budget]] of Object.entries(LAYERS))test(`${id} layer: vector
 test('festival layers: fetched only for their festival, base under the night tint, glow above it',()=>{
  assert.match(app,/const VILLAGE_FEST=\{posidelki:'village-fest-posidelki\.svg',/);
  assert.match(app,/d\?\.festivalDecor==='on'\?d\.festival:''/,'nothing is fetched while the decor switch is off');
- assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),/,'base under the night tint, glow above it');
+ assert.match(app,/world\.append\(villageMerchantLayer\('base'\),villageFestLayer\('base'\),villageStageLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageStageLayer\('glow'\),/,'base under the night tint, glow above it');
  assert.match(app,/FEST\.applyWorld\(view\);syncVillageFest\(\);/);
  assert.match(css,/\.village-fest\{position:absolute;inset:0;pointer-events:none;display:none\}/);
  assert.match(css,/:root:not\(\[data-farm-theme=night\]\) \.village-fest-glow \.vf-night\{display:none\}/);
  assert.match(css,/prefers-reduced-motion:no-preference\)\{\s*\.vf-smoke\{animation/);
+});
+
+// «Праздник 1/4…4/4» (the village fund): the plaza decor drawn by scripts/art/village/fest_stages.js instead of the flat CSS
+// strips that crossed the plaza on the screen axis. One layer; CSS shows its groups by .village-world[data-stage].
+test('fund stages: one vector layer, groups shown by stage, glow over the night tint only at stage 3',()=>{
+ const file='village-fest-stages.svg',svg=fs.readFileSync(path.join(stat,file),'utf8');
+ assert.match(svg,/^<svg [^>]*viewBox="0 0 2400 1800"/);
+ assert.doesNotMatch(svg,/<image|data:|<style|style=|<script|href=/i,'no raster, inline style or script');
+ for(const g of ['vs-flags','vs-flowers','vs-lights','vs-balloons','vs-glow'])assert.match(svg,new RegExp(`<g class="${g}">`));
+ assert.ok(svg.length<60000,'stays light');
+ assert.ok(api.includes(`'${file}'`),'served as an asset');
+ assert.match(app,/const VILLAGE_STAGE='village-fest-stages\.svg'/);
+ assert.match(app,/syncVillageContrast\(\);syncVillageStage\(stage\);/,'synced with the stage of every village render');
+ assert.match(app,/if\(!stage\)return;/,'nothing is fetched before the first stage');
+ assert.doesNotMatch(css,/\.village-(flags|flowers|lights|balloons|festival)\b/,'the CSS strips are gone');
+ assert.match(css,/\.village-stage :is\(\.vs-flags,\.vs-flowers,\.vs-lights,\.vs-balloons,\.vs-glow\)\{display:none\}/);
+ assert.ok(css.includes('.village-world:is([data-stage="1"],[data-stage="2"],[data-stage="3"]) .village-stage-base .vs-flags'),'flags from stage 1');
+ assert.ok(css.includes('.village-world:is([data-stage="2"],[data-stage="3"]) .village-stage-base .vs-flowers'),'flowers from stage 2');
+ assert.ok(css.includes('.village-world[data-stage="3"] .village-stage-base :is(.vs-lights,.vs-balloons)'),'lights and balloons at stage 3');
+ assert.ok(css.includes(':root[data-farm-theme=night] .village-world[data-stage="3"] .village-stage-glow .vs-glow'),'the bulbs glow at night');
 });

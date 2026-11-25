@@ -14,6 +14,7 @@ import {springFlowers} from './fest_flowers.js';
 import {pumpkinNight} from './fest_pumpkin.js';
 import {aprilFools} from './fest_fools.js';
 import {cosmonautics} from './fest_cosmos.js';
+import {villageStages} from './fest_stages.js';
 import {buildArt} from './build.js';
 import {crewSvgs,poohRoamingSvg} from './crew.js';
 import {residentSvgs} from './residents.js';
@@ -426,6 +427,7 @@ meta.fest={posidelki:posidelki({B,P,matrix:[.75*K,0,0,.75*K,.75*OX,.75*OY],windo
  meta.fest.pumpkin_night=pumpkinNight({...festV,pond:POND});
  if(!opts.pumpkinPreview)meta.fest.april_fools=aprilFools({...festV,pond:POND});
  if(!opts.pumpkinPreview)meta.fest.cosmonautics=cosmonautics(festV);
+ meta.fest.stages=villageStages(festV);   // «Праздник 1/4…4/4»: the village fund's plaza decor, shown by stage (not a calendar festival)
  // «Контрастный режим» (UI_RULES §16): vector path edges over the art, a game layer shown only in that mode (contrast_paths.js)
  meta.contrast_paths=contrastPaths(festV)}
 {const corners=[];for(const [x,y] of [[CART[0],CART[1]],[CART[2],CART[1]],[CART[2],CART[3]],[CART[0],CART[3]]])for(const z of [0,64])corners.push(scr(P(x,y,z)).map(v=>v*.75));

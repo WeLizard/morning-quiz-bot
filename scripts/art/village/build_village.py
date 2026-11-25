@@ -18,7 +18,6 @@ import base64
 import hashlib
 import io
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -60,18 +59,17 @@ def app_buttons() -> list:
             + [w(*d["hall"]), w(*d["gate"])])
 
 
+# Where the badge stood in the world until 2026-11-24 (a7dc241 moved it into the fixed .village-hud). The approved festival
+# layers were placed clear of this rect; keeping it lets them rebuild byte-identical. Drop it when the layers are re-approved.
+LEGACY_BADGE = [1070.0, 1067.8, 1330.0, 1131.8]
+
+
 def festival_badge() -> list:
-    """The village festival badge («Праздник с N ур.», «Праздник 2/4»), a world-unit rect: a wide DOM plate under the plaza
-    (style.css .village-festival box, .village-stage-badge at its left/top). Festival decor keeps clear of it."""
-    css = (ROOT / "qw_farm" / "static" / "style.css").read_text(encoding="utf-8")
-    box = re.search(r"\.village-festival\{inset:auto;left:([\d.]+)%;top:([\d.]+)%;width:([\d.]+)%;height:([\d.]+)%\}", css)
-    badge = re.search(r"\.village-stage-badge\{position:absolute;left:([\d.]+)%;top:([\d.]+)%", css)
-    if not box or not badge:
-        raise RuntimeError("style.css changed: the village festival badge is not found")
-    l, t, w, h = map(float, box.groups())
-    x, y = (l + w * float(badge[1]) / 100) * 24, (t + h * float(badge[2]) / 100) * 18
-    # [x0, y0, x1, y1]: about 110x24 css px, which is ~260x56 world units at the phone zoom of the village
-    return [round(x - 130, 1), round(y - 32, 1), round(x + 130, 1), round(y + 32, 1)]
+    """A world-unit rect the festival decor keeps clear of. The festival badge («Праздник 2/4») was a DOM plate under the
+    plaza until 2026-11-24; it now lives in the screen-fixed .village-hud and covers no place of the world, and the CSS
+    festival box it was measured from is gone (the stages are drawn by fest_stages.js). The old rect is kept so the
+    approved festival layers rebuild byte-identical."""
+    return LEGACY_BADGE
 
 
 def walk_targets() -> dict:

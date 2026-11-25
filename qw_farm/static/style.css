@@ -439,11 +439,6 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-townhall{width:62px;height:44px;background:#f8f2d8dd;border-radius:12px;flex-direction:column;gap:1px;box-shadow:0 3px 7px #52643c20;font-size:12px}
 .village-townhall svg{width:23px;height:23px}.village-townhall[aria-pressed=true]{box-shadow:0 0 0 2px #8aab70}
 .village-back{position:absolute;left:10px;top:10px;z-index:5;min-height:44px;padding:8px 13px;background:#faf8e9e8;border-radius:13px;font-size:12px;box-shadow:0 3px 9px #48603a16}
-.village-festival{position:absolute;inset:0;pointer-events:none}
-.village-flags{display:none;position:absolute;left:32%;top:45%;width:36%;height:20px;border-top:2px solid #a18c64;background:repeating-linear-gradient(120deg,transparent 0 9px,#c99a76 10px 20px,#e6c677 21px 31px,transparent 32px 42px);clip-path:polygon(0 0,100% 0,100% 12%,85% 100%,72% 20%,60% 100%,48% 20%,36% 100%,24% 20%,12% 100%,0 12%)}
-.village-flowers{display:none;position:absolute;left:33%;top:82%;width:35%;height:10px;background:radial-gradient(circle,#d3989f 0 3px,#89a46e 4px 6px,transparent 7px) 0 0/23px 10px}
-.village-lights{display:none;position:absolute;left:31%;top:47%;width:38%;height:8px;background:radial-gradient(circle,#f8da8c 0 3px,transparent 4px) 0 0/25px 8px;filter:drop-shadow(0 0 3px #f5dc97)}
-.stage-1 .village-flags,.stage-2 .village-flags,.stage-3 .village-flags,.stage-2 .village-flowers,.stage-3 .village-flowers,.stage-3 .village-lights{display:block}
 .village-resident{scroll-margin-top:8px}.village-dialogue{font-size:14px;line-height:1.5;color:#45644b;margin:10px 0}
 .village-services{margin:10px 0;border:1px solid #d6dec8;border-radius:14px;padding:0 10px;min-width:0}
 .village-services summary{min-height:44px;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;color:#375f48;list-style:none}
@@ -502,15 +497,11 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-npc-name{display:grid;gap:1px;z-index:4}.village-npc-name b{font-weight:700}
 .village-hearts{font-style:normal;color:#a24f5c;letter-spacing:1px;font-size:12px}
 .village-npc[aria-pressed=true]{z-index:5}
-.village-flags{height:26px;background:repeating-linear-gradient(120deg,transparent 0 9px,#d9694f 10px 20px,#f2cf5c 21px 31px,#6fa6c9 32px 42px,transparent 43px 52px);transform-origin:50% 0}
-.village-flowers{height:18px;background:radial-gradient(circle at 50% 38%,#e87d8a 0 4px,transparent 5px) 0 0/26px 18px,radial-gradient(circle at 50% 82%,#6f9c58 0 6px,transparent 7px) 0 0/26px 18px}
-.village-lights{height:10px;background:radial-gradient(circle,#fff0a8 0 3px,#f6c85c 3.5px 4.5px,transparent 5.5px) 0 0/25px 10px}
-.village-balloons{display:none;position:absolute;left:63%;top:32%;width:9%;height:13%;background:radial-gradient(ellipse 30% 28% at 28% 28%,#e87d8a 96%,transparent),radial-gradient(ellipse 30% 28% at 68% 22%,#f2cf5c 96%,transparent),radial-gradient(ellipse 30% 28% at 52% 52%,#6fa6c9 96%,transparent)}
 /* ---- performance: static art layer, small composited animated parts, pausing off screen / hidden tab ---- */
 .village-world{contain:layout style}
 .village-art{will-change:transform;transform:translateZ(0)}
 .village-fx,.village-night,.village-sun,.village-actors{position:absolute;inset:0;pointer-events:none}
-.village-actors>*{pointer-events:auto}.village-actors>.village-festival{pointer-events:none}
+.village-actors>*{pointer-events:auto}
 .va{will-change:transform,opacity}
 .is-off,.is-off *,.village-paused *{animation-play-state:paused!important}
 .is-off::before,.is-off::after,.is-off ::before,.is-off ::after,.village-paused ::before,.village-paused ::after{animation-play-state:paused!important}
@@ -549,6 +540,12 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 :root[data-festival=april_fools][data-festival-decor=on] .village-fest[data-fest=april_fools],
 :root[data-festival=cosmonautics][data-festival-decor=on] .village-fest[data-fest=cosmonautics]{display:block}
 .village-fest-base .vf-night,.village-fest-glow .vf-decor,.village-fest-glow .vf-day{display:none}
+/* «Праздник 1/4…4/4» (village fund): the plaza decor of village-fest-stages.svg (scripts/art/village/fest_stages.js), by stage */
+.village-stage{position:absolute;inset:0;pointer-events:none}
+.village-stage>svg{display:block;width:100%;height:100%}
+.village-stage :is(.vs-flags,.vs-flowers,.vs-lights,.vs-balloons,.vs-glow){display:none}
+.village-world:is([data-stage="1"],[data-stage="2"],[data-stage="3"]) .village-stage-base .vs-flags,.village-world:is([data-stage="2"],[data-stage="3"]) .village-stage-base .vs-flowers,
+.village-world[data-stage="3"] .village-stage-base :is(.vs-lights,.vs-balloons),:root[data-farm-theme=night] .village-world[data-stage="3"] .village-stage-glow .vs-glow{display:inline}
 :root[data-farm-theme=night] .village-fest-base .vf-day{display:none}
 :root:not([data-farm-theme=night]) .village-fest-glow .vf-night{display:none}
 /* «Контрастный режим»: path edges (village-contrast-paths.svg) under the night tint, only with html[data-qw-contrast="1"] */
@@ -611,9 +608,7 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  @keyframes vfx-flap-a{0%{opacity:1}50%{opacity:0}}
  @keyframes vfx-flap-b{0%{opacity:0}50%{opacity:1}}
 }
-.stage-3 .village-balloons{display:block}
 /* ---- big village: left/top of the festival follow the old centre block (30% x 53.3% of the world) ---- */
-.village-festival{inset:auto;left:30.5%;top:36.4%;width:39%;height:26%}
 .village-hud{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden}
 .village-hud[hidden]{display:none!important}
 .village-hud>*{pointer-events:auto}
@@ -728,11 +723,9 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  @keyframes v-pulse{50%{transform:scale(1.12)}}
  .village-order:not(.is-ready){animation:v-nudge 2.6s ease-in-out infinite}
  @keyframes v-nudge{0%,80%,100%{transform:translateY(0)}88%{transform:translateY(-3px)}94%{transform:translateY(0)}}
- .village-flags{animation:v-bunting 4.2s ease-in-out infinite}
- @keyframes v-bunting{0%,100%{transform:skewX(0) rotate(0)}50%{transform:skewX(-3deg) rotate(.5deg)}}
- .village-lights{animation:v-twinkle 1.9s ease-in-out infinite}
  @keyframes v-twinkle{50%{opacity:.55}}
- .village-balloons{animation:v-float 5s ease-in-out infinite}
+ .village-stage .vs-balloons{animation:v-float 5s ease-in-out infinite}
+ .village-stage-glow .vs-glow{animation:v-twinkle 1.9s ease-in-out infinite}
  @keyframes v-float{50%{transform:translateY(-8px)}}
  @keyframes v-flicker{0%,100%{opacity:1}45%{opacity:.82}55%{opacity:.95}}
  .vn-fly{animation:v-fly 9s ease-in-out infinite;animation-delay:calc(var(--d,0s) - var(--e,0s))}

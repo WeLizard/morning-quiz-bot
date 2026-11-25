@@ -2781,6 +2781,17 @@ function syncVillageFest(){
  if(typeof fetch!=='function')return;
  fetch(`/app/farm/assets/${file}`).then(r=>r.ok?r.text():'').then(svg=>{if(svg.startsWith('<svg')){villageFestCache[id]=svg;fill(svg);}}).catch(()=>{});
 }
+// «Праздник 1/4…4/4»: one vector layer of the plaza decor (generator: scripts/art/village/fest_stages.js); CSS shows its groups by
+// .village-world[data-stage], the glow copy sits above the night tint.
+const VILLAGE_STAGE='village-fest-stages.svg',villageStageCache={};
+function villageStageLayer(kind){const n=el('div',null,`village-stage village-stage-${kind}`);n.setAttribute('aria-hidden','true');return n;}
+function syncVillageStage(stage){
+ if(villageWorldEl)villageWorldEl.dataset.stage=stage===null?'':String(stage);
+ if(!stage)return;const layers=[...($('village-scene')?.querySelectorAll?.('.village-stage')||[])].filter(n=>!n.firstChild);if(!layers.length)return;
+ if(villageStageCache.svg){for(const n of layers)n.innerHTML=villageStageCache.svg;return;}
+ if(typeof fetch!=='function')return;
+ fetch(`/app/farm/assets/${VILLAGE_STAGE}`).then(r=>r.ok?r.text():'').then(svg=>{if(svg.startsWith('<svg')){villageStageCache.svg=svg;for(const n of layers)if(!n.firstChild)n.innerHTML=svg;}}).catch(()=>{});
+}
 function villageContrastLayer(){const n=el('div',null,'village-contrast');n.setAttribute('aria-hidden','true');return n;}
 function syncVillageContrast(){
  const on=globalThis.document?.documentElement?.getAttribute?.('data-qw-contrast')==='1',layer=$('village-scene')?.querySelector?.('.village-contrast');
@@ -2799,7 +2810,7 @@ function villageBuildWorld(){
  const actors=el('div',null,'village-actors');
  const gate=button(null,e=>villageGo([VILLAGE_GATE[0],VILLAGE_GATE[1]-1.2],exitVillage,e),'village-gate');gate.style.left=`${VILLAGE_GATE_BOARD[0]}%`;gate.style.top=`${VILLAGE_GATE_BOARD[1]}%`;gate.style.width=`${VILLAGE_GATE_BOARD[2]}%`;gate.style.height=`${VILLAGE_GATE_BOARD[3]}%`;gate.dataset.villageGate='gate';gate.setAttribute('aria-label','На ферму: ворота деревни');gate.title='На ферму';gate.innerHTML=VILLAGE_GATE_SIGN;
  const player=el('div',null,'village-player');player.setAttribute('aria-hidden','true');player.style.left=`${villagePos[0]}%`;player.style.top=`${villagePos[1]}%`;player.dataset.face='right';player.innerHTML=villagePlayerSvg();
- world.append(villageMerchantLayer('base'),villageFestLayer('base'),villageContrastLayer(),villageBuildLayer('base'),sun,villageFx(),night,villageFestLayer('glow'),villageBuildLayer('glow'),villageMerchantLayer('glow'),villageMerchantFigure(),villageWaterWheel(),villageCrewLayer(),actors,villagePlaces(),gate,player);
+ world.append(villageMerchantLayer('base'),villageFestLayer('base'),villageStageLayer('base'),villageContrastLayer(),villageBuildLayer('base'),sun,villageFx(),night,villageFestLayer('glow'),villageStageLayer('glow'),villageBuildLayer('glow'),villageMerchantLayer('glow'),villageMerchantFigure(),villageWaterWheel(),villageCrewLayer(),actors,villagePlaces(),gate,player);
  return world;
 }
 function syncVillageScene(){
@@ -2818,13 +2829,12 @@ function syncVillageScene(){
  const sig=JSON.stringify([S.me.id,stage,villageSheet,villageResident,jack,santaGuests,workSite,names.map(n=>[n,repInfo(n).lv,villageOrders(n).map(o=>[o.id,villageReady(o)]),villageQuestPhase(n)])]);
  // The world (image, lights, effects, player) is built once; only the actors layer changes with game state.
  if(!villageWorldEl||root.children?.[0]!==villageWorldEl){villageWorldEl=villageBuildWorld();root.replaceChildren(villageWorldEl);villageCenter(villagePos,false);}
- syncVillageSites();syncVillageBuild(workingNames);syncVillageContrast();
+ syncVillageSites();syncVillageBuild(workingNames);syncVillageContrast();syncVillageStage(stage);
  if(sig===villageSceneSignature){villageCullHeaderControls();return;}villageSceneSignature=sig;
  root.setAttribute('aria-label',(stage===null?(eco()?.fund_open?'Деревня. Данные праздника обновляются.':`Деревня. Сезонный фонд откроется с ${ECON().fund_level} уровня.`):`Деревня. ${['Начало подготовки праздника','Флажки к празднику','Цветы к празднику','Площадь готова к празднику'][stage]}.`)+' Прокручивай карту, нажимай на землю, чтобы идти, или выбирай жителей кнопками.');
  const focused=document.activeElement?.dataset?.villageNpc||document.activeElement?.dataset?.villageTownhall;
  const world=villageWorldEl,actors=world.children.find?world.children.find(n=>n.className==='village-actors'):world.querySelector('.village-actors'),parts=[];
- const festival=el('div',null,`village-festival stage-${stage===null?'locked':stage}`);festival.setAttribute('aria-hidden','true');festival.append(el('span',null,'village-flags'),el('span',null,'village-flowers'),el('span',null,'village-lights'),el('span',null,'village-balloons'));
- const badge=el('div',null,`village-stage-badge stage-${stage===null?'locked':stage}`);if(stage===null)badge.append(el('b',eco()?.fund_open?'Праздник: ждём данные':`Праздник с ${ECON().fund_level} ур.`));else{badge.append(el('b',`Праздник ${stage+1}/4`),el('small',VILLAGE_STAGES[stage]));const pips=el('span',null,'village-pips');pips.setAttribute('aria-hidden','true');for(let i=0;i<4;i++)pips.append(el('i',null,i<=stage?'on':''));badge.append(pips);}parts.push(festival);
+ const badge=el('div',null,`village-stage-badge stage-${stage===null?'locked':stage}`);if(stage===null)badge.append(el('b',eco()?.fund_open?'Праздник: ждём данные':`Праздник с ${ECON().fund_level} ур.`));else{badge.append(el('b',`Праздник ${stage+1}/4`),el('small',VILLAGE_STAGES[stage]));const pips=el('span',null,'village-pips');pips.setAttribute('aria-hidden','true');for(let i=0;i<4;i++)pips.append(el('i',null,i<=stage?'on':''));badge.append(pips);}
  for(const [idx,npc] of names.entries()){
   const figure=VILLAGE_RESIDENT_FIGURES[npc];if(!figure)continue;
   const [foot,roamingArt]=figure,spot=npcSpot(npc),orders=villageOrders(npc),quest=villageQuest(npc),ready=orders.some(villageReady)||!!(quest&&villageQuestPhase(npc)==='active'&&enough({[quest.item]:quest.qty})),selected=villageSheet==='resident'&&npc===villageResident;

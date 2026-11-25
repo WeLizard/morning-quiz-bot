@@ -44,7 +44,7 @@ test('construction.js: Сорока opens on her visit, Sonya shutters 23–7 Mo
  assert.deepEqual(C.stallStates(me,night),{magpie:'open',igor:'open',sonya:'closed',agata:'open',post:'open',player:'open'});
 });
 test('app.js: layers under and above the night tint, the crew, synced with the village scene; CSS keeps the motion optional',()=>{
- assert.match(app,/villageFestLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageBuildLayer\('glow'\),/);
+ assert.match(app,/villageFestLayer\('base'\),villageStageLayer\('base'\),villageContrastLayer\(\),villageBuildLayer\('base'\),sun,villageFx\(\),night,villageFestLayer\('glow'\),villageStageLayer\('glow'\),villageBuildLayer\('glow'\),/);
  assert.match(app,/villageWaterWheel\(\),villageCrewLayer\(\),actors,/);
  assert.match(app,/syncVillageBuild\(workingNames\);syncVillageContrast\(\);/);
  // one piece placer for every pack (village-build.svg by default, the building effects pass their own spec)

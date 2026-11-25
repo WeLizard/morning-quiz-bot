@@ -112,6 +112,13 @@ def count_outputs(farm, outputs):
         count(farm, 'p:' + item, qty)
 
 
+def uncredited_outputs(job):
+    """Workshop output not already assigned to a completed contract."""
+    credited = job.get('contract_credited', {})
+    return {item: qty - credited.get(item, 0) for item, qty in job.get('outputs', {}).items()
+            if qty - credited.get(item, 0) > 0}
+
+
 # --- balance model ------------------------------------------------------------------------------------------
 LAND_AT_LEVEL = ((1, 8), (3, 12), (6, 14), (9, 16), (13, 18), (18, 20))
 
@@ -245,13 +252,74 @@ def streak_bonus(farm, day):
     return 0
 
 
+def _advance_streak(farm, day):
+    s = farm['market']['streak']
+    if s['last_day'] != day:
+        s['count'] = s['count'] + 1 if s['last_day'] == day - 1 else 1
+        s['last_day'] = day
+
+
+def _pay_contract(farm, c, day, paid_at, clip_coins=False):
+    """Pay a completed contract using its board day for the streak bonus."""
+    bonus = streak_bonus(farm, day)
+    coins = c['coins'] * (100 + bonus) // 100
+    if clip_coins:
+        coins = min(coins, max(0, 10 ** 12 - farm['coins']))
+    xp = c['xp'] * (100 + bonus) // 100
+    c['claimed'] = True
+    farm['coins'] += coins
+    xp = progression.grant_xp(farm, xp, 'contract', paid_at, True)
+    items = farm['market']['contracts']['items']
+    if items and all(x['claimed'] for x in items):
+        _advance_streak(farm, day)
+    return coins, xp, bonus
+
+
+def _finalize_expired_contracts(farm, old_day, now):
+    """Settle only saved progress and workshop work finished before the old cutoff."""
+    m = farm['market']
+    board = m['contracts']
+    if old_day < 0 or not board['items']:
+        return
+    cutoff = (old_day + 1) * 86400 - TZ_OFFSET
+    # Eligible batches are deterministic and their per-job marker survives JSON saves.
+    jobs = sorted(((obj, job) for obj in farm.get('objects', []) for job in obj.get('jobs', [])
+                   if cutoff - 86400 <= job.get('ready_at', float('inf')) < cutoff),
+                  key=lambda pair: (pair[1].get('ready_at', 0), pair[0].get('id', ''), pair[1].get('id', '')))
+    for c in board['items']:
+        if c['claimed']:
+            continue
+        if c['kind'] == 'craft':
+            need_qty = max(0, c['goal'] - contract_progress(farm, c))
+            eligible = [(obj, job, max(0, job.get('outputs', {}).get(c['item'], 0) -
+                                       job.get('contract_credited', {}).get(c['item'], 0)))
+                        for obj, job in jobs]
+            # Incomplete expired contracts must not consume products that can count toward later work.
+            if sum(qty for _, _, qty in eligible) < need_qty:
+                eligible = []
+            for obj, job, available in eligible:
+                if need_qty <= 0:
+                    break
+                item = c['item']
+                take = min(need_qty, available)
+                if take:
+                    job.setdefault('contract_credited', {})[item] = job.get('contract_credited', {}).get(item, 0) + take
+                    count(farm, 'p:' + item, take)
+                    need_qty -= take
+        if contract_progress(farm, c) >= c['goal']:
+            _pay_contract(farm, c, old_day, now, clip_coins=True)
+
+
 def settle(farm, now):
     """Server-authoritative market clock: caravan arrival/expiry and the Moscow-day contract reset."""
     m = upgrade_market(farm)
     settle_caravan(farm, now)
     day = moscow_day(now)
-    if m['contracts']['day'] != day:  # generated at every level, so a level-up never changes a settled farm
-        make_contracts(farm, day)
+    old_day = m['contracts']['day']
+    if day > old_day:
+        _finalize_expired_contracts(farm, old_day, now)
+        make_contracts(farm, day)  # generated at every level, so a level-up never changes a settled farm
+    # A regressing system clock must not replace a newer persisted board.
 
 
 # --- commands ----------------------------------------------------------------------------------------------
@@ -289,16 +357,7 @@ def apply_market(farm, kind, data, now, command_id):
         need(not c['claimed'], 'already_claimed', 'Награда уже получена.')
         need(contract_progress(farm, c) >= c['goal'], 'contract_incomplete', 'Контракт ещё не выполнен.')
         day = m['contracts']['day']
-        bonus = streak_bonus(farm, day)
-        coins, xp = c['coins'] * (100 + bonus) // 100, c['xp'] * (100 + bonus) // 100
-        c['claimed'] = True
-        farm['coins'] += coins
-        xp = progression.grant_xp(farm, xp, 'contract', now, True)
-        if all(x['claimed'] for x in m['contracts']['items']):
-            s = m['streak']
-            if s['last_day'] != day:
-                s['count'] = s['count'] + 1 if s['last_day'] == day - 1 else 1
-                s['last_day'] = day
+        coins, xp, bonus = _pay_contract(farm, c, day, now)
         return f'Контракт выполнен: +{coins} монет, +{xp} XP' + (f' (серия +{bonus}%).' if bonus else '.')
     raise AssertionError('Unknown market command')
 

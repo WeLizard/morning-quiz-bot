@@ -2427,9 +2427,9 @@ function contractsCard(m){
  const items=m.contracts.items,cfg=S.catalog.market.contracts;
  if(S.me.level<cfg.level){note(`Контракты появятся со ${cfg.level} уровня.`,c);return c;}
  const sub=el('p',null,'note');sub.append('Обновятся через ',timer(mskMidnight(now())),' (по Москве).');c.append(sub);
- const day=m.contracts.day,s=m.streak,streak=(s.last_day===day||s.last_day===day-1)?Math.min(cfg.streak_max,s.count)*cfg.streak_step:0;
+ const day=m.contracts.day,s=m.streak,days=(s.last_day===day||s.last_day===day-1)?s.count:0,streak=Math.min(cfg.streak_max,days)*cfg.streak_step;
  for(const k of items){const got=Math.min(contractProgress(k),k.goal),row=el('div',null,`contract${k.claimed?' done':''}`),txt=el('div',null,'contract-copy');txt.append(el('strong',contractText(k)),el('small',k.claimed?'награда получена':`${fmt(got)} / ${fmt(k.goal)} · +${Math.floor(k.coins*(100+streak)/100)} монет, +${Math.floor(k.xp*(100+streak)/100)} XP`));txt.append(meter(got,k.goal));row.append(txt,button(k.claimed?'Готово':'Забрать',()=>command('contract_claim',{contract:k.id}),k.claimed||got<k.goal?'secondary small':'primary small',k.claimed||got<k.goal));c.append(row);}
- c.append(el('small',s.count?`Серия: ${s.count} дн. подряд${streak?` · +${streak}% к наградам`:''}`:'Выполни все три контракта — начнётся серия с небольшим бонусом.','streak'));
+ c.append(el('small',days?`Серия: ${days} дн. подряд${streak?` · +${streak}% к наградам`:''}`:'Выполни все три контракта — начнётся серия с небольшим бонусом.','streak'));
  return c;
 }
 function residentsCard(p){

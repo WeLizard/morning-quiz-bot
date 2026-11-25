@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.engine import make_url
 
+from qw_farm import market
 from qw_farm.domain import validate_state
 from qw_farm.integration import register_models
 from qw_farm.invites import NEIGHBOR
@@ -134,6 +135,52 @@ async def receipts(env, account_id, key):
         table = env.schema['receipts']
         return (await session.execute(select(table).where(
             table.c.account_id == UUID(account_id), table.c.command_id == key))).mappings().all()
+
+
+def test_contract_streak_and_unclaimed_craft_survive_mini_app_restart(farm_pg_url):
+    async def scenario():
+        async with environment(farm_pg_url) as env, player(env) as actor:
+            day = market.moscow_day(env.now[0])
+            cutoff = (day + 1) * 86400 - market.TZ_OFFSET
+            async with env.db.transaction() as session:
+                unit = Unit(session, env.schema)
+                farm = await unit.by_account(actor.account_id)
+                farm['xp'] = 10_000
+                farm['market']['streak'] = {'count': 45, 'last_day': day - 1}
+                farm['market']['contracts'] = {'day': day, 'items': [
+                    dict(id=f'contract_{day}_0', kind='harvest', item='wheat', base=0, goal=1,
+                         coins=3, xp=1, claimed=True),
+                    dict(id=f'contract_{day}_1', kind='craft', item='flour', base=0, goal=1,
+                         coins=100, xp=1, claimed=False),
+                    dict(id=f'contract_{day}_2', kind='orders', item=None, base=0, goal=1,
+                         coins=3, xp=1, claimed=True),
+                ]}
+                mill = next(obj for obj in farm['objects'] if obj['type'] == 'mill')
+                mill['jobs'] = [dict(id='backlog-flour', recipe='flour', starts_at=cutoff-181,
+                                     ready_at=cutoff-1, seconds=180, inputs={'wheat': 1},
+                                     outputs={'flour': 1}, xp=1, version=farm['catalog'])]
+                coins = farm['coins']
+                await unit.save(farm)
+            assert (await view(actor))['market']['streak'] == {'count': 45, 'last_day': day - 1}
+            env.now[0] = cutoff + 1800
+            settings = MiniAppSettings(TOKEN, ORIGIN, offline=True)
+            for _ in range(2):
+                restarted = create_app(database=env.db, settings=settings, clock=lambda: env.now[0])
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=restarted), base_url=ORIGIN,
+                                             cookies=actor.client.cookies) as client:
+                    response = await client.get(API + '/me', params={'identity': 'guest'})
+                    assert response.status_code == 200, response.text
+                    state = response.json()['farm']
+                    assert state['market']['streak'] == {'count': 46, 'last_day': day}
+                    assert state['market']['contracts']['day'] == day + 1
+                    assert state['coins'] == coins + 120
+            async with env.db.transaction() as session:
+                ledger = env.schema['ledger']
+                payouts = await session.scalars(select(ledger.c.coins_delta).where(
+                    ledger.c.farm_id == UUID(actor.farm_id), ledger.c.kind == 'automation'))
+                assert list(payouts) == [120]
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize('identity', ['guest', 'telegram'])

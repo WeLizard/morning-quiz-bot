@@ -402,7 +402,7 @@ def apply(me, other, kind, data, now, command_id, speed=1, form='n', upkeep_conf
     elif kind=='collect':
         job=find(obj.get('jobs',[]),data['job'])
         need(job['ready_at']<=now,'not_ready','Продукция ещё не готова.')
-        inventory(me,job['outputs']);expansion.market.count_outputs(me,job['outputs']);progression.grant_xp(me,job['xp'],'craft',now,True,RECIPES[job['recipe']]['seconds'] if job.get('recipe') in RECIPES else None);me['stats']['crafts']+=1;text='Готовая продукция на складе.'
+        inventory(me,job['outputs']);expansion.market.count_outputs(me,expansion.market.uncredited_outputs(job));progression.grant_xp(me,job['xp'],'craft',now,True,RECIPES[job['recipe']]['seconds'] if job.get('recipe') in RECIPES else None);me['stats']['crafts']+=1;text='Готовая продукция на складе.'
         obj['jobs'].remove(job);obj['revision']+=1
     elif kind=='buy_animal':
         a=named(ANIMALS,data['animal'])

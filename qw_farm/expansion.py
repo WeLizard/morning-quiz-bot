@@ -397,7 +397,7 @@ def take_animal(farm, obj, at, owner=True):
 
 def take_job(farm, obj, job, at, owner=True):
     inventory(farm, job['outputs'])
-    market.count_outputs(farm, job['outputs'])
+    market.count_outputs(farm, market.uncredited_outputs(job))
     recipe = RECIPES.get(job.get('recipe'))
     progression.grant_xp(farm, job['xp'], 'craft', at, owner, recipe['seconds'] if recipe else None)
     farm['stats']['crafts'] += 1

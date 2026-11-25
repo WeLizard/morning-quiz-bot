@@ -1,5 +1,6 @@
 """Farm catalog r8: residents' reputation, the caravan (big order), daily contracts and their balance."""
 import asyncio
+import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -315,6 +316,77 @@ def test_craft_contract_counts_collected_products():
     cmd(state, 'queue', {'object': 'bk', 'recipe': rid['id']})
     cmd(state, 'collect', {'object': 'bk', 'job': state['objects'][0]['jobs'][0]['id']}, T0 + rid['seconds'] * 4)
     assert market.contract_progress(state, craft) >= base + 1 + rid['outputs'][craft['item']]
+
+
+def test_expired_contract_rollover_pays_ready_saved_craft_once_and_collection_keeps_inventory():
+    state = farm(xp=LEVELS[9])
+    state['objects'].append(dict(id='loom-1', type='loom', x=0, y=0, w=2, h=2, revision=0, level=1,
+                                 jobs=[], animal=None, animal_job=None))
+    cutoff = midnight_msk(T0)
+    old_day = market.moscow_day(cutoff - 1)
+    settle(state, cutoff - 2)
+    item = 'golden_fan'
+    state['market']['counts']['p:' + item] = 0
+    craft = dict(id=f'contract_{old_day}_1', kind='craft', item=item, goal=2, base=0,
+                 coins=100, xp=20, claimed=False)
+    state['market']['contracts'] = dict(day=old_day, items=[
+        dict(id=f'contract_{old_day}_0', kind='orders', item=None, goal=1, base=0, coins=10, xp=2, claimed=True),
+        craft,
+        dict(id=f'contract_{old_day}_2', kind='harvest', item='wheat', goal=1, base=0, coins=10, xp=2, claimed=True),
+    ])
+    state['market']['streak'] = dict(last_day=old_day - 1, count=45)
+    # Three batches were actually ready before midnight; a fourth is ready exactly at cutoff.
+    state['objects'][0]['jobs'] = [
+        dict(id=f'job{i}', recipe='golden_fan', ready_at=cutoff - 10 - i, outputs={item: 1}, xp=42)
+        for i in range(3)
+    ] + [dict(id='late', recipe='golden_fan', ready_at=cutoff, outputs={item: 1}, xp=42)]
+
+    market.settle(state, cutoff + 3600)
+    assert state['market']['contracts']['day'] == old_day + 1
+    assert craft['claimed'] is True
+    assert state['market']['streak'] == dict(last_day=old_day, count=46)
+    assert state['coins'] == 10 ** 6 + 120  # the expired board's capped +20% bonus
+    assert sum(j.get('contract_credited', {}).get(item, 0) for j in state['objects'][0]['jobs']) == 2
+    assert state['objects'][0]['jobs'][-1].get('contract_credited', {}) == {}
+
+    # The saved marker and paid board survive the same JSON boundary as service persistence.
+    state = json.loads(json.dumps(state))
+    paid_coins = state['coins']
+    market.settle(state, cutoff + 3600)
+    market.settle(state, cutoff - 60)  # a regressing clock cannot restore the expired board
+    assert state['coins'] == paid_coins
+    assert state['market']['contracts']['day'] == old_day + 1
+
+    fresh = dict(id='fresh-craft', kind='craft', item=item, goal=1,
+                 base=state['market']['counts']['p:' + item], coins=5, xp=1, claimed=False)
+    state['market']['contracts']['items'] = [fresh]
+    qty_before = state['inventory'].get(item, 0)
+    credited_job = next(j for j in state['objects'][0]['jobs'] if j.get('contract_credited', {}).get(item))
+    cmd(state, 'collect', {'object': 'loom-1', 'job': credited_job['id']}, cutoff + 3600)
+    assert state['inventory'][item] == qty_before + 1
+    assert market.contract_progress(state, fresh) == 0  # credited old-contract quantity is not counted twice
+    assert market.contract_progress(state, fresh) == 0
+
+
+def test_expired_craft_contract_does_not_credit_insufficient_or_old_jobs():
+    state = farm(xp=LEVELS[9])
+    cutoff = midnight_msk(T0)
+    old_day = market.moscow_day(cutoff - 1)
+    settle(state, cutoff - 2)
+    item = 'golden_fan'
+    craft = dict(id=f'contract_{old_day}_1', kind='craft', item=item, goal=2, base=0,
+                 coins=100, xp=20, claimed=False)
+    state['market']['contracts'] = dict(day=old_day, items=[craft])
+    state['objects'].append(dict(id='loom-1', type='loom', x=0, y=0, w=2, h=2, revision=0, level=1,
+                                 jobs=[dict(id='old', recipe='golden_fan', ready_at=cutoff - 86401,
+                                            outputs={item: 2}, xp=42),
+                                       dict(id='short', recipe='golden_fan', ready_at=cutoff - 1,
+                                            outputs={item: 1}, xp=42)], animal=None, animal_job=None))
+    market.settle(state, cutoff + 10)
+    assert len(state['objects'][0]['jobs']) == 2
+    assert all(job.get('contract_credited', {}) == {} for job in state['objects'][0]['jobs'])
+    assert not craft['claimed']
+    assert state['market']['counts'].get('p:' + item, 0) == 0
 
 
 # --- idempotency and old saves -------------------------------------------------------------------------

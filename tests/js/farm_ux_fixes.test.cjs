@@ -60,6 +60,7 @@ test('exit sign is a real button: one board on the posts, farm-style highlight, 
  assert.match(sign,/^<svg class="vg-sign"/);assert.match(sign,/<g class="vg-day">[\s\S]*>Ферма<\/text>[\s\S]*<g class="vg-night">[\s\S]*>Ферма<\/text>/);
  assert.match(sign,/matrix\(1 -0\.5 0 1 /,'board lies in the gate plane (iso axis 1:-0.5)');
  assert.match(sign,/stop-color="#f1dfb2"/,'farm sign board gradient');assert.match(css,/:root\[data-farm-theme=night\] \.vg-night\{display:inline\}/);
+ assert.match(css,/:root\[data-farm-theme=night\]:not\(\[data-qw-contrast="1"\]\) \.village-gate \.vg-sign\{filter:var\(--vg-night\)\}/,'at night the board is dimmed with the village, except in contrast mode');
  // only the board itself takes taps: the button ignores the pointer, the board-shaped .vg-hit catches it
  assert.equal((sign.match(/class="vg-hit"/g)||[]).length,1);assert.match(css,/\.village-gate\{[^}]*pointer-events:none/);assert.match(css,/\.village-gate \.vg-hit\{pointer-events:visiblePainted\}/);
  assert.match(css,/\.village-gate:active \.vg-sign\{filter:var\(--farm-lit-pressed\)\}/);

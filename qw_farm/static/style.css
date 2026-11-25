@@ -646,8 +646,14 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-gate:focus-visible .vg-sign{filter:brightness(1.12) var(--farm-focus-ring)}
 .village-gate:focus-visible:active .vg-sign{filter:brightness(.94) var(--farm-focus-ring)}
 /* the board of the original painted gate: cream face, thin brown border, dark-brown lettering, no glow */
-/* Day and night boards of gate.js; at night the board stays light above the tint, like the farm's own name sign. */
+/* Day and night boards of gate.js. The board sits above the night tint; at full brightness it stood out of the dark village
+   (owner, 2026-11-26), so at night it is dimmed warm, as if lit by the gate's lanterns. Contrast mode keeps it bright. */
 .vg-night{display:none}:root[data-farm-theme=night] .vg-day{display:none}:root[data-farm-theme=night] .vg-night{display:inline}
+:root[data-farm-theme=night]:not([data-qw-contrast="1"]) .village-gate{--vg-night:brightness(.7) saturate(.85) sepia(.12)}
+:root[data-farm-theme=night]:not([data-qw-contrast="1"]) .village-gate .vg-sign{filter:var(--vg-night)}
+:root[data-farm-theme=night]:not([data-qw-contrast="1"]) .village-gate:hover .vg-sign{filter:var(--vg-night) var(--farm-lit)}
+:root[data-farm-theme=night]:not([data-qw-contrast="1"]) .village-gate:active .vg-sign{filter:var(--vg-night) var(--farm-lit-pressed)}
+:root[data-farm-theme=night]:not([data-qw-contrast="1"]) .village-gate:focus-visible .vg-sign{filter:var(--vg-night) brightness(1.12) var(--farm-focus-ring)}
 @media(prefers-reduced-motion:reduce){.village-gate .vg-sign{transition:none}}
 /* Residents get the same highlight on hover and keyboard focus. */
 .village-npc:hover .village-walker svg,.village-npc:focus-visible .village-walker svg{filter:var(--farm-lit)}

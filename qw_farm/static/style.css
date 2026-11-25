@@ -1095,7 +1095,8 @@ body.dasha-game-open .header-destinations{display:none!important}
 #dasha-game-view[hidden]{display:none!important}
 #dasha-game-view{position:absolute;inset:0;z-index:24;overflow:auto;overscroll-behavior:contain;min-width:0;min-height:0}
 #dasha-game-view .dasha-masthead{min-height:52px}
-#dasha-game-view .dasha-back{min-height:44px;padding:8px 12px;border-radius:12px;background:#eaf0de;color:#52704c;font-weight:700}
+/* «‹ В деревню» of every village minigame is one shared button: qw-btn secondary paints it (day, night, contrast); only the size lives here. */
+:is(#dasha-game-view .dasha-back,#oleg-game-view .oleg-back,#pie-game-view .pie-back,#ballista-game-view .ballista-back,#santa-game-view .sb-back){flex:none;min-height:44px;padding:8px 12px;border-radius:12px;font-size:var(--qw-fs-control);font-weight:700;white-space:nowrap}
 #dasha-game-view .dasha-logo-carrot{width:100%;height:100%}
 #dasha-game-view .dasha-coin{display:grid;place-items:center;width:26px;height:26px;border:2px solid #9e7136;border-radius:50%;background:radial-gradient(circle,#ffe3a0 0 48%,#e5b759 50%);color:#996934;font-size:0}
 #dasha-game-view .dasha-stake{min-height:48px;border:1.5px solid #c6d3b7;border-radius:12px;background:#f5f5e6;color:#345945;font-size:var(--qw-fs-control);font-weight:800}

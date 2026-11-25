@@ -7,7 +7,6 @@ body.ballista-game-open .workspace>#rail,body.ballista-game-open .workspace>.sce
 #ballista-game-view h1,#ballista-game-view p{margin:0}
 #ballista-game-view h1{font-size:var(--qw-fs-h1);line-height:1.15}
 #ballista-game-view .ballista-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
-#ballista-game-view .ballista-back{min-height:44px;padding:8px 14px;border:1px solid var(--qw-game-line,#b5c8a9);border-radius:var(--qw-r-control);background:var(--qw-game-surface,#fffaf0);color:inherit;font:inherit;font-weight:700;cursor:pointer}
 #ballista-game-view .ballista-intro{font-size:var(--qw-fs-body)}
 #ballista-game-view .ballista-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,330px);gap:18px;align-items:start}
 #ballista-game-view .ballista-stage-card,#ballista-game-view .ballista-controls{min-width:0;background:var(--qw-game-surface,#fffaf0);border:1px solid var(--qw-game-line,#c8d4b9);border-radius:var(--qw-r-card);padding:12px;box-shadow:0 8px 24px #28463019}

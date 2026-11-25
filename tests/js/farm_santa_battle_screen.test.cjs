@@ -111,7 +111,7 @@ test('wiring: served assets, page host, app view, festival card and the calm set
  assert.ok(html.includes('/app/farm/assets/santa-battle.css'));
  assert.match(html,/<section id="santa-game-view" aria-label="Битва с Сантой" hidden><\/section>/);
  const app=read('qw_farm/static/app.js');
- assert.match(app,/import \{mountSantaBattle,calmBattle,playerLook,CALM_KEY\} from '\.\/santa-battle\.js';/);
+ assert.match(app,/import \{mountSantaBattle,calmBattle,playerLook,CALM_KEY\} from '\.\/santa-battle\.js(\?v=[\w.-]+)?';/);
  assert.match(app,/look:\(\)=>playerLook\(S\.form\)/);
  assert.match(app,/navPush\('santa-battle',closeSantaGame\)/);
  assert.match(app,/if\(santaGameOpen\)\{e\.preventDefault\(\);closeSantaGame\(\);return;\}/);

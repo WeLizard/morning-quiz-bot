@@ -25,7 +25,7 @@ body.oleg-game-open .header-destinations{display:none!important}
 #oleg-game-view .oleg-mast-title{min-width:0}
 #oleg-game-view .oleg-eyebrow{display:block;color:#576d58;font-size:var(--qw-fs-caption);font-weight:750;letter-spacing:.08em;text-transform:uppercase}
 #oleg-game-view .oleg-masthead h1{font-size:var(--qw-fs-h1);line-height:1.12;letter-spacing:-.04em;color:#274d3d}
-#oleg-game-view .oleg-back{margin-left:auto;min-height:44px;padding:8px 12px;border:1px solid #c7d3b7;border-radius:12px;background:#eaf0de;color:#52704c;font-weight:700;white-space:nowrap}
+#oleg-game-view .oleg-back{margin-left:auto}
 #oleg-game-view .oleg-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,335px);gap:22px;align-items:start}
 #oleg-game-view .oleg-stage-card{min-width:0;background:#f8f4de;padding:9px;border-radius:28px;box-shadow:0 16px 40px #466b4b24;border:1px solid #dae3c7}
 #oleg-game-view .oleg-scene{position:relative;width:100%;aspect-ratio:1100/690;overflow:hidden;border-radius:21px;background:#dce7c9}
@@ -112,6 +112,34 @@ body.oleg-game-open .header-destinations{display:none!important}
 :root[data-farm-theme=night] #oleg-game-view .os-oleg{filter:brightness(.94) sepia(.14) saturate(1.08)}
 :root[data-farm-theme=night] #oleg-game-view .os-stand>rect{filter:brightness(.86) saturate(.92)}
 :root[data-farm-theme=night] #oleg-game-view .os-lamp{fill:#ffe08a;filter:drop-shadow(0 0 6px #ffd56a)}
+/* Night page: the same palette as Dasha's night view (farm night tokens), so the page does not stay light after dark. */
+:root[data-farm-theme=night] #oleg-game-view{
+  --qw-game-header:var(--paper,#172821);--qw-game-surface:var(--panel,#1d3128);--qw-game-surface-2:var(--surface,#243c30);
+  --qw-game-text:var(--ink,#edf1df);--qw-game-muted:var(--muted,#b8c8b4);--qw-game-line:var(--line,#486050);
+  --qw-game-accent:var(--green,#8fbd87);--qw-game-accent-fill:var(--honey,#ecc878);--qw-game-accent-ink:var(--accent-ink,#16291c);
+  background:radial-gradient(circle at 80% 4%,#2b3f5a 0,transparent 40%),var(--paper,#172821)
+}
+:root[data-farm-theme=night] #oleg-game-view .oleg-masthead h1{color:var(--ink,#edf1df)}
+:root[data-farm-theme=night] #oleg-game-view .oleg-eyebrow{color:#a5c09b}
+:root[data-farm-theme=night] #oleg-game-view .oleg-brand-mark{background:#2b4437;box-shadow:0 5px 15px #0006}
+:root[data-farm-theme=night] #oleg-game-view .oleg-stage-card{background:#20352b;border-color:#3d5446;box-shadow:0 16px 40px #04110a66}
+:root[data-farm-theme=night] #oleg-game-view .oleg-scene{background:#2f3f5c}
+:root[data-farm-theme=night] #oleg-game-view .oleg-speech{background:#22372d;border-color:#7c8f5f;color:#f0f2e2;box-shadow:0 8px 20px #0008}
+:root[data-farm-theme=night] #oleg-game-view .oleg-speech::after{background:#22372d;border-color:#7c8f5f}
+:root[data-farm-theme=night] #oleg-game-view .oleg-scene-caption{color:#f6e7c4}
+:root[data-farm-theme=night] #oleg-game-view .oleg-bell{background:#24392f;border-color:#8a7a55;color:var(--ink,#edf1df);box-shadow:0 4px 0 #142219}
+:root[data-farm-theme=night] #oleg-game-view .oleg-bell:not(:disabled):active{box-shadow:0 1px 0 #142219}
+:root[data-farm-theme=night] #oleg-game-view .oleg-bell.oleg-lit{box-shadow:0 8px 0 #142219,0 0 0 4px #f4d78a}
+:root[data-farm-theme=night] #oleg-game-view .oleg-card{background:var(--panel,#1d3128);border-color:#3d5446;box-shadow:0 10px 27px #04110a55}
+:root[data-farm-theme=night] #oleg-game-view .oleg-intro{background:linear-gradient(135deg,#22382e,#1d3128)}
+:root[data-farm-theme=night] #oleg-game-view .oleg-intro h2{color:var(--green2,#b0d59e)}
+:root[data-farm-theme=night] #oleg-game-view :is(.oleg-intro p,.oleg-status,.oleg-key-help,.oleg-round-hint){color:#cdd8c6}
+:root[data-farm-theme=night] #oleg-game-view .oleg-reward{color:var(--honey,#ecc878)}
+:root[data-farm-theme=night] #oleg-game-view .oleg-key-help{border-top-color:#3d5446}
+:root[data-farm-theme=night] #oleg-game-view .oleg-sound{background:var(--surface,#243c30);border-color:var(--line,#486050);color:var(--ink,#edf1df)}
+:root[data-farm-theme=night] #oleg-game-view .oleg-sound[aria-pressed="true"]{background:var(--surface-selected,#3a5742);border-color:var(--green,#8fbd87)}
+:root[data-farm-theme=night] #oleg-game-view .oleg-progress{background:#24392f;border-color:#3d5446}
+:root[data-farm-theme=night] #oleg-game-view .oleg-primary{border-color:#b98d45;background:linear-gradient(#efd081,#d9ab55);color:#2b2a1a;box-shadow:0 5px 0 #8f6c36,0 9px 18px #0007}
 @keyframes os-swing{0%{transform:rotate(0)}25%{transform:rotate(9deg)}60%{transform:rotate(-7deg)}100%{transform:rotate(0)}}
 @keyframes os-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}}
 @keyframes oleg-bell-ring{0%,100%{rotate:0deg}25%{rotate:8deg}75%{rotate:-8deg}}

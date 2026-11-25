@@ -181,7 +181,6 @@
 :root[data-farm-theme=night] #dasha-game-view .dasha-masthead h1{color:var(--ink,#edf1df)}
 :root[data-farm-theme=night] #dasha-game-view .dasha-eyebrow{color:#a5c09b}
 :root[data-farm-theme=night] #dasha-game-view .dasha-brand-mark{background:#2b4437;box-shadow:0 5px 15px #0006}
-:root[data-farm-theme=night] #dasha-game-view .dasha-back{background:var(--surface,#243c30);color:var(--ink,#edf1df);border-color:var(--line,#486050)}
 :root[data-farm-theme=night] #dasha-game-view .dasha-stage-card{background:#20352b;border-color:#3d5446;box-shadow:0 16px 40px #04110a66}
 :root[data-farm-theme=night] #dasha-game-view .dasha-scene{background:#2f3f5c}
 :root[data-farm-theme=night] #dasha-game-view .dasha-intro{background:linear-gradient(135deg,#22382e,#1d3128)}

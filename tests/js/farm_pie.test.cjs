@@ -108,7 +108,7 @@ test('installed day and night scenes carry the live layers, height keyframes and
 
 test('app.js opens the pie screen from the fair card and closes it like the other village games',async()=>{
  const app=fs.readFileSync(path.join(root,'qw_farm/static/app.js'),'utf8');
- assert.match(app,/^import \{mountPieGame\} from '\.\/pie-game\.js';/m);
+ assert.match(app,/^import \{mountPieGame\} from '\.\/pie-game\.js(\?v=[\w.-]+)?';/m);
  assert.match(app,/pieGame:\(\)=>openPieGame\(\)/);
  // declared with the other nested games, re-rendered after /me and commands, closed on tab change, logout and Escape
  assert.match(app,/ballistaGame=null,ballistaGameOpen=false,pieGame=null,pieGameOpen=false[,;]/);

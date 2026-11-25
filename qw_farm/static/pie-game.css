@@ -7,7 +7,6 @@ body.pie-game-open .workspace>#rail,body.pie-game-open .workspace>.scene-area,bo
 #pie-game-view h1,#pie-game-view p{margin:0}
 #pie-game-view h1{font-size:var(--qw-fs-h1);line-height:1.15}
 #pie-game-view .pie-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
-#pie-game-view .pie-back{min-height:44px;padding:8px 14px;border:1px solid var(--qw-game-line,#b5c8a9);border-radius:var(--qw-r-control);background:var(--qw-game-surface,#fffaf0);color:inherit;font:inherit;font-weight:700;cursor:pointer}
 #pie-game-view .pie-intro{font-size:var(--qw-fs-body)}
 #pie-game-view .pie-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,330px);gap:18px;align-items:start}
 #pie-game-view .pie-stage-card,#pie-game-view .pie-controls{min-width:0;background:var(--qw-game-surface,#fffaf0);border:1px solid var(--qw-game-line,#c8d4b9);border-radius:var(--qw-r-card);padding:12px;box-shadow:0 8px 24px #28463019}

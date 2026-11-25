@@ -1,9 +1,9 @@
 import './address.js';
 import {mountDashaGame,dashaReasonText,localizeWagerNotice} from './dasha-game.js';
-import {mountOlegGame} from './oleg-game.js?v=20261116-cash-budget';
-import {mountBallistaGame} from './ballista-game.js?v=20261116-cash-budget';
-import {mountPieGame} from './pie-game.js';
-import {mountSantaBattle,calmBattle,playerLook,CALM_KEY} from './santa-battle.js';
+import {mountOlegGame} from './oleg-game.js?v=20261126-exit';
+import {mountBallistaGame} from './ballista-game.js?v=20261126-exit';
+import {mountPieGame} from './pie-game.js?v=20261126-exit';
+import {mountSantaBattle,calmBattle,playerLook,CALM_KEY} from './santa-battle.js?v=20261126-exit';
 import {FarmScene,farmLightingAt} from './scene.js?v=20261124-coffee-cotton';
 import {CATEGORIES,CATEGORY_COLOR,categoryOf,swansLeft,readyInfo,listObjects,countByCategory,pushToast,expireToasts,toastText,wheelScrollDelta,buildingPurpose} from './scene_map.js';
 import {openFieldGame} from './field_overlay.js?v=20261030c';

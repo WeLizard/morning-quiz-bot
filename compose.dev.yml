@@ -143,6 +143,8 @@ services:
       MINI_APP_ORIGIN: http://127.0.0.1:4185
       MINI_APP_OFFLINE: "1"
       QW_FARM_ENABLED: "1"
+      # Dev-only stable key: the merchant stock needs a persistent secret, otherwise /api/farm/v1/start fails with 500.
+      QW_FARM_MERCHANT_SECRET: local-development-only-merchant-stock-key
       MQB_DEV_GUEST_ENABLED: ${MQB_DEV_GUEST_ENABLED:-0}
       MQB_ROOM_CLASSIC_ENABLED: ${MQB_ROOM_CLASSIC_ENABLED:-0}
       MQB_ROOM_PHOTO_ENABLED: ${MQB_ROOM_PHOTO_ENABLED:-0}

@@ -1,45 +1,140 @@
 {
- "rgba_sha256": "5518c31e27ab9619e82cdb1e2925228e4618ed8e8b3b7d5215793bbf49df30e4",
- "webp_sha256": "ee1d4e772537b2384444b9ab750003c1af15785f4bb9a2dfa795d64aa6323475",
- "svg_sha256": "cd08b6c107567f16f27626ae8c2ab3a447852a2a8e0a75d4fcb6b1f6bb07b1bf",
- "svg_bytes": 677618,
+ "note": "Hashes of scripts/art/village/build_village.py output = qw_farm/static/village.svg as installed. Refresh on purpose after an approved art change.",
+ "rgba_sha256": "d24d59620bfc07e3fa96924928ca439667233ebd78487304d6d951f2a4778e4a",
+ "webp_sha256": "c0a6227ac99e2dec140ca81c86cb66f03cb87261c4fe05d3c0973de03186ee5a",
+ "svg_sha256": "8eb35807e7de56356fd9f69b2d7725e9a7133cb49f217924e63ce5272dae376f",
+ "svg_bytes": 677802,
  "versions": {
-  "chromium": "chromium_headless_shell-1194",
+  "chromium": "chromium_headless_shell-1248",
   "pillow": "11.3.0",
   "libwebp": "1.5.0"
  },
- "note": "Hashes of scripts/art/village/build_village.py output = qw_farm/static/village.svg as installed. Refresh on purpose after an approved art change.",
  "inputs": {
+  "scripts/art/village/residents.js": "c0e7e36ae64abf97",
+  "scripts/art/village/guests.js": "a173973c4b5a1f06",
+  "scripts/art/village/crew-residents.js": "50f2f5f1eb76e38e",
+  "scripts/art/village/host-residents.js": "186e951ec6cbb3ab",
+  "scripts/art/village/trickster-residents.js": "9d0ce30a719f6bbe",
   "scripts/art/village/gate.js": "7b7a7a1f5f7f6db9",
   "scripts/art/village/svg_ctx.js": "fb1801443a6289cf",
   "scripts/art/village/walk.js": "2f8b62d68b3999c5",
-  "scripts/art/village/player.js": "bcd5e9e6d8f689b7",
+  "scripts/art/village/player.js": "a97b6d947874caf0",
   "scripts/art/village/fest_posidelki.js": "d7747d2c8a6d5740",
   "scripts/art/village/fest_kit.js": "6f64347d06d04925",
-  "scripts/art/village/fest_snow.js": "181752fd82afb0f4",
-  "scripts/art/village/fest_newyear.js": "3de47c7071ff0666",
+  "scripts/art/village/fest_snow.js": "325993730fadc137",
+  "scripts/art/village/fest_newyear.js": "64196be036c96c75",
   "scripts/art/village/fest_maslenitsa.js": "d162335110670a43",
   "scripts/art/village/fest_flowers.js": "225257d3a178d362",
-  "scripts/art/village/build.js": "f0d88bfccaea7a07",
-  "scripts/art/village/crew.js": "bec6f84851fbccd3",
+  "scripts/art/village/fest_fools.js": "2d73ff477214bb68",
+  "scripts/art/village/fest_cosmos.js": "24cdf8f5b32088de",
+  "scripts/art/village/build.js": "5d7e6cd85bf84f1b",
+  "scripts/art/village/crew.js": "9f2df3defa1d780c",
   "scripts/art/village/merchant.js": "c890c30c4bb04366",
   "scripts/art/village/contrast_paths.js": "2c2924254b24d24a",
-  "qw_farm/static/scene_buildings.js": "0e1d7897a4fb3a64",
-  "qw_farm/static/scene.js": "cc2f086ff609d596",
-  "qw_farm/static/scene_expansion.js": "797bbe3eb7f520f5",
-  "qw_farm/static/scene_map.js": "998ff1a2874de964",
-  "scripts/art/village/village.js": "93b99d9c57a8f051",
+  "qw_farm/static/scene_buildings.js": "eac249f44118f4ba",
+  "qw_farm/static/scene.js": "96f653dff80b46e5",
+  "qw_farm/static/scene_expansion.js": "eb700894f10f2ce0",
+  "qw_farm/static/scene_map.js": "417325146b47e6c0",
+  "scripts/art/village/village.js": "8ba2a88707f44125",
   "scripts/art/village/common.js": "3ba377144e786cca",
   "scripts/art/village/fest_pumpkin.js": "a90db9bfdd11a0da",
-  "scripts/art/village/pumpkin_jack.js": "fc40a6e281be0de1"
+  "scripts/art/village/pumpkin_jack.js": "fc40a6e281be0de1",
+  "scripts/art/village/santa_guests.js": "2b8e4646ec64edb0"
  },
  "fest_sha256": {
   "posidelki": "5ed29158fdf12fb0e17d6b96358428637dff1d298ed87c2b481be90ff463d6b6",
-  "new_year": "76e033e4107f398866f29f4cf2c3d9bd2e3e3165405972f518888c6223d16ae2",
-  "maslenitsa": "fb44d6082b5e9374918747937af23809db0f8a3c3dfb98757f6f60122217468e",
+  "new_year": "01f82aa823eff006c9f630c54bf85e5470764253965bb55b8fbc987ba7634262",
+  "maslenitsa": "e84087bbbeb3d1901ff772dd685f77d28cb6afc4ebe8f9bd53e9bb7946ee04fd",
   "spring_flowers": "93d99c0d1c2eb962c7df92673c12ffb8db8ead48b9d6aec51b9f9cf855748cf7",
-  "pumpkin_night": "15506c35d39420363c81a5b76ed881672face0c0f3e1112ae098b6861e3809f8"
+  "pumpkin_night": "15506c35d39420363c81a5b76ed881672face0c0f3e1112ae098b6861e3809f8",
+  "april_fools": "0dbebc2da135765f4095ee1662e6e374fbfa71cc84178b7086c48e125a869b99",
+  "cosmonautics": "4b563d7ddffcc3c58de1ab80be4a01b293056b7c3fb0abc1718fa727a8d23ef2",
+  "stages": "b447bbd357027bd07d2568caeeefd7ab6b7f05d7913811aaec4e7567b5ff008a"
  },
+ "jack_sha256": "d05029ea69eebc924528780d526615add8d00c2b15598be7f969a9bed6a84418",
+ "residents_sha256": {
+  "Механик Крот": {
+   "sha256": "544656edf884b335a523ead826e28bdc41a2cca8e3d063b48b9a3c3568249a37"
+  },
+  "Кошка Кая": {
+   "sha256": "93e5d76d47e954b87f26856c81b9451480bf652029fafe5c399dc45951509f9d"
+  },
+  "Кошка Соня": {
+   "sha256": "3cd574c65eba28597ab56913351fd789a9fed3c0645b3b507e86a5fd493dec56"
+  },
+  "Филиныч": {
+   "sha256": "839e2dd666d09fed108e5e1874d996f1fbef482a8c3627576392b2bf4b416b48"
+  },
+  "Агата": {
+   "sha256": "8678094a2828ab44aa81a6b5caaa21c1b007bbb043fe49482bc1e637610816cd"
+  },
+  "Почтальон Ёж": {
+   "sha256": "6742a1e19032c8b5dff6ac737371b7e3b5fbe0754b80ebc989cd0f57339dc001"
+  },
+  "Суслик Игорь": {
+   "sha256": "a7a0c7c565605a6985a74106763906d9e3f38b594276d550082050a699de835a"
+  },
+  "Неведома Зверушка": {
+   "sha256": "1d7177d2c8e50f5d1e691a73599a715872f12ccd49147338439823a614503fef"
+  },
+  "Лиса Даша": {
+   "sha256": "aa7c59d93b47f0a874664b9534e7d256a27e72818bb4cae12965e51921a8de99"
+  },
+  "Петух Олег": {
+   "sha256": "ebe832bbde0d7b86b36adb336c13182d563fc41316f0e8050a04604ec4ec8694"
+  }
+ },
+ "guests_sha256": {
+  "bogatyr": {
+   "sha256": "fc67ba41c798a1aacc5cf1d2291a026d11066a087136f88d834a133b667a493e"
+  },
+  "trader": {
+   "sha256": "6fc1f3d40841dcdc6353606a53ab80677418dc30a7566649c48613806d035ce0"
+  },
+  "fisher": {
+   "sha256": "b4eb35c07f0253858724d3bbc614159ca629c19904d918a914cc9c482d9fde1b"
+  },
+  "forester": {
+   "sha256": "727d53c80e21707da599d3a7e23ccf4fa4f3336947f9520481b1d605a6783cc0"
+  },
+  "teller": {
+   "sha256": "dd891065f0575a68cf1a13f5a91309f0de68d1d9f7a0d9bde26b017c2c34fa48"
+  },
+  "crafter": {
+   "sha256": "6f4f530a0df9b8d71a6cab40e532fcdab0854ea91d0da56fb1a249bbeaf10589"
+  },
+  "traveler": {
+   "sha256": "30a118fe2bb1d72b369cda648b54bb3848b4fa1190b39eaf70ef34dbc5da9458"
+  },
+  "egg_dymok": {
+   "sha256": "c06d387f861d3af63e0e60cb206389e4e2ec6f04d29b6f956d2c47efae8b042f"
+  },
+  "egg_shustrik": {
+   "sha256": "5c1241d5a9748fc74865e0e0e5f2e488f81e5d2ecb9060cf367a5e48d3002be7"
+  },
+  "egg_pushok": {
+   "sha256": "700b42917ecfce1e7e13eca7c7b39ad27dca8b4297c03bea6df8127c778a63e1"
+  },
+  "egg_boryan": {
+   "sha256": "d9ad43d2f71a35071718376ca7b8386058ad04a24279126e62a7a50fcd93beb0"
+  },
+  "egg_belyana": {
+   "sha256": "3fe0827fade6e534370081e77c2724a8804444539c9ea18dd2a633fd8517f36c"
+  },
+  "egg_kroshka": {
+   "sha256": "0cad62530eb05a4aa43957ff8c17924f41c363d8a3feb33f085115ca804eaea0"
+  },
+  "egg_sharik": {
+   "sha256": "102a6e34f333806461838361defd404dd9716b7d3b42fbea0e00db167f7f24e6"
+  },
+  "egg_filya": {
+   "sha256": "352e0ad42722f481cd3afcff0c26edcf454faff4ca5c399dbdf498c595476693"
+  },
+  "egg_makro": {
+   "sha256": "da65ac528cb3c83132d068914c259b134cb3f4c5ffd68e3569534fa1527cc1da"
+  }
+ },
+ "pooh_roaming_sha256": "680bf9f482ff79a45c6df1b55cd5bc5f1dbc19d1d84146ef1449a8c3c54e517f",
  "merchant_sha256": "ba41bfafff67ec8d0f3780478ea81b37c14262686e871c89f12e66397633f27c",
  "build_sha256": "fe8a582c75f9af04e202b1157dcea76991addff51f82e846cb6474524379c1a3",
  "contrast_paths_sha256": "39038be2419604cbe310caac7a83e329ebe744a8a416a5576438290df8a342a4"

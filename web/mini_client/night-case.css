@@ -100,6 +100,8 @@
 .ncase-plate .ic{--s:12px;display:inline-block;margin-right:4px;vertical-align:-1px}
 .ncase-anyseat>.blank{display:grid;place-items:center;width:56px;aspect-ratio:2/3;border-radius:6px;background:#08090b;color:var(--qw-game-muted);box-shadow:0 0 0 1px var(--nc-edge-soft)}
 .ncase-anyseat .nc-muted{display:block}
+.ncase-lobbychat{max-height:min(360px,50vh);overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+.ncase-lobbychat+.nc-join{margin-top:var(--qw-s-3)}
 
 /* ---------- 03 role card: the portrait in the hero frame ---------- */
 .ncase-reveal{padding-top:var(--qw-s-4)}

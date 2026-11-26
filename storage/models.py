@@ -1061,6 +1061,31 @@ class NightLobbyCommand(Base):
     __table_args__ = (CheckConstraint("kind = 'create_lobby'", name='ck_night_lobby_kind'),)
 
 
+class NightLobbyMessage(Base):
+    """A line of the lobby talk («Обсуждение»): players at the table before the case starts.
+
+    The sender's table name and seat (hero and character) are kept as they were when the line was written."""
+    __tablename__ = 'night_lobby_messages'
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger, nullable=False)   # order at the table, given under the game row lock
+    command_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    sender_account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    character_id: Mapped[Optional[str]] = mapped_column(String(96))
+    look_id: Mapped[Optional[str]] = mapped_column(String(96))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    text_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        UniqueConstraint('game_id','sender_account_id','command_id', name='uq_night_lobby_message_command'),
+        UniqueConstraint('game_id','seq', name='uq_night_lobby_message_seq'),
+        CheckConstraint('seq >= 1', name='ck_night_lobby_message_seq'),
+        CheckConstraint('length(text) BETWEEN 1 AND 500 AND octet_length(text) <= 2048', name='ck_night_lobby_message_text'),
+        Index('ix_night_lobby_messages_game_time', 'game_id', 'created_at'),
+    )
+
+
 class NightEvent(Base):
     __tablename__ = 'night_events'
     game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)

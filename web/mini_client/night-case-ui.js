@@ -146,7 +146,7 @@ function open(options) {
     if (!kit || !Q) throw new Error('night_case_shell_required');
     let alive = true, locked = false, epoch = 0, poll = null, timer = null, reading = false, identityReading = false, commandBusy = false;
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
-    let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null;
+    let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
     let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
     let viewer = boot?.viewer_account_id || null;
@@ -231,7 +231,7 @@ function open(options) {
         if (locked || !alive) return;
         locked = true; epoch++; controller.abort(); clearInterval(poll); timer?.stop(); timer = null;
         view = proposal = room = game = boot = invitation = viewer = null;
-        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; askGhost = null; whisperTo.clear(); hearingPick.clear(); accuseOpen = false;
+        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; lobbyDraft = ''; askGhost = null; whisperTo.clear(); hearingPick.clear(); accuseOpen = false;
         ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null; worldPack = null; kit.useWorld?.(null);
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); Q.menu.register([], 'Ночной город');
@@ -701,6 +701,37 @@ function open(options) {
         return kit.panel({icon: 'calendar', title: 'Окна дела'}, el('p', 'nc-lead', `${when} по поясу ${zone}${offset && offset !== 'GMT' ? ` (${offset})` : ''}.`),
             p(`Пояс задал хозяин стола, когда собирал его. Неделя — ${plural(count, 'окно', 'окна', 'окон')}.`));
     }
+    // Lobby talk (mockup 4, «Обсуждение»): the hero's portrait and title, the player as a plate; own lines on the right.
+    // Everyone in the company reads it; only players at the table write. The draft outlives the poll re-render.
+    function lobbyChat(data) {
+        const lines = arr(data.chat), joined = Boolean(ownSeat(data));
+        const rows = lines.map(line => {
+            const hero = arr(data.heroes).find(row => row.id === line.character_id), look = hero ? heroLook(hero, line.look_id) : null;
+            const who = put(el('span', 'ncase-who'), el('span', 'nm', hero ? hero.title : 'Любое место'),
+                line.mine ? el('span', 'ncase-tag me', 'ты') : el('span', 'ncase-tag', seatName(line)));
+            const art = assets.get(look?.art?.asset_id);
+            const portrait = art ? Object.assign(el('img', 'ncase-face xs'), {src: art.url, alt: '', loading: 'lazy'}) : put(el('span', 'ncase-face xs blank'), icon('people'));
+            return put(el('div', `nc-msg${line.mine ? ' mine' : ''}`), line.mine ? null : portrait, put(el('div', 'bub'), who, p(line.text)));
+        });
+        const feed = rows.length ? put(el('div', 'nc-chat ncase-lobbychat'), ...rows) : p('Пока тихо. Договоритесь, кто кого играет и когда начинаете.');
+        if (rows.length) root.requestAnimationFrame?.(() => { feed.scrollTop = feed.scrollHeight; });
+        if (!joined) return kit.panel({icon: 'talk', title: 'Обсуждение', count: lines.length ? String(lines.length) : ''}, feed, p('Писать могут игроки за столом.'));
+        const input = el('input', 'nc-field'); input.type = 'text'; input.value = lobbyDraft; input.maxLength = 500;
+        input.placeholder = 'Сообщение'; input.setAttribute('aria-label', 'Сообщение в обсуждении'); input.autocomplete = 'off';
+        input.addEventListener('input', () => { lobbyDraft = input.value; });
+        const send = button('Отправить', async () => {
+            const value = lobbyDraft.trim();
+            if (!value) return;
+            sending = 'Сообщение';
+            const result = await mutate(api('lobby-chat'), {command_id: id(), text: value});
+            sending = '';
+            if (result?.message) { lobbyDraft = ''; chatFocus = true; await refresh(); }
+        });
+        input.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault?.(); send.click(); } });
+        // After a sent line the field keeps the focus, so a conversation goes on without a tap.
+        if (chatFocus) { chatFocus = false; root.requestAnimationFrame?.(() => input.focus?.()); }
+        return kit.panel({icon: 'talk', title: 'Обсуждение', count: lines.length ? String(lines.length) : ''}, feed, put(el('div', 'nc-join'), input, send));
+    }
     function openLobby() {
         const data = view.lobby, seats = arr(data.seats), mine = ownSeat(data), owner = room?.role === 'owner';
         const counts = arr(data.allowed_counts), lo = counts[0] || 3;
@@ -716,7 +747,7 @@ function open(options) {
             put(el('div', 'ncase-heroes'), ...arr(data.heroes).map(hero => heroCard(hero, data))), anySeat(data), npcRow(data));
         const place = mine ? kit.panel({icon: 'seal', title: 'Как тебя звать'}, p(mine.ready ? 'Готовность подтверждена. Чтобы сменить имя или место, сними её.' : 'Имя и обращение видят все за столом. Потом подтверди готовность внизу.'), name.node, address.node) : null;
         const leave = mine ? put(el('div', 'qw-danger-zone'), button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')) : null;
-        return [scene, table, put(el('div', 'nc-col'), place, narratorLobby()), put(el('div', 'nc-col'), owner ? invitePanel() : null, windowsCard(data), leave)];
+        return [scene, table, put(el('div', 'nc-col'), lobbyChat(data), place, narratorLobby()), put(el('div', 'nc-col'), owner ? invitePanel() : null, windowsCard(data), leave)];
     }
     // The ready toggle sits in the dock and reads the fields of «Как тебя звать» from main.
     let lobbyFields = null;

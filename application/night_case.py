@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, exists, or_, select, text, update
+from sqlalchemy import and_, exists, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from domain.address import effective_address_form, parse_address_form
 from domain.night_case_engine import Transition, open_counts, start, start_open, step
@@ -34,8 +34,9 @@ from domain.night_case_v2_format import CompiledCase, compile_v2, load_v2
 from domain.night_case_narrative import (ActionContext, ActionProposal, confirm_action, propose_action)
 from storage.admin_actions import operation_fence
 from storage.guest_accounts import normalize_display_name
+from domain.night_case_delivery_state import normalize_say_text
 from storage.models import (Account, AccountMerge, Game, GamePlayer, GameCommand,
-    NightCase, NightGameSealed, NightLobbyCommand, NightEvent, NightMessage,
+    NightCase, NightGameSealed, NightLobbyCommand, NightLobbyMessage, NightEvent, NightMessage,
     NightIntentProposal, NightRenderJob, NightRendering, NightRewardClaim,
     Room, RoomMembership)
 from storage.night_cases import (NightCaseRepository, NightStorageConflict, NightStorageCorruption,
@@ -733,6 +734,54 @@ class NightCaseApplicationService:
             client_command_id=cmd.command_id,kind=kind,payload=payload,result=result,status='applied',now=now)
         return result
 
+    # Lobby talk («Обсуждение», mockup 4): the last lines in the lobby view; only players at the table write.
+    LOBBY_CHAT_SHOWN=50
+    LOBBY_CHAT_BURST=8          # lines per sender in LOBBY_CHAT_WINDOW
+    LOBBY_CHAT_WINDOW=timedelta(seconds=60)
+
+    async def _lobby_chat(self,game_id,aliases):
+        rows=list((await self.session.scalars(select(NightLobbyMessage).where(NightLobbyMessage.game_id==game_id)
+            .order_by(NightLobbyMessage.seq.desc()).limit(self.LOBBY_CHAT_SHOWN))).all())
+        return [self._lobby_line(row,aliases) for row in reversed(rows)]
+
+    @staticmethod
+    def _lobby_line(row,aliases):
+        return {'id':row.id,'name':row.name,'character_id':row.character_id,'look_id':row.look_id,'text':row.text,
+            'at':_stamp(row.created_at),'mine':row.sender_account_id in aliases}
+
+    @_atomic
+    async def post_lobby_message(self,*,account_id,game_id,command):
+        account=await self._principal(account_id)
+        if type(command) is not dict or set(command)!={'command_id','text'}: raise NightCaseError('invalid_command',422)
+        command_id=command['command_id']
+        if type(command_id) is not str or not 8<=len(command_id)<=64: raise NightCaseError('invalid_command',422)
+        try: line=normalize_say_text(command['text']).strip()
+        except ValueError: raise NightCaseError('invalid_command',422) from None
+        if not 1<=len(line)<=500: raise NightCaseError('invalid_command',422)
+        digest=hashlib.sha256(line.encode('utf-8')).hexdigest()
+        locked=await self.repo.lock_game(game_id)
+        if locked is None or locked.game.mode!='night_case': raise NightCaseError('unavailable',404)
+        await self._member(locked.game.room_id,account.id)
+        aliases=await historical_aliases(self.session,account.id)
+        prior=(await self.session.execute(select(NightLobbyMessage).where(NightLobbyMessage.game_id==game_id,
+            NightLobbyMessage.sender_account_id==account.id,NightLobbyMessage.command_id==command_id))).scalar_one_or_none()
+        if prior is not None:
+            if prior.text_hash!=digest: raise NightCaseError('command_conflict')
+            return {'message':self._lobby_line(prior,aliases),'chat':await self._lobby_chat(game_id,aliases)}
+        if locked.sealed.lifecycle!='lobby' or locked.sealed.lobby is None: raise NightCaseError('game_not_lobby')
+        own=next((r for r in locked.sealed.lobby['roster'] if r['account_id']==str(account.id)),None)
+        if own is None: raise NightCaseError('unavailable',404)
+        now=self.clock()
+        recent=await self.session.scalar(select(func.count()).select_from(NightLobbyMessage).where(NightLobbyMessage.game_id==game_id,
+            NightLobbyMessage.sender_account_id==account.id,NightLobbyMessage.created_at>now-self.LOBBY_CHAT_WINDOW))
+        if recent>=self.LOBBY_CHAT_BURST: raise NightCaseError('rate_limited',429)
+        # The game row is held FOR UPDATE: the next number is unique and follows the order of writes.
+        seq=(await self.session.scalar(select(func.max(NightLobbyMessage.seq)).where(NightLobbyMessage.game_id==game_id)) or 0)+1
+        row=NightLobbyMessage(game_id=game_id,id=str(uuid4()),seq=seq,command_id=command_id,sender_account_id=account.id,
+            name=own['name'],character_id=own.get('character_id'),look_id=own.get('look_id'),text=line,text_hash=digest,created_at=now)
+        self.session.add(row); await self.session.flush()
+        return {'message':self._lobby_line(row,aliases),'chat':await self._lobby_chat(game_id,aliases)}
+
     @_atomic
     async def join_lobby(self,*,account_id,game_id,command):
         return await self._lobby_command(account_id=account_id,game_id=game_id,command=command,kind='join_lobby')
@@ -999,7 +1048,9 @@ class NightCaseApplicationService:
             try: art=await self._art(locked.sealed,case)
             except NightCaseError: art=None   # no binding: the lobby is simply drawn without pictures
             public={'world':copy.deepcopy(meta.get('world')),'style_pack':copy.deepcopy(meta.get('style_pack')),'art':art}
-            return {'game_id':game_id,'mode':'night_case','lobby':self._lobby_view(locked,account.id,case),
+            lobby=self._lobby_view(locked,account.id,case)
+            lobby['chat']=await self._lobby_chat(game_id,aliases)
+            return {'game_id':game_id,'mode':'night_case','lobby':lobby,
                 'public':public,'self':None,'menu':[],'server_now':_stamp(now),'runtime_status':'ok'},locked
         case,rules,state=await self._runtime(locked)
         original=selected if selected is not None else account.id if account.id in aliases else sorted(aliases,key=str)[0]

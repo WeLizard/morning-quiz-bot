@@ -160,6 +160,64 @@ class FreeSeatingLobbyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(running["self"]["character_id"], "person_00")
         self.assertEqual(second["self"]["character_id"], "person_01")
 
+    async def say(self, account, game, text, command_id=None):
+        async with self.db.transaction() as session:
+            return await self.service(session).post_lobby_message(account_id=account, game_id=game,
+                                                                  command={"command_id": command_id or uuid4().hex, "text": text})
+
+    async def test_lobby_talk_is_written_at_the_table_and_read_by_the_company(self):
+        """Mockup 4 «Обсуждение»: players at the table write; every company member reads; the line keeps the seat."""
+        from datetime import timedelta
+        from application.night_case import NightCaseError
+        async with self.db.transaction() as session:
+            view = (await self.service(session).create_lobby(account_id=self.owner, room_id=self.room, command=self.cmd(
+                0, {"case_id": self.ref.case_id, "case_version": self.ref.case_version, "timezone": "Europe/Berlin"})))["view"]
+        game = view["game_id"]
+        view = await self.call("join_lobby", self.accounts[1], game, view)
+        view = await self.call("take_seat", self.accounts[1], game, view, {"character_id": "person_01", "look_id": None})
+        revision = view["lobby_revision"]
+        first = await self.say(self.accounts[1], game, "  Беру второго. Стартуем вечером?  ", command_id="chat-0001")
+        self.assertEqual(first["message"]["text"], "Беру второго. Стартуем вечером?")
+        self.assertEqual((first["message"]["name"], first["message"]["character_id"], first["message"]["mine"]), ("Player 1", "person_01", True))
+        # The same command is the same line; another text under it is a conflict.
+        again = await self.say(self.accounts[1], game, "Беру второго. Стартуем вечером?", command_id="chat-0001")
+        self.assertEqual(again["message"]["id"], first["message"]["id"])
+        with self.assertRaises(NightCaseError) as conflict:
+            await self.say(self.accounts[1], game, "другой текст", command_id="chat-0001")
+        self.assertEqual(conflict.exception.code, "command_conflict")
+        await self.say(self.owner, game, "Да, в семь.")
+        # A member who has not joined reads the talk but cannot write; the talk does not move the lobby revision.
+        async with self.db.transaction() as session:
+            outsider = await self.service(session).get_view(account_id=self.accounts[3], game_id=game)
+        self.assertEqual([row["text"] for row in outsider["lobby"]["chat"]], ["Беру второго. Стартуем вечером?", "Да, в семь."])
+        self.assertEqual([row["mine"] for row in outsider["lobby"]["chat"]], [False, False])
+        self.assertEqual(outsider["lobby"]["lobby_revision"], revision)
+        self.assertNotIn("sender_account_id", outsider["lobby"]["chat"][0])
+        with self.assertRaises(NightCaseError) as stranger:
+            await self.say(self.accounts[3], game, "Можно мне?")
+        self.assertEqual(stranger.exception.code, "unavailable")
+        for bad in ("", "   ", "x" * 501, "звонок\x07"):
+            with self.assertRaises(NightCaseError) as invalid:
+                await self.say(self.owner, game, bad)
+            self.assertEqual(invalid.exception.code, "invalid_command")
+        # A burst is cut after eight lines a minute; a minute later the sender writes again.
+        for i in range(7):
+            await self.say(self.owner, game, f"строка {i}")
+        with self.assertRaises(NightCaseError) as burst:
+            await self.say(self.owner, game, "ещё")
+        self.assertEqual((burst.exception.code, burst.exception.status), ("rate_limited", 429))
+        self.now = START + timedelta(minutes=2)
+        await self.say(self.owner, game, "ещё")
+        # After the start the lobby talk is closed.
+        view = await self.call("join_lobby", self.accounts[2], game, view)
+        view = await self.call("take_seat", self.owner, game, view, {"character_id": "person_00", "look_id": None})
+        for i, account in enumerate(self.accounts[:3]):
+            view = await self.call("set_ready", account, game, view, {"name": f"Player {i}", "address_form": "n", "ready": True})
+        await self.call("start_game", self.owner, game, view)
+        with self.assertRaises(NightCaseError) as closed:
+            await self.say(self.owner, game, "Поехали")
+        self.assertEqual(closed.exception.code, "game_not_lobby")
+
 
 class LobbyNameTest(unittest.TestCase):
     """A player without a free display name is «Игрок N» at the table, never the service seat id."""

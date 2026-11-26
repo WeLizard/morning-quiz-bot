@@ -293,6 +293,11 @@ def test_lobby_history_and_confirmation_pass_only_their_declared_inputs(monkeypa
             assert service.calls[-1] == ('confirm_intent', {'account_id': ACCOUNT, 'game_id': GAME, 'proposal_id': 'own-proposal'})
             assert (await client.get(f'/api/night-case/games/{GAME}/history?stream=messages&cursor=signed&limit=10')).status_code == 200
             assert service.calls[-1][1]['stream'] == 'messages' and service.calls[-1][1]['limit'] == 10
+            # The lobby talk (mockup 4) is a write with CSRF, delegated as is to the service.
+            line = {'command_id': 'chat-0001', 'text': 'Стартуем вечером?'}
+            assert (await client.post(f'/api/night-case/games/{GAME}/lobby-chat', json=line)).status_code == 403
+            assert (await client.post(f'/api/night-case/games/{GAME}/lobby-chat', headers=headers(), json=line)).status_code == 200
+            assert service.calls[-1] == ('post_lobby_message', {'account_id': ACCOUNT, 'game_id': GAME, 'command': line})
     asyncio.run(run())
 
 

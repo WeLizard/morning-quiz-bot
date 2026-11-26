@@ -34,6 +34,7 @@ ERROR_TEXT = {
     'profile_changed': 'Профиль изменился. Открой дело заново из главного меню.',
     'ai_unavailable': 'AI сейчас недоступен. Выбери авторское начало дела.',
     'starter_unproven': 'Не удалось подтвердить, кто начал дело.',
+    'rate_limited': 'Слишком много запросов подряд. Подожди немного.',
 }
 PUBLIC_CODES = frozenset(ERROR_TEXT) | frozenset({
     'account_ancestry_invalid', 'action_unavailable', 'case_unavailable', 'duplicate_name',
@@ -160,7 +161,8 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
             return await invoke(request, identity, method, write=True, game_id=game_id, command=await body(request))
         app.add_api_route('/api/night-case/games/{game_id}/' + path, handle, methods=['POST'], name='night_case_' + path)
 
-    for path, method in [('join', 'join_lobby'), ('leave', 'leave_lobby'), ('ready', 'set_ready'), ('seat', 'take_seat'), ('start', 'start_game')]:
+    for path, method in [('join', 'join_lobby'), ('leave', 'leave_lobby'), ('ready', 'set_ready'), ('seat', 'take_seat'), ('start', 'start_game'),
+                         ('lobby-chat', 'post_lobby_message')]:
         lifecycle(path, method)
 
     @app.get('/api/night-case/games/{game_id}/view')

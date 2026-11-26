@@ -855,3 +855,39 @@ test('the ready toggle in the dock sends the name and address typed in the lobby
     assert.deepEqual(JSON.parse(JSON.stringify(ready.body.params)), {name: 'Вера К.', address_form: 'f', ready: true});
     fixture.handle.close();
 });
+
+test('the lobby talk shows the hero and the player plate, sends a line and keeps the draft for players only (mockup 4)', async () => {
+    const {state, manifest, pointer} = openLobbyFixture();
+    state.lobby.chat = [
+        {id: 'm1', name: 'Нина', character_id: 'investigator', look_id: null, text: 'Беру следователя. Стартуем вечером?', at: '2026-11-26T09:58:00Z', mine: false},
+        {id: 'm2', name: 'Вера', character_id: null, look_id: null, text: 'Да, в семь.', at: '2026-11-26T09:59:00Z', mine: true}];
+    const fixture = controller(state, url => url === pointer ? manifest : url.endsWith('/lobby-chat') ? {message: {id: 'm3'}, chat: []} : undefined); await settle();
+    const card = find(fixture.host, node => node.className === 'nc-card' && /Обсуждение/.test(node.textContent));
+    assert.ok(card);
+    const lines = nodesOf(card, node => /^nc-msg\b/.test(node.className));
+    assert.equal(lines.length, 2);
+    assert.match(lines[0].textContent, /Следователь\s+Нина\s+Беру следователя/);
+    assert.match(find(lines[0], node => node.tagName === 'img').src, /character_investigator\.webp$/);
+    assert.equal(lines[1].className, 'nc-msg mine');
+    assert.match(lines[1].textContent, /Любое место\s+ты\s+Да, в семь\./);
+    const input = find(card, node => node.attrs?.['aria-label'] === 'Сообщение в обсуждении');
+    input.value = '  Я за экономку  '; await input.events.input();
+    await input.events.keydown({key: 'Enter'}); await settle();
+    const sent = fixture.calls.find(call => call.url.endsWith('/lobby-chat'));
+    assert.ok(sent, 'Enter sends the line');
+    assert.equal(sent.body.text, 'Я за экономку');
+    assert.match(sent.body.command_id, /^request-/);
+    assert.equal(sent.url, '/api/night-case/games/game/lobby-chat');
+    fixture.handle.close();
+});
+
+test('a company member who has not joined reads the lobby talk but has no field to write', async () => {
+    const {state, manifest, pointer} = openLobbyFixture();
+    state.lobby.self_seat = null; state.lobby.self = null;
+    state.lobby.chat = [{id: 'm1', name: 'Нина', character_id: 'investigator', look_id: null, text: 'Ждём ещё одного.', at: '2026-11-26T09:58:00Z', mine: false}];
+    const fixture = controller(state, url => url === pointer ? manifest : undefined); await settle();
+    assert.match(fixture.host.textContent, /Ждём ещё одного\./);
+    assert.match(fixture.host.textContent, /Писать могут игроки за столом\./);
+    assert.equal(find(fixture.host, node => node.attrs?.['aria-label'] === 'Сообщение в обсуждении'), undefined);
+    fixture.handle.close();
+});

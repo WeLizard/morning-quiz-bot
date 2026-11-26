@@ -20,7 +20,6 @@
 .ncase-citations,.ncase-recipients {display:flex;flex-direction:column;gap:var(--qw-s-2)}
 .ncase-claim {color:var(--qw-game-muted);font-size:var(--qw-fs-small)}
 .ncase-proof {color:var(--qw-game-accent);font-size:var(--qw-fs-small)}
-.ncase-entry {display:flex;flex-direction:column;gap:var(--qw-s-2);border-bottom:var(--qw-outline-w) solid var(--qw-game-line);padding-bottom:var(--qw-s-3)}
 .ncase-main .nc-hero {width:100%;box-sizing:border-box;min-height:200px}
 .ncase-main .nc-hero .copy {min-width:0}
 .ncase-role-portrait {width:min(100%,240px);max-height:320px;object-fit:contain;align-self:center}
@@ -191,6 +190,10 @@
 .ncase-chron img{width:56px;height:56px;border-radius:8px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
 .ncase-chron img.obj{object-fit:contain;padding:5px;box-sizing:border-box;background:var(--nc-tint)}
 .ncase-chron .when{display:block;font:700 var(--qw-fs-caption)/1.3 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-muted)}
+/* live: an event without a picture shows its sign; buttons under the text start at the left */
+.ncase-chron .sign{display:grid;place-items:center;width:56px;height:56px;border-radius:8px;background:var(--nc-tint);color:var(--nc-muted);box-shadow:0 0 0 1px var(--nc-edge-soft)}
+.ncase-chron .sign .ic{--s:26px}
+.ncase-chron li .qw-btn-row{justify-content:flex-start;margin-top:var(--qw-s-2)}
 .ncase-chron p{font-size:var(--qw-fs-body);line-height:1.4}
 
 /* ---------- 09 hearing: suspects by portrait, citations by picture ---------- */

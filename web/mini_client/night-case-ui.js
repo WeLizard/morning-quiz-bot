@@ -1036,9 +1036,13 @@ function open(options) {
             };
             const sources = card('lens', 'Приложи улики', 'до пяти', el('p', 'nc-muted', 'Сервер проверит, хватает ли доказательств. Утверждения ключами не считаются.'),
                 rows.length ? put(el('div', 'ncase-cites'), ...rows) : p('На доске пока нет записей, которые можно приложить.'));
+            // Finding 3 of 2026-11-21: the accused sees the charge and cannot support it against themselves.
+            const accused = hearing?.suspect && hearing.suspect === view.self.character_id;
             if (kind === 'vote') return [card('scales', 'Идёт слушание', hearing?.resolve_window ? `до окна ${hearing.resolve_window}` : '',
-                    el('p', 'nc-muted', 'Поддержи обвинение или возрази. Голос тайный; итог объявят, когда слушание закроется.'), ...(hearing ? accusedBlock(hearing) : [])),
-                sources, kit.row(button('Возражаю', () => send('oppose')), button('Поддержать', () => send('support'), 'primary'))];
+                    accused ? kit.alert({tone: 'warn', icon: 'alert', title: 'Обвиняют тебя. Возрази и приложи улики в свою защиту: поддержать обвинение против себя нельзя.'})
+                        : el('p', 'nc-muted', 'Поддержи обвинение или возрази. Голос тайный; итог объявят, когда слушание закроется.'), ...(hearing ? accusedBlock(hearing) : [])),
+                sources, accused ? kit.row(button('Возражаю', () => send('oppose'), 'primary'))
+                    : kit.row(button('Возражаю', () => send('oppose')), button('Поддержать', () => send('support'), 'primary'))];
             if (kind === 'final_vote') return [card('scales', 'Итоговое слушание', '',
                     el('p', 'nc-muted', 'Кто вывел и скрывал хозяина? Если он всё сделал сам, без помощников, назови его самого. Голос можно изменить, пока слушание не закрылось; итог объявят после закрытия.'),
                     ballot ? kit.alert({tone: 'ok', icon: 'check', title: `Твой голос записан: ${ballot.suspect ? heroTitle(ballot.suspect) : 'без обвинения'}`}) : null),
@@ -1116,14 +1120,44 @@ function open(options) {
         default: return 'Событие дела.';
         }
     }
+    const EVENT_SIGN = {window: 'moon', board: 'papers', observation_granted: 'lens', archive_requested: 'papers', hearing: 'scales', status: 'people',
+        npc_revealed: 'eye', world_changed: 'house', version_marked: 'story', ghost_whispered: 'envelope', ghost_whisper_received: 'envelope',
+        testimony_asked: 'talk', testimony_answered: 'talk', final: 'laurel', afk_notice: 'hourglass', window_digest: 'calendar', story_return_closed: 'envelope', scene: 'eye'};
     function history() {
-        const eventCards = (stream, title) => panel(title, ...pages[stream].items.map(item => {
+        const entry = item => {
             const payload = item.payload || {};
-            return put(el('article', 'ncase-entry'), el('strong', null, `Окно ${item.window_idx}`),
-                item.kind === 'scene' ? sceneArt(sceneOf(item.event_id)?.art, 'Сцена окна') : null, p(eventText(item)),
-                ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : []));
-        }), ...(pages[stream].next_cursor ? [kit.row(button('Ещё записи', async () => { await loadHistory(stream, true); render(); }))] : []));
-        return [eventCards('public', 'Общий ход дела'), eventCards('self', 'Твои события')];
+            const pic = (item.kind === 'scene' && sceneArt(sceneOf(item.event_id)?.art, 'Сцена окна')) || put(el('span', 'sign'), icon(EVENT_SIGN[item.kind] || 'calendar'));
+            return put(el('li'), pic, put(el('div'), el('span', 'when', `Окно ${item.window_idx}`), p(eventText(item)),
+                ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : [])));
+        };
+        const eventCards = (stream, sign, title, empty) => card(sign, title, pages[stream].items.length ? plural(pages[stream].items.length, 'запись', 'записи', 'записей') : '',
+            pages[stream].items.length ? put(el('ul', 'ncase-chron'), ...pages[stream].items.map(entry)) : p(empty),
+            ...(pages[stream].next_cursor ? [kit.row(button('Ещё записи', async () => { await loadHistory(stream, true); render(); }))] : []));
+        return [eventCards('public', 'calendar', 'Общий ход дела', 'Записей пока нет.'), eventCards('self', 'seal', 'Твои события', 'Пока ничего: твои находки, переходы и записки появятся здесь.')];
+    }
+    // 14 «Дело закрыто»: the played variant's picture and text, the own result, and who was who (hero first, player as a plate).
+    const PARTS = {culprit: 'виновный', accomplice: 'сообщник Тени'};
+    const SIDE_SHORT = {shadow: 'Тень', investigation: 'Следствие', independent: 'Сам за себя'};
+    function finaleCards(final) {
+        const own = view.self, goals = new Map(arr(final?.goal_results).map(row => [row.account_id, row.met === true]));
+        const facts = arr(final?.reward_facts).find(row => row.account_id === own.account_id);
+        const met = goals.get(own.account_id);
+        const sideTag = faction => {
+            const node = el('span', `ncase-fac ${SIDE_SHORT[faction] ? faction : 'investigation'}`);
+            const emblem = kit.art?.(`emblem_${faction}`);
+            if (emblem) node.append(Object.assign(el('img'), {src: emblem, alt: ''}));
+            node.append(SIDE_SHORT[faction] || SIDE_SHORT.investigation);
+            return node;
+        };
+        const mine = card('laurel', 'Твой итог', '', put(el('div', 'ncase-me'), portraitFrame(own.character_id, face(own.character_id, 'ncase-face lg')),
+            put(el('div'), el('span', 'nc-eyebrow', 'Твой итог'), el('strong', null, `${heroTitle(own.character_id)} · ${met ? 'цель выполнена' : 'цель не выполнена'}`),
+                el('span', 'nc-muted', facts ? (facts.faction_won ? 'Твоя сторона победила.' : 'Твоя сторона в этот раз проиграла.') : 'Подробности своей цели смотри в «Досье».'))));
+        const cast = arr(final?.cast);
+        const who = cast.length ? card('people', 'Кто был кем', 'роли открыты', put(el('ul', 'ncase-cast'), ...cast.map(row => put(el('li'), face(row.character_id),
+            put(el('div'), put(el('span', 'ncase-who'), el('span', 'nm', heroTitle(row.character_id)), plateFor(row.character_id)),
+                el('span', 'sub', PARTS[row.part] || (row.faction === 'independent' ? 'свой интерес' : 'следствие'))),
+            sideTag(row.faction), row.account_id ? (goals.get(row.account_id) ? kit.tag?.('цель', {tone: 'ok', icon: 'check'}) || el('span', 'nc-tag ok', 'цель') : el('span', 'nc-tag', 'не вышло')) : null)))) : null;
+        return [mine, who];
     }
     function rules() {
         return [panel('Как идёт дело', p('Четырнадцать окон на семь дней. Окна открывает сервер; заходи в удобное время. На перемещения и действия тратятся очки действий.'),
@@ -1148,10 +1182,12 @@ function open(options) {
         const stateNotice = clock.phase === 'frozen' ? panel('Стол ждёт возвращения', p('Общий простой остановил окна. Отметь возвращение, чтобы продолжить.'),
             kit.row(...choiceList().filter(row => row.quote.kind === 'seen').map(row => actionButton(row)))) : own.status === 'departed' ? panel('Участие завершено', p('Тебе доступна собственная разрешённая история до выхода и итог дела.')) : own.status === 'ghost' && tab !== 'place' ? panel(removedTitle(), p('Твоё действие окна — во вкладке «Место».')) : null;
         const final = own.postmortem;
-        const finale = pub.final || view.final_summary ? panel('Дело завершено', sealedArt(final?.variant_art, 'Развязка дела'), p(bodyText(final?.ending)), p(bodyText(final?.variant_final_text)),
-            p(final?.goal_results?.find(row => row.account_id === own.account_id)?.met ? 'Твоя личная цель выполнена.' : 'Подробности своей личной цели смотри в итоговом досье.')) : null;
+        const over = pub.final || view.final_summary;
+        const finale = !over ? null : tab === 'place' ? [card('laurel', 'Дело закрыто', '', sealedArt(final?.variant_art, 'Развязка дела'),
+                el('p', 'nc-lead', bodyText(final?.ending)), bodyText(final?.variant_final_text) ? p(bodyText(final?.variant_final_text)) : null), ...(final ? finaleCards(final) : [])]
+            : card('laurel', 'Дело закрыто', '', p('Развязка, твой итог и «кто был кем» — на вкладке «Место».'), kit.row(button('К итогу', () => showTab('place'), 'primary')));
         const finalHearing = clock.phase === 'final_hearing' && !pub.final;
-        const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? panel(finalHearing ? 'Итоговое слушание' : 'Идёт слушание',
+        const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? card('scales', finalHearing ? 'Итоговое слушание' : 'Идёт слушание', '',
             p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
             kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
         const current = tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
@@ -1165,7 +1201,7 @@ function open(options) {
             });
             selector = panel('Твоя история', choice.node);
         }
-        frame([navigation(), selector, stateNotice, hearingNotice, finale, confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean), arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
+        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean), arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
             `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`);
     }
     function close() {

@@ -425,10 +425,26 @@ test('publish buttons name the evidence, a second publication is one card and ow
 test('after the final the place shows no actions and no free intent box without a host', async () => {
     const state = view();
     state.public.final = {code: 'solved', at: '2026-11-20T10:00:00Z'};
-    state.self.postmortem = {ending: {text: 'Финал'}, goal_results: []};
+    state.self.postmortem = {ending: {text: 'Финал'}, goal_results: [{account_id: VIEWER, met: true}, {account_id: 'other', met: false}],
+        reward_facts: [{account_id: VIEWER, faction_won: true}],
+        cast: [{character_id: 'lawyer', account_id: VIEWER, controller: 'player', faction: 'investigation', part: null},
+            {character_id: 'maid', account_id: 'other', controller: 'player', faction: 'shadow', part: 'accomplice'},
+            {character_id: 'owner', account_id: null, controller: 'npc', faction: 'shadow', part: 'culprit'}]};
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active'}, {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}];
+    state.public.looks = {lawyer: {title: 'Адвокат'}, maid: {title: 'Горничная'}, owner: {title: 'Хозяин'}};
+    state.self.account_id = VIEWER; // the server always sends the viewer's account with the own view
     const fixture = controller(state); await settle();
     assert.doesNotMatch(fixture.host.textContent, /Осталось действий|Предложить действие|Осмотреть стол/);
-    assert.match(fixture.host.textContent, /Дело завершено/);
+    const all = fixture.host.textContent;
+    assert.match(all, /Дело закрыто/);
+    assert.match(all, /Адвокат · цель выполнена/);
+    assert.match(all, /Твоя сторона победила/);
+    assert.match(all, /Кто был кем/);
+    assert.match(all, /Горничная.*Нина.*сообщник Тени.*Тень.*не вышло/s);
+    assert.match(all, /Хозяин.*ведёт игра.*виновный/s);
+    await button(fixture.host, 'Улики').click(); await settle();
+    assert.ok(button(fixture.host, 'К итогу'), 'other tabs point to the finale instead of repeating it');
+    assert.doesNotMatch(fixture.host.textContent, /Кто был кем/);
     fixture.handle.close();
 });
 
@@ -694,5 +710,18 @@ test('a hearing shows accuser and suspect by portrait; the final vote picks a he
     const sent = fixture.calls.find(row => row.url.endsWith('/commands'));
     assert.equal(sent.body.kind, 'final_vote');
     assert.deepEqual({...sent.body.params, citations: [...sent.body.params.citations]}, {citations: ['b1'], suspect: 'butler'});
+    fixture.handle.close();
+});
+
+test('the accused sees the charge and can only object (finding 3)', async () => {
+    const state = view();
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active'}, {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}];
+    state.public.hearing = {id: 'h1', accuser: 'other', suspect: 'lawyer', resolve_window: 4, initial_citations: []};
+    state.menu = [{kind: 'form', entry_id: 'vote', label: 'vote', command_kind: 'vote', cost: 0, subject_ids: [], board_ids: [], hearing_id: 'h1'}];
+    const fixture = controller(state); await settle();
+    await button(fixture.host, 'Улики').click(); await settle();
+    assert.match(fixture.host.textContent, /Обвиняют тебя/);
+    assert.ok(button(fixture.host, 'Возражаю'));
+    assert.equal(button(fixture.host, 'Поддержать'), undefined);
     fixture.handle.close();
 });

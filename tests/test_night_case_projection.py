@@ -100,6 +100,15 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(set(public["final"]), {"code", "at"})
         self.assertEqual(own["self"]["postmortem"]["ending"], case.document()["endings"]["unresolved"])
         self.assertIsNotNone(own["self"]["postmortem"]["variant_final_text"])
+        # «Who was who» (MQB-012 screen 14): every seat with its side; the culprit by role, also when the game leads that hero.
+        cast = own["self"]["postmortem"]["cast"]
+        self.assertEqual({row["account_id"] for row in cast if row["controller"] == "player"}, {p["account_id"] for p in t.state.players})
+        variant = next(v for v in case.document()["variants"] if v["id"] == t.state.sealed["variant_id"])
+        culprit = [row for row in cast if row["part"] == "culprit"]
+        self.assertEqual([row["character_id"] for row in culprit], [variant["culprit"]])
+        self.assertTrue(all(row["faction"] == "shadow" for row in cast if row["part"]))
+        self.assertTrue(all(row["faction"] in {"investigation", "independent", "shadow"} for row in cast))
+        self.assertNotIn("postmortem", public.get("self") or {})
 
     def test_private_variant_result_does_not_enter_public_events(self):
         case, rules, roster, a = setup(4, "variant_a")

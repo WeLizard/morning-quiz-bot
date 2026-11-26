@@ -379,3 +379,26 @@
 .ncase-act .obj.sign .ic{--s:26px}
 .ncase-nav button .ic{pointer-events:none}
 .ncase-reveal .ncase-rolecard{align-self:center}
+
+/* ===== out of play (owner decision: removed — darkened; killed — translucent with an effect; question B7 picks the effect) =====
+   On a wrapper of the portrait (.pic of a hero card, .ncase-faceframe around a face): an <img> has no pseudo-elements. */
+.ncase-faceframe{position:relative;display:inline-block;border-radius:50%;isolation:isolate}
+:is(.pic,.ncase-faceframe,.ncase-rolecard .face).ncase-out img{filter:grayscale(.75) brightness(.6)}
+:is(.pic,.ncase-faceframe).ncase-dead{background:#050506}
+:is(.pic,.ncase-faceframe).ncase-dead::before,:is(.pic,.ncase-faceframe).ncase-dead::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit}
+/* А «Пепел»: grey and half gone, a black mourning ribbon across the corner */
+[data-death=ash] img{filter:grayscale(1) brightness(.8) contrast(1.15);opacity:.5}
+[data-death=ash]::after{background:linear-gradient(135deg,transparent 0 69%,var(--nc-edge) 69% 69.6%,#050506 69.6% 78.4%,var(--nc-edge) 78.4% 79%,transparent 79%)}
+.ncase-faceframe[data-death=ash]::after{background:linear-gradient(135deg,transparent 0 62%,#050506 62% 74%,transparent 74%)}
+/* Б «Вуаль»: translucent, a cold haze drifting slowly over the face */
+[data-death=veil] img{filter:grayscale(.9) brightness(.95) sepia(.15) hue-rotate(160deg);opacity:.42}
+[data-death=veil]::after{background:radial-gradient(60% 40% at 30% 40%,rgb(200 215 225/.32),transparent 70%),radial-gradient(50% 35% at 70% 70%,rgb(200 215 225/.26),transparent 70%);
+  background-size:200% 200%;animation:nc-veil 14s ease-in-out infinite alternate}
+@keyframes nc-veil{from{background-position:0 0,100% 100%}to{background-position:100% 60%,0 30%}}
+/* В «Свеча»: the edges burn inward, a warm flicker of the last light */
+[data-death=candle] img{filter:grayscale(.85) sepia(.35) brightness(.75);opacity:.6;
+  -webkit-mask-image:radial-gradient(closest-side,#000 55%,transparent 100%);mask-image:radial-gradient(closest-side,#000 55%,transparent 100%)}
+[data-death=candle]::after{background:radial-gradient(closest-side at 50% 60%,rgb(255 170 80/.18),transparent 75%);animation:nc-candle 3.2s ease-in-out infinite}
+@keyframes nc-candle{0%,100%{opacity:.55}35%{opacity:1}60%{opacity:.7}80%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){[data-death]::after{animation:none}}
+:root.nc[data-qw-contrast="1"] [data-death] img{opacity:.75}

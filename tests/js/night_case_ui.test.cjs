@@ -642,3 +642,23 @@ test('a lobby seat stored as a service id is shown as a numbered player', async 
     assert.doesNotMatch(fixture.host.textContent, /seat02/);
     fixture.handle.close();
 });
+
+test('people nearby come by portrait with the player plate; a hero removed by the table is darkened', async () => {
+    const crypto = require('node:crypto');
+    const sort = value => Array.isArray(value) ? value.map(sort) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sort(value[key])])) : value;
+    const manifest = {schema: 'nc-assets/2', world: 'manor_lake', files: {'assets/character_cook.webp': 'a'.repeat(64), 'assets/character_maid.webp': 'b'.repeat(64)}, assets: {
+        manor_char_cook: {url: 'assets/character_cook.webp', alt: 'Повар'}, manor_char_maid: {url: 'assets/character_maid.webp', alt: 'Горничная'}}};
+    const digest = crypto.createHash('sha256').update(JSON.stringify(sort(manifest))).digest('hex'), pointer = `/app/night/packs/${digest}/assets.json`;
+    const state = view();
+    Object.assign(state.public, {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer},
+        players: [{account_id: 'other', character_id: 'maid', name: 'Нина', status: 'ghost'}],
+        looks: {cook: {id: 'base', title: 'Повар', art: {asset_id: 'manor_char_cook'}}, maid: {id: 'base', title: 'Горничная', art: {asset_id: 'manor_char_maid'}}}});
+    state.self.nearby = [{character_id: 'cook', name: 'Пётр Ильич', controller: 'npc'}, {character_id: 'maid', name: 'Нина', controller: 'player'}];
+    const live = controller(state, url => url === pointer ? manifest : undefined); await settle();
+    const people = find(live.host, node => node.className === 'ncase-people');
+    assert.ok(people, 'the people nearby are a list of portraits');
+    assert.match(people.textContent, /Повар/); assert.match(people.textContent, /ведёт игра/); assert.match(people.textContent, /Нина/);
+    const darkened = find(people, node => /ncase-out/.test(node.className));
+    assert.equal(darkened?.children[0]?.src, `/app/night/packs/${digest}/assets/character_maid.webp`);
+    live.handle.close();
+});

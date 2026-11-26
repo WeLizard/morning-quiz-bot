@@ -680,7 +680,7 @@ function open(options) {
     const SIDES = {investigation: ['Твоя сторона — следствие', 'Знак Следствия'], shadow: ['Твоя сторона — Тень', 'Знак Тени'], independent: ['Ты сам по себе', 'Независимые']};
     function roleCard(data, faction) {
         const artwork = assets.get(data.art?.asset_id);
-        const figure = el('figure', 'ncase-rolecard'), frame = el('span', 'face');
+        const figure = el('figure', 'ncase-rolecard'), frame = el('span', `face${view.self?.status === 'ghost' ? ' ncase-out' : ''}`);
         if (artwork) {
             const portrait = el('img', 'ncase-role-portrait'); portrait.src = artwork.url;
             portrait.alt = text(data.art?.alt).slice(0, 300) || artwork.alt || data.title || 'Портрет роли'; frame.append(portrait);
@@ -753,7 +753,10 @@ function open(options) {
         if (row.controller === 'npc') return el('span', 'ncase-tag game', 'ведёт игра');
         return row.character_id === view.self?.character_id ? el('span', 'ncase-tag me', 'ты') : el('span', 'ncase-tag', seatName(row));
     }
-    const person = row => put(el('li', `ncase-person${row.controller === 'npc' ? ' npc' : ''}`), face(row.character_id), el('span', 'nm', heroTitle(row.character_id)), plate(row));
+    // Out of play: a removed hero is darkened (owner decision); «killed» waits for a case with deaths and the owner's pick (B7).
+    const removed = char => arr(view?.public?.players).some(item => item.character_id === char && item.status === 'ghost');
+    const portraitFrame = (char, node) => removed(char) ? put(el('span', 'ncase-faceframe ncase-out'), node) : node;
+    const person = row => put(el('li', `ncase-person${row.controller === 'npc' ? ' npc' : ''}`), portraitFrame(row.character_id, face(row.character_id)), el('span', 'nm', heroTitle(row.character_id)), plate(row));
     const pressed = row => proposal?.selection_id && proposal.selection_id === row.quote.selection_id;
     // An action as a tile: the item or the speaker's portrait, else the verb's sign; the confirmation names the full action.
     function actTile(row, label, {face: speaker = null, sub = '', sign = 'eye', full = label} = {}) {

@@ -109,7 +109,7 @@ jobs:
 
       - name: Run JavaScript tests
         if: ${{ !cancelled() }}
-        run: node --test tests/js/mini_navigation.test.cjs tests/js/alchemy_sync.test.cjs
+        run: node --test tests/js/mini_navigation.test.cjs tests/js/alchemy_sync.test.cjs tests/js/night_case_ui.test.cjs tests/js/night_city_wiring.test.cjs
 
       - name: Run repository checks
         if: ${{ !cancelled() }}

@@ -41,7 +41,7 @@ def finished(variant_id):
 class SceneArtFormatTests(unittest.TestCase):
     def test_manor_events_and_variants_name_their_own_scene_assets(self):
         for group in ('events', 'variants'):
-            self.assertEqual(len(RAW[group]), 6 if group == 'events' else 3)
+            self.assertEqual(len(RAW[group]), 6 if group == 'events' else 5)
             for entry in RAW[group]:
                 self.assertEqual(entry['art']['asset_id'], 'manor_scene_' + entry['id'])
                 self.assertTrue(entry['art']['alt'])
@@ -80,9 +80,10 @@ class SceneArtProjectionTests(unittest.TestCase):
         scenes = [e for e in public['chronicle'] if e['kind'] == 'scene']
         by_event = {e['id']: e['art'] for e in RAW['events']}
         self.assertLessEqual(set(by_event), {e['payload']['content_event_id'] for e in scenes})
+        # Turning-point scenes carry a picture of their own too (Manor v5).
+        by_event |= {e['id']: e['art'] for e in RAW['module_data']['turning_point']['scenes']}
         for entry in scenes:
-            # Module scenes (turning point) have no picture of their own.
-            self.assertEqual(entry.get('art'), by_event.get(entry['payload']['content_event_id']))
+            self.assertEqual(entry.get('art'), by_event[entry['payload']['content_event_id']])
         self.assertFalse(any('art' in e for e in public['chronicle'] if e['kind'] != 'scene'))
         self.assertNotIn('art', self.state.document()['public']['chronicle'][0])
 

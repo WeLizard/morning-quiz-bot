@@ -590,6 +590,12 @@ function open(options) {
                 if (value) await enterRoom(value);
             })))], 'Ночной город');
     }
+    // The finished game stays readable from the history; the room screen offers the case list again.
+    function newCase() {
+        epoch++; game = null; view = null; proposal = null; tab = 'place'; worldPack = null; assetWorld = null; assets = new Map();
+        kit.useWorld?.(null); clearHistory();
+        renderRoom();
+    }
     function renderRoom() {
         if (room?.role !== 'owner') return frame([panel(room?.title || 'Компания', p('Хозяин компании ещё не начал сбор на дело. Когда начнёт, здесь можно будет присоединиться.'), kit.row(button('Проверить', () => enterRoom(room))))], room?.title || 'Компания');
         const cases = arr(boot?.cases);
@@ -1207,7 +1213,10 @@ function open(options) {
         const final = own.postmortem;
         const over = pub.final || view.final_summary;
         const finale = !over ? null : tab === 'place' ? [card('laurel', 'Дело закрыто', '', sealedArt(final?.variant_art, 'Развязка дела'),
-                el('p', 'nc-lead', bodyText(final?.ending)), bodyText(final?.variant_final_text) ? p(bodyText(final?.variant_final_text)) : null), ...(final ? finaleCards(final) : [])]
+                el('p', 'nc-lead', bodyText(final?.ending)), bodyText(final?.variant_final_text) ? p(bodyText(final?.variant_final_text)) : null), ...(final ? finaleCards(final) : []),
+                // After the final the room can take a new case (mockup 14): only its owner starts one; the server allows it once the game is over.
+                room?.role === 'owner' ? kit.row(button('К компаниям', () => entry()), button('Новое дело', () => newCase(), 'primary'))
+                    : card('people', 'Что дальше', '', p('Новое дело начнёт хозяин компании: сбор появится здесь же.'), kit.row(button('К компаниям', () => entry())))]
             : card('laurel', 'Дело закрыто', '', p('Развязка, твой итог и «кто был кем» — на вкладке «Место».'), kit.row(button('К итогу', () => showTab('place'), 'primary')));
         const finalHearing = clock.phase === 'final_hearing' && !pub.final;
         const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? card('scales', finalHearing ? 'Итоговое слушание' : 'Идёт слушание', '',

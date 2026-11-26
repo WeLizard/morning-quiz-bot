@@ -444,8 +444,10 @@ test('after the final the place shows no actions and no free intent box without 
     assert.match(all, /Горничная.*Нина.*сообщник Тени.*Тень.*не вышло/s);
     assert.match(all, /Хозяин.*ведёт игра.*виновный/s);
     assert.match(all, /на стороне Тени/, 'a shadow hero by the case, not by the variant');
+    assert.ok(button(fixture.host, 'Новое дело'), 'the room owner can start the next case from the finale');
     await button(fixture.host, 'Улики').click(); await settle();
     assert.ok(button(fixture.host, 'К итогу'), 'other tabs point to the finale instead of repeating it');
+    assert.equal(button(fixture.host, 'Новое дело'), undefined, 'the finale tab alone offers the next case');
     assert.doesNotMatch(fixture.host.textContent, /Кто был кем/);
     fixture.handle.close();
 });

@@ -54,6 +54,9 @@
 .ncase-badge{position:absolute;top:4px;left:calc(50% + 8px);min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;
   background:var(--nc-accent);color:var(--nc-accent-ink);font:800 12px/18px var(--qw-font);text-align:center}
 @media (min-width:768px){.ncase-nav{margin-bottom:0}}
+/* live: the tabs sit inside the case column, not across the viewport as in the mockup — no viewport-centring padding
+   (at 1280 it left 32 px per tab, 2026-11-26) */
+.ncase-main>.ncase-nav{padding-left:0;padding-right:0}
 
 /* ---------- 01 case of the week ---------- */
 .ncase-facts{display:flex;flex-wrap:wrap;gap:var(--qw-s-2);margin-top:var(--qw-s-3)}

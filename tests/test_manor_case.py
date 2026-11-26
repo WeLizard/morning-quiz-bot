@@ -300,6 +300,9 @@ class ManorCommandAcceptance(unittest.TestCase):
             p.act("lawyer", "act_" + action)
         self.assertTrue(next(f["value"] for f in p.doc["public"]["flags"] if f["id"] == "will_burned"))
         self.assertIn("ev_will_burned", self.scenes(p))
+        view = project(CASE, RULES, p.t.state, PlayerActor(p.player("daughter")["account_id"]))
+        news = next(e for e in view["chronicle"] if e["kind"] == "scene" and e["payload"]["content_event_id"] == "ev_will_burned")
+        self.assertEqual(news["art"]["asset_id"], "manor_scene_ev_will_burned")  # a turning scene comes with its picture
         for action in ["inspect_fireplace_ash", "inspect_lawyer_seal", "compare_ash_seal"]:
             p.act("daughter", action)
         p.cmd("daughter", "pin", {"observation_id": "burner_seal"})

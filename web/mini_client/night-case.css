@@ -124,6 +124,7 @@
 .ncase-ap i.on{background:var(--nc-accent);box-shadow:0 0 8px rgb(226 164 67/.55)}
 .ncase-ap b{margin-left:6px;font:700 var(--qw-fs-small)/1 var(--qw-font);color:var(--nc-accent-text);text-shadow:0 1px 2px #000}
 .ncase-event{display:grid;grid-template-columns:72px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
+.ncase-event > div:only-child{grid-column:1/-1}
 .ncase-event img{width:72px;height:96px;border-radius:8px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
 .ncase-event p{margin-top:4px;font-size:var(--qw-fs-body);line-height:1.45}
 .ncase-people{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--qw-s-3)}

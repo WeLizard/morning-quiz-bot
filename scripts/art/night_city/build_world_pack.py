@@ -36,9 +36,9 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = '4c8a5f882beafd02104d0a623aec3996cf9dec8b9677b42103fa383add717728'
+MANOR_CASE_CANONICAL_SHA256 = '3e23930509daf49805cd8c6e9541893ab7aa95a53fd58b90545dbe717434dcf3'
 MANOR_LOOKS = 20                                  # extra appearance portraits from characters_variants/
-MANOR_SCENES = 6                                  # public event scenes from scenes_events/
+MANOR_SCENES = 10                                 # public scenes from scenes_events/: 6 case events, 4 turning scenes
 MANOR_SEALED = 5                                  # per-variant finales: withheld from the pack until the final
 MANOR_CASE_VERSION = 5
 # Case item -> source picture under the style pack (MANOR_V5_PLOT.md section 4). Every authored item has one.
@@ -67,7 +67,11 @@ MANOR_ITEM_SOURCES = {
 MANOR_ITEMS = len(MANOR_ITEM_SOURCES)
 MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS + MANOR_SCENES + MANOR_ITEMS            # characters, locations, looks, scenes, items
 MANOR_WEBPS = 20 + 8 * 4 + MANOR_ITEMS + MANOR_LOOKS + MANOR_SCENES          # portraits, place times, items, looks, scenes
-SCENE_GROUPS = {'events': 'scene_'}               # public case group -> source file prefix
+
+
+def scene_entries(case):
+    """Public scenes with a picture (scenes_events/scene_<id>.png): case events, then turning-point scenes."""
+    return [*case.get('events', []), *((case.get('module_data') or {}).get('turning_point') or {}).get('scenes', [])]
 SEALED_GROUPS = {'variants': 'scene_final_'}      # sealed case group -> source file prefix
 SEALED_DIR = ROOT / 'web/mini_client/night/sealed'  # served as /app/night/sealed/<sha256>.webp, listed nowhere
 
@@ -643,19 +647,18 @@ def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEA
         assets[asset_id] = {'url': variants['day'], 'alt': alt, 'variants': variants}
 
     scene_count = 0
-    for group, prefix in SCENE_GROUPS.items():
-        for entry in case.get(group, []):
-            art = entry.get('art') or {}
-            asset_id, alt = art.get('asset_id'), art.get('alt')
-            if asset_id != f"manor_scene_{entry['id']}" or not isinstance(alt, str) or not alt:
-                raise SystemExit(f"scene art must be manor_scene_<id> with alt: {group}/{entry['id']}")
-            path = source.find(f"scenes_events/{prefix}{entry['id']}.png")
-            if path is None:
-                raise SystemExit(f"missing scene image {prefix}{entry['id']}.png")
-            if asset_id in assets:
-                raise SystemExit(f'duplicate case art asset_id: {asset_id}')
-            assets[asset_id] = {'url': export_one(path, f"{prefix}{entry['id']}.webp", 600, 78, asset_id), 'alt': alt}
-            scene_count += 1
+    for entry in scene_entries(case):
+        art = entry.get('art') or {}
+        asset_id, alt = art.get('asset_id'), art.get('alt')
+        if asset_id != f"manor_scene_{entry['id']}" or not isinstance(alt, str) or not alt:
+            raise SystemExit(f"scene art must be manor_scene_<id> with alt: {entry['id']}")
+        path = source.find(f"scenes_events/scene_{entry['id']}.png")
+        if path is None:
+            raise SystemExit(f"missing scene image scene_{entry['id']}.png")
+        if asset_id in assets:
+            raise SystemExit(f'duplicate case art asset_id: {asset_id}')
+        assets[asset_id] = {'url': export_one(path, f"scene_{entry['id']}.webp", 600, 78, asset_id), 'alt': alt}
+        scene_count += 1
     if scene_count != MANOR_SCENES:
         raise SystemExit(f'manor_lake case must have {MANOR_SCENES} scene pictures, found {scene_count}')
 
@@ -782,8 +785,10 @@ def case_art_refs(case_path):
     if case.get('meta', {}).get('version') != MANOR_CASE_VERSION or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
         raise SystemExit('manor_lake case does not match the pinned art source')
     refs = {}
-    for group in ('characters', 'locations', *SCENE_GROUPS, 'items'):
-        for entry in case.get(group, []):
+    groups = {'characters': case.get('characters', []), 'locations': case.get('locations', []),
+              'scenes': scene_entries(case), 'items': case.get('items', [])}
+    for group, entries in groups.items():
+        for entry in entries:
             arts = [entry.get('art') or {}] + [look.get('art') or {} for look in (entry.get('looks') or [])[1:]]
             for art in arts:
                 asset_id, alt = art.get('asset_id'), art.get('alt')

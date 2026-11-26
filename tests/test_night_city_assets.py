@@ -17,17 +17,19 @@ SCHEMA = ROOT / 'scripts/art/night_city/assets_manifest.schema.json'
 IMMUTABLE_SCHEMA = ROOT / 'scripts/art/night_city/immutable_assets_manifest.schema.json'
 CASE = ROOT / 'content/night_city/manor_lake.case.json'
 ART = ROOT / 'docs/tasks/night_city/art_batch2/noir_print_a'
-PINNED_CASE_HASH = '4c8a5f882beafd02104d0a623aec3996cf9dec8b9677b42103fa383add717728'
+PINNED_CASE_HASH = '3e23930509daf49805cd8c6e9541893ab7aa95a53fd58b90545dbe717434dcf3'
 
 
-def case_art_refs(groups=('characters', 'locations', 'events', 'items')):
+def case_art_refs(groups=('characters', 'locations', 'scenes', 'items')):
     """Read only public art IDs and alt text; never include case prose in the manifest.
 
     Per-variant finales ('variants') are sealed: never in the public manifest or folder."""
     case = json.loads(CASE.read_text(encoding='utf-8'))
     refs = {}
     for group in groups:
-        for entry in case[group]:
+        # 'scenes': case events and the turning-point scenes, all shown to everyone.
+        entries = case['events'] + case['module_data']['turning_point']['scenes'] if group == 'scenes' else case[group]
+        for entry in entries:
             # Appearance looks add portraits; the first look is the top-level art itself.
             for art in [entry.get('art') or {}] + [look['art'] for look in entry.get('looks', [])[1:]]:
                 refs[art.get('asset_id')] = {'group': group, 'id': entry.get('id'), 'alt': art.get('alt')}
@@ -88,7 +90,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(self.manifest['schema'], 'nc-assets/1')
         self.assertEqual(self.manifest['world'], 'manor_lake')
         self.assertEqual(set(self.manifest['assets']), set(refs))
-        self.assertEqual(len(refs), 93)
+        self.assertEqual(len(refs), 97)
         self.assertLessEqual(LOOK_ASSETS, set(refs))
         for asset_id, value in self.manifest['assets'].items():
             self.assertEqual(value['alt'], refs[asset_id]['alt'])
@@ -118,8 +120,8 @@ class ManorAssetExportTests(unittest.TestCase):
     def test_scenes_are_single_pictures_from_scenes_events(self):
         refs = case_art_refs()
         sources = {row['asset_id']: row['source'] for row in self.report['assets'] if row['asset_id']}
-        scenes = {key: ref for key, ref in refs.items() if ref['group'] == 'events'}
-        self.assertEqual(len(scenes), 6)
+        scenes = {key: ref for key, ref in refs.items() if ref['group'] == 'scenes'}
+        self.assertEqual(len(scenes), 10)
         for asset_id, ref in scenes.items():
             self.assertEqual(asset_id, f"manor_scene_{ref['id']}")
             value = self.manifest['assets'][asset_id]
@@ -170,13 +172,13 @@ class ManorAssetExportTests(unittest.TestCase):
 
     def test_all_source_images_are_accounted_for_and_hashes_match(self):
         records = self.report['assets']
-        self.assertEqual(self.report['manifest_count'], 93)
+        self.assertEqual(self.report['manifest_count'], 97)
         self.assertEqual(self.report['character_count'], 20)
         self.assertEqual(self.report['look_count'], 20)
         self.assertEqual(self.report['location_variant_count'], 32)
-        self.assertEqual(self.report['scene_count'], 6)
+        self.assertEqual(self.report['scene_count'], 10)
         self.assertEqual(self.report['item_count'], 39)
-        self.assertEqual(len(records), 117)
+        self.assertEqual(len(records), 121)
         self.assertLessEqual(self.report['item_bytes'], 10_000_000)
         self.assertEqual(
             hashlib.sha256((self.out / 'assets.json').read_bytes()).hexdigest(),
@@ -209,7 +211,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(set(self.immutable_manifest['files']), {
             f'assets/{path.name.lower()}' for path in (self.out / 'assets').glob('*.webp')
         })
-        self.assertEqual(len(self.immutable_manifest['files']), 117)  # 20 portraits, 32 place times, 39 items, 26 looks and scenes
+        self.assertEqual(len(self.immutable_manifest['files']), 121)  # 20 portraits, 32 place times, 39 items, 20 looks, 10 scenes
         self.assertEqual(set(self.immutable_manifest['assets']), set(case_art_refs()))
         self.assertNotIn(digest, json.dumps(self.immutable_manifest, ensure_ascii=False))
         for relative, expected_hash in self.immutable_manifest['files'].items():

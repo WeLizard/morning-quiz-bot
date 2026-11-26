@@ -439,7 +439,7 @@ def project(case, rules, state, viewer=None):
     result = {"game_id": doc["game_id"], "case_id": case.case_id, "clock": copy.deepcopy(doc["clock"]), "flags": copy.deepcopy(doc["public"]["flags"]), "locks": copy.deepcopy(doc["public"]["locks"]), "observations": [materialized(o["observation_id"], o["source"]) for o in doc["public"]["observations"]], "board": board, "chronicle": copy.deepcopy(doc["public"]["chronicle"]), "players": [{"account_id": p["account_id"], "character_id": p["character_id"], "name": p["name"], "status": p["status"]} for p in doc["players"]], "npcs": [{"character_id": n["character_id"], "name": n["name"], "status": n["status"]} for n in doc["npcs"]], "hearing": copy.deepcopy(doc["hearing"]), "final": public_final}
     result["clock"].pop("resume_receipts", None)
     # Case events may carry a public picture; the kernel event keeps only its id and text.
-    scene_art = {e["id"]: e["art"] for e in c["events"] if e.get("art")}
+    scene_art = {e["id"]: e["art"] for e in [*c["events"], *_module(c, "turning_point").get("scenes", [])] if e.get("art")}
     for entry in result["chronicle"]:
         if entry["kind"] == "scene" and entry["payload"]["content_event_id"] in scene_art:
             entry["art"] = copy.deepcopy(scene_art[entry["payload"]["content_event_id"]])

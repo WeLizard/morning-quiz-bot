@@ -564,3 +564,25 @@ ochre-gold rim light, fine hatching, 1930s, December. Vertical scene illustratio
 (RGB без альфы), `contact_scenes_v5.png`.
 
 В конце — итог в `notes.txt` пакета: что сделано, отбраковка, модель и effort (или «не подтверждены»).
+
+## 9. «Усадьба» версия 5: сцены-повороты (2026-11-26)
+
+Четыре сцены, которые игра показывает всем в момент поворота, приходили без картинки (проверено в живой партии
+на стенде). Общие правила те же, что в пункте 8: пакет `noir_print_a`, только встроенный `image_gen`, платный API
+не использовать, ничего не коммитить и не удалять, временные файлы — в `F:\Temp`, проблемный файл — не больше двух
+переделок, без текста, букв и цифр, людей нет.
+
+Формат как у `scenes_events/scene_ev_*.png`: 2:3, 1024×1536, непрозрачные. Промпт строить как у событий
+в `scenes_events/manifest.json` («Same engraved noir print style, palette, linework and lighting as the reference:
+dark navy and black masses, ochre-gold rim light, fine hatching, 1930s, December. Vertical scene illustration, no
+text, no letters. Scene: <сцена>. No people.»). Референс — место из таблицы.
+
+| Файл | Место-референс | Сцена |
+| --- | --- | --- |
+| `scene_passage_discovered.png` | `locations/library_night.png` | in the locked library at night a tall section of oak bookshelves has swung open on hidden iron hinges, revealing narrow worn stone steps that descend into darkness; a lantern stands on the top step throwing gold light down the stairs; dust hangs in the draught |
+| `scene_ev_swapped_book.png` | `locations/library_morning.png` | close view of a high library shelf of leather-bound volumes in cold morning light from a frosted window; one book stands a finger's width out of line and its spine is a different shade, and in the dust on the shelf edge in front of it there is a clean fresh stripe where it was recently pulled out |
+| `scene_ev_cellar_knock.png` | `locations/cellar_night.png` | worn stone steps lead down to a heavy iron-banded cellar door at night; a candle on the lowest step, its flame bent; fine dust drifting down from the door frame as if shaken by knocking; frost on the stone walls |
+| `scene_ev_will_burned.png` | `locations/main_hall_evening.png` | the great stone fireplace of the hall with low glowing embers; in the grey ash lies the corner of a thick sheet of paper with a scorched brown edge and a blob of sealing wax on it, a darker second layer of wax over the first; an iron poker leans on the grate; a thin wisp of smoke rises |
+
+Записи в `scenes_events/manifest.json` (как у существующих, плюс `generator` и `source`), проверка Pillow
+(RGB без альфы, 1024×1536), лист `contact_scenes_turning_v5.png`. Итог — в `notes.txt` пакета.

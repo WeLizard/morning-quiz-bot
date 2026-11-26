@@ -259,6 +259,12 @@ def _compile_scene_art(d: dict[str, Any]) -> None:
             if art["asset_id"] in taken:
                 _bad("v2.art", _ptr(group, i, "art", "asset_id"), "Картинка сцены повторяет чужой asset_id")
             taken.add(art["asset_id"])
+    for i, scene in enumerate(((d.get("module_data") or {}).get("turning_point") or {}).get("scenes", ())):
+        art = scene.get("art")  # a turning scene is shown to everyone like a case event
+        if art is not None:
+            if art["asset_id"] in taken:
+                _bad("v2.art", _ptr("module_data", "turning_point", "scenes", i, "art", "asset_id"), "Картинка сцены повторяет чужой asset_id")
+            taken.add(art["asset_id"])
 
 
 def _compile_modules(d, maps, predicates):

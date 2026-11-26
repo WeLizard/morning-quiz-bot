@@ -339,6 +339,16 @@ class NightCasePersonalFormatTests(unittest.TestCase):
             doc["actions"][0]["outcomes"] = []
             compile_document(doc)
 
+    def test_a_turning_scene_may_carry_a_picture_of_its_own(self):
+        doc = self.source()
+        scene = doc["module_data"]["turning_point"]["scenes"][0]
+        scene["art"] = {"asset_id": "manor_scene_turn", "alt": "Сцена поворота"}
+        self.assertEqual(compile_document(doc).document()["module_data"]["turning_point"]["scenes"][0]["art"]["asset_id"], "manor_scene_turn")
+        doc["variants"][0]["art"] = {"asset_id": "manor_scene_turn", "alt": "Финал"}  # one picture, two places
+
+        with self.assertRaises(CaseV2Error):
+            compile_document(doc)
+
     def test_destroyed_flag_names_a_false_flag_of_a_destroyable_original(self):
         def with_flag(d, initial=False):
             d["flags"].append({"id": "original_burned", "initial": initial})

@@ -1502,6 +1502,9 @@
                     "minItems": 0,
                     "maxItems": 8
                   },
+                  "art": {
+                    "$ref": "#/$defs/art"
+                  },
                   "body": {
                     "$ref": "#/$defs/body"
                   },

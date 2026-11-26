@@ -12,7 +12,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value && Object.hasOwn(value, key)).map(key => [key, value[key]]));
 function playerView(value) {
     const safe = pick(value, ['game_id', 'mode', 'server_now', 'runtime_status', 'final_summary', 'lobby', 'menu', 'history_seats', 'selected_original_account_id']);
-    safe.public = pick(value?.public, ['clock', 'world', 'art', 'locations', 'players', 'npcs', 'board', 'observations', 'modules', 'hearing', 'final', 'flags', 'locks', 'looks']);
+    safe.public = pick(value?.public, ['case_id', 'clock', 'world', 'art', 'locations', 'players', 'npcs', 'board', 'observations', 'modules', 'hearing', 'final', 'flags', 'locks', 'looks']);
     // Only shared scenes leave the public chronicle: id, window, text and picture.
     safe.public.scenes = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'scene')
         .map(entry => ({event_id: entry.event_id, window_idx: entry.window_idx, body: entry.payload?.body, art: entry.art}));
@@ -801,6 +801,10 @@ function open(options) {
         tile.addEventListener('click', () => Promise.resolve(selectAction(row, full)).catch(fail));
         return tile;
     }
+    // A talk as a tile: the hero's portrait and title, the question under it (always: «Расспросить дворецкого про ночь»
+    // names the butler, yet without it three tiles of one hero look the same); the confirmation names both.
+    const talkTile = row => actTile(row, row.npc_title || row.label, {face: row.npc_character_id, sub: row.npc_title ? row.label : '',
+        full: row.npc_title && !mentions(row.label, row.npc_title) ? `${row.label} · ${row.npc_title}` : row.label});
     // A neighbouring place as a picture at this time of day.
     function placeTile(row) {
         const target = arr(view.public.locations).find(item => item.id === row.quote.params?.location);
@@ -842,7 +846,7 @@ function open(options) {
         const go = moves.length ? card('door', 'Куда пойти', costLine(moves), put(el('div', 'ncase-map'), ...moves.map(placeTile))) : null;
         return [scene, shared, people,
             ...actionGroups(acts),
-            talks.length ? card('talk', 'Поговорить', costLine(talks), put(el('div', 'ncase-acts'), ...talks.map(row => actTile(row, row.npc_title || row.label, {face: row.npc_character_id, sub: row.npc_title && !mentions(row.label, row.npc_title) ? row.label : ''})))) : null,
+            talks.length ? card('talk', 'Поговорить', costLine(talks), put(el('div', 'ncase-acts'), ...talks.map(talkTile))) : null,
             acts.length || talks.length ? null : card('lens', 'Действия', '', p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')),
             waiting.length ? card('papers', 'Архив', '', p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в хронику и досье.`)) : null,
             go,
@@ -1222,7 +1226,8 @@ function open(options) {
         const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? card('scales', finalHearing ? 'Итоговое слушание' : 'Идёт слушание', '',
             p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
             kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
-        const current = tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
+        // Once the case is closed the place tab is the finale (mockup 14): no place picture or actions under it.
+        const current = over && tab === 'place' ? [] : tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
         let selector = null;
         if (['finished', 'stopped'].includes(view.runtime_status) && arr(view.history_seats).length > 1) {
             const choice = choose('Твои завершённые роли', [{id: '', label: 'Все твои роли'}, ...view.history_seats.map(seat => ({id: seat.original_account_id, label: `${seat.display_name} · ${seat.role_title}`}))], selectedOriginal);
@@ -1233,8 +1238,11 @@ function open(options) {
             });
             selector = panel('Твоя история', choice.node);
         }
-        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean), arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
-            `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`);
+        // A closed case is headed by its title (mockup 14), not by the last place.
+        const caseTitle = arr(boot?.cases).find(item => item.id === pub.case_id)?.title;
+        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean),
+            over ? caseTitle || 'Дело закрыто' : arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
+            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`);
     }
     function close() {
         if (!alive) return;

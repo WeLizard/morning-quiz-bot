@@ -86,7 +86,8 @@ def case_art_ids(case: dict) -> tuple[set[str], set[str]]:
             for art in [entry.get('art') or {}] + [look.get('art') or {} for look in entry.get('looks', [])]:
                 if art.get('asset_id'):
                     public.add(art['asset_id'])
-    for entry in case.get('items', []):
+    turning = ((case.get('module_data') or {}).get('turning_point') or {}).get('scenes', [])
+    for entry in [*case.get('items', []), *turning]:
         if (entry.get('art') or {}).get('asset_id'):
             public.add(entry['art']['asset_id'])
     for variant in case.get('variants', []):

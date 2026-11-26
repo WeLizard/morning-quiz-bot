@@ -1367,14 +1367,14 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
             async with room_principal(request, identity, write=True) as (session, who):
                 service = RoomClassicApplicationService(session, rules=scoring_rules)
                 if action == 'current':
-                    return {'current': await service.current(room_id=room_id, account_id=UUID(who.account_id))}
+                    return {'current': await service.current(room_id=room_id, account_id=UUID(who.account_id), now=clock())}
                 if action == 'setup':
                     return await service.setup(room_id=room_id, account_id=UUID(who.account_id))
                 if action == 'start':
                     return await service.start(room_id=room_id, account_id=UUID(who.account_id), command_id=command_id,
-                        enabled=room_classic_enabled, **values)
+                        enabled=room_classic_enabled, now=clock(), **values)
                 return await service.command(room_id=room_id, account_id=UUID(who.account_id), command_id=command_id,
-                                             kind=action, **values)
+                                             kind=action, now=clock(), **values)
         except LookupError as error:
             raise MiniAppError(404, str(error)) from None
         except PermissionError as error:
@@ -1426,20 +1426,20 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
                 service = RoomPhotoApplicationService(session)
                 scope = {'room_id': room_id, 'account_id': UUID(who.account_id)}
                 if action == 'current':
-                    result = await service.current(**scope)
+                    result = await service.current(**scope, now=clock())
                     occupied = bool(result and result.get('occupied'))
                     return {'current': None if result and 'occupied' in result else result, 'occupied': occupied}
                 if action == 'setup':
                     return await service.setup(**scope)
                 if action == 'image':
                     path = await service.image(**scope, game_id=request.query_params.get('game_id'),
-                                               round_id=request.query_params.get('round_id'))
+                                               round_id=request.query_params.get('round_id'), now=clock())
                     return FileResponse(path, media_type='image/webp', headers={
                         'Cache-Control': 'no-store', 'Content-Disposition': 'inline; filename="photo.webp"'})
                 if action == 'start':
                     return await service.start(**scope, command_id=command_id,
-                                               enabled=room_photo_enabled, **values)
-                return await service.command(**scope, command_id=command_id, kind=action, **values)
+                                               enabled=room_photo_enabled, now=clock(), **values)
+                return await service.command(**scope, command_id=command_id, kind=action, now=clock(), **values)
         except LookupError as error:
             raise MiniAppError(404, str(error)) from None
         except PermissionError as error:

@@ -25,6 +25,22 @@ def body(text):
     return {"text": text, "mentions": []}
 
 
+def unnamed(doc=None):
+    """The Manor as an old case without names and public lines on its heroes."""
+    doc = copy.deepcopy(doc or RAW)
+    for c in doc["characters"]:
+        for entry in [c, *(c.get("looks") or ())]:
+            entry.pop("name", None)
+            entry.pop("public", None)
+    return doc
+
+
+def drawer_key(doc, location="library", title="Ключ от ящика", text="Медный ключ с зелёной ниткой."):
+    """Add one test item next to the case's own items."""
+    doc["items"] = list(doc.get("items", [])) + [{"id": "drawer_key", "title": title, "body": body(text), "location": location}]
+    return doc
+
+
 def named(doc=None):
     """The Manor with a name and a public line on every look (ids give unique names)."""
     doc = copy.deepcopy(doc or RAW)
@@ -42,8 +58,7 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(compile_doc(RAW).content_hash, compile_v2(load_v2((ROOT / "content/night_city/manor_lake.case.json").read_bytes())).content_hash)
 
     def test_names_public_lines_items_and_subjects_compile(self):
-        doc = named()
-        doc["items"] = [{"id": "drawer_key", "title": "Ключ от ящика", "body": body("Медный ключ с зелёной ниткой."), "location": "library"}]
+        doc = drawer_key(named())
         doc["observations"][0]["subject"] = {"item": "drawer_key"}
         doc["observations"][1]["subject"] = {"location": "library"}
         doc["observations"][2]["subject"] = {"character": "lawyer"}
@@ -62,11 +77,10 @@ class FormatTests(unittest.TestCase):
             compile_doc(doc)
 
     def test_items_and_subjects_reference_existing_places_and_things(self):
-        doc = named()
-        doc["items"] = [{"id": "drawer_key", "title": "Ключ", "body": body("Ключ."), "location": "nowhere"}]
+        doc = drawer_key(named(), location="nowhere")
         with self.assertRaises(CaseV2Error):
             compile_doc(doc)
-        doc["items"][0]["location"] = None
+        doc["items"][-1]["location"] = None
         doc["observations"][0]["subject"] = {"item": "missing_item"}
         with self.assertRaises(CaseV2Error):
             compile_doc(doc)
@@ -86,7 +100,7 @@ class NameTests(unittest.TestCase):
         doc = named()
         look = Renderer(doc).looks["cook"]
         self.assertEqual(public_look(look)["name"], "Имя cook")
-        self.assertNotIn("name", public_look(Renderer(RAW).looks["cook"]))
+        self.assertNotIn("name", public_look(Renderer(unnamed()).looks["cook"]))
 
     def test_heroes_the_game_plays_carry_their_look_names(self):
         case = compile_doc(named())
@@ -103,11 +117,16 @@ class RulesReportTests(unittest.TestCase):
     def test_the_manor_is_reported_against_every_rule(self):
         report = check_rules(RAW)
         status = {rule: row["status"] for rule, row in report["rules"].items()}
-        self.assertEqual(status, {"P1": "not_checked", "P2": "failed", "P3": "not_checked", "P4": "failed",
-                                  "P5": "failed", "P6": "failed", "P7": "failed", "P8": "not_checked", "P9": "not_checked"})
+        # Manor v5 keeps every rule the report can check; P1, P3, P8 and P9 are not checked yet.
+        self.assertEqual(status, {"P1": "not_checked", "P2": "passed", "P3": "not_checked", "P4": "passed",
+                                  "P5": "passed", "P6": "passed", "P7": "passed", "P8": "not_checked", "P9": "not_checked"},
+                         {rule: row["problems"][:3] for rule, row in report["rules"].items()})
         self.assertFalse(report["passed"])
-        problems = report["rules"]["P4"]["problems"]
-        self.assertTrue(any("/characters/lawyer/faction" in p for p in problems))
+
+    def test_an_old_shadow_faction_still_fails_P4(self):
+        doc = copy.deepcopy(RAW)
+        next(c for c in doc["characters"] if c["id"] == "lawyer")["faction"] = "shadow"
+        self.assertTrue(any("/characters/lawyer/faction" in p for p in check_rules(doc)["rules"]["P4"]["problems"]))
 
     def test_a_case_kept_to_the_checkable_rules_passes_them(self):
         doc = named()
@@ -122,7 +141,7 @@ class RulesReportTests(unittest.TestCase):
         while len(doc["variants"]) < 5:
             extra = copy.deepcopy(doc["variants"][1]); extra["id"] = f"variant_x{len(doc['variants'])}"
             doc["variants"].append(extra)
-        doc["items"] = [{"id": "drawer_key", "title": "Ключ", "body": body("Ключ."), "location": "library"}]
+        drawer_key(doc)
         for o in doc["observations"]:
             o["subject"] = {"location": "library"}
         report = check_rules(doc)
@@ -187,8 +206,7 @@ class DirectorCastTests(unittest.TestCase):
 
     def test_director_cast_describes_the_party_look_and_clue_subjects(self):
         from application.night_case_director import director_cast
-        doc = named()
-        doc["items"] = [{"id": "drawer_key", "title": "Ключ от ящика", "body": body("Медный ключ."), "location": "library"}]
+        doc = drawer_key(named(), text="Медный ключ.")
         key = RAW["variants"][0]["key_proofs"][0]
         next(o for o in doc["observations"] if o["id"] == key)["subject"] = {"item": "drawer_key"}
         party = {"sealed": {"looks": {"cook": "f45"}}, "players": [{"character_id": "lawyer", "name": "Маша"}], "npcs": []}

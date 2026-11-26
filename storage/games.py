@@ -1,7 +1,7 @@
 """Persistence primitives for versioned, long-running game modes."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from uuid import UUID, uuid4
 
@@ -584,7 +584,7 @@ class GameRepository:
         current_time = now or datetime.now(timezone.utc)
         if type(current_time) in {int, float}:
             current_time = datetime.fromtimestamp(current_time, tz=timezone.utc)
-        cutoff = datetime.fromtimestamp(current_time.timestamp() - idle_seconds, tz=timezone.utc)
+        cutoff = current_time - timedelta(seconds=idle_seconds)  # no fromtimestamp: Windows rejects pre-1970 stamps
         last_event = (select(func.max(GameEvent.created_at)).where(GameEvent.game_id == Game.id)
                       .correlate(Game).scalar_subquery())
         statement = (

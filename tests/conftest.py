@@ -28,10 +28,10 @@ def _farm_fractional_clock(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _farm_merchant_secret(request, monkeypatch):
-    """Merchant stock needs a persistent HMAC secret (qw_farm.merchant); farm tests get a fixed test one unless they set their own."""
-    if not request.node.fspath.basename.startswith('test_farm'):
-        return
+def _farm_merchant_secret(monkeypatch):
+    """Merchant stock needs a persistent HMAC secret (qw_farm.merchant). Every test gets a fixed test one unless the
+    environment or the test sets its own: farms are also created outside test_farm_* (account linking, Telegram login,
+    contrast mode), and CI has no BOT_TOKEN to fall back on."""
     if not any(os.getenv(name) for name in ('QW_FARM_MERCHANT_SECRET', 'QW_FARM_INVITE_SECRET', 'BOT_TOKEN')):
         monkeypatch.setenv('QW_FARM_MERCHANT_SECRET', 'farm-tests-merchant-secret-of-32-characters')
 

@@ -717,20 +717,12 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
  @keyframes v-flip{0%{transform:scaleX(1)}19%{transform:scaleX(var(--face,1))}53%{transform:scaleX(calc(var(--face,1) * -1))}70%{transform:scaleX(1)}}
  @keyframes v-bob{0%,100%{rotate:-3deg;translate:0 0}50%{rotate:3deg;translate:0 -2px}}
  [data-resident-mode] .village-walker,[data-resident-mode=working] .village-walker>svg{animation:none}
- [data-resident-mode=roaming]{animation:v-resident-walk var(--cycle) ease-in-out infinite;animation-delay:var(--d)}
- @keyframes v-resident-walk{
-  0%,18%,70%,100%{translate:0 0}
-  34%,52%{translate:calc(var(--resident-dx) * var(--village-width)) calc(var(--resident-dy) * var(--village-width))}
- }
- /* The gait steps the HTML walker, not the <svg>: an independent translate on an SVG element is not composited, and that alone
-    kept every village frame on the main thread. */
- [data-resident-mode=roaming] .village-walker>svg{animation-name:v-flip;animation-duration:var(--cycle)}
- [data-resident-mode=roaming] .village-walker{animation:v-resident-gait var(--cycle) ease-in-out infinite;animation-delay:calc(var(--d,0s) - var(--e,0s))}
- [data-resident-mode=roaming]:focus-visible,[data-resident-mode=roaming]:focus-visible .village-walker,[data-resident-mode=roaming]:focus-visible .village-walker>svg{animation-play-state:paused}
- @keyframes v-resident-gait{
-  0%,18%,22%,26%,30%,34%,52%,56%,60%,64%,68%,70%,100%{translate:0 0}
-  20%,24%,28%,32%,54%,58%,62%,66%{translate:0 -1.5px}
- }
+ /* Strolls (app.js villageRoam): generated keyframes per resident — the button moves along the path, the figure turns, the walker
+ steps; the gait moves the HTML walker, not the <svg>, so every frame stays on the compositor. A tapped resident waits. */
+ [data-resident-mode=roaming]{animation:var(--roam) var(--cycle) linear infinite;animation-delay:var(--d)}
+ [data-resident-mode=roaming] .village-walker>svg{animation:var(--roam-face) var(--cycle) steps(1,end) infinite;animation-delay:var(--d)}
+ [data-resident-mode=roaming] .village-walker{animation:var(--roam-gait) var(--cycle) linear infinite;animation-delay:var(--d)}
+ :is([data-resident-mode=roaming]:focus-visible,[data-roam=wait]),:is([data-resident-mode=roaming]:focus-visible,[data-roam=wait]) :is(.village-walker,.village-walker>svg){animation-play-state:paused}
  .village-thought{animation:v-think var(--cycle,18s) ease-out infinite;animation-delay:calc(var(--td,0s) - var(--e,0s))}
  @keyframes v-think{0%,5%{visibility:hidden;opacity:0;transform:scale(.4) translateY(6px)}8%,17%{visibility:visible;opacity:1;transform:none}20%,100%{visibility:hidden;opacity:0;transform:scale(.7) translateY(-4px)}}
  .village-order.is-ready{animation:v-pulse 1.8s ease-in-out infinite}

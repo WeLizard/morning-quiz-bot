@@ -237,7 +237,8 @@ test('all eleven residents are native buttons with full-body art and preserve se
   assert.equal(button.tagName,'button');assert.equal(button.attrs['aria-controls'],'panel-content');
   assert.equal(button.dataset.residentMode,'roaming');assert.equal(button.children[0].innerHTML,art);
   assert.equal(button.style.left,`${x/24}%`);assert.equal(button.style.top,`${y/18}%`);
-  assert.ok(Number.isFinite(button.style['--resident-dx']));assert.ok(Number.isFinite(button.style['--resident-dy']));
+  assert.match(button.style['--roam'],/^vr-\d+-\d+$/);assert.match(button.style['--cycle'],/^\d+\.\d\ds$/);assert.match(button.style['--d'],/^-?\d+\.\d\ds$/);
+  assert.equal(button.dataset.roam,name==='Агата'?'wait':'walk',`${name}: only the chosen resident waits for the player`);
  }
  const agata=residents.find(n=>n.dataset.villageNpc==='Агата');
  assert.equal(agata.attrs['aria-pressed'],'true');assert.match(agata.attrs['aria-label'],/есть просьба/);
@@ -402,13 +403,21 @@ test('static targets stack above wandering residents and their approach routes r
  const board=vm.runInContext('VILLAGE_GATE_BOARD',ctx),places=vm.runInContext('VILLAGE_PLACES',ctx);
  const targets=[{id:'gate',x:board[0]*W/100,y:board[1]*H/100,hw:Math.max(22,board[2]*W/200),hh:Math.max(22,board[3]*H/200)}].concat(places.map(p=>({id:p[0],x:p[3]*W/100,y:p[4]*H/100,hw:22,hh:22})));
  const graph=vm.runInContext('VILLAGE_WALK',ctx);
- for(const [npc,[[sx,sy]]] of Object.entries(figures)){
-  const [dx,dy]=ctx.villageResidentDrift(npc,[sx,sy]);
-  for(let k=0;k<=20;k++){
-   const x=sx+dx*k/20,y=sy+dy*k/20,cx=x*scale,cy=y*scale-25.56;
-   assert.ok(ctx.villageSnap(graph,x,y).d<4,`${npc} stays near the walk graph`);
-   for(const t of targets)assert.ok(Math.abs(t.x-cx)>=24+t.hw+8||Math.abs(t.y-cy)>=30+t.hh+8,`${npc} crowds ${t.id}`);
-  }
+ // Residents stroll (villageResidentRoute): from the doorstep onto the paths, along them, and stand still only where no button is.
+ const crowds=(t,x,y)=>Math.abs(t.x-x*scale)<24+t.hw+8&&Math.abs(t.y-(y*scale-25.56))<30+t.hh+8;
+ for(const [npc,[[sx,sy]]] of Object.entries(figures))for(const day of [20400,20401,20402,20403]){
+  const pts=ctx.villageResidentRoute(npc,[sx,sy],day),r=ctx.villageRoamPlan(pts),len=r.cum[r.cum.length-1];
+  assert.deepEqual([...pts[0]],[sx,sy],`${npc} sets out from home`);
+  assert.ok(len>=100,`${npc} takes a real stroll on day ${day}, not a step (${len.toFixed(0)})`);
+  const onGraph=i=>{for(let k=0;k<=10;k++){const x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*k/10,y=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*k/10;if(ctx.villageSnap(graph,x,y).d>=1)return false;}return true;};
+  // a doorstep off the paths (the bear den) is left by a short step; everything after it runs on the walk graph
+  assert.ok(onGraph(1)||Math.hypot(pts[1][0]-sx,pts[1][1]-sy)<40,`${npc} steps from the doorstep onto a path`);
+  for(let i=2;i<pts.length;i++)assert.ok(onGraph(i),`${npc} keeps to the walk graph`);
+  for(const t of targets)assert.ok(crowds(t,sx,sy)||!crowds(t,...pts[pts.length-1]),`${npc} stops by ${t.id} on day ${day}`);
+  // the cycle: home, out, stand, back
+  assert.deepEqual([...ctx.villageRoamAt(r,1)].map(Math.round),[sx,sy].map(Math.round));
+  assert.deepEqual([...ctx.villageRoamAt(r,r.out+r.walk+1)].map(Math.round),[...pts[pts.length-1]].map(Math.round));
+  assert.ok(r.cycle<40,`${npc}: a stroll lasts under 40 s`);
  }
 });
 
@@ -416,12 +425,12 @@ test('construction leaves a gap between its workers and nearby buttons at phone 
  const {ctx}=setup(),scale=2/3;
  const resident=(name,[x,y])=>({name,x:x*scale,y:y*scale-25.56,hw:24,hh:30});
  const markers=(name,[x,y],hw,hh)=>({name,x:x*16,y:y*12,hw,hh});
- const oleg='Петух Олег',olegFoot=figures[oleg][0],olegDrift=ctx.villageResidentDrift(oleg,olegFoot);
+ const oleg='Петух Олег',olegFoot=figures[oleg][0],olegStops=[0,1,2,3].map(i=>{const p=ctx.villageResidentRoute(oleg,olegFoot,20400+i);return p[p.length-1];});
  const targets=[
   markers('market',vm.runInContext("VILLAGE_PLACES.find(p=>p[0]==='market').slice(3,5)",ctx),22,22),
   markers('hall',vm.runInContext('VILLAGE_HALL',ctx),31,22),
   markers('guest',vm.runInContext('VILLAGE_VISITOR_SPOTS[1]',ctx),24,24),
-  ...Array.from({length:11},(_,i)=>resident(oleg,olegFoot.map((x,j)=>x+olegDrift[j]*i/10))),
+  resident(oleg,olegFoot),...olegStops.map(p=>resident(oleg,p)),   // where Oleg stands: at home and at the end of his strolls
  ];
  const build=vm.runInContext('VILLAGE_BUILD',ctx);
  const sites=vm.runInContext('VILLAGE_SITES',ctx);

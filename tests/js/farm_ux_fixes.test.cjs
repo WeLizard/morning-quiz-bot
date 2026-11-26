@@ -35,7 +35,7 @@ test('mill tap box follows the drawn silhouette and no longer steals from neighb
 test('village residents move the native 48×60 touch target together with the figure',()=>{
  assert.match(css,/\.village-npc,\.village-townhall\{[^}]*;width:48px/);
  assert.match(css,/\.village-npc\[data-resident-mode\][^\n]*\{height:60px/);
- assert.match(css,/\[data-resident-mode=roaming\]\{animation:v-resident-walk/);
+ assert.match(css,/\[data-resident-mode=roaming\]\{animation:var\(--roam\) var\(--cycle\) linear infinite/);
  // Native buttons retain at least 8px of space at their resting positions.
  const figures=JSON.parse(app.match(/const VILLAGE_RESIDENT_FIGURES=(.*);/)[1]);
  const pts=Object.entries(figures).map(([n,[[x,y]]])=>({n,x:x*2/3,y:y*2/3}));

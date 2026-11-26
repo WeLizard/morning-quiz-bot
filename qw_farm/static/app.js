@@ -105,7 +105,7 @@ const VILLAGE_PLAYER_SVG_F='<svg class="vp-art" viewBox="-17 -48 34 52" aria-hid
 const villagePlayerSvg=()=>S.form==='f'?VILLAGE_PLAYER_SVG_F:VILLAGE_PLAYER_SVG;
 // Walk graph of the village (generated: manifest.walk of scripts/art/village/build_village.py, format in its README):
 // n = node x,y pairs and z = walkable quads in world units (2400x1800), e = node index pairs, a = approach node per target.
-const VILLAGE_WALK={n:[77,365,2323,365,1920,427,1922,428,1874,452,287,471,2113,471,2060,497,498,576,1902,576,1218,602,1176,605,709,681,1691,681,1408,698,1390,707,1533,760,1056,767,919,787,586,813,510,814,609,825,547,832,595,832,1016,835,1384,835,656,848,489,861,946,870,1114,884,1279,888,1502,891,480,892,1499,892,987,896,476,898,485,900,884,901,1305,901,1516,901,1063,909,1174,914,1226,914,1331,914,750,922,1308,925,1147,927,1253,927,1358,927,963,940,1437,940,1103,949,1200,953,1305,953,1411,953,1279,966,1169,969,1156,975,1358,980,1200,985,797,1012,1586,1015,809,1017,1261,1028,1895,1044,1174,1045,1745,1055,1194,1056,1200,1059,1186,1060,358,1067,1706,1074,1077,1094,1334,1094,645,1099,1770,1107,1010,1109,674,1114,1029,1118,1814,1129,1182,1146,533,1155,1253,1164,1235,1173,884,1190,1323,1217,1639,1217,2007,1225,323,1260,744,1260,2156,1300,1656,1325,2095,1331,919,1348,112,1366,959,1368,1057,1374,1797,1383,1937,1383,1008,1391,1007,1392,1013,1395,42,1401,2358,1401,830,1433,1200,1474,1186,1481,1340,1559,1551,1664,1762,1769],e:[0,5,1,6,2,3,3,4,3,7,5,8,6,7,7,9,8,12,9,13,10,11,10,14,12,18,13,16,14,15,14,16,16,25,17,18,18,24,19,21,19,22,20,22,21,23,21,26,22,27,24,28,24,29,25,33,27,32,28,34,29,40,29,41,30,38,31,33,32,35,33,39,35,36,35,70,37,44,37,49,38,43,38,47,39,50,41,46,42,47,43,45,43,48,46,51,46,52,47,52,47,53,48,53,48,54,49,62,49,65,50,54,50,61,52,56,53,55,53,58,54,58,56,57,56,59,58,63,60,62,61,71,62,74,63,73,63,80,64,75,65,67,65,72,66,71,67,68,67,69,70,81,71,75,72,78,72,80,74,77,74,81,75,79,76,78,78,84,79,86,79,87,80,83,81,88,81,89,82,83,83,85,84,89,87,90,88,94,89,93,90,92,90,103,91,97,92,98,93,95,94,102,95,100,95,104,96,101,97,98,99,100,100,101,101,106,105,106,106,107,107,108,108,109],a:{"gate":105,"hall":59,"merchant":40,"place:board":45,"place:library":15,"place:market":34,"place:pier":20,"place:post":44,"place:workshop":64,"start":99,"visitor:0":96,"visitor:1":69,"visitor:2":36,"visitor:3":77,"Агата":31,"Кошка Кая":23,"Кошка Соня":73,"Лиса Даша":91,"Медведь Пух":104,"Механик Крот":66,"Неведома Зверушка":4,"Петух Олег":11,"Почтальон Ёж":60,"Суслик Игорь":76,"Филиныч":17},z:[[33,308,1025,804,954,839,-37,343],[2367,308,2437,343,1446,839,1376,804],[919,927,989,962,33,1440,-37,1405],[1481,927,2437,1405,2367,1440,1411,962],[1130,1032,1200,1067,814,1260,744,1225],[393,1050,1858,1783,1788,1818,323,1085],[1235,594,1516,734,1481,752,1200,611],[1902,401,2042,471,2007,488,1867,418],[603,804,744,874,709,892,568,822],[1130,1103,1340,1208,1305,1225,1095,1120],[1411,1067,1446,1085,1270,1173,1235,1155],[1762,1138,1797,1155,1586,1260,1551,1243],[1200,716,1551,892,1200,1067,849,892],[600,592,754,669,684,704,530,627]]};
+const VILLAGE_WALK={n:[77,365,2323,365,1920,427,1922,428,1874,452,287,471,2113,471,2060,497,498,576,1902,576,1218,602,1176,605,709,681,1691,681,1408,698,1390,707,1533,760,1056,767,919,787,586,813,510,814,609,825,547,832,595,832,1016,835,1384,835,656,848,489,861,946,870,1114,884,1279,888,1502,891,480,892,1499,892,987,896,476,898,485,900,884,901,1305,901,1516,901,1063,909,1174,914,1226,914,1331,914,750,922,1308,925,1147,927,1253,927,1358,927,963,940,1437,940,1103,949,1200,953,1305,953,1411,953,1279,966,1169,969,1156,975,1358,980,1200,985,797,1012,1586,1015,809,1017,1261,1028,1895,1044,1174,1045,1745,1055,1194,1056,1200,1059,1186,1060,358,1067,1706,1074,1077,1094,1334,1094,645,1099,1770,1107,1010,1109,674,1114,1029,1118,1814,1129,1182,1146,533,1155,1253,1164,1235,1173,884,1190,1323,1217,1639,1217,2007,1225,323,1260,744,1260,2156,1300,1656,1325,2095,1331,919,1348,112,1366,1057,1374,989,1383,1797,1383,1937,1383,1008,1391,1007,1392,1013,1395,42,1401,2358,1401,865,1444,1200,1474,1186,1481,1340,1559,1551,1664,1762,1769],e:[0,5,1,6,2,3,3,4,3,7,5,8,6,7,7,9,8,12,9,13,10,11,10,14,12,18,13,16,14,15,14,16,16,25,17,18,18,24,19,21,19,22,20,22,21,23,21,26,22,27,24,28,24,29,25,33,27,32,28,34,29,40,29,41,30,38,31,33,32,35,33,39,35,36,35,70,37,44,37,49,38,43,38,47,39,50,41,46,42,47,43,45,43,48,46,51,46,52,47,52,47,53,48,53,48,54,49,62,49,65,50,54,50,61,52,56,53,55,53,58,54,58,56,57,56,59,58,63,60,62,61,71,62,74,63,73,63,80,64,75,65,67,65,72,66,71,67,68,67,69,70,81,71,75,72,78,72,80,74,77,74,81,75,79,76,78,78,84,79,86,79,87,80,83,81,88,81,89,82,83,83,85,84,89,87,90,88,94,89,93,90,92,90,103,91,97,92,98,93,96,94,102,95,101,96,100,96,104,97,98,99,100,100,101,101,106,105,106,106,107,107,108,108,109],a:{"gate":105,"hall":59,"merchant":40,"place:board":45,"place:library":15,"place:market":34,"place:pier":20,"place:post":44,"place:workshop":64,"start":99,"visitor:0":95,"visitor:1":69,"visitor:2":36,"visitor:3":77,"Агата":31,"Кошка Кая":23,"Кошка Соня":73,"Лиса Даша":91,"Медведь Пух":104,"Механик Крот":66,"Неведома Зверушка":4,"Петух Олег":11,"Почтальон Ёж":60,"Суслик Игорь":76,"Филиныч":17},z:[[33,308,1025,804,954,839,-37,343],[2367,308,2437,343,1446,839,1376,804],[919,927,989,962,33,1440,-37,1405],[1481,927,2437,1405,2367,1440,1411,962],[1130,1032,1200,1067,814,1260,744,1225],[393,1050,1858,1783,1788,1818,323,1085],[1235,594,1516,734,1481,752,1200,611],[1902,401,2042,471,2007,488,1867,418],[603,804,744,874,709,892,568,822],[1130,1103,1340,1208,1305,1225,1095,1120],[1411,1067,1446,1085,1270,1173,1235,1155],[1762,1138,1797,1155,1586,1260,1551,1243],[1200,716,1551,892,1200,1067,849,892],[600,592,754,669,684,704,530,627]]};
 // Festival layers of the village (scripts/art/village/fest_<id>.js, vector): one file per festival, fetched only while
 // html[data-festival=<id>][data-festival-decor=on]. style.css shows decor and day light under the night tint, the glow above it.
 const VILLAGE_FEST={posidelki:'village-fest-posidelki.svg',new_year:'village-fest-new_year.svg',maslenitsa:'village-fest-maslenitsa.svg',spring_flowers:'village-fest-spring_flowers.svg',pumpkin_night:'village-fest-pumpkin_night.svg',april_fools:'village-fest-april_fools.svg',cosmonautics:'village-fest-cosmonautics.svg'},villageFestCache={};
@@ -190,6 +190,10 @@ function syncFarmMotion(){
 const villageReduced=()=>!farmAnimationsEnabled();
 const villageClamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 let villageIO=null,villageWorldEl=null,villageVisBound=false;
+// strolls of the residents (villageRoam below) and the «Праздник» decor layer (syncVillageStage)
+const VILLAGE_ROAM={speed:40,home:8,away:6,reach:[110,320],step:.36};
+const villageRoamState=new Map();let villageRoamEpoch=Date.now()/1000,villageRoamSheet=null;
+const VILLAGE_STAGE='village-fest-stages.svg',villageStageCache={};
 
 const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
 const own=()=>S.farm?.is_owner;
@@ -2609,7 +2613,7 @@ function villagePlan(W,from,to){
  return pts.filter((p,i)=>!i||p[0]!==pts[i-1][0]||p[1]!==pts[i-1][1]);
 }
 // Walk: constant speed along the planned polyline, one requestAnimationFrame chain (cancelled on re-plan and on leaving the village).
-function villageWalkStop(){villageWalkToken++;if(villageWalkRaf&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(villageWalkRaf);villageWalkRaf=0;villageWalkPlayer?.classList?.remove('is-walking');villageWalkPlayer=null;}
+function villageWalkStop(){villageWalkToken++;if(typeof villageRoamRelease==='function')villageRoamRelease();if(villageWalkRaf&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(villageWalkRaf);villageWalkRaf=0;villageWalkPlayer?.classList?.remove('is-walking');villageWalkPlayer=null;}
 function villageWalk(target,done,instant=false,key){
  const world=$('village-scene')?.children?.[0],player=world?.querySelector?.('.village-player');
  villageWalkStop();
@@ -2645,6 +2649,105 @@ function villageBindWorld(root){
  const keys={ArrowUp:[0,-1],w:[0,-1],ц:[0,-1],ArrowDown:[0,1],s:[0,1],ы:[0,1],ArrowLeft:[-1,0],a:[-1,0],ф:[-1,0],ArrowRight:[1,0],d:[1,0],в:[1,0]};
  root.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||e.target?.closest?.('input,textarea,select'))return;const d=keys[e.key]||keys[String(e.key).toLowerCase()];if(!d)return;e.preventDefault();root.scrollBy({left:d[0]*260,top:d[1]*260,behavior:villageReduced()?'auto':'smooth'});});
 }
+// Residents stroll the paths round their homes (owner, 2026-11-26): each Moscow day a resident picks one spot within reach along
+// the walk graph, walks there, stands a while and walks back home. The route keeps clear of the village's fixed buttons (gate
+// board, place signs, hall, guests, site plaques) at phone scale where it stands, as the resting spots do; on the way it may pass
+// a button (the signs lie above the residents): a route clear all the way wins, then one passing buttons for at most a third of
+// it, and a resident boxed in by buttons (the postman by the market) takes the least crowded ones. One CSS animation per
+// resident with generated keyframes at constant speed (villageRoamCss), so the observers still pause it off screen, and the
+// layer may be rebuilt without a jump: the phase continues from villageRoamEpoch. A tapped resident stops and waits.
+function villageRoamDay(now=Date.now()){return Math.floor((now+3*3600e3)/864e5);}
+function villageRoamTargets(){
+ const s=2/3,box=(x,y,hw,hh)=>({x:x*s,y:y*s,hw,hh}),[gx,gy,gw,gh]=VILLAGE_GATE_BOARD;
+ return [box(gx*24,gy*18,Math.max(22,gw*16),Math.max(22,gh*12)),...VILLAGE_PLACES.map(p=>box(p[3]*24,p[4]*18,22,22)),box(VILLAGE_HALL[0]*24,VILLAGE_HALL[1]*18,31,22),
+  ...VILLAGE_VISITOR_SPOTS.map(([x,y])=>box(x*24,y*18,24,24)),...VILLAGE_SITES.map(([,,x,y])=>({...box(x*24,y*18,70,29),y:y*18*s+7}))];
+}
+// a resident's 48×60 button with its foot at x,y (world units) crowds a target at phone scale
+function villageRoamCrowds(t,x,y){const s=2/3;return Math.abs(t.x-x*s)<24+t.hw+8&&Math.abs(t.y-(y*s-25.56))<30+t.hh+8;}
+function villageResidentRoute(npc,foot,day=villageRoamDay()){
+ const W=VILLAGE_WALK,start=W.a[npc],N=W.n.length/2,P=i=>[W.n[2*i],W.n[2*i+1]];
+ const fallback=()=>{const d=villageResidentDrift(npc,foot);return [foot,[foot[0]+d[0],foot[1]+d[1]]];};
+ if(start===undefined)return fallback();
+ const adj=Array.from({length:N},()=>[]);
+ for(let k=0;k<W.e.length;k+=2){const a=W.e[k],b=W.e[k+1],l=Math.hypot(P(a)[0]-P(b)[0],P(a)[1]-P(b)[1]);adj[a].push([b,l]);adj[b].push([a,l]);}
+ const dist=new Map([[start,0]]),prev=new Map(),open=[start];
+ while(open.length){open.sort((a,b)=>dist.get(a)-dist.get(b));const u=open.shift();if(dist.get(u)>VILLAGE_ROAM.reach[1])continue;for(const [v,l] of adj[u]){const c=dist.get(u)+l;if(!dist.has(v)||c<dist.get(v)){dist.set(v,c);prev.set(v,u);open.push(v);}}}
+ const targets=villageRoamTargets().filter(t=>!villageRoamCrowds(t,foot[0],foot[1]));   // a button already beside the home is the home's own business
+ const crowded=(x,y)=>targets.some(t=>villageRoamCrowds(t,x,y));
+ // the share of the route that passes a button (sampled every 8 units)
+ const passing=pts=>{let all=0,hit=0;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/8));for(let k=1;k<=n;k++){all++;if(crowded(a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n))hit++;}}return all?hit/all:0;};
+ // stops: points every 16 units along the reached edges (the graph has nodes only at bends), by the nearer end
+ const to=v=>{const path=[];for(let i=v;i!==undefined;i=prev.get(i))path.unshift(P(i));return path;},stops=[];
+ for(let k=0;k<W.e.length;k+=2){const a=W.e[k],b=W.e[k+1];if(!dist.has(a)&&!dist.has(b))continue;const A=P(a),B=P(b),L=Math.hypot(B[0]-A[0],B[1]-A[1]);
+  for(let o=0;o<=L;o+=16){const da=dist.has(a)?dist.get(a)+o:Infinity,db=dist.has(b)?dist.get(b)+L-o:Infinity,d=Math.min(da,db),q=[A[0]+(B[0]-A[0])*o/L,A[1]+(B[1]-A[1])*o/L];
+   if(d>=VILLAGE_ROAM.reach[0]&&d<=VILLAGE_ROAM.reach[1])stops.push([...to(da<=db?a:b),q]);}}
+ const all=stops.map(path=>[foot,...path]).filter(pts=>!crowded(...pts[pts.length-1])).map(pts=>[pts,passing(pts)]);
+ const clear=all.filter(([,f])=>f===0),near=all.filter(([,f])=>f<=1/3),best=Math.min(...all.map(([,f])=>f));
+ const routes=(clear.length?clear:near.length?near:all.filter(([,f])=>f<=best+.08)).map(([pts])=>pts);
+ if(!routes.length)return fallback();
+ let h=Math.imul(day,2654435761)>>>0;for(const ch of npc)h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;
+ routes.sort((a,b)=>a[a.length-1][0]-b[b.length-1][0]||a[a.length-1][1]-b[b.length-1][1]);
+ return routes[h%routes.length].filter((p,i,a)=>!i||Math.hypot(p[0]-a[i-1][0],p[1]-a[i-1][1])>.5);
+}
+// The timeline of a route: stand at home, walk out, stand, walk back. Times in seconds.
+function villageRoamPlan(pts){
+ const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+ const walk=cum[cum.length-1]/VILLAGE_ROAM.speed,cycle=VILLAGE_ROAM.home+2*walk+VILLAGE_ROAM.away;
+ return {pts,cum,walk,cycle,out:VILLAGE_ROAM.home,back:VILLAGE_ROAM.home+walk+VILLAGE_ROAM.away};
+}
+// where the resident's foot is t seconds into the cycle
+function villageRoamAt(r,t){
+ t=((t%r.cycle)+r.cycle)%r.cycle;const len=r.cum[r.cum.length-1],v=VILLAGE_ROAM.speed;
+ const d=t<r.out?0:t<r.out+r.walk?(t-r.out)*v:t<r.back?len:t<r.back+r.walk?len-(t-r.back)*v:0;
+ let i=1;while(i<r.cum.length-1&&r.cum[i]<d)i++;
+ const a=r.pts[i-1],b=r.pts[i]||a,l=(r.cum[i]-r.cum[i-1])||1,k=Math.max(0,Math.min(1,(d-r.cum[i-1])/l));
+ return [a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k];
+}
+// @keyframes for the button (translate), the figure (facing) and the walker (gait)
+function villageRoamCss(id,r){
+ const v=VILLAGE_ROAM.speed,len=r.cum[r.cum.length-1],pc=t=>`${(t/r.cycle*100).toFixed(3)}%`;
+ const tr=p=>`translate:calc(${((p[0]-r.pts[0][0])/2400).toFixed(5)} * var(--village-width)) calc(${((p[1]-r.pts[0][1])/2400).toFixed(5)} * var(--village-width))`;
+ const out=r.pts.map((p,i)=>[r.out+r.cum[i]/v,p]),back=r.pts.map((p,i)=>[r.back+(len-r.cum[i])/v,p]).reverse();
+ const move=[[0,r.pts[0]],...out,...back,[r.cycle,r.pts[0]]].map(([t,p])=>`${pc(t)}{${tr(p)}}`).join('');
+ let f=1;const flips=[];
+ for(const leg of [out,back])for(let i=0;i<leg.length-1;i++){const dx=leg[i+1][1][0]-leg[i][1][0];if(Math.abs(dx)>.5)f=dx<0?-1:1;flips.push([leg[i][0],f]);}
+ const flip=`0%{transform:scaleX(${flips.length?flips[flips.length-1][1]:1})}`+flips.map(([t,s])=>`${pc(t)}{transform:scaleX(${s})}`).join('');
+ const gait=[];for(const t0 of [r.out,r.back]){for(let t=t0,k=0;t<t0+r.walk;t+=VILLAGE_ROAM.step/2,k++)gait.push(`${pc(t)}{translate:0 ${k%2?'-1.5px':'0'}}`);gait.push(`${pc(t0+r.walk)}{translate:0 0}`);}
+ return [`@keyframes vr-${id}{${move}}`,`@keyframes vrf-${id}{${flip}}`,`@keyframes vrg-${id}{0%{translate:0 0}${gait.join('')}100%{translate:0 0}}`];
+}
+// The generated rules live in one constructed sheet of the page (no inline <style>: the CSP has style-src 'self').
+function villageRoamRules(id,r){
+ if(villageRoamSheet===null){villageRoamSheet=false;try{if(typeof CSSStyleSheet==='function'&&document.adoptedStyleSheets){const sheet=new CSSStyleSheet();document.adoptedStyleSheets=[...document.adoptedStyleSheets,sheet];villageRoamSheet=sheet;}}catch(e){}}
+ if(!villageRoamSheet||r.rules===id)return;
+ for(const rule of villageRoamCss(id,r))try{villageRoamSheet.insertRule(rule,villageRoamSheet.cssRules.length);}catch(e){}
+ r.rules=id;
+}
+function villageRoam(npc,foot){
+ const day=villageRoamDay(),key=String(foot);let r=villageRoamState.get(npc);
+ if(!r||r.day!==day||r.key!==key){
+  const old=r;let h=0;for(const ch of npc)h=(h*31+ch.charCodeAt(0))%997;
+  r={...villageRoamPlan(villageResidentRoute(npc,foot,day)),day,key,id:`${villageRoamState.size}-${day}`,shift:0,frozen:null,waiting:false};
+  if(old)r.id=old.id.split('-')[0]+`-${day}`;
+  r.shift=-(h%97)/97*r.cycle;   // residents do not all set out at once
+  villageRoamState.set(npc,r);
+ }
+ return r;
+}
+function villageRoamPhase(r,now=Date.now()/1000){return r.frozen??now-villageRoamEpoch-r.shift;}
+function villageRoamFreeze(r,now=Date.now()/1000){if(r.frozen===null)r.frozen=villageRoamPhase(r,now);}
+function villageRoamResume(r,now=Date.now()/1000){if(r.frozen===null)return;r.shift=now-villageRoamEpoch-r.frozen;r.frozen=null;}
+// put the stroll on a resident's button: rules, cycle, a delay that continues the phase; paused while it waits for the player
+function villageRoamApply(b,r,wait){
+ villageRoamRules(r.id,r);
+ if(wait)villageRoamFreeze(r);else villageRoamResume(r);
+ const phase=((villageRoamPhase(r)%r.cycle)+r.cycle)%r.cycle;
+ villageVars(b,{'--roam':`vr-${r.id}`,'--roam-face':`vrf-${r.id}`,'--roam-gait':`vrg-${r.id}`,'--cycle':`${r.cycle.toFixed(2)}s`,'--d':`${(-phase).toFixed(2)}s`});
+ b.dataset.roam=wait?'wait':'walk';
+}
+// A tapped resident stops where it is and waits while the player walks up; a walk elsewhere (villageWalkStop) lets it go on.
+function villageRoamWhere(npc){const r=villageRoamState.get(npc);if(!r)return null;const at=villageRoamAt(r,villageRoamPhase(r));return Math.hypot(at[0]-r.pts[0][0],at[1]-r.pts[0][1])<2?null:at;}
+function villageRoamWait(npc,b){const r=villageRoamState.get(npc);if(!r||villageResident===npc)return;r.waiting=true;villageRoamApply(b,r,true);}
+function villageRoamRelease(){for(const [npc,r] of villageRoamState){if(!r.waiting||villageResident===npc)continue;r.waiting=false;const n=$('village-scene')?.querySelector?.(`[data-village-npc="${npc}"]`);if(n)villageRoamApply(n,r,false);else villageRoamResume(r);}}
 // Performance: the art is a static image; every moving thing is a small element animated with transform/opacity only. Elements outside the viewport (and everything while the tab is hidden) are paused by observers, never by a frame loop.
 function villageObserve(world){if(typeof IntersectionObserver!=='function'||!world.querySelectorAll)return;const root=$('village-scene');if(!villageIO)villageIO=new IntersectionObserver(list=>{for(const e of list)e.target.classList.toggle('is-off',!e.isIntersecting);},{root,rootMargin:'160px'});villageIO.disconnect();world.querySelectorAll('.va').forEach(n=>villageIO.observe(n));}
 function villageAt(n,x,y){n.style.left=`${(x/24).toFixed(2)}%`;n.style.top=`${(y/18).toFixed(2)}%`;return n;}
@@ -2787,7 +2890,6 @@ function syncVillageFest(){
 }
 // «Праздник 1/4…4/4»: one vector layer of the plaza decor (generator: scripts/art/village/fest_stages.js); CSS shows its groups by
 // .village-world[data-stage], the glow copy sits above the night tint.
-const VILLAGE_STAGE='village-fest-stages.svg',villageStageCache={};
 function villageStageLayer(kind){const n=el('div',null,`village-stage village-stage-${kind}`);n.setAttribute('aria-hidden','true');return n;}
 function syncVillageStage(stage){
  if(villageWorldEl)villageWorldEl.dataset.stage=stage===null?'':String(stage);
@@ -2846,12 +2948,15 @@ function syncVillageScene(){
   const b=button(null,e=>{
    if(npc==='Лиса Даша')villagePresenceTalk();
    const open=()=>chooseVillageResident(npc);
-   if(working){villageWalkStop();open();}else villageGo([spot[0],spot[1]+1.6],open,e);
+   if(working){villageWalkStop();open();return;}
+   const at=e?.detail?villageRoamWhere(npc):null;   // out on a stroll: the player walks up to where the resident stops
+   if(at)villageWalk([at[0]/24,at[1]/18+1.6],open,false);else villageGo([spot[0],spot[1]+1.6],open,e);
+   villageRoamWait(npc,b);
   },'village-npc va');
   b.style.left=`${spot[0]}%`;b.style.top=`${spot[1]}%`;
   if(!working){
-   const [dx,dy]=villageResidentDrift(npc,foot);
-   villageVars(b,{'--resident-dx':dx/2400,'--resident-dy':dy/2400,'--face':dx<0?'-1':'1','--d':pooh?'0s':`${(idx*2.1)%9}s`,'--cycle':pooh?'10s':`${16+idx*1.7}s`,'--td':`${idx*3.1%13}s`});
+   const r=villageRoam(npc,foot);if(selected)r.waiting=false;
+   villageRoamApply(b,r,selected||r.waiting);villageVars(b,{'--td':`${idx*3.1%13}s`});
   }
   b.dataset.residentMode=mode;if(pooh)b.dataset.pooh=mode;
   b.dataset.villageNpc=npc;b.dataset.edge=spot[0]<8?'left':'';b.setAttribute('aria-pressed',String(selected));b.setAttribute('aria-controls','panel-content');b.setAttribute('aria-label',`${npc}${orders.length?` · есть просьба${ready?', можно доставить':''}`:''}`);

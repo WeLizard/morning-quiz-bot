@@ -21,6 +21,6 @@ def build():
  assert not any(m in html for m in [*sources,'/*__JOURNEY__*/'])
  output=html.encode('utf-8');(ROOT/'index.html').write_bytes(output)
  report['html_sha256']=hashlib.sha256(output).hexdigest()
- (ROOT/'CONTENT_REPORT.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+ (ROOT/'CONTENT_REPORT.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8',newline=chr(10))  # LF on every OS: scripts/check_alchemy_build.py compares bytes
  print('Built',len(output),'bytes;',report['elements'],'elements;',report['recipes'],'recipes;',report['distinct_svg_bodies'],'distinct SVG bodies')
 if __name__=='__main__':build()

@@ -725,3 +725,21 @@ test('the accused sees the charge and can only object (finding 3)', async () => 
     assert.equal(button(fixture.host, 'Поддержать'), undefined);
     fixture.handle.close();
 });
+
+test('the chronicle declines by the character (owner B1): the hero in the case form, the own verb by the own hero', async () => {
+    const state = view();
+    state.self.account_id = VIEWER;
+    state.self.role = {title: 'Экономка', gender: 'f'};
+    state.public.players = [{account_id: VIEWER, character_id: 'housekeeper', name: 'Петя', status: 'active'}];
+    state.public.looks = {housekeeper: {title: 'Экономка', gender: 'f', title_forms: {acc: 'Экономку', dat: 'Экономке', gen: 'Экономки'}},
+        butler: {title: 'Дворецкий', gender: 'm', title_forms: {acc: 'Дворецкого', dat: 'Дворецкому', gen: 'Дворецкого'}}};
+    const items = [{event_id: 'e1', kind: 'hearing', window_idx: 3, payload: {stage: 'opened', suspect: 'housekeeper'}},
+        {event_id: 'e2', kind: 'ghost_whispered', window_idx: 4, payload: {recipient_character: 'butler', observation_id: 'x'}}];
+    const fixture = controller(state, url => url.includes('/history?') ? {items, next_cursor: null} : undefined); await settle();
+    await button(fixture.host, 'Хроника').click(); await settle();
+    const all = fixture.host.textContent;
+    assert.match(all, /Открыто слушание: обвиняют Экономку\./);
+    assert.match(all, /Ты передала Дворецкому лично/);
+    assert.doesNotMatch(all, /Петя\./, 'the player name is not used as the hero');
+    fixture.handle.close();
+});

@@ -748,6 +748,11 @@ function open(options) {
         return image;
     }
     const heroTitle = char => text(lookOf(char)?.title) || nameOf(char);
+    // Owner's answer B1 (2026-11-26): texts decline by the character — its gender and its title in the case
+    // (gen/dat/acc/ins/prep from the case's title_forms), not by the player's address form.
+    const heroAs = (char, form) => text(lookOf(char)?.title_forms?.[form]) || heroTitle(char);
+    // In pickers: the hero first, the player beside.
+    const heroLabel = char => { const seat = arr(view?.public?.players).find(row => row.character_id === char); return seat ? `${heroTitle(char)} · ${seatName(seat)}` : heroTitle(char); };
     // The hero first, the player as a small plate beside (NIGHT_CITY_MENU_DESIGN §3.4).
     function plate(row) {
         if (row.controller === 'npc') return el('span', 'ncase-tag game', 'ведёт игра');
@@ -836,7 +841,7 @@ function open(options) {
             rows.length ? null : p('Сейчас действовать нечем: действие этого окна уже сделано или в памяти пока нет того, что можно передать.'));
         const asked = questions().filter(q => q.ghost_character === own.character_id && q.status === 'open').map(q => {
             const answers = rows.filter(row => row.quote.kind === 'testimony_answer' && row.quote.params.question_event_id === q.question_event_id);
-            return panel(`Вопрос от: ${nameOf(q.asker_character)}`, p(`«${q.text}»`), p(`Ответ увидят все. Ответить можно до окна ${q.answer_by}.`),
+            return panel(`Вопрос от ${heroAs(q.asker_character, 'gen')}`, p(`«${q.text}»`), p(`Ответ увидят все. Ответить можно до окна ${q.answer_by}.`),
                 answers.length ? kit.row(...answers.map(row => button(row.quote.params.answer === 'yes' ? 'Да' : 'Нет', () => selectAction(row, `Ответить «${row.quote.params.answer === 'yes' ? 'да' : 'нет'}»`)))) : null);
         });
         const memories = new Map();
@@ -850,17 +855,17 @@ function open(options) {
             const observation = all.find(entry => entry.observation_id === key) || {title: 'Воспоминание'};
             const title = observation.title || 'воспоминание';
             const offered = item.whisper.map(row => row.quote.params.recipient);
-            const to = offered.length ? choose('Кому передать лично', offered.map(char => ({id: char, label: nameOf(char)})), offered.includes(whisperTo.get(key)) ? whisperTo.get(key) : offered[0]) : null;
+            const to = offered.length ? choose('Кому передать лично', offered.map(char => ({id: char, label: heroLabel(char)})), offered.includes(whisperTo.get(key)) ? whisperTo.get(key) : offered[0]) : null;
             to?.input.addEventListener('change', () => whisperTo.set(key, to.input.value));
             const buttons = [...(item.share ? [button('На доску', () => selectAction(item.share, `На доску: ${title}`))] : []),
                 ...(to ? [button('Передать лично', () => {
                     const row = item.whisper.find(entry => entry.quote.params.recipient === to.input.value);
-                    return row ? selectAction(row, `Передать «${title}»: ${nameOf(row.quote.params.recipient)}`) : null;
+                    return row ? selectAction(row, `Передать «${title}» ${heroAs(row.quote.params.recipient, 'dat')}`) : null;
                 })] : [])];
             return evidenceCard(observation, 'Твоё воспоминание. На доске его увидят все, лично — только тот, кому передашь.', buttons, to?.node);
         });
         const signs = rows.filter(row => row.quote.kind === 'ghost_sign');
-        const sent = arr(own.modules?.ghost_whisper?.sent).map(row => p(`Окно ${row.window_idx}: «${observationTitle(row.observation_id) || 'воспоминание'}» — ${nameOf(row.recipient_character)}`));
+        const sent = arr(own.modules?.ghost_whisper?.sent).map(row => p(`Окно ${row.window_idx}: «${observationTitle(row.observation_id) || 'воспоминание'}» — ${heroAs(row.recipient_character, 'dat')}`));
         return [intro, ...asked, cards.length ? card('papers', 'Твои воспоминания', plural(cards.length, 'запись', 'записи', 'записей'), ...cards) : null,
             signs.length ? panel('Явление', p('Знак увидят все за столом. Каждый знак — один раз за дело.'), kit.row(...signs.map(row => button(row.label, () => selectAction(row, `Явление: ${row.label}`))))) : null,
             sent.length ? panel(said('Ты уже передал лично', 'Ты уже передала лично'), ...sent) : null];
@@ -924,7 +929,7 @@ function open(options) {
         const personal = arr(view.self.observations).map(item => {
             const actions = choiceList().filter(row => ['pin', 'ghost_share'].includes(row.quote.kind) && row.quote.params.observation_id === item.observation_id)
                 .map(row => actionButton(row, row.quote.kind === 'pin' ? `${onBoard.has(item.observation_id) ? 'Подтвердить от себя' : 'Опубликовать'}: ${item.title || 'улика'}` : `${row.label}: ${item.title || 'воспоминание'}`));
-            const passed = item.source?.kind === 'ghost' ? `Передано лично: ${nameOf(item.source.actor_character)} — ${mystic() ? 'призрак дела' : 'отстранённый игрок'}.` : '';
+            const passed = item.source?.kind === 'ghost' ? `Передано лично от ${heroAs(item.source.actor_character, 'gen')} — ${mystic() ? 'призрака дела' : 'выбывшего из дела'}.` : '';
             const source = lost.has(item.observation_id) ? 'Твоя находка. Оригинала больше нет: от него остался пепел. Записанное тобой — всё, что от него осталось.'
                 : passed ? `${passed}${onBoard.has(item.observation_id) ? ' Эта улика уже на доске.' : ''}`
                 : onBoard.has(item.observation_id) ? 'Твоя находка. Эта улика уже на доске.' : 'Твоя находка';
@@ -949,12 +954,12 @@ function open(options) {
         const form = formList().find(row => row.command_kind === 'testimony_ask');
         if (!questions().length && !form) return [];
         const rows = questions().slice().reverse().map(q => put(el('article', 'ncase-event'),
-            el('strong', null, `Окно ${q.window_idx} · вопрос от: ${nameOf(q.asker_character)} · кому: ${nameOf(q.ghost_character)}`), p(`«${q.text}»`),
+            el('strong', null, `Окно ${q.window_idx} · вопрос от ${heroAs(q.asker_character, 'gen')} — ${heroAs(q.ghost_character, 'dat')}`), p(`«${q.text}»`),
             p(q.status === 'answered' ? `Ответ: ${q.answer === 'yes' ? 'да' : 'нет'}.` : q.status === 'open' ? `Ждёт ответа до окна ${q.answer_by}.` : 'Ответа не было.')));
         let ask = [];
         if (form) {
             const ghosts = arr(form.subject_ids);
-            const who = choose('Кого спросить', ghosts.map(char => ({id: char, label: nameOf(char)})), ghosts.includes(askGhost) ? askGhost : ghosts[0]);
+            const who = choose('Кого спросить', ghosts.map(char => ({id: char, label: heroLabel(char)})), ghosts.includes(askGhost) ? askGhost : ghosts[0]);
             const question = field('Вопрос, на который можно ответить «да» или «нет»', askText, true);
             question.input.maxLength = 200;
             who.input.addEventListener('change', () => { askGhost = who.input.value; });
@@ -1064,7 +1069,7 @@ function open(options) {
         for (const target of arr(form?.recipient_ids || form?.subject_ids)) {
             const check = el('input'); check.type = 'checkbox'; check.checked = recipients.includes(target);
             check.addEventListener('change', () => { recipients = recipients.filter(value => value !== target); if (check.checked && recipients.length < 2) recipients.push(target); else check.checked = false; });
-            targetRows.append(put(el('label', 'ncase-checkbox'), check, el('span', null, nameOf(target))));
+            targetRows.append(put(el('label', 'ncase-checkbox'), check, el('span', null, heroLabel(target))));
         }
         const draftLabel = channel === 'whisper' ? 'Реплика для приватной беседы' : 'Реплика за столом', draft = field(draftLabel, ownDraft, true);
         draft.input.placeholder = draftLabel;
@@ -1095,7 +1100,7 @@ function open(options) {
     }
     function eventText(item) {
         const payload = item.payload || {}, own = view.self;
-        const player = character => nameOf(character);
+        const player = character => heroTitle(character), as = heroAs;
         const boardRow = arr(view.public.board).find(row => row.id === payload.board_id);
         const who = account => account === own.account_id ? 'Ты' : arr(view.public.players).find(row => row.account_id === account)?.name || 'Участник';
         if (bodyText(payload.body)) return bodyText(payload.body);
@@ -1104,14 +1109,14 @@ function open(options) {
         case 'board': return boardRow ? `${who(boardRow.owner_account_id)}: на доске ${boardRow.observation_id ? `улика «${observationTitle(boardRow.observation_id) || 'без названия'}»` : 'новая версия'}.` : 'На доске появилась запись.';
         case 'observation_granted': return `Находка: «${observationTitle(payload.observation_id) || 'запись'}».`;
         case 'archive_requested': return `Архивный запрос отправлен. Ответ — в окне ${payload.due_window}.`;
-        case 'hearing': return payload.stage === 'opened' ? `Открыто слушание: обвиняют ${player(payload.suspect)}.` : `Слушание закрыто${payload.resolution === 'cancelled' ? ' без решения' : ''}: обвиняли ${player(payload.suspect)}.`;
+        case 'hearing': return payload.stage === 'opened' ? `Открыто слушание: обвиняют ${as(payload.suspect, 'acc')}.` : `Слушание закрыто${payload.resolution === 'cancelled' ? ' без решения' : ''}: обвиняли ${as(payload.suspect, 'acc')}.`;
         case 'status': return {ghost: `${player(payload.character_id)} теперь наблюдает за делом.`, fog: `${player(payload.character_id)} пропадает из виду.`, removed: `${player(payload.character_id)} покидает дело.`, active: `${player(payload.character_id)} снова за столом.`}[payload.status] || 'Состав стола изменился.';
         case 'npc_revealed': return 'Хозяин найден.';
         case 'world_changed': return 'Обстановка в усадьбе изменилась.';
         case 'version_marked': return `${who(payload.by_account)}: версия ${payload.state === 'archived' ? 'отправлена в архив' : 'возвращена'}.`;
-        case 'ghost_whispered': return `Ты ${said('передал', 'передала')} лично «${observationTitle(payload.observation_id) || 'воспоминание'}»: ${player(payload.recipient_character)}.`;
+        case 'ghost_whispered': return `Ты ${said('передал', 'передала')} ${as(payload.recipient_character, 'dat')} лично «${observationTitle(payload.observation_id) || 'воспоминание'}».`;
         case 'ghost_whisper_received': return `${player(payload.from_character)} передаёт тебе лично: «${observationTitle(payload.observation_id) || 'воспоминание'}».`;
-        case 'testimony_asked': return `Вопрос от: ${player(payload.asker_character)} · кому: ${player(payload.ghost_character)}. «${text(payload.text)}»`;
+        case 'testimony_asked': return `Вопрос от ${as(payload.asker_character, 'gen')} — ${as(payload.ghost_character, 'dat')}: «${text(payload.text)}»`;
         case 'testimony_answered': { const q = questions().find(row => row.question_event_id === payload.question_event_id); return `${q ? player(q.ghost_character) : 'Выбывший'} отвечает: ${payload.answer === 'yes' ? 'да' : 'нет'}.`; }
         case 'final': return 'Дело закрыто.';
         case 'afk_notice': return `Ты ${said('пропустил', 'пропустила')} окон подряд: ${payload.missed_windows}.`;

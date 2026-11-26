@@ -1155,12 +1155,12 @@ function open(options) {
             return node;
         };
         const mine = card('laurel', 'Твой итог', '', put(el('div', 'ncase-me'), portraitFrame(own.character_id, face(own.character_id, 'ncase-face lg')),
-            put(el('div'), el('span', 'nc-eyebrow', 'Твой итог'), el('strong', null, `${heroTitle(own.character_id)} · ${met ? 'цель выполнена' : 'цель не выполнена'}`),
+            put(el('div'), el('strong', null, `${heroTitle(own.character_id)} · ${met ? 'цель выполнена' : 'цель не выполнена'}`),
                 el('span', 'nc-muted', facts ? (facts.faction_won ? 'Твоя сторона победила.' : 'Твоя сторона в этот раз проиграла.') : 'Подробности своей цели смотри в «Досье».'))));
         const cast = arr(final?.cast);
         const who = cast.length ? card('people', 'Кто был кем', 'роли открыты', put(el('ul', 'ncase-cast'), ...cast.map(row => put(el('li'), face(row.character_id),
             put(el('div'), put(el('span', 'ncase-who'), el('span', 'nm', heroTitle(row.character_id)), plateFor(row.character_id)),
-                el('span', 'sub', PARTS[row.part] || (row.faction === 'independent' ? 'свой интерес' : 'следствие'))),
+                el('span', 'sub', PARTS[row.part] || {shadow: 'на стороне Тени', independent: 'свой интерес'}[row.faction] || 'следствие')),
             sideTag(row.faction), row.account_id ? (goals.get(row.account_id) ? kit.tag?.('цель', {tone: 'ok', icon: 'check'}) || el('span', 'nc-tag ok', 'цель') : el('span', 'nc-tag', 'не вышло')) : null)))) : null;
         return [mine, who];
     }

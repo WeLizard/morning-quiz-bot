@@ -429,7 +429,8 @@ test('after the final the place shows no actions and no free intent box without 
         reward_facts: [{account_id: VIEWER, faction_won: true}],
         cast: [{character_id: 'lawyer', account_id: VIEWER, controller: 'player', faction: 'investigation', part: null},
             {character_id: 'maid', account_id: 'other', controller: 'player', faction: 'shadow', part: 'accomplice'},
-            {character_id: 'owner', account_id: null, controller: 'npc', faction: 'shadow', part: 'culprit'}]};
+            {character_id: 'owner', account_id: null, controller: 'npc', faction: 'shadow', part: 'culprit'},
+            {character_id: 'cook', account_id: 'third', controller: 'player', faction: 'shadow', part: null}]};
     state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active'}, {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}];
     state.public.looks = {lawyer: {title: 'Адвокат'}, maid: {title: 'Горничная'}, owner: {title: 'Хозяин'}};
     state.self.account_id = VIEWER; // the server always sends the viewer's account with the own view
@@ -442,6 +443,7 @@ test('after the final the place shows no actions and no free intent box without 
     assert.match(all, /Кто был кем/);
     assert.match(all, /Горничная.*Нина.*сообщник Тени.*Тень.*не вышло/s);
     assert.match(all, /Хозяин.*ведёт игра.*виновный/s);
+    assert.match(all, /на стороне Тени/, 'a shadow hero by the case, not by the variant');
     await button(fixture.host, 'Улики').click(); await settle();
     assert.ok(button(fixture.host, 'К итогу'), 'other tabs point to the finale instead of repeating it');
     assert.doesNotMatch(fixture.host.textContent, /Кто был кем/);

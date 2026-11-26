@@ -887,6 +887,8 @@ kit.music = createMusic({
     packOf: id => (skin.pack?.id === id ? skin.pack : null),
 });
 kit.createMusic = createMusic;
+/** Whether music is on (default or chosen): for a game's ⚙ switch, which changes it through QW.prefs, not the player. */
+kit.musicOn = () => kit.music.enabled;
 const syncMusicPreferences = () => kit.music.applyPreferences(window.QW?.prefs?.get?.().gamePreferences);
 window.addEventListener?.('qw:game-preferences', syncMusicPreferences);
 syncMusicPreferences();

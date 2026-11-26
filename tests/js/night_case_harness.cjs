@@ -59,7 +59,8 @@ function controller(view, requestHook, options = {}) {
         loadShell() {}, useWorld() {}, seats(rows) { return wrap('seats', rows.map(row => make('span', '', row.name))); },
     };
     const zoneApi = shellPrefs(options.Intl || Intl).prefs;
-    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {prefs: zoneApi, configure() {}, menu: {register() {}}, nav: options.nav || {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle} };
+    const menu = {items: [], register(items) { this.items = items; }};
+    const win = {NightCity: {kit, parseLaunch: () => null}, QW: {prefs: zoneApi, configure() {}, menu, nav: options.nav || {push() {}, pop() {}}}, crypto: {randomUUID: () => `request-${++next}`, subtle} };
     const host = new Node('div');
     const listeners = new Map();
     const doc = {createElement: make, documentElement: new Node('html'), hidden: false,
@@ -78,7 +79,7 @@ function controller(view, requestHook, options = {}) {
         throw new Error('Unexpected request: ' + url);
     };
     const handle = win.NightCase.open({host, target: {roomId: 'room'}, bootstrap: {enabled: true, cases: [], viewer_account_id: VIEWER}, identity: 'guest', request, isCurrent: () => true, ...options});
-    return {host, handle, calls, nodes, intervals, doc, listeners, zoneApi};
+    return {host, handle, calls, nodes, intervals, doc, listeners, zoneApi, menu, kit};
 }
 
 module.exports = {Node, find, settle, shellPrefs, controller, VIEWER, source};

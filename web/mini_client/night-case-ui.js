@@ -272,12 +272,30 @@ function open(options) {
             return hour < 6 || hour >= 21 ? 'night' : hour < 11 ? 'morning' : hour < 17 ? 'day' : 'evening';
         } catch { return 'day'; }
     }
+    // Sound and contrast are account settings (the hub profile has the same switches): applied at once on this
+    // device, saved to the account, rolled back if the server refuses.
+    async function saveMusic(on) {
+        // The player itself belongs to the kit: the case only changes the shared preference it follows.
+        const before = {...(Q.prefs?.get?.().gamePreferences || {})};
+        Q.prefs?.applyAccount?.({game_preferences: {...before, music: on}});
+        try { Q.prefs?.applyAccount?.(await request('/api/account/game-preferences', {method: 'POST', body: {account_id: viewer, game_preferences: {music: on}}})); }
+        catch { Q.prefs?.applyAccount?.({game_preferences: before}); }
+    }
+    async function saveContrast(on) {
+        Q.prefs?.setContrast?.(on);
+        try { Q.prefs?.applyAccount?.(await request('/api/account/contrast-mode', {method: 'POST', body: {enabled: on}})); }
+        catch { Q.prefs?.setContrast?.(!on); }
+    }
+    // The ⚙ menu of the case (mockup screen 19): glyphs from the shell's sprite, the game block first.
     function menu() {
+        const glyph = name => `<use href="/app/night/shell/icons.svg#nc-i-${name}"/>`;
         Q.menu.register([
-            {id: 'night-case-rules', label: 'Правила дела', onSelect: () => showTab('rules')},
-            {id: 'night-case-refresh', label: 'Обновить связь', onSelect: () => refresh()},
-            ...(view?.self && !view.lobby && ai?.can_configure ? [{id: 'night-case-narrator', label: 'Ведущий партии', onSelect: () => showTab('narrator')}] : []),
-            ...(view?.self && choiceList().some(row => row.quote.kind === 'forfeit') ? [{id: 'night-case-leave', label: 'Покинуть дело', danger: true, onSelect: () => confirmForfeit()}] : []),
+            {id: 'night-case-rules', label: 'Правила дела', icon: glyph('story'), onSelect: () => showTab('rules')},
+            ...(view?.self && !view.lobby && ai?.can_configure ? [{id: 'night-case-narrator', label: 'Ведущий партии', icon: glyph('vial'), onSelect: () => showTab('narrator')}] : []),
+            ...(kit.musicOn ? [{id: 'night-case-music', label: 'Музыка', hint: 'громкость — в профиле', icon: glyph('music'), toggle: () => kit.musicOn(), onSelect: () => saveMusic(!kit.musicOn())}] : []),
+            ...(Q.prefs?.setContrast ? [{id: 'night-case-contrast', label: 'Контрастный режим', icon: glyph('eye'), toggle: () => Boolean(Q.prefs.get?.().contrast), onSelect: () => saveContrast(!Q.prefs.get?.().contrast)}] : []),
+            {id: 'night-case-refresh', label: 'Обновить связь', icon: glyph('repeat'), onSelect: () => refresh()},
+            ...(view?.self && choiceList().some(row => row.quote.kind === 'forfeit') ? [{id: 'night-case-leave', label: 'Покинуть дело', hint: 'вернуться в партию будет нельзя', icon: glyph('door'), danger: true, onSelect: () => confirmForfeit()}] : []),
         ], 'Ночной город');
     }
     function showTab(next) {

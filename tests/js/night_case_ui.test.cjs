@@ -745,3 +745,21 @@ test('the chronicle declines by the character (owner B1): the hero in the case f
     assert.doesNotMatch(all, /Петя\./, 'the player name is not used as the hero');
     fixture.handle.close();
 });
+
+test('the ⚙ menu has glyphs and switches music through the account preference, not the player (mockup 19)', async () => {
+    const fixture = controller(view(), url => url.startsWith('/api/account/game-preferences') ? {account_id: VIEWER, game_preferences: {music: false}} : undefined);
+    let on = true;
+    fixture.kit.musicOn = () => on;
+    await settle();
+    const ids = fixture.menu.items.map(item => item.id);
+    assert.ok(ids.includes('night-case-rules') && ids.includes('night-case-contrast') && ids.includes('night-case-refresh'));
+    assert.ok(fixture.menu.items.every(item => item.icon), 'every game item has a glyph');
+    const music = fixture.menu.items.find(item => item.id === 'night-case-music');
+    assert.ok(music, 'the music switch is in the menu once the kit can say whether music is on');
+    assert.equal(music.toggle(), true);
+    await music.onSelect(); await settle();
+    const saved = fixture.calls.find(row => row.url.startsWith('/api/account/game-preferences'));
+    assert.deepEqual(JSON.parse(JSON.stringify(saved.body)), {account_id: VIEWER, game_preferences: {music: false}});
+    assert.equal(fixture.zoneApi.get().gamePreferences.music, false);
+    fixture.handle.close();
+});

@@ -60,6 +60,7 @@ function controller(view, requestHook, options = {}) {
         track(opts) { const node = make('div', 'nc-track'); node.setAttribute('aria-label', opts.label || ''); node.dataset.ready = String(opts.ready); node.dataset.total = String(opts.total); return node; },
         dock(opts) { return wrap('nc-dock', [opts.hint ? make('p', 'nc-dock-hint', opts.hint) : null, ...opts.buttons].filter(Boolean)); },
         tag(value) { return make('span', 'nc-tag', value); },
+        toggle(opts) { const node = make('button', 'nc-toggle', opts.title); node.dataset.on = String(opts.on); node.addEventListener('click', () => opts.onChange(!opts.on)); node.append(make('span', '', opts.text)); return node; },
     };
     const zoneApi = shellPrefs(options.Intl || Intl).prefs;
     const menu = {items: [], register(items) { this.items = items; }};
@@ -71,7 +72,7 @@ function controller(view, requestHook, options = {}) {
     runInNewContext(source, {window: win, document: doc, AbortController, setTimeout, clearTimeout, TextEncoder, Intl: options.Intl || Intl,
         setInterval(fn) { intervals.add(fn); return fn; }, clearInterval(fn) { intervals.delete(fn); }});
     const request = async (url, init) => {
-        calls.push({url, body: init.body, expectedViewer: init.expectedViewer, signal: init.signal});
+        calls.push({url, method: init.method, body: init.body, key: init.key, expectedViewer: init.expectedViewer, signal: init.signal});
         if (requestHook) { const answer = await requestHook(url, init); if (answer !== undefined) return answer; }
         if (url === '/api/guest/rooms/room') return {id: 'room', title: 'Комната', role: 'owner'};
         if (url.includes('/current')) return {game_id: 'game'};

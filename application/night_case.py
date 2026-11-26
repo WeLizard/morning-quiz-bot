@@ -722,6 +722,8 @@ class NightCaseApplicationService:
                 client_command_id=cmd.command_id,kind=kind,payload=payload,result=result,status='applied',now=now)
             return result
         if changed:
+            from application.rooms import RoomApplicationService
+            RoomApplicationService.touch_open(room)   # lobby activity keeps an open table listed (real time)
             lobby['revision']+=1
             await self.repo.write_snapshot(locked,expected_storage_revision=locked.sealed.storage_revision,
                 kernel=None,lobby=lobby,snapshot_hash=json_hash(lobby),lifecycle=locked.sealed.lifecycle)

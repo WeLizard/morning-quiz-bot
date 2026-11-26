@@ -1258,7 +1258,7 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
     async def guest_join_open_room(request: Request, room_id: str, identity: str | None = Query(None)):
         """Sit at (or wait for) the table of an open room without a code."""
         from application.mafia import MafiaApplicationService
-        from application.rooms import RoomRateLimited
+        from application.rooms import RoomApplicationService, RoomRateLimited
         from domain.night_worlds import AgeConfirmRequired
         identity = room_identity(request, identity)
         value = await guest_mafia_json(request, keys=set(), optional=frozenset({'age_ok'}))
@@ -1268,6 +1268,11 @@ def create_app(*, database=None, settings=None, membership=None, clock=time.time
         try:
             async with room_principal(request, identity, lock=True) as (session, who):
                 try:
+                    # A Night Case lobby takes the newcomer into the company; the hero is chosen in the lobby.
+                    night = await RoomApplicationService(session).join_open_night_case(
+                        room_id=room_id, account_id=UUID(who.account_id), age_ok=value.get('age_ok', False))
+                    if night is not None:
+                        return night
                     return await MafiaApplicationService(session).room_join_open(
                         room_id=room_id, account_id=UUID(who.account_id),
                         name=who.display_name or 'Игрок', command_id=command_id, age_ok=value.get('age_ok', False))

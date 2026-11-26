@@ -73,6 +73,9 @@ const errors = {
     credential_unavailable: 'Ключ больше недоступен. Подключи его заново.',
     game_not_running: 'Партия уже не идёт.',
     game_not_lobby: 'Сбор уже закончился — обнови дело.',
+    removed_from_room: 'Хозяин убрал тебя из этой компании. Вернуться можно только по приглашению.',
+    age_confirm_required: 'Этот мир — 18+. Подтверди возраст, чтобы сесть за стол.',
+    table_full: 'За этим столом мест больше нет.',
 };
 /* AI narrator (NIGHT_CASE_AI_ACCESS §7). The host's own key lives only in the password input until submit. */
 const narratorStatus = {authored: 'авторский текст', pending: 'авторский текст, ждём ответа администратора',
@@ -82,13 +85,14 @@ const narratorReasons = {ai_disabled: 'ИИ выключен на сервере
 const narratorFields = {organization_id: 'Organization ID', project_id: 'Project ID', workspace_id: 'Workspace ID', folder_id: 'Folder ID', scope: 'Scope'};
 const errorText = error => error?.network ? 'Нет связи. Повтори тот же запрос — действие не применится дважды.' : errors[error?.code] || 'Действие сейчас недоступно. Обнови дело и попробуй снова.';
 
-async function http(path, {method = 'GET', body, identity = 'guest', signal, expectedViewer} = {}) {
+async function http(path, {method = 'GET', body, identity = 'guest', signal, expectedViewer, key} = {}) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, {once: true});
     const timer = setTimeout(abort, 12000);
     const headers = method === 'GET' ? {} : {'Content-Type': 'application/json', 'X-Guest-CSRF': '1', 'X-Mini-CSRF': '1'};
     if (expectedViewer) headers['X-Night-Expected-Viewer'] = expectedViewer;
+    if (key) headers['Idempotency-Key'] = key;
     try {
         const response = await fetch(`${path}${path.includes('?') ? '&' : '?'}identity=${encodeURIComponent(identity)}`, {
             method, headers, credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
@@ -168,7 +172,7 @@ function open(options) {
             if (!live() || generation !== epoch) throw new Error('night_controller_closed');
             return result;
         } catch (error) {
-            if (live() && (error.code === 'profile_changed' || [401, 403].includes(error.status) ||
+            if (live() && (error.code === 'profile_changed' || error.status === 401 || error.status === 403 && error.code !== 'removed_from_room' ||
                 error.status === 404 && /^\/api\/night-case\/games\/[^/]+\/view(?:\?|$)/.test(path))) invalidate();
             throw error;
         }
@@ -571,7 +575,8 @@ function open(options) {
         epoch++; game = null; room = null; view = null; proposal = null; tab = 'place';
         selectedOriginal = ''; clearHistory();
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); lookPick = null;
-        const result = await request('/api/guest/rooms');
+        const [result, open] = await Promise.all([request('/api/guest/rooms'),
+            request('/api/guest/rooms/open').catch(() => null), kit.worldIndex?.()]);
         if (!live()) return;
         const rooms = panel('Твои компании', ...arr(result.items).map(item =>
             button(item.title || 'Компания', () => enterRoom(item))));
@@ -579,6 +584,7 @@ function open(options) {
         const title = field('Название компании');
         const code = field('Код или ссылка приглашения');
         frame([kit.scene({shell: 'entry', size: 'tall', title: 'Ночной город', text: 'Детективные истории в разных мирах. Компания берёт дело и неделю живёт в нём: заходи, когда удобно, игра сама напишет, что случилось.'}), rooms,
+            open ? openTables(arr(open.items).filter(item => item.game === 'night_case')) : null,
             panel('Новая компания', title.node, kit.stack(button('Создать', async () => {
                 const value = await mutate('/api/guest/rooms', {request_id: id(), title: title.input.value});
                 if (value) await enterRoom(value);
@@ -591,6 +597,47 @@ function open(options) {
                 const value = await mutate('/api/guest/rooms/join', params);
                 if (value) await enterRoom(value);
             })))], 'Ночной город');
+    }
+    // Open lobbies of other companies: look at the table without a code; the hero is chosen in the lobby.
+    function openTables(items) {
+        const list = el('ul', 'nc-list ncase-rows');
+        for (const table of items) {
+            const seated = Number(table.seated) || 0, capacity = Number(table.capacity) || seated;
+            const free = Math.max(0, capacity - seated), entry = kit.worldEntry?.(table.world), thumb = entry ? kit.thumbUrl?.(entry) : '';
+            const meta = [table.case_title, free ? `свободно ${plural(free, 'место', 'места', 'мест')}` : 'мест нет',
+                table.host_name ? `хозяин ${table.host_name}` : null].filter(Boolean).join(' · ');
+            let action = null;
+            action = table.joined ? button('Открыть', () => enterRoom({id: table.room_id, title: table.title}))
+                : free ? button('Смотреть', () => joinOpen(table, action)) : el('span', 'nc-muted', 'стол полон');
+            if (action.tagName === 'BUTTON') action.classList.add('compact');
+            list.append(put(el('li'), thumb ? Object.assign(el('img', 'thumb'), {src: thumb, alt: ''}) : el('span'),
+                put(el('div'), el('span', 'ttl', table.title || 'Компания'), el('span', 'meta', meta)), action));
+        }
+        if (!items.length) list.append(put(el('li', 'nc-empty'), el('span'), el('span', 'nc-muted', 'Открытых сборов сейчас нет. Хозяин стола открывает сбор в карточке «Пригласить».')));
+        return panel('Открытые сборы', list);
+    }
+    async function joinOpen(table, control, adult = false) {
+        if (!adult && (Number(table.world_age) || 0) >= 18) {
+            // An 18+ world: the newcomer confirms the age on the spot (the server does not store it).
+            const confirm = button('Мне есть 18', () => joinOpen(table, confirm, true), 'primary'); confirm.classList.add('compact');
+            control.replaceWith(confirm); return;
+        }
+        control.disabled = true; notice = '';
+        try {
+            const result = await request(`/api/guest/rooms/${encodeURIComponent(table.room_id)}/join-open`, {method: 'POST', body: adult ? {age_ok: true} : {}, key: id()});
+            if (live()) await enterRoom(result?.room || {id: table.room_id, title: table.title});
+        } catch (error) {
+            if (!live()) return;
+            control.disabled = false; notice = errorText(error);
+            host.querySelector('.ncase-main')?.prepend(kit.alert({title: notice}));
+        }
+    }
+    async function setOpen(on) {
+        try {
+            const next = await request(`/api/guest/rooms/${encodeURIComponent(room.id)}/open`, {method: 'POST', body: {open: on}});
+            room = {...room, ...next};
+        } catch (error) { notice = errorText(error); }
+        render();
     }
     // The finished game stays readable from the history; the room screen offers the case list again.
     function newCase() {
@@ -798,6 +845,14 @@ function open(options) {
             ...(room?.role === 'owner' ? [invitePanel()] : []),
             ...(data.self_seat ? [panel('Выход', kit.stack(button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')))] : [])];
     }
+    function openToggle() {
+        if (room?.role !== 'owner' || typeof room.open !== 'boolean' || !kit.toggle) return null;
+        const until = room.open && room.open_expires_at ? new Date(room.open_expires_at) : null;
+        const clock = until && !Number.isNaN(until.getTime()) ? `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}` : '';
+        return kit.toggle({title: 'Открытый сбор', on: room.open, onChange: on => setOpen(on),
+            text: room.open ? `Стол виден в «Открытых сборах»${clock ? `; без движения за столом уйдёт из списка в ${clock}` : ''}.`
+                : 'Чужие игроки увидят стол в «Открытых сборах» и смогут сесть на свободное место.'});
+    }
     function invitePanel() {
         const create = button('Создать приглашение', async () => {
             create.disabled = true;
@@ -806,11 +861,11 @@ function open(options) {
                 render();
             } finally { create.disabled = false; }
         });
-        if (!invitation) return panel('Пригласить друзей', p('Ссылка добавляет в компанию. Каждый отдельно присоединится к сбору; в Telegram-чат она никого не добавляет.'), kit.row(create));
+        if (!invitation) return panel('Пригласить друзей', p('Ссылка добавляет в компанию. Каждый отдельно присоединится к сбору; в Telegram-чат она никого не добавляет.'), kit.row(create), openToggle());
         const link = field('Ссылка в компанию', invitation.web_url || ''); link.input.readOnly = true;
         return panel('Пригласить друзей', kit.ticket({code: invitation.short_code, onCopy: async code => { await navigator.clipboard.writeText(code); notice = 'Код скопирован.'; render(); }}),
             link.node, kit.row(button('Скопировать ссылку', async () => { await navigator.clipboard.writeText(link.input.value); notice = 'Ссылка скопирована.'; render(); })),
-            p('Отправь код или ссылку друзьям. Присоединение к партии остаётся отдельным действием.'));
+            p('Отправь код или ссылку друзьям. Присоединение к партии остаётся отдельным действием.'), openToggle());
     }
     // Section tabs: a sign over the label (mockups, game mode). «Беседа» and «Хроника» become one feed in stage 9.
     const TABS = [['place', 'house', 'Место'], ['chat', 'talk', 'Беседа'], ['board', 'lens', 'Улики'], ['self', 'seal', 'Досье'], ['history', 'calendar', 'Хроника']];

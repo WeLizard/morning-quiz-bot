@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from domain.mafia import MIN_PLAYERS, MAX_PLAYERS, open_table_summary
 from domain.night_worlds import require_age_ok, world_age, world_or_default
-from storage.models import Game, Room, RoomInvite, RoomMembership
+from storage.models import Game, NightGameSealed, Room, RoomInvite, RoomMembership
 from storage.admin_actions import operation_fence
 from storage.games import GameRepository
 from application import room_limits
@@ -37,6 +37,17 @@ def normalize_room_title(value: object) -> str:
     if any(ord(char) < 32 for char in title):
         raise ValueError('Название содержит недопустимые символы.')
     return title
+
+
+def night_case_table_summary(lobby: dict) -> dict:
+    """Open-list facts of a Night Case lobby: host name, seats; free seating plays as many as came."""
+    roster = list(lobby.get('roster') or [])
+    counts = [int(n) for n in lobby.get('allowed_counts') or () if type(n) is int] or [len(roster) or 1]
+    host = next((r for r in roster if r.get('account_id') == lobby.get('owner_account_id')), None)
+    capacity = max(counts)
+    return {'game': 'night_case', 'case_title': lobby.get('title') or '', 'host_name': host['name'] if host else '',
+            'seated': len(roster), 'waiting': 0, 'needs_from': min(counts), 'capacity': capacity,
+            'status': 'full' if len(roster) >= capacity else 'gathering'}
 
 
 class RoomApplicationService:
@@ -377,31 +388,93 @@ class RoomApplicationService:
 
     async def list_open(self, *, account_id: UUID, limit: int = OPEN_LIST_LIMIT,
                         now: datetime | None = None) -> list[dict]:
-        """Public list of open tables: room, host display name, seated count, status; no accounts."""
+        """Public list of open tables: room, host display name, seated count, status; no accounts.
+
+        A table is the room's current Mafia game or a Night Case lobby (marked ``game: 'night_case'``); a room with
+        both lists the case, because a new case lobby leaves the finished Mafia game current. A running or
+        finished case is not listed: nobody can join it.
+        """
         current = now or datetime.now(timezone.utc)
         rows = (await self.session.execute(
-            select(Room, Game).join(Game, (Game.room_id == Room.id) & (Game.mode == 'mafia')
+            select(Room, Game).join(Game, (Game.room_id == Room.id) & Game.mode.in_(['mafia', 'night_case'])
                                     & Game.is_current.is_(True))
             .where(Room.kind == 'standalone', Room.is_open.is_(True),
                    Room.open_activity_at > current - OPEN_ROOM_IDLE)
-            .order_by(Room.open_activity_at.desc(), Room.id).limit(max(1, min(int(limit), OPEN_LIST_LIMIT)))
+            .order_by(Room.open_activity_at.desc(), Room.id).limit(2 * OPEN_LIST_LIMIT)  # a room may list two games
         )).all()
+        night_ids = [game.id for _, game in rows if game.mode == 'night_case' and game.status == 'lobby']
+        lobbies = dict((await self.session.execute(
+            select(NightGameSealed.game_id, NightGameSealed.lobby).where(
+                NightGameSealed.game_id.in_(night_ids or ['']), NightGameSealed.lifecycle == 'lobby')
+        )).all())
+        tables = {}
+        for room, game in rows:
+            if game.mode == 'night_case':
+                if game.id in lobbies and lobbies[game.id]:
+                    tables[room.id] = (room, game)
+            else:
+                tables.setdefault(room.id, (room, game))
+        chosen = list(tables.values())[:max(1, min(int(limit), OPEN_LIST_LIMIT))]
         mine = set((await self.session.scalars(select(RoomMembership.room_id).where(
             RoomMembership.account_id == account_id, RoomMembership.status == 'active',
-            RoomMembership.room_id.in_([room.id for room, _ in rows] or ['']),
+            RoomMembership.room_id.in_([room.id for room, _ in chosen] or ['']),
         ))).all())
         items = []
-        for room, game in rows:
-            summary = open_table_summary(game.state, room_id=room.id)
-            if summary is None:
-                continue
-            items.append({
-                'room_id': room.id, 'title': room.title, 'host_name': summary['host_name'],
-                'seated': summary['seated'], 'waiting': summary['waiting'],
-                'needs_from': MIN_PLAYERS, 'capacity': MAX_PLAYERS,
-                'status': summary['status'],  # gathering | playing | full
-                'world': world_or_default(room.world),
-                'world_age': world_age(room.world),
-                'joined': room.id in mine,
-            })
+        for room, game in chosen:
+            if game.mode == 'night_case':
+                item = night_case_table_summary(lobbies[game.id])
+            else:
+                summary = open_table_summary(game.state, room_id=room.id)
+                if summary is None:
+                    continue
+                item = {'host_name': summary['host_name'],
+                        'seated': summary['seated'], 'waiting': summary['waiting'],
+                        'needs_from': MIN_PLAYERS, 'capacity': MAX_PLAYERS,
+                        'status': summary['status']}  # gathering | playing | full
+            items.append({'room_id': room.id, 'title': room.title, **item,
+                          'world': world_or_default(room.world), 'world_age': world_age(room.world),
+                          'joined': room.id in mine})
         return items
+
+    async def join_open_night_case(self, *, room_id: str, account_id: UUID, age_ok: bool = False,
+                                   now: datetime | None = None) -> dict | None:
+        """Enter an open room whose current table is a Night Case lobby, without a code.
+
+        Only the membership: the player looks at the lobby and takes a hero there. Returns None when the
+        room's current table is not a case lobby, so the caller falls back to the Mafia table.
+        Locks follow the lobby commands: family lock, room, membership.
+        """
+        from storage.games import night_room_lock
+        current = now or datetime.now(timezone.utc)
+        night_lobby = select(Game.id).where(Game.room_id == room_id, Game.mode == 'night_case',
+                                            Game.is_current.is_(True), Game.status == 'lobby')
+        if await self.session.scalar(night_lobby) is None:
+            return None
+        await operation_fence(self.session)
+        await night_room_lock(self.session, room_id)
+        room = await self.session.scalar(select(Room).where(
+            Room.id == room_id, Room.kind == 'standalone').with_for_update())
+        if room is None or not self.open_is_fresh(room, current):
+            raise LookupError('Эта комната сейчас не открыта.')
+        if await self.session.scalar(night_lobby) is None:
+            raise LookupError('Сбор на дело уже закрыт.')
+        membership = await self.session.scalar(select(RoomMembership).where(
+            RoomMembership.room_id == room_id, RoomMembership.account_id == account_id,
+        ).with_for_update().execution_options(populate_existing=True))
+        if membership is not None and membership.status == 'removed':
+            raise PermissionError('Хозяин убрал тебя из этой комнаты. Вернуться можно только по приглашению.')
+        is_new = membership is None or membership.status != 'active'
+        if is_new:
+            require_age_ok(room.world, age_ok)       # a new player of an 18+ world confirms it (not stored)
+            await room_limits.charge_membership(self.session, account_id, current)
+            if membership is None:
+                membership = RoomMembership(room_id=room_id, account_id=account_id, role='member', status='active')
+                self.session.add(membership)
+            else:
+                membership.role, membership.status = 'member', 'active'
+                membership.updated_at = func.greatest(
+                    func.clock_timestamp(), RoomMembership.updated_at + text("interval '1 microsecond'"))
+            await self.session.flush()
+            await self.session.refresh(membership, ['updated_at'])
+        self.touch_open(room, current)
+        return {'room': self.projection(room, membership), 'joined': is_new, 'seat': None, 'game': 'night_case'}

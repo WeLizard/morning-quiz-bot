@@ -218,6 +218,56 @@ class FreeSeatingLobbyTests(unittest.IsolatedAsyncioTestCase):
             await self.say(self.owner, game, "Поехали")
         self.assertEqual(closed.exception.code, "game_not_lobby")
 
+    async def test_an_open_lobby_is_listed_and_a_stranger_enters_without_a_code(self):
+        """Mockup 4 «Открытый сбор»: the owner lists the lobby; a stranger enters the company and sits in the lobby."""
+        from application.rooms import RoomApplicationService
+        from storage.models import Account, RoomMembership
+        stranger, removed = uuid4(), uuid4()
+        async with self.db.transaction() as session:
+            session.add_all([Account(id=stranger, display_name="Чужой"), Account(id=removed, display_name="Убранный")])
+            await session.flush()
+            session.add(RoomMembership(room_id=self.room, account_id=removed, role="member", status="removed"))
+        async with self.db.transaction() as session:
+            view = (await self.service(session).create_lobby(account_id=self.owner, room_id=self.room, command=self.cmd(
+                0, {"case_id": self.ref.case_id, "case_version": self.ref.case_version, "timezone": "Europe/Berlin"})))["view"]
+        game = view["game_id"]
+        async def listed(account=stranger):
+            async with self.db.transaction() as session:
+                return [row for row in await RoomApplicationService(session).list_open(account_id=account) if row["room_id"] == self.room]
+        async def enter(account):
+            async with self.db.transaction() as session:
+                return await RoomApplicationService(session).join_open_night_case(room_id=self.room, account_id=account)
+        self.assertEqual(await listed(), [], "closed by default")
+        with self.assertRaises(LookupError):
+            await enter(stranger)
+        async with self.db.transaction() as session:
+            opened = await RoomApplicationService(session).set_open(account_id=self.owner, room_id=self.room, open=True)
+        self.assertTrue(opened["open"])
+        [row] = await listed()
+        self.assertEqual({k: row[k] for k in ("game", "case_title", "host_name", "seated", "needs_from", "capacity", "status", "joined")},
+                         {"game": "night_case", "case_title": view["case"]["title"], "host_name": "Player 0", "seated": 1,
+                          "needs_from": 3, "capacity": 12, "status": "gathering", "joined": False})
+        self.assertFalse({"owner_account_id", "account_id", "roster"} & set(row), "no accounts on the public list")
+        entered = await enter(stranger)
+        assert entered is not None
+        self.assertEqual((entered["joined"], entered["seat"], entered["room"]["role"]), (True, None, "member"))
+        self.assertFalse((await enter(stranger))["joined"], "a member entering again is not a new entry")
+        with self.assertRaises(PermissionError):
+            await enter(removed)
+        # The newcomer is a company member: the lobby shows «Присоединиться к столу», and the seat counts on the list.
+        view = await self.call("join_lobby", stranger, game, view)
+        [row] = await listed()
+        self.assertEqual((row["seated"], row["joined"]), (2, True))
+        async with self.db.transaction() as session:
+            await RoomApplicationService(session).set_open(account_id=self.owner, room_id=self.room, open=False)
+        self.assertEqual(await listed(uuid4()), [])
+        # A room whose current table is no case lobby leaves the entry to the Mafia table.
+        other = uuid4().hex
+        async with self.db.transaction() as session:
+            from storage.models import Room
+            session.add(Room(id=other, kind="standalone", owner_account_id=self.owner)); await session.flush()
+            self.assertIsNone(await RoomApplicationService(session).join_open_night_case(room_id=other, account_id=stranger))
+
 
 class LobbyNameTest(unittest.TestCase):
     """A player without a free display name is «Игрок N» at the table, never the service seat id."""

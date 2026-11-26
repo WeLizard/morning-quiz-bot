@@ -891,3 +891,45 @@ test('a company member who has not joined reads the lobby talk but has no field 
     assert.equal(find(fixture.host, node => node.attrs?.['aria-label'] === 'Сообщение в обсуждении'), undefined);
     fixture.handle.close();
 });
+
+test('«Открытые сборы» on the root: case tables of other companies, «Смотреть» enters without a code (mockup 1)', async () => {
+    const fixture = controller(view(), url => {
+        if (url === '/api/guest/rooms') return {items: []};
+        if (url === '/api/guest/rooms/open') return {items: [
+            {room_id: 'north', title: 'Северный клуб', game: 'night_case', case_title: 'Хозяин исчез', host_name: 'Вера', seated: 5, capacity: 12, world: 'manor_lake', world_age: 12, joined: false},
+            {room_id: 'full', title: 'Полный стол', game: 'night_case', case_title: 'Хозяин исчез', host_name: 'Олег', seated: 12, capacity: 12, joined: false},
+            {room_id: 'mafia', title: 'Стол мафии', host_name: 'Гость', seated: 2, capacity: 12, joined: false}]};
+        if (url.endsWith('/join-open')) return {room: {id: 'north', title: 'Северный клуб', role: 'member'}, joined: true, seat: null};
+        if (url === '/api/guest/rooms/north') return {id: 'north', title: 'Северный клуб', role: 'member'};
+        if (url === '/api/rooms/north/night-case/current') return {game_id: null};
+        return undefined;
+    }, {target: null});
+    await settle();
+    const text = fixture.host.textContent;
+    assert.match(text, /Открытые сборы/);
+    assert.match(text, /Хозяин исчез · свободно 7 мест · хозяин Вера/);
+    assert.match(text, /Полный стол.*стол полон/s);
+    assert.doesNotMatch(text, /Стол мафии/, 'the case lists only case tables');
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Смотреть').click(); await settle();
+    const join = fixture.calls.find(call => call.url === '/api/guest/rooms/north/join-open');
+    assert.equal(join.method, 'POST');
+    assert.ok(join.key, 'the entry is one command: the server de-duplicates it by Idempotency-Key');
+    assert.match(fixture.host.textContent, /Хозяин компании ещё не начал сбор/);
+    fixture.handle.close();
+});
+
+test('the owner opens the lobby to strangers in «Пригласить» (mockup 4 «Открытый сбор»)', async () => {
+    const {state, manifest, pointer} = openLobbyFixture();
+    const fixture = controller(state, url => url === pointer ? manifest
+        : url === '/api/guest/rooms/room' ? {id: 'room', title: 'Комната', role: 'owner', open: false, open_expires_at: null}
+            : url === '/api/guest/rooms/room/open' ? {id: 'room', title: 'Комната', role: 'owner', open: true, open_expires_at: '2026-11-26T10:30:00Z'} : undefined);
+    await settle();
+    const toggle = () => find(fixture.host, node => node.className === 'nc-toggle');
+    assert.equal(toggle().dataset.on, 'false');
+    assert.match(toggle().textContent, /Чужие игроки увидят стол в «Открытых сборах»/);
+    await toggle().click(); await settle();
+    assert.equal(JSON.stringify(fixture.calls.find(call => call.url === '/api/guest/rooms/room/open').body), '{"open":true}');
+    assert.equal(toggle().dataset.on, 'true');
+    assert.match(toggle().textContent, /Стол виден в «Открытых сборах»; без движения за столом уйдёт из списка в \d\d:\d\d\./);
+    fixture.handle.close();
+});

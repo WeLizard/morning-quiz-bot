@@ -10,7 +10,6 @@ const crypto = require('node:crypto');
 const {controller, find, settle} = require('./night_case_harness.cjs');
 
 const NOT_DRAWN_YET = {
-    portrait: 'only the own role portrait is drawn; people nearby, at the table and on the hearing are text until the hero cards of stage 2 (screens 4, 7, 8, 12, 13)',
     item: 'evidence cards are text; items get pictures in stage 2 (screen 10) and the pack lists them in stage 5',
     frame: 'hero, dossier and evidence frames of the world pack: stage 1 components',
     back: 'role card back and flip: stage 2, screen 6',
@@ -47,6 +46,7 @@ function fullView({digest, pointer}) {
     const art = id => ({asset_id: id, alt: 'Картина'});
     return {game_id: 'game', mode: 'night_case', server_now: '2026-11-16T20:00:00Z', runtime_status: 'running',
         public: {world: 'manor_lake', art: {manifest_sha256: digest, manifest_url: pointer},
+            looks: {lawyer: {id: 'f40', title: 'Адвокат', art: art('manor_char_lawyer__f40')}, cook: {id: 'base', title: 'Повар', art: art('manor_char_cook')}},
             clock: {window_idx: 2, window_seq: 1, phase: 'investigation'},
             locations: [{id: 'library', name: 'Библиотека', body: {text: 'Пахнет старой бумагой.'}, art: art('manor_loc_library')}],
             players: [{seat: 1, character_id: 'lawyer', title: 'Адвокат', art: art('manor_char_lawyer__f40')}],
@@ -57,7 +57,8 @@ function fullView({digest, pointer}) {
         self: {actor_seq: 0, status: 'active', location: 'library', character_id: 'lawyer', ap: 3, faction: 'investigation',
             role: {title: 'Адвокат', art: art('manor_char_lawyer__f40')}, goal: {body: {text: 'Цель'}, criteria: {text: 'Критерий'}},
             nearby: [{character_id: 'cook', title: 'Повар', art: art('manor_char_cook')}], observations: [], secrets: []},
-        menu: [{kind: 'choice', label: 'Осмотреть стол', quote: {kind: 'act', params: {action_id: 'inspect_desk'}, selection_id: 'sel', cost: 1}}]};
+        menu: [{kind: 'choice', label: 'Осмотреть стол', quote: {kind: 'act', params: {action_id: 'inspect_desk'}, selection_id: 'sel', cost: 1}},
+            {kind: 'choice', label: 'Библиотека', quote: {kind: 'move', params: {location: 'library'}, selection_id: 'sel-move', cost: 1}}]};
 }
 
 // Which pack group an address belongs to: case packs by file name, world packs (frames, backs, emblems, music) by folder.

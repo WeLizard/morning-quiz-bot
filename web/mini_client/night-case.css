@@ -5,9 +5,6 @@
 .ncase-main .nc-card {display:flex;flex-direction:column;gap:var(--qw-s-3)}
 .ncase-main .nc-note {white-space:pre-wrap;overflow-wrap:anywhere;max-width:75ch}
 .ncase-main .qw-btn {white-space:normal;overflow-wrap:anywhere}
-.ncase-tabs {flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;padding-block:var(--qw-s-1);flex-shrink:0}
-.ncase-tabs .qw-btn {flex:0 0 auto;min-width:5rem}
-.ncase-tabs [aria-current=page] {border-color:var(--qw-game-accent);color:var(--qw-game-accent);font-weight:750}
 .ncase-field {display:flex;flex-direction:column;gap:var(--qw-s-2);font-size:var(--qw-fs-body);color:var(--qw-game-text)}
 .ncase-field .nc-field {width:100%;min-height:var(--qw-btn-h);box-sizing:border-box;font:inherit;color:var(--qw-game-text);border-radius:var(--qw-r-control)}
 .ncase-field textarea {min-height:7rem;resize:vertical}
@@ -23,7 +20,7 @@
 .ncase-citations,.ncase-recipients {display:flex;flex-direction:column;gap:var(--qw-s-2)}
 .ncase-claim {color:var(--qw-game-muted);font-size:var(--qw-fs-small)}
 .ncase-proof {color:var(--qw-game-accent);font-size:var(--qw-fs-small)}
-.ncase-message,.ncase-event {display:flex;flex-direction:column;gap:var(--qw-s-2);border-bottom:var(--qw-outline-w) solid var(--qw-game-line);padding-bottom:var(--qw-s-3)}
+.ncase-message,.ncase-entry {display:flex;flex-direction:column;gap:var(--qw-s-2);border-bottom:var(--qw-outline-w) solid var(--qw-game-line);padding-bottom:var(--qw-s-3)}
 .ncase-message>strong {font-size:var(--qw-fs-body)}
 .ncase-main .nc-hero {width:100%;box-sizing:border-box;min-height:200px}
 .ncase-main .nc-hero .copy {min-width:0}
@@ -34,3 +31,351 @@
 .ncase-key-fields {display:flex;flex-direction:column;gap:var(--qw-s-3)}
 .ncase-key-fields:empty {display:none}
 .ncase-narrator-pick {margin-block:var(--qw-s-2)}
+
+/* ===== MQB-012 stage 1: the case screens of the mockups (docs/design/mockups/night-case/mock.css, 2026-11-21) =====
+   Colours only through --nc-* / --qw-game-* (the world pack sets them); sizes, gaps and buttons stay the shell's. */
+/* header icons come from the world-neutral sprite */
+.nc-bar .qw-icon-btn svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nc-bar .qw-back svg{width:24px;height:24px}
+
+/* ---------- faces: the case portraits (512×768, bust on black) cropped to the head ---------- */
+.ncase-face{display:block;flex:none;width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:50% 16%;background:#08090b;
+  box-shadow:0 0 0 1.5px var(--nc-edge),0 0 0 3.5px rgb(var(--nc-page-rgb)/.9)}
+.ncase-face.xs{width:32px;height:32px}
+.ncase-face.sm{width:36px;height:36px}
+.ncase-face.lg{width:76px;height:76px;box-shadow:0 0 0 2px var(--nc-edge),0 0 0 5px rgb(var(--nc-page-rgb)/.9),0 0 0 6px var(--nc-edge-soft)}
+
+/* ---------- section tabs: icon over label, no bottom bar (game mode) ---------- */
+.ncase-nav{position:sticky;top:calc(var(--qw-header-h) + var(--qw-safe-top));z-index:28;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  padding:0 max(calc(var(--qw-gutter) - 8px + var(--qw-safe-right)),calc((100vw - var(--qw-col-read)) / 2 + var(--qw-gutter) - 8px)) 0 max(calc(var(--qw-gutter) - 8px + var(--qw-safe-left)),calc((100vw - var(--qw-col-read)) / 2 + var(--qw-gutter) - 8px));
+  background:rgb(var(--nc-page-rgb)/.97);border-bottom:1px solid var(--qw-game-line)}
+:root.nc .ncase-nav button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;margin:0;padding:6px 2px 5px;
+  border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:var(--qw-game-muted);font:650 var(--qw-fs-caption)/1.15 var(--qw-font);cursor:pointer}
+.ncase-nav .ic{--s:24px;color:inherit}
+:root.nc .ncase-nav button[aria-current=page]{color:var(--nc-accent-text);border-bottom-color:var(--nc-accent);background:linear-gradient(0deg,var(--nc-tint),transparent 85%)}
+.ncase-badge{position:absolute;top:4px;left:calc(50% + 8px);min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;
+  background:var(--nc-accent);color:var(--nc-accent-ink);font:800 12px/18px var(--qw-font);text-align:center}
+@media (min-width:768px){.ncase-nav{margin-bottom:0}}
+
+/* ---------- 01 case of the week ---------- */
+.ncase-facts{display:flex;flex-wrap:wrap;gap:var(--qw-s-2);margin-top:var(--qw-s-3)}
+.ncase-facts .nc-tag{background:rgb(var(--nc-page-rgb)/.72);color:var(--qw-game-text);border-color:var(--nc-edge-soft)}
+.ncase-how{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--qw-s-3)}
+.ncase-how li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
+.ncase-how img{width:64px;height:64px;border-radius:10px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
+.ncase-how img.obj{object-fit:contain;padding:6px;box-sizing:border-box;background:var(--nc-tint)}
+.ncase-how strong{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.ncase-how span{display:block;font-size:var(--qw-fs-small);line-height:1.4;color:var(--qw-game-muted)}
+
+/* ---------- 02 heroes: portrait cards, the player is a plate on the portrait ---------- */
+.ncase-heroes,.ncase-looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--qw-btn-gap)}
+@media (min-width:560px){.ncase-heroes{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1024px){.ncase-heroes{grid-template-columns:repeat(4,minmax(0,1fr))}}
+:root.nc :is(.ncase-hero,.ncase-look,.ncase-suspect){position:relative;display:flex;flex-direction:column;margin:0;padding:0;overflow:hidden;text-align:left;cursor:pointer;
+  font:inherit;color:var(--qw-game-text);border-radius:14px;border:1px solid var(--qw-game-line);background:var(--nc-surface)}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .pic{position:relative;display:block;aspect-ratio:4/5;overflow:hidden;background:#08090b}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .pic img{width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .pic::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgb(255 255 255/.04),inset 0 -40px 30px -20px rgb(var(--nc-page-rgb)/.7)}
+:is(.ncase-hero,.ncase-look) .cap{display:block;padding:8px 10px 10px;border-top:2px solid var(--nc-edge-soft)}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .nm{display:block;font:700 var(--qw-fs-body)/1.25 var(--qw-font)}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .sub{display:block;font-size:var(--qw-fs-caption);line-height:1.3;color:var(--qw-game-muted)}
+:root.nc :is(.ncase-hero,.ncase-look,.ncase-suspect)[aria-pressed="true"]{border-color:var(--nc-accent-text);box-shadow:inset 0 0 0 1px var(--nc-accent-text),0 0 22px rgb(226 164 67/.2);background:var(--nc-tint)}
+:root.nc :is(.ncase-hero,.ncase-look,.ncase-suspect)[aria-pressed="true"] .cap{border-top-color:var(--nc-accent)}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .tick{position:absolute;right:8px;top:8px;width:28px;height:28px;box-sizing:border-box;padding:5px;border-radius:50%;
+  background:var(--nc-accent);color:var(--nc-accent-ink);box-shadow:0 0 0 2px var(--nc-page)}
+:is(.ncase-hero,.ncase-look,.ncase-suspect) .tick svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+:root.nc .ncase-hero:disabled{cursor:default}
+.ncase-hero.taken .pic img{filter:grayscale(.55) brightness(.62)}
+.ncase-hero.taken .nm{color:var(--qw-game-muted)}
+.ncase-plate{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:3px 10px;border-radius:var(--qw-r-pill);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:rgb(var(--nc-page-rgb)/.88);border:1px solid var(--nc-edge);font:700 var(--qw-fs-caption)/1.3 var(--qw-font);color:var(--qw-game-text)}
+.ncase-hero.mine .ncase-plate{background:var(--nc-accent);border-color:var(--nc-accent-lo);color:var(--nc-accent-ink)}
+.ncase-anyseat{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:var(--qw-s-3);align-items:center;padding-top:var(--qw-s-3);border-top:1px solid var(--nc-rule)}
+.ncase-anyseat img{width:56px;aspect-ratio:2/3;border-radius:6px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
+.ncase-anyseat strong{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.ncase-looks{max-width:520px}
+.ncase-look .pic{aspect-ratio:2/3}
+.ncase-look .pic img{object-position:50% 0}
+
+/* ---------- 03 role card: the portrait in the hero frame ---------- */
+.ncase-reveal{padding-top:var(--qw-s-4)}
+.ncase-rolewrap{display:flex;flex-direction:column;align-items:center;gap:var(--qw-s-4)}
+.ncase-role-copy{display:flex;flex-direction:column;gap:var(--qw-s-4);width:100%}
+@media (min-width:1024px){.ncase-rolewrap{display:grid;grid-template-columns:300px minmax(0,1fr);align-items:center;gap:var(--qw-s-5)}}
+.ncase-rolecard{position:relative;margin:0;width:min(74vw,300px);aspect-ratio:480/725;isolation:isolate}
+.ncase-rolecard .face{position:absolute;inset:11% 13.5% 8.5% 13.5%;z-index:-1;overflow:hidden;border-radius:6px;background:#08090b}
+.ncase-rolecard .face img{width:100%;height:100%;object-fit:cover;object-position:50% 10%}
+.ncase-rolecard .face::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 48%,rgb(var(--nc-page-rgb)/.92) 80%)}
+.ncase-rolecard .frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ncase-rolecard figcaption{position:absolute;left:17%;right:17%;bottom:13%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.ncase-rolecard .eyebrow{font:700 var(--qw-fs-caption)/1.2 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--nc-accent-text)}
+.ncase-rolecard strong{font:850 clamp(24px,7.4vw,30px)/1.05 var(--qw-font);text-shadow:0 2px 8px #000}
+.ncase-rolecard .side,.ncase-side,.ncase-fac{display:inline-flex;align-items:center;gap:6px;padding:2px 10px 2px 3px;border-radius:var(--qw-r-pill);border:1px solid var(--nc-edge);
+  background:rgb(var(--nc-page-rgb)/.9);font:700 var(--qw-fs-caption)/1.3 var(--qw-font);color:var(--qw-game-text);white-space:nowrap}
+:is(.ncase-rolecard .side,.ncase-side,.ncase-fac) img{width:24px;height:24px;object-fit:contain}
+.ncase-fac.shadow{color:var(--nc-shadow)}.ncase-fac.investigation{color:var(--nc-invest)}.ncase-fac.independent{color:var(--nc-indep)}
+
+/* ---------- 04 place ---------- */
+.ncase-place{--hero-top:170px}
+@media (min-width:768px){.ncase-place{--hero-top:210px}}
+.ncase-ap{display:flex;align-items:center;gap:6px;margin-top:var(--qw-s-3)}
+.ncase-ap i{width:12px;height:12px;transform:rotate(45deg);border:1.5px solid var(--nc-accent);border-radius:2px;background:transparent}
+.ncase-ap i.on{background:var(--nc-accent);box-shadow:0 0 8px rgb(226 164 67/.55)}
+.ncase-ap b{margin-left:6px;font:700 var(--qw-fs-small)/1 var(--qw-font);color:var(--nc-accent-text);text-shadow:0 1px 2px #000}
+.ncase-event{display:grid;grid-template-columns:72px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
+.ncase-event img{width:72px;height:96px;border-radius:8px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
+.ncase-event p{margin-top:4px;font-size:var(--qw-fs-body);line-height:1.45}
+.ncase-people{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--qw-s-3)}
+.ncase-person{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;min-width:0}
+.ncase-person .ncase-face{width:64px;height:64px;margin-bottom:6px}
+.ncase-person.npc .ncase-face{box-shadow:0 0 0 1.5px var(--nc-indep),0 0 0 3.5px rgb(var(--nc-page-rgb)/.9)}
+.ncase-person .nm{max-width:100%;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere;font:700 var(--qw-fs-small)/1.25 var(--qw-font)}
+.ncase-person .sub{font-size:var(--qw-fs-caption);color:var(--qw-game-muted)}
+.ncase-acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--qw-btn-gap)}
+:root.nc .ncase-act{position:relative;display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:10px;min-height:64px;margin:0;padding:7px 10px 7px 7px;
+  text-align:left;cursor:pointer;font:inherit;color:var(--qw-game-text);border-radius:12px;border:1px solid var(--qw-game-line);background:var(--nc-surface)}
+.ncase-act img{width:48px;height:48px;border-radius:8px;background:var(--nc-tint);box-shadow:inset 0 0 0 1px var(--nc-edge-soft)}
+.ncase-act img.obj{object-fit:contain;padding:4px;box-sizing:border-box}
+.ncase-act img.face{object-fit:cover;object-position:50% 14%;border-radius:50%;box-shadow:0 0 0 1.5px var(--nc-indep)}
+.ncase-act .nm{display:block;font:650 var(--qw-fs-small)/1.25 var(--qw-font)}
+.ncase-act .sub{display:block;font-size:var(--qw-fs-caption);line-height:1.25;color:var(--qw-game-muted)}
+:root.nc .ncase-act[aria-pressed="true"]{border-color:var(--nc-accent-text);box-shadow:inset 0 0 0 1px var(--nc-accent-text);background:var(--nc-tint)}
+.ncase-act .tick{position:absolute;left:38px;top:4px;width:22px;height:22px;box-sizing:border-box;padding:4px;border-radius:50%;background:var(--nc-accent);color:var(--nc-accent-ink);box-shadow:0 0 0 2px var(--nc-page)}
+.ncase-act .tick svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.ncase-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--qw-btn-gap)}
+:root.nc .ncase-go{position:relative;display:block;margin:0;padding:0;overflow:hidden;cursor:pointer;font:inherit;color:var(--qw-game-text);text-align:left;
+  aspect-ratio:3/2;border-radius:12px;border:1px solid var(--nc-edge);background:#08090b}
+.ncase-go img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 40%}
+.ncase-go .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 7px;background:linear-gradient(180deg,transparent,rgb(var(--nc-page-rgb)/.9) 45%)}
+.ncase-go .nm{display:block;font:700 var(--qw-fs-small)/1.2 var(--qw-font);text-shadow:0 1px 3px #000}
+.ncase-go .sub{display:block;font-size:var(--qw-fs-caption);color:var(--nc-accent-text);text-shadow:0 1px 3px #000}
+
+/* ---------- 05 dossier ---------- */
+.ncase-me{display:grid;grid-template-columns:76px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
+.ncase-me strong{display:block;margin:2px 0 6px;font:750 var(--qw-fs-h3)/1.2 var(--qw-font)}
+.ncase-me .nc-muted{display:block}
+.ncase-steps{display:flex;flex-wrap:wrap;gap:6px}
+.ncase-steps span{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 6px;border-radius:var(--qw-r-pill);border:1px solid var(--qw-game-line);font:700 var(--qw-fs-caption)/1.3 var(--qw-font);color:var(--qw-game-muted)}
+.ncase-steps .ic{--s:18px;color:inherit}
+.ncase-steps .on{border-color:var(--nc-accent);color:var(--nc-accent-text);background:var(--nc-tint)}
+.ncase-secret{display:grid;grid-template-columns:72px minmax(0,1fr);gap:var(--qw-s-3);align-items:center}
+.ncase-secret img{width:72px;height:96px;border-radius:8px;object-fit:cover;filter:saturate(.8);box-shadow:0 0 0 1px var(--nc-edge-soft)}
+.ncase-secret p{font-size:var(--qw-fs-body);line-height:1.45}
+
+/* ---------- 06 board: evidence cards on the kit's frame_evidence ---------- */
+.ncase-evi{padding-top:var(--qw-s-3);border-top:1px solid var(--nc-rule)}
+.nc-head+.ncase-evi,.nc-head+.nc-muted+.ncase-evi{border-top:0}
+.ncase-evi.claim-card .nc-evidence-art{opacity:.8}
+.ncase-draft{width:100%;box-sizing:border-box;min-height:88px;padding:10px 12px;border-radius:var(--qw-r-control);border:1px solid var(--nc-field-line);font:inherit;resize:vertical}
+
+/* ---------- 07 chat: hero portraits beside the bubbles ---------- */
+.ncase-chatmain .nc-msg .ncase-face{margin-top:2px}
+.ncase-compose .nc-field{width:100%;box-sizing:border-box;padding:12px;border-radius:var(--qw-r-control);border:1px solid var(--nc-field-line);font:inherit}
+.nc-main.has-dock.ncase-chatmain{padding-bottom:calc(var(--nc-dock-h) + var(--qw-safe-bottom) + var(--qw-s-4))}
+
+/* ---------- 08 chronicle ---------- */
+.ncase-track{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.ncase-track .day{display:grid;grid-template-columns:1fr 1fr;gap:3px;justify-items:stretch;text-align:center}
+.ncase-track i{height:8px;border-radius:2px;background:var(--qw-game-line)}
+.ncase-track i.done{background:var(--nc-accent-lo)}
+.ncase-track i.cur{background:var(--nc-accent);box-shadow:0 0 10px rgb(226 164 67/.6)}
+.ncase-track b{grid-column:1/-1;margin-top:3px;font:700 var(--qw-fs-caption)/1 var(--qw-font);color:var(--qw-game-muted)}
+.ncase-track .now b{color:var(--nc-accent-text)}
+.ncase-chron{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ncase-chron li{display:grid;grid-template-columns:56px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;padding:10px 0;border-top:1px solid var(--nc-rule)}
+.ncase-chron li:first-child{border-top:0;padding-top:0}
+.ncase-chron img{width:56px;height:56px;border-radius:8px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
+.ncase-chron img.obj{object-fit:contain;padding:5px;box-sizing:border-box;background:var(--nc-tint)}
+.ncase-chron .when{display:block;font:700 var(--qw-fs-caption)/1.3 var(--qw-font);letter-spacing:.06em;text-transform:uppercase;color:var(--qw-game-muted)}
+.ncase-chron p{font-size:var(--qw-fs-body);line-height:1.4}
+
+/* ---------- 09 hearing: suspects by portrait, citations by picture ---------- */
+.ncase-suspects{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:var(--qw-btn-gap)}
+.ncase-suspect .pic{aspect-ratio:1}
+.ncase-suspect .pic img{object-position:50% 14%}
+:root.nc .ncase-suspect{padding-bottom:8px}
+.ncase-suspect .nm,.ncase-suspect .sub{padding:0 8px}
+.ncase-suspect .nm{margin-top:6px;font-size:var(--qw-fs-small)}
+.ncase-suspect .tick{width:26px;height:26px;right:6px;top:6px}
+.ncase-cites{display:flex;flex-direction:column;gap:var(--qw-btn-gap)}
+:root.nc .ncase-cite{display:grid;grid-template-columns:44px minmax(0,1fr) 28px;gap:var(--qw-s-3);align-items:center;min-height:56px;margin:0;padding:6px 10px 6px 6px;
+  text-align:left;cursor:pointer;font:inherit;color:var(--qw-game-text);border-radius:12px;border:1px solid var(--qw-game-line);background:var(--nc-surface)}
+.ncase-cite img{width:44px;height:44px;object-fit:contain;padding:3px;box-sizing:border-box;border-radius:8px;background:var(--nc-tint)}
+.ncase-cite .nm{display:block;font:650 var(--qw-fs-small)/1.25 var(--qw-font)}
+.ncase-cite .sub{display:block;font-size:var(--qw-fs-caption);color:var(--qw-game-muted)}
+.ncase-cite .box{width:26px;height:26px;box-sizing:border-box;border-radius:7px;border:1.5px solid var(--nc-edge)}
+.ncase-cite .box .tick{display:block;width:100%;height:100%;padding:3px;box-sizing:border-box;border-radius:5px;background:var(--nc-accent);color:var(--nc-accent-ink)}
+.ncase-cite .box .tick svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+:root.nc .ncase-cite[aria-pressed="true"]{border-color:var(--nc-accent-text);box-shadow:inset 0 0 0 1px var(--nc-accent-text);background:var(--nc-tint)}
+:root.nc .ncase-cite.claim{border-style:dashed;cursor:not-allowed}
+.ncase-cite.claim img{opacity:.6}
+
+/* ---------- 10 final: who was who ---------- */
+.ncase-cast{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ncase-cast li{display:grid;grid-template-columns:48px minmax(0,1fr) auto;grid-template-areas:"f n r" "f s s";column-gap:var(--qw-s-3);row-gap:4px;align-items:center;padding:10px 0;border-top:1px solid var(--nc-rule)}
+.ncase-cast li:first-child{border-top:0;padding-top:0}
+.ncase-cast .ncase-face{grid-area:f}
+.ncase-cast li>div{grid-area:n;min-width:0}
+.ncase-cast .nm{display:block;font:700 var(--qw-fs-body)/1.25 var(--qw-font)}
+.ncase-cast .sub{display:block;font-size:var(--qw-fs-caption);color:var(--qw-game-muted)}
+.ncase-cast .ncase-fac{grid-area:s;justify-self:start}
+.ncase-cast .nc-tag{grid-area:r}
+
+/* ---------- the player plate (§3.4): the hero first, the player small beside ---------- */
+.ncase-who{display:inline-flex;flex-wrap:wrap;align-items:center;gap:3px 6px;min-width:0}
+.ncase-who .nm{font:700 var(--qw-fs-small)/1.25 var(--qw-font);color:var(--qw-game-text)}
+.ncase-tag{display:inline-block;padding:0 7px;border-radius:var(--qw-r-pill);border:1px solid var(--nc-edge-soft);background:rgb(var(--nc-page-rgb)/.6);
+  font:650 12px/18px var(--qw-font);color:var(--qw-game-muted);white-space:nowrap}
+.ncase-tag.me{border-color:var(--nc-accent);color:var(--nc-accent-text)}
+.ncase-tag.game{border-style:dashed}
+.nc-msg .ncase-who{margin-bottom:2px}
+.nc-msg .ncase-who .nm{font-size:var(--qw-fs-caption);color:var(--nc-gold-text)}
+.ncase-person .ncase-tag{margin-top:3px}
+.ncase-suspect .ncase-tag{align-self:flex-start;margin:3px 8px 0}
+.ncase-left{justify-content:flex-start}
+
+/* ---------- 01 root ---------- */
+.ncase-mycase{display:grid;grid-template-columns:76px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
+.ncase-mycase .art{position:relative;width:64px}
+.ncase-mycase .cover{width:64px;aspect-ratio:2/3;border-radius:6px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge)}
+.ncase-mycase .ncase-face{position:absolute;right:-14px;bottom:-8px}
+.ncase-mycase strong{display:block;font:750 var(--qw-fs-h3)/1.2 var(--qw-font)}
+.ncase-mycase .nc-muted{display:block;margin-top:2px}
+.ncase-news{display:flex;align-items:flex-start;gap:6px;margin-top:6px;font:650 var(--qw-fs-small)/1.35 var(--qw-font);color:var(--nc-accent-text)}
+.ncase-news .ic{--s:18px;margin-top:1px}
+.ncase-rows li{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:var(--qw-s-3);align-items:center}
+.ncase-rows .thumb{width:44px;height:60px;border-radius:6px;object-fit:cover;box-shadow:0 0 0 1px var(--nc-edge-soft)}
+
+/* ---------- 02 worlds: the kit's .nc-world tiles; a world without a case is dimmed ---------- */
+.ncase-worlds .nc-world{--w-accent:var(--nc-edge)}
+.ncase-worlds .nc-world.soon img{filter:grayscale(.65) brightness(.5)}
+.ncase-worlds .w-cases{display:block;margin-top:4px;font:700 var(--qw-fs-caption)/1.2 var(--qw-font);color:var(--nc-accent-text)}
+.ncase-worlds .soon .w-cases{color:var(--qw-game-muted);font-weight:600}
+.ncase-worlds .tick{box-sizing:border-box;padding:5px;border-radius:50%;background:var(--nc-accent);color:var(--nc-accent-ink);box-shadow:0 0 0 2px var(--nc-page)}
+.ncase-worlds .tick svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- 03 case card: the cast ---------- */
+.ncase-castgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:var(--qw-s-3) var(--qw-s-2)}
+.ncase-castgrid li{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;text-align:center}
+.ncase-castgrid .ncase-face{width:56px;height:56px}
+.ncase-castgrid .nm{font:650 var(--qw-fs-caption)/1.25 var(--qw-font);overflow-wrap:anywhere}
+.ncase-never{display:flex;flex-wrap:wrap;align-items:center;gap:var(--qw-s-2) var(--qw-s-3);padding-top:var(--qw-s-3);border-top:1px solid var(--nc-rule)}
+.ncase-never .faces{display:flex;padding-left:6px}
+.ncase-never .faces .ncase-face{margin-left:-6px;filter:grayscale(.5) brightness(.8)}
+.ncase-never .nc-muted{flex:1 1 200px}
+
+/* ---------- 07 place: the action points and the narrator line in the scene ---------- */
+.ncase-hero-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--qw-s-2) var(--qw-s-4);margin-top:var(--qw-s-3)}
+.ncase-hero-row .ncase-ap{margin-top:0}
+.ncase-narr{display:inline-flex;align-items:center;gap:6px;padding:2px 10px 2px 6px;border-radius:var(--qw-r-pill);border:1px solid var(--nc-edge-soft);
+  background:rgb(var(--nc-page-rgb)/.75);font:650 var(--qw-fs-caption)/1.4 var(--qw-font);color:var(--qw-game-text)}
+.ncase-narr .ic{--s:18px}
+
+/* ---------- 08 talk ---------- */
+.ncase-npc{display:grid;grid-template-columns:104px minmax(0,1fr);gap:var(--qw-s-4);align-items:center}
+.ncase-npc .portrait{width:104px;aspect-ratio:3/4;border-radius:10px;object-fit:cover;object-position:50% 8%;
+  box-shadow:0 0 0 1px var(--nc-edge),0 0 0 4px rgb(var(--nc-page-rgb)/.9),0 0 0 5px var(--nc-edge-soft)}
+.ncase-npc .ncase-who{margin-top:4px}
+.ncase-npc .ncase-who .nm{font:800 var(--qw-fs-h2)/1.15 var(--qw-font)}
+.ncase-npc .nc-muted{margin-top:6px}
+:root.nc .nc-msg .ncase-npc-say{background:var(--nc-tint);border-color:var(--nc-edge)}
+.ncase-acts.one{grid-template-columns:minmax(0,1fr)}
+
+/* ---------- 09 feed «Гостиная у камина» ---------- */
+.ncase-week .ncase-track{margin-top:2px}
+.ncase-feed{gap:var(--qw-s-3)}
+.ncase-report{display:grid;grid-template-columns:80px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;padding:var(--qw-s-3);border-radius:14px;border:1px solid var(--nc-edge);background:var(--nc-tint)}
+.ncase-report img{width:80px;height:106px;border-radius:8px;object-fit:cover}
+.ncase-report p{margin-top:4px;font-size:var(--qw-fs-body);line-height:1.45}
+.ncase-pub{display:grid;grid-template-columns:52px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;padding:8px 10px;border-radius:12px;border:1px dashed var(--nc-edge-soft)}
+.ncase-pub img{width:52px;height:52px;object-fit:contain;padding:4px;box-sizing:border-box;border-radius:8px;background:var(--nc-surface-2)}
+.ncase-pub .nc-muted{display:block}
+.ncase-pub strong{display:block;font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.ncase-hearing-note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--qw-s-2) var(--qw-s-3);align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--nc-shadow);background:rgb(var(--nc-page-rgb)/.6)}
+.ncase-hearing-note .faces{display:flex;align-items:center;gap:4px}
+.ncase-hearing-note .faces .ic{--s:20px}
+.ncase-hearing-note strong{display:block;font:700 var(--qw-fs-small)/1.3 var(--qw-font)}
+.ncase-hearing-note .nc-muted{display:block}
+.ncase-hearing-note .qw-btn{grid-column:1/-1;justify-self:start}
+
+/* ---------- 11 dossier: a note (whisper) ---------- */
+.ncase-note{padding:12px 14px;border-radius:4px 14px 14px 14px;background:linear-gradient(180deg,rgb(42 36 24),rgb(31 26 18));border:1px solid var(--nc-edge-soft);box-shadow:0 6px 14px rgb(0 0 0/.35)}
+.ncase-note .from{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.ncase-note p{margin-top:8px;font-size:var(--qw-fs-body);line-height:1.45}
+
+/* ---------- 12 hearing: accuser and accused ---------- */
+.ncase-accuse{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:var(--qw-s-2);text-align:center}
+.ncase-accuse figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.ncase-accuse figcaption{display:flex;flex-direction:column;align-items:center;gap:2px}
+.ncase-accuse .ncase-who{justify-content:center}
+.ncase-accuse .ic.mid{--s:32px}
+.ncase-cast .ncase-who .nm{font-size:var(--qw-fs-body)}
+
+/* ---------- 15–23 states: new objects (transparent cutouts) over the case's own pictures ---------- */
+.ncase-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;padding:6px;text-align:center;
+  border:1.5px dashed var(--nc-edge);border-radius:10px;background:rgb(var(--nc-page-rgb)/.72);color:var(--nc-accent-text);font:600 var(--qw-fs-caption)/1.25 var(--qw-font)}
+.ncase-slot .ic{--s:22px}
+.ncase-objhero .ncase-hero-obj{position:absolute;z-index:-1;left:50%;top:14px;width:min(46%,240px);aspect-ratio:1;transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 10px 18px rgb(0 0 0/.65))}
+.ncase-objhero .ncase-hero-obj.ncase-slot{height:auto}
+.nc-hero.short.ncase-objhero .ncase-hero-obj{top:8px;width:min(30%,150px)}
+@media (min-width:768px){.ncase-objhero .ncase-hero-obj{left:auto;right:32px;top:24px;transform:none;width:min(34%,220px)}}
+/* removed: the own portrait, cold and faded; no ghost figure (this world has no mysticism) */
+.ncase-out::before{filter:grayscale(.85) brightness(.7)}
+.ncase-out-face{position:absolute;z-index:-1;right:6%;top:10px;height:calc(var(--hero-top) + 30px);aspect-ratio:2/3;object-fit:cover;object-position:50% 12%;
+  filter:grayscale(1) brightness(1.35) contrast(1.1) drop-shadow(0 0 14px rgb(170 205 215/.35));opacity:.82;-webkit-mask-image:linear-gradient(180deg,#000 55%,transparent);mask-image:linear-gradient(180deg,#000 55%,transparent)}
+.ncase-can{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ncase-can li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:center;font-size:var(--qw-fs-body);line-height:1.35}
+.ncase-can .ic{--s:20px}
+.ncase-can .on .ic{color:var(--nc-accent-text)}
+.ncase-can .off{color:var(--qw-game-muted)}
+.ncase-can .off span{text-decoration:line-through;text-decoration-color:rgb(201 189 166/.5)}
+.ncase-empty{margin:var(--qw-s-2) 0}
+.ncase-person.away .ncase-face{filter:grayscale(.75) brightness(.7)}
+.ncase-next{margin:0;padding-left:1.3em;display:grid;gap:8px;font-size:var(--qw-fs-body);line-height:1.45}
+.ncase-next li::marker{color:var(--nc-accent-text);font-weight:800}
+.ncase-free{display:grid;grid-template-columns:64px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;margin-bottom:var(--qw-s-3)}
+.ncase-free .obj{width:64px;height:64px;object-fit:contain;filter:drop-shadow(0 4px 8px rgb(0 0 0/.5))}
+.ncase-free .ncase-slot{font-size:12px;line-height:1.15}
+.ncase-revs{display:grid;grid-template-columns:96px minmax(0,1fr);gap:var(--qw-s-3);align-items:center;margin-bottom:var(--qw-s-2)}
+.ncase-revs .obj{width:96px;height:96px;object-fit:contain}
+.ncase-revs ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:var(--qw-fs-body)}
+.ncase-revs b{display:block;font-size:var(--qw-fs-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--nc-accent-text)}
+.ncase-theory{padding:var(--qw-s-3) 0;border-top:1px solid var(--nc-rule)}
+.ncase-theory .top{display:flex;align-items:center;justify-content:space-between;gap:var(--qw-s-2)}
+.ncase-theory strong{font:700 var(--qw-fs-body)/1.3 var(--qw-font)}
+.ncase-theory.archived strong,.ncase-theory.archived>.nc-muted{opacity:.75}
+.ncase-theory .qw-btn-row{margin-top:var(--qw-s-2)}
+.ncase-link{display:flex;align-items:center;gap:8px;margin-top:6px;font:600 var(--qw-fs-small)/1.3 var(--qw-font)}
+.ncase-link img{width:36px;height:36px;object-fit:contain;border-radius:6px;background:var(--nc-surface-2)}
+.ncase-link.supports{color:var(--nc-invest)}
+.ncase-link.contradicts{color:var(--nc-shadow)}
+.ncase-letter{display:grid;grid-template-columns:112px minmax(0,1fr);gap:var(--qw-s-2) var(--qw-s-3);align-items:center;margin-bottom:var(--qw-s-2)}
+.ncase-letter .obj{grid-row:span 2;width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 8px 14px rgb(0 0 0/.5))}
+.ncase-letter .from{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ===== contrast mode (UI_RULES §16): solid plates, 2 px outlines ===== */
+:root.nc[data-qw-contrast="1"] :is(.ncase-hero,.ncase-look,.ncase-suspect,.ncase-act,.ncase-cite,.ncase-go){border-width:2px}
+:root.nc[data-qw-contrast="1"] :is(.ncase-hero,.ncase-look,.ncase-suspect,.ncase-act,.ncase-cite)[aria-pressed="true"]{border-width:3px;box-shadow:none}
+:root.nc[data-qw-contrast="1"] :is(.ncase-plate,.ncase-rolecard .side,.ncase-side,.ncase-fac,.ncase-facts .nc-tag){background:var(--nc-page);border-width:2px}
+:root.nc[data-qw-contrast="1"] .ncase-hero.mine .ncase-plate{background:var(--nc-accent);color:var(--nc-accent-ink)}
+:root.nc[data-qw-contrast="1"] .ncase-hero.taken .pic img{filter:grayscale(.7) brightness(.45)}
+:root.nc[data-qw-contrast="1"] .ncase-go .cap{background:var(--nc-page)}
+:root.nc[data-qw-contrast="1"] .ncase-nav{background:var(--nc-page);border-bottom-width:2px}
+:root.nc[data-qw-contrast="1"] .ncase-nav button{color:var(--qw-game-text)}
+:root.nc[data-qw-contrast="1"] .ncase-nav button[aria-current=page]{border-bottom-width:4px;background:var(--nc-tint)}
+:root.nc[data-qw-contrast="1"] .ncase-rolecard .face::after{background:linear-gradient(180deg,transparent 45%,var(--nc-page) 72%)}
+:root.nc[data-qw-contrast="1"] :is(.ncase-track i){outline:1px solid var(--qw-game-line)}
+:root.nc[data-qw-contrast="1"] .ncase-cite.claim{border-style:dashed}
+:root.nc[data-qw-contrast="1"] :is(.ncase-tag,.ncase-narr){background:var(--nc-page);border-width:2px}
+:root.nc[data-qw-contrast="1"] :is(.ncase-note,.ncase-report,.ncase-hearing-note,.ncase-pub){border-width:2px;background:var(--nc-surface)}
+:root.nc[data-qw-contrast="1"] .ncase-slot{background:var(--nc-page);border-width:2px;color:var(--qw-game-text)}
+:root.nc[data-qw-contrast="1"] .ncase-can .off{color:var(--qw-game-text)}
+:root.nc[data-qw-contrast="1"] .ncase-theory.archived :is(strong,.nc-muted){opacity:1}
+:root.nc[data-qw-contrast="1"] .ncase-theory{border-top-width:2px}
+/* live-case additions to the mockups */
+.ncase-event .ncase-scene-art{width:72px;height:96px;aspect-ratio:auto;border-radius:8px}
+.ncase-face.blank,.ncase-act .face.blank{display:grid;place-items:center;color:var(--qw-game-muted)}
+.ncase-act .obj.sign{display:grid;place-items:center;width:48px;height:48px;border-radius:8px;background:var(--nc-tint);box-shadow:inset 0 0 0 1px var(--nc-edge-soft);color:var(--nc-accent-text)}
+.ncase-act .obj.sign .ic{--s:26px}
+.ncase-nav button .ic{pointer-events:none}
+.ncase-reveal .ncase-rolecard{align-self:center}

@@ -12,7 +12,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value && Object.hasOwn(value, key)).map(key => [key, value[key]]));
 function playerView(value) {
     const safe = pick(value, ['game_id', 'mode', 'server_now', 'runtime_status', 'final_summary', 'lobby', 'menu', 'history_seats', 'selected_original_account_id']);
-    safe.public = pick(value?.public, ['clock', 'world', 'art', 'locations', 'players', 'npcs', 'board', 'observations', 'modules', 'hearing', 'final', 'flags', 'locks']);
+    safe.public = pick(value?.public, ['clock', 'world', 'art', 'locations', 'players', 'npcs', 'board', 'observations', 'modules', 'hearing', 'final', 'flags', 'locks', 'looks']);
     // Only shared scenes leave the public chronicle: id, window, text and picture.
     safe.public.scenes = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'scene')
         .map(entry => ({event_id: entry.event_id, window_idx: entry.window_idx, body: entry.payload?.body, art: entry.art}));
@@ -152,7 +152,7 @@ function open(options) {
     let viewer = boot?.viewer_account_id || null;
     const pages = {public: {items: [], next_cursor: null}, self: {items: [], next_cursor: null}, messages: {items: [], next_cursor: null}};
     const cursors = new Set(), controller = new AbortController();
-    let assets = new Map(), assetWorld = null;
+    let assets = new Map(), assetWorld = null, worldPack = null;
     let selectedOriginal = '';
     let ai = null, aiAt = 0, aiMode = null, aiPresets = null, aiKeyForm = false;
     const aiOn = () => boot?.capabilities?.ai_narrator === true;
@@ -233,7 +233,7 @@ function open(options) {
         view = proposal = room = game = boot = invitation = viewer = null;
         ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; askGhost = null; whisperTo.clear();
         ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
-        outbox.clear(); clearHistory(); assets.clear(); assetWorld = null;
+        outbox.clear(); clearHistory(); assets.clear(); assetWorld = null; worldPack = null; kit.useWorld?.(null);
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.menu.register([], 'Ночной город');
         const header = kit.header(); header.node.classList.add('ncase-bar');
         header.set({eyebrow: 'Ночной город', title: 'Доступ к делу изменился'});
@@ -247,7 +247,7 @@ function open(options) {
         if (!view && !room) frame([panel('Связь с делом', p(notice), kit.row(button('Повторить', () => game ? refresh() : initialize())))]);
         else render();
     }
-    function frame(children, title = 'Усадьба') {
+    function frame(children, title = 'Усадьба', eyebrow = 'Ночной город') {
         if (!live()) return;
         timer?.stop(); timer = null;
         const header = kit.header(), clock = view?.public?.clock;
@@ -255,7 +255,7 @@ function open(options) {
         kit.pageScene?.({slot: game ? 'day' : null, shell: game ? 'table' : 'entry', time: sceneTime()});
         if (clock?.closes_at && !view?.public?.final) timer = kit.timer({endsAt: Date.parse(clock.closes_at) / 1000,
             serverNow: Date.parse(view.server_now) / 1000, alive: live, onExpire: refresh});
-        header.set({eyebrow: 'Ночной город', title, clock: timer?.clock});
+        header.set({eyebrow, title, clock: timer?.clock});
         const main = put(el('main', 'nc-main ncase-main'), ...children);
         if (info && !notice) main.prepend(kit.alert({tone: 'ok', icon: 'check', title: info}));
         // An unconfirmed write shows one banner with «Повторить»; its network error is not repeated as a second alert.
@@ -386,6 +386,12 @@ function open(options) {
                         if (!live() || generation !== epoch) return;
                         assets = manifest ? await verifiedManifest(manifest, world, view.public.art) : new Map();
                     } catch { /* Missing export is an image-free view, never a guessed file or hidden case lookup. */ }
+                }
+                // The world pack dresses the case: palette, title font, hero frame, side emblems, card backs, music.
+                if (world && worldPack?.id !== world && kit.loadPack) {
+                    const pack = await kit.loadPack(world);
+                    if (!live() || generation !== epoch) return;
+                    if (pack) { worldPack = pack; kit.useWorld(pack); }
                 }
                 if (tab === 'chat') await loadHistory('messages');
                 if (aiOn()) {
@@ -659,25 +665,44 @@ function open(options) {
             link.node, kit.row(button('Скопировать ссылку', async () => { await navigator.clipboard.writeText(link.input.value); notice = 'Ссылка скопирована.'; render(); })),
             p('Отправь код или ссылку друзьям. Присоединение к партии остаётся отдельным действием.'));
     }
+    // Section tabs: a sign over the label (mockups, game mode). «Беседа» and «Хроника» become one feed in stage 9.
+    const TABS = [['place', 'house', 'Место'], ['chat', 'talk', 'Беседа'], ['board', 'lens', 'Улики'], ['self', 'seal', 'Досье'], ['history', 'calendar', 'Хроника']];
     function navigation() {
-        return put(el('nav', 'qw-btn-row ncase-tabs'), ...[['place', 'Место'], ['self', 'Досье'], ['board', 'Улики'], ['chat', 'Беседа'], ['history', 'Хроника']].map(([key, label]) => {
-            const control = button(label, async () => { showTab(key); if (key === 'chat') { await loadHistory('messages'); render(); } if (key === 'history') { await loadHistory('public'); await loadHistory('self'); render(); } });
+        const nav = el('nav', 'ncase-nav ncase-tabs'); nav.setAttribute('aria-label', 'Разделы дела');
+        return put(nav, ...TABS.map(([key, sign, label]) => {
+            const control = el('button', null, label); control.type = 'button';
+            control.prepend(icon(sign));
+            control.addEventListener('click', () => Promise.resolve((async () => { showTab(key); if (key === 'chat') { await loadHistory('messages'); render(); } if (key === 'history') { await loadHistory('public'); await loadHistory('self'); render(); } })()).catch(fail));
             control.setAttribute('aria-current', tab === key ? 'page' : 'false'); return control;
         }));
     }
-    function role() {
-        const own = view.self, data = own.role || {};
-        // Portrait, title and alt follow the look sealed for this party (role.art is the look's art).
+    // Screen 6/11: the role card in the world's hero frame (portrait of this party's look, side sign), then side, secret and goal.
+    const SIDES = {investigation: ['Твоя сторона — следствие', 'Знак Следствия'], shadow: ['Твоя сторона — Тень', 'Знак Тени'], independent: ['Ты сам по себе', 'Независимые']};
+    function roleCard(data, faction) {
         const artwork = assets.get(data.art?.asset_id);
-        const portrait = artwork ? el('img', 'ncase-role-portrait') : null;
-        if (portrait) { portrait.src = artwork.url; portrait.alt = text(data.art?.alt).slice(0, 300) || artwork.alt || data.title || 'Портрет роли'; }
-        return panel('Твоё досье', kit.roleBadge({title: data.title || 'Твоя роль', faction: own.faction, line: 'Видишь только ты'}),
-            portrait,
-            p(bodyText(data.bio)), p(bodyText(own.goal?.body)), el('h3', 'nc-h3', 'Как засчитывается цель'), p(bodyText(own.goal?.criteria)),
-            ...arr(own.secrets).map(item => kit.secret(bodyText(item))),
-            ...(own.truth ? [el('h3', 'nc-h3', 'Что ты знаешь о случившемся'), kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method))] : []),
-            ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`)),
-            ...arr(own.modules?.archive_requests?.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоей хронике.')));
+        const figure = el('figure', 'ncase-rolecard'), frame = el('span', 'face');
+        if (artwork) {
+            const portrait = el('img', 'ncase-role-portrait'); portrait.src = artwork.url;
+            portrait.alt = text(data.art?.alt).slice(0, 300) || artwork.alt || data.title || 'Портрет роли'; frame.append(portrait);
+        }
+        figure.append(frame);
+        const frameUrl = kit.art?.('frame_hero');
+        if (frameUrl) { const border = el('img', 'frame'); border.src = frameUrl; border.alt = ''; figure.append(border); }
+        const emblemUrl = kit.art?.(`emblem_${faction}`), side = el('span', 'side', (SIDES[faction] || SIDES.investigation)[1]);
+        if (emblemUrl) { const emblem = el('img'); emblem.src = emblemUrl; emblem.alt = ''; side.prepend(emblem); }
+        figure.append(put(el('figcaption'), el('span', 'eyebrow', 'Видишь только ты'), el('strong', null, data.title || 'Твоя роль'), side));
+        return figure;
+    }
+    function role() {
+        const own = view.self, data = own.role || {}, faction = SIDES[own.faction] ? own.faction : 'investigation';
+        const look = [data.name, data.age ? plural(Number(data.age), 'год', 'года', 'лет') : ''].filter(Boolean).join(', ');
+        return [put(el('section', 'ncase-reveal'), put(el('div', 'ncase-rolewrap'), roleCard(data, faction), put(el('div', 'ncase-role-copy'),
+            card('scales', faction === 'independent' ? said('Ты сам по себе', 'Ты сама по себе') : SIDES[faction][0], '', look ? p(look) : null, p(bodyText(data.bio))),
+            arr(own.secrets).length ? card('seal', 'Твоя тайна', '', ...arr(own.secrets).map(item => kit.secret(bodyText(item)))) : null,
+            card('laurel', 'Твоя цель', '', p(bodyText(own.goal?.body)), el('h3', 'nc-h3', 'Как засчитывается цель'), p(bodyText(own.goal?.criteria)),
+                ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`))),
+            own.truth ? card('eye', 'Что ты знаешь о случившемся', '', kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method))) : null,
+            arr(own.modules?.archive_requests?.requests).length ? card('papers', 'Запросы в архив', '', ...arr(own.modules.archive_requests.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоей хронике.'))) : null)))];
     }
     // Event and finale pictures: only assets of the verified pack, alt from the case.
     function sceneArt(art, fallback) {
@@ -698,33 +723,103 @@ function open(options) {
         return image;
     }
     const sceneOf = eventId => arr(view?.public?.scenes).find(entry => entry.event_id === eventId);
+
+    /* ---- case components (mockups docs/design/mockups/night-case, styles in night-case.css; MQB-012 stage 1) ---- */
+    const TIME_WORDS = {morning: 'Утро', day: 'День', evening: 'Вечер', night: 'Ночь'};
+    const icon = name => (kit.icon ? kit.icon(name) : el('span', 'ic'));
+    const card = (iconName, title, count, ...children) => kit.panel({icon: iconName, title, count}, ...children);
+    const plural = (n, one, few, many) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many}`;
+    // «1 действие» over a group when every choice in it costs the same.
+    const costLine = rows => { const costs = new Set(rows.map(row => Number(row.quote.cost) || 0)); const cost = costs.size === 1 ? [...costs][0] : 0; return cost ? plural(cost, 'действие', 'действия', 'действий') : ''; };
+    // Action points as diamonds: lit — left in this window.
+    function apMeter(left) {
+        const total = Math.max(3, Number(left) || 0), node = el('span', 'ncase-ap');
+        node.setAttribute('aria-label', `Действий осталось: ${left} из ${total}`);
+        for (let i = 0; i < total; i++) node.append(el('i', i < left ? 'on' : ''));
+        node.append(el('b', null, `${left} из ${plural(total, 'действия', 'действий', 'действий')}`));
+        return node;
+    }
+    // The portrait of a hero in this party's look, cropped to the head; a neutral mark when the pack has none.
+    const lookOf = char => { const looks = view?.public?.looks; return (looks && typeof looks === 'object' ? looks[char] : null) || null; };
+    function face(char, cls = 'ncase-face') {
+        const art = assets.get(lookOf(char)?.art?.asset_id);
+        if (!art) return put(el('span', `${cls} blank`), icon('people'));
+        const image = el('img', cls); image.src = art.url; image.alt = ''; image.loading = 'lazy';
+        return image;
+    }
+    const heroTitle = char => text(lookOf(char)?.title) || nameOf(char);
+    // The hero first, the player as a small plate beside (NIGHT_CITY_MENU_DESIGN §3.4).
+    function plate(row) {
+        if (row.controller === 'npc') return el('span', 'ncase-tag game', 'ведёт игра');
+        return row.character_id === view.self?.character_id ? el('span', 'ncase-tag me', 'ты') : el('span', 'ncase-tag', seatName(row));
+    }
+    const person = row => put(el('li', `ncase-person${row.controller === 'npc' ? ' npc' : ''}`), face(row.character_id), el('span', 'nm', heroTitle(row.character_id)), plate(row));
+    const pressed = row => proposal?.selection_id && proposal.selection_id === row.quote.selection_id;
+    // An action as a tile: the item or the speaker's portrait, else the verb's sign; the confirmation names the full action.
+    function actTile(row, label, {face: speaker = null, sub = '', sign = 'eye', full = label} = {}) {
+        const tile = el('button', 'ncase-act'); tile.type = 'button';
+        const art = assets.get(row.art?.asset_id);
+        let pic;
+        if (speaker) pic = face(speaker, 'face');
+        else if (art) { pic = el('img', 'obj'); pic.src = art.url; pic.alt = ''; }
+        else pic = put(el('span', 'obj sign'), icon(sign));
+        put(tile, pic, put(el('span'), el('span', 'nm', label), sub ? el('span', 'sub', sub) : null));
+        if (pressed(row)) tile.setAttribute('aria-pressed', 'true');
+        if (outbox.busy) tile.disabled = true;
+        tile.addEventListener('click', () => Promise.resolve(selectAction(row, full)).catch(fail));
+        return tile;
+    }
+    // A neighbouring place as a picture at this time of day.
+    function placeTile(row) {
+        const target = arr(view.public.locations).find(item => item.id === row.quote.params?.location);
+        const art = assets.get(target?.art?.asset_id), time = sceneTime();
+        const tile = el('button', 'ncase-go'); tile.type = 'button';
+        if (art) { const image = el('img'); image.src = art.variants?.[time] || art.url; image.alt = ''; image.loading = 'lazy'; tile.append(image); }
+        // Who is where stays private (the public view has no positions), so the tile shows only the place.
+        put(tile, put(el('span', 'cap'), el('span', 'nm', target?.name || row.label)));
+        if (pressed(row)) tile.setAttribute('aria-pressed', 'true');
+        if (outbox.busy) tile.disabled = true;
+        tile.addEventListener('click', () => Promise.resolve(selectAction(row, `Перейти: ${target?.name || row.label}`)).catch(fail));
+        return tile;
+    }
+    // Screen 7 «Место» (mockups, MQB-012 stage 2): the place by time of day with the action points, the window's event,
+    // the people nearby by portrait, where to go as place tiles and what to do as action tiles.
     function place() {
         const own = view.self, location = arr(view.public.locations).find(item => item.id === own.location);
         const over = Boolean(view.public.final || view.final_summary);
         const moves = choiceList().filter(row => row.quote.kind === 'move');
-        const acts = choiceList().filter(row => ['act', 'talk', 'archive_request', 'story_reply'].includes(row.quote.kind));
+        const acts = choiceList().filter(row => ['act', 'archive_request', 'story_reply'].includes(row.quote.kind));
+        const talks = choiceList().filter(row => row.quote.kind === 'talk');
         const nearby = arr(own.nearby).filter(row => row.character_id !== own.character_id);
-        const scene = put(el('section', 'nc-hero short'), put(el('div', 'copy'), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)), over || own.status === 'ghost' ? null : p(`Осталось действий: ${own.ap}`), over ? null : narratorLine()));
+        const time = sceneTime(), ghost = own.status === 'ghost';
+        const scene = put(el('section', 'nc-hero ncase-place'), put(el('div', 'copy'),
+            el('span', 'nc-eyebrow', `${TIME_WORDS[time]} · ты здесь`), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)),
+            over || ghost ? null : put(el('div', 'ncase-hero-row'), apMeter(own.ap)), over ? null : narratorLine()));
         const artwork = assets.get(location?.art?.asset_id);
-        scene.style?.setProperty('--img', artwork ? `url(${artwork.variants[sceneTime()] || artwork.url})` : 'none');
+        scene.style?.setProperty('--img', artwork ? `url(${artwork.variants?.[time] || artwork.url})` : 'none');
         if (over) return [scene];
         const window_ = view.public.clock?.window_idx;
         const current = arr(view.public.scenes).filter(entry => entry.window_idx === window_).at(-1);
-        const shared = current ? panel('Сейчас в усадьбе', sceneArt(current.art, 'Сцена окна'), p(bodyText(current.body))) : null;
-        if (own.status === 'ghost') return [scene, shared, ...removedActions()];
+        const shared = current ? put(el('section', 'nc-card'), put(el('div', 'ncase-event'), sceneArt(current.art, 'Сцена окна'),
+            put(el('div'), el('span', 'nc-eyebrow', 'Сейчас в усадьбе'), p(bodyText(current.body))))) : null;
+        if (ghost) return [scene, shared, ...removedActions()];
         const waiting = arr(own.modules?.archive_requests?.requests).filter(item => item.status === 'pending');
         const free = boot?.capabilities?.free_intent === true ? field('Что ты хочешь сделать?', '', true) : null;
-        return [scene, shared,
-            panel('Доступные действия', ...(acts.length ? actionGroups(acts) : [p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')]),
-                ...(waiting.length ? [p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в хронику и досье.`)] : [])),
-            panel('Карта усадьбы', p('Можно перейти только в соседние места.'), ...actionGroups(moves)),
-            panel('Кто рядом', ...nearby.map(row => p(`${displayName(row)}${row.controller === 'npc' ? ' · собеседник' : ''}`)), ...(nearby.length ? [] : [p(own.role?.gender === 'f' ? 'Сейчас ты здесь одна.' : 'Сейчас ты здесь один.')]),
-                ...(free ? [free.node, kit.stack(button('Предложить действие', async () => {
+        const people = card('people', 'Кто рядом', nearby.length ? String(nearby.length) : '',
+            nearby.length ? put(el('ul', 'ncase-people'), ...nearby.map(person)) : p(said('Сейчас ты здесь один.', 'Сейчас ты здесь одна.')));
+        const go = moves.length ? card('door', 'Куда пойти', costLine(moves), put(el('div', 'ncase-map'), ...moves.map(placeTile))) : null;
+        return [scene, shared, people,
+            ...actionGroups(acts),
+            talks.length ? card('talk', 'Поговорить', costLine(talks), put(el('div', 'ncase-acts'), ...talks.map(row => actTile(row, row.npc_title || row.label, {face: row.npc_character_id, sub: row.npc_title && !mentions(row.label, row.npc_title) ? row.label : ''})))) : null,
+            acts.length || talks.length ? null : card('lens', 'Действия', '', p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')),
+            waiting.length ? card('papers', 'Архив', '', p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в хронику и досье.`)) : null,
+            go,
+            ...(free ? [card('story', 'Своими словами', '', free.node, kit.stack(button('Предложить действие', async () => {
                     const result = await mutate(api('intent'), {request_id: id(), text: free.input.value, selection_id: null});
                     notice = result?.kind === 'clarification' ? 'Уточни действие: выбери одну из доступных кнопок. Пока ничего не потрачено.' : '';
                     if (result?.kind === 'proposal') proposal = {...result.proposal, label: 'Предложенное действие'};
                     render();
-                }))] : [])),
+                })))] : []),
             // A frozen table offers «Я здесь» in its own notice above; the place does not repeat it.
             ...(view.public.clock?.phase === 'frozen' ? [] : choiceList().filter(row => row.quote.kind === 'seen').map(row => panel(row.label, kit.stack(actionButton(row)))))];
     }
@@ -767,28 +862,23 @@ function open(options) {
             signs.length ? panel('Явление', p('Знак увидят все за столом. Каждый знак — один раз за дело.'), kit.row(...signs.map(row => button(row.label, () => selectAction(row, `Явление: ${row.label}`))))) : null,
             sent.length ? panel(said('Ты уже передал лично', 'Ты уже передала лично'), ...sent) : null];
     }
-    // Shown on every tab: finishing the window, or who is still playing it.
-    // Actions grouped by verb: «Осмотреть · 1 ОД» once, then short buttons with the object only.
+    // Actions grouped by verb into cards of tiles: «Осмотреть · 1 действие» once, then the objects only.
     // The confirmation still names the full action.
+    const GROUP_SIGN = {archive_request: 'papers', story_reply: 'envelope', act: 'eye'};
     function actionGroups(rows) {
         const groups = new Map();
         for (const row of rows) {
-            const kind = row.quote.kind, full = row.npc_title && !mentions(row.label, row.npc_title) ? `${row.label} · ${row.npc_title}` : row.label;
-            const split = /^([^:]{2,40}):\s*(.+)$/.exec(row.label);
-            const [title, short] = kind === 'move' ? ['Перейти', row.label] : kind === 'archive_request' ? ['Запросить в архиве', row.label]
-                : kind === 'talk' ? ['Поговорить', full]
-                : kind === 'story_reply' ? ['Письмо', row.label]
+            const kind = row.quote.kind, split = /^([^:]{2,40}):\s*(.+)$/.exec(row.label);
+            const [title, short] = kind === 'archive_request' ? ['Запросить в архиве', row.label] : kind === 'story_reply' ? ['Письмо', row.label]
                 : split ? [split[1], split[2]] : ['Другие действия', row.label];
-            if (!groups.has(title)) groups.set(title, []);
-            groups.get(title).push({row, full, short});
+            if (!groups.has(title)) groups.set(title, {kind, items: []});
+            groups.get(title).items.push({row, full: row.label, short});
         }
-        return [...groups].map(([title, items]) => {
-            const costs = new Set(items.map(item => Number(item.row.quote.cost) || 0)), same = costs.size === 1 ? [...costs][0] : null;
-            const buttons = items.map(item => {
-                const node = button(`${item.short}${same == null && item.row.quote.cost ? ` · ${item.row.quote.cost} ОД` : ''}`, () => selectAction(item.row, item.full));
-                node.classList?.add('compact'); return node;
-            });
-            return put(el('section', 'ncase-group'), el('h3', 'nc-h3', `${title}${same ? ` · ${same} ОД` : ''}`), kit.row(...buttons));
+        return [...groups].map(([title, {kind, items}]) => {
+            const sign = /осмотр/i.test(title) ? 'lens' : GROUP_SIGN[kind] || 'eye';
+            const rowsOf = items.map(item => item.row), shared = costLine(rowsOf);
+            return card(sign, title, shared, put(el('div', 'ncase-acts'), ...items.map(item => actTile(item.row, item.short, {sign, full: item.full,
+                sub: !shared && item.row.quote.cost ? plural(Number(item.row.quote.cost), 'действие', 'действия', 'действий') : ''}))));
         });
     }
     // Shown on every tab. Who else has finished stays private: the kernel keeps it out of the public view.
@@ -798,7 +888,7 @@ function open(options) {
         if (own.finished_window) return panel(said('Ты завершил окно', 'Ты завершила окно'),
             p('Ждём остальных. Новое окно откроется, когда все завершат своё или выйдет время.'));
         const finish = choiceList().find(row => row.quote.kind === 'finish_window');
-        return finish ? panel('Окно', p(`${said('Сделал', 'Сделала')} всё, что ${said('хотел', 'хотела')}? Заверши окно: когда завершат все, следующее откроется раньше.`), kit.stack(actionButton(finish))) : null;
+        return finish ? card('hourglass', 'Окно', '', p(`${said('Сделал', 'Сделала')} всё, что ${said('хотел', 'хотела')}? Заверши окно: когда завершат все, следующее откроется раньше.`), kit.stack(actionButton(finish))) : null;
     }
     function evidenceCard(item, source, actions = [], extra = null) {
         return panel(item.title || (item.kind === 'claim' ? 'Утверждение' : 'Доказательство'),
@@ -955,7 +1045,7 @@ function open(options) {
     function history() {
         const eventCards = (stream, title) => panel(title, ...pages[stream].items.map(item => {
             const payload = item.payload || {};
-            return put(el('article', 'ncase-event'), el('strong', null, `Окно ${item.window_idx}`),
+            return put(el('article', 'ncase-entry'), el('strong', null, `Окно ${item.window_idx}`),
                 item.kind === 'scene' ? sceneArt(sceneOf(item.event_id)?.art, 'Сцена окна') : null, p(eventText(item)),
                 ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : []));
         }), ...(pages[stream].next_cursor ? [kit.row(button('Ещё записи', async () => { await loadHistory(stream, true); render(); }))] : []));
@@ -990,7 +1080,7 @@ function open(options) {
         const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? panel(finalHearing ? 'Итоговое слушание' : 'Идёт слушание',
             p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
             kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
-        const current = tab === 'self' ? [role()] : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
+        const current = tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
         let selector = null;
         if (['finished', 'stopped'].includes(view.runtime_status) && arr(view.history_seats).length > 1) {
             const choice = choose('Твои завершённые роли', [{id: '', label: 'Все твои роли'}, ...view.history_seats.map(seat => ({id: seat.original_account_id, label: `${seat.display_name} · ${seat.role_title}`}))], selectedOriginal);
@@ -1001,14 +1091,15 @@ function open(options) {
             });
             selector = panel('Твоя история', choice.node);
         }
-        frame([navigation(), selector, stateNotice, hearingNotice, finale, confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean), `Окно ${clock.window_idx || '—'} · ${arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба'}`);
+        frame([navigation(), selector, stateNotice, hearingNotice, finale, confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean), arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
+            `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`);
     }
     function close() {
         if (!alive) return;
         alive = false; epoch++; controller.abort(); clearInterval(poll); timer?.stop();
         view = proposal = room = game = boot = invitation = null; ownDraft = ''; recipients = [];
         outbox.clear(); cursors.clear(); for (const page of Object.values(pages)) page.items.length = 0;
-        assets.clear(); assetWorld = null;
+        assets.clear(); assetWorld = null; worldPack = null;
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); kit.useWorld(null); document.documentElement.classList.remove('nc');
     }
     active = {close, refresh};

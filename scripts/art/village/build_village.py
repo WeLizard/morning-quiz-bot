@@ -104,6 +104,7 @@ def manifest(meta: dict) -> dict:
         "world": [2400, 1800],
         "residents": {name: {"sha256": hashlib.sha256(svg.encode()).hexdigest()}
                       for name, svg in meta["residents"].items()},
+        "guests": {gid: {"sha256": hashlib.sha256(svg.encode()).hexdigest()} for gid, svg in meta["guests"].items()},
         "lights": lights,
         "smoke": [u(x, y) for x, y in meta["smoke"]],
         "sails": [u(x, y) for x, y in meta["sails"]],
@@ -133,7 +134,7 @@ def manifest(meta: dict) -> dict:
     }
 
 
-INPUTS = ("scripts/art/village/residents.js", "scripts/art/village/crew-residents.js",
+INPUTS = ("scripts/art/village/residents.js", "scripts/art/village/guests.js", "scripts/art/village/crew-residents.js",
           "scripts/art/village/host-residents.js", "scripts/art/village/trickster-residents.js", "scripts/art/village/gate.js", "scripts/art/village/svg_ctx.js", "scripts/art/village/walk.js", "scripts/art/village/player.js", "scripts/art/village/fest_posidelki.js", "scripts/art/village/fest_kit.js", "scripts/art/village/fest_snow.js", "scripts/art/village/fest_newyear.js", "scripts/art/village/fest_maslenitsa.js", "scripts/art/village/fest_flowers.js", "scripts/art/village/fest_fools.js", "scripts/art/village/fest_cosmos.js", "scripts/art/village/build.js", "scripts/art/village/crew.js", "scripts/art/village/merchant.js", "scripts/art/village/contrast_paths.js", "qw_farm/static/scene_buildings.js", "qw_farm/static/scene.js", "qw_farm/static/scene_expansion.js",
           "qw_farm/static/scene_map.js", "scripts/art/village/village.js", "scripts/art/village/common.js")
 
@@ -179,6 +180,8 @@ def build(out: Path, install: bool = False) -> dict:
     (out / "pooh-roaming.svg").write_text(res["meta"]["pooh_roaming"], encoding="utf-8", newline="")
     (out / "resident-figures.json").write_text(
         json.dumps(res["meta"]["residents"], ensure_ascii=False, separators=(",", ":")), encoding="utf-8", newline="")
+    (out / "guest-figures.json").write_text(   # the village guests (guests.js): inline in app.js VILLAGE_VISITOR_FIGURES
+        json.dumps(res["meta"]["guests"], ensure_ascii=False, separators=(",", ":")), encoding="utf-8", newline="")
     for fid, layer in res["meta"]["fest"].items():   # festival layers: qw_farm/static/village-fest-<id>.svg
         (out / f"village-fest-{fid}.svg").write_text(layer["svg"], encoding="utf-8", newline="")
     jack = res["meta"]["fest"]["pumpkin_night"]["jack"]
@@ -202,6 +205,7 @@ def build(out: Path, install: bool = False) -> dict:
               "fest_sha256": {fid: hashlib.sha256(f["svg"].encode()).hexdigest() for fid, f in res["meta"]["fest"].items()},
               "jack_sha256": hashlib.sha256(jack["svg"].encode()).hexdigest() if jack else None,
               "residents_sha256": man["residents"],
+              "guests_sha256": man["guests"],
               "pooh_roaming_sha256": hashlib.sha256(res["meta"]["pooh_roaming"].encode()).hexdigest(),
               "merchant_sha256": hashlib.sha256((res["meta"]["merchant"]["svg"] + res["meta"]["merchant"]["figure"]).encode()).hexdigest(),
               "build_sha256": hashlib.sha256(res["meta"]["build"]["sprite"].encode()).hexdigest(),

@@ -291,3 +291,13 @@ manifest содержит SHA256 каждого жителя в `residents`, has
 точное совпадение с утверждёнными хешами (`residents-approved.json`), единый
 viewBox и отсутствие растра/фильтров. При намеренной правке сначала покажи
 превью владельцу; обновляй утверждённые хеши только после одобрения.
+
+### Гости деревни
+
+`guests.js` рисует шестнадцать гостей: семь странников (`VILLAGE_VISITORS`, богатырь в тёмном плаще и шлеме) и девять
+зверьков-пасхалок (`VILLAGE_EGGS`, ключи `egg_*`). Рамка та же, что у жителей (`-18 -50 36 54`, ноги на y=0).
+`build_village.py` пишет `out/guest-figures.json`, SHA256 каждого гостя — в manifest `guests` и hashes `guests_sha256`.
+Клиент держит их inline в `app.js` → `VILLAGE_VISITOR_FIGURES` (кнопка гостя в мире и портрет в листе гостя);
+после правки `guests.js` скопируй JSON туда целиком. `tests/js/farm_village_guests.test.cjs` сверяет копию с выходом
+генератора и проверяет, что фигура есть у каждого гостя. Превью для владельца: `python scripts/art/village/preview_guests.py`
+→ `.local/village-generator/guests-preview/guests-{day,night}.png`.

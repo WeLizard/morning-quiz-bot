@@ -684,6 +684,14 @@ dialog{width:min(440px,calc(100vw - var(--qw-safe-left) - var(--qw-safe-right) -
 .village-visitor{position:absolute;box-sizing:border-box;width:48px;height:48px;margin:-24px 0 0 -24px;padding:0;background:transparent;border:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .village-visitor-face{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#fff6dc;border:2px solid #d9c58e;box-shadow:0 3px 4px #52643c35;font-size:21px;line-height:1}
 .village-visitor .village-thought{visibility:hidden;pointer-events:auto}
+/* a guest with a drawn figure (guests.js, app.js VILLAGE_VISITOR_FIGURES): stands with its feet on the spot like a resident,
+   no plate; the 44px-wide button keeps the tap size, the ::after ring of .village-visitor widens it further */
+.village-visitor[data-figure]{width:44px;height:60px;margin:-56px 0 0 -22px;border-radius:14px}
+.village-visitor[data-figure] .village-walker>svg{display:block;width:40px;height:60px;flex:none;overflow:visible;transform-origin:50% 92.6%}
+.village-visitor[data-figure]:is(:hover,:focus-visible) .village-walker>svg{filter:var(--farm-lit)}
+.village-guest-portrait{display:grid;place-items:end center;width:35px;height:40px;flex-shrink:0;border-radius:11px;background:#f0e7d4;overflow:hidden}
+.village-guest-portrait>svg{width:30px;height:45px;margin-bottom:-4px}
+:root[data-farm-theme=night] .village-guest-portrait{background:#3a4a3f}
 :root[data-farm-theme=night] :is(.village-place,.village-site){background:var(--float);border-color:var(--line);color:var(--ink)}
 @media(max-width:480px){.village-minimap{width:112px;right:8px;bottom:calc(8px + var(--qw-safe-bottom))}}
 @media(prefers-reduced-motion:no-preference){

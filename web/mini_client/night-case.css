@@ -166,6 +166,11 @@
 .ncase-evi{padding-top:var(--qw-s-3);border-top:1px solid var(--nc-rule)}
 .nc-head+.ncase-evi,.nc-head+.nc-muted+.ncase-evi{border-top:0}
 .ncase-evi.claim-card .nc-evidence-art{opacity:.8}
+/* live: no item picture yet — the sign of the record on the plate; buttons under the text start at the left */
+.nc-evidence-plate.sign{color:var(--nc-muted)}
+.nc-evidence-plate.sign .ic{width:40%;height:40%}
+.nc-evidence-plate.sign .ic svg{width:100%;height:100%}
+.ncase-evi figcaption .qw-btn-row{justify-content:flex-start;margin-top:var(--qw-s-2)}
 .ncase-draft{width:100%;box-sizing:border-box;min-height:88px;padding:10px 12px;border-radius:var(--qw-r-control);border:1px solid var(--nc-field-line);font:inherit;resize:vertical}
 
 /* ---------- 07 chat: hero portraits beside the bubbles ---------- */

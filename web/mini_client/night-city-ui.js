@@ -548,14 +548,16 @@ kit.picker = ({items = [], selected = null, disabled = false, onSelect, label = 
 };
 
 /* --- records of a case: evidence (proof vs claim) and dossier --- */
-/** {kind: 'proof' | 'claim', title, image (url), meta, text} — proof: found by the server; claim: words, may be false. */
-kit.evidence = ({kind = 'proof', title, image = null, meta = '', text = ''} = {}) => {
-    const plate = el('div', 'nc-evidence-plate');
+/** {kind: 'proof' | 'claim', title, image (url), icon (a sign on the plate when there is no picture), meta, text,
+ *  children (extra nodes under the text: buttons, a picker)} — proof: found by the server; claim: words, may be false. */
+kit.evidence = ({kind = 'proof', title, image = null, icon = null, meta = '', text = '', children = []} = {}) => {
+    const plate = el('div', `nc-evidence-plate${image ? '' : ' sign'}`);
     if (image) { const img = el('img', 'pic'); img.src = image; img.alt = ''; plate.append(img); }
+    else if (icon) plate.append(kit.icon(icon));
     const frameUrl = kit.art('frame_evidence');
     const frame = frameUrl ? Object.assign(el('img', 'frame'), {src: frameUrl, alt: ''}) : null;
     const caption = put(el('figcaption'), el('span', `nc-evidence-kind ${kind}`, kind === 'claim' ? 'Утверждение' : 'Доказательство'),
-        el('strong', null, title), meta ? rich(meta, 'span', 'meta') : null, text ? rich(text, 'p') : null);
+        el('strong', null, title), meta ? rich(meta, 'span', 'meta') : null, text ? rich(text, 'p') : null, ...children);
     const art = put(el('div', `nc-evidence-art${frame ? '' : ' plain'}`), plate, frame);
     if (frame) frameVars(art, 'evidence');
     return put(el('figure', `nc-evidence ${kind}`), art, caption);

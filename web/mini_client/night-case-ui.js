@@ -861,7 +861,7 @@ function open(options) {
         });
         const signs = rows.filter(row => row.quote.kind === 'ghost_sign');
         const sent = arr(own.modules?.ghost_whisper?.sent).map(row => p(`Окно ${row.window_idx}: «${observationTitle(row.observation_id) || 'воспоминание'}» — ${nameOf(row.recipient_character)}`));
-        return [intro, ...asked, ...cards,
+        return [intro, ...asked, cards.length ? card('papers', 'Твои воспоминания', plural(cards.length, 'запись', 'записи', 'записей'), ...cards) : null,
             signs.length ? panel('Явление', p('Знак увидят все за столом. Каждый знак — один раз за дело.'), kit.row(...signs.map(row => button(row.label, () => selectAction(row, `Явление: ${row.label}`))))) : null,
             sent.length ? panel(said('Ты уже передал лично', 'Ты уже передала лично'), ...sent) : null];
     }
@@ -893,10 +893,15 @@ function open(options) {
         const finish = choiceList().find(row => row.quote.kind === 'finish_window');
         return finish ? card('hourglass', 'Окно', '', p(`${said('Сделал', 'Сделала')} всё, что ${said('хотел', 'хотела')}? Заверши окно: когда завершат все, следующее откроется раньше.`), kit.stack(actionButton(finish))) : null;
     }
+    // One record in the world's evidence frame (mockup screen 10): proof — found by the game, claim — words, may be false.
+    // The item's picture when the pack has it, otherwise a sign on the plate.
     function evidenceCard(item, source, actions = [], extra = null) {
-        return panel(item.title || (item.kind === 'claim' ? 'Утверждение' : 'Доказательство'),
-            el('strong', item.kind === 'claim' ? 'ncase-claim' : 'ncase-proof', item.kind === 'claim' ? 'Утверждение — требует проверки' : 'Доказательство'),
-            p(bodyText(item.body) || text(item.text)), source ? p(source) : null, extra, actions.length ? kit.row(...actions) : null);
+        const claim = item.kind === 'claim', art = assets.get(item.art?.asset_id);
+        const record = kit.evidence({kind: claim ? 'claim' : 'proof', title: item.title || (claim ? 'Утверждение' : 'Доказательство'),
+            image: art?.url || null, icon: claim ? 'story' : 'lens', meta: source || '', text: bodyText(item.body) || text(item.text),
+            children: [extra, actions.length ? kit.row(...actions) : null]});
+        record.className += ` ncase-evi${claim ? ' claim-card' : ''}`;
+        return record;
     }
     function board() {
         const all = [...arr(view.public.observations), ...arr(view.self.observations)], observations = new Map(all.map(item => [item.observation_id, item]));
@@ -925,14 +930,18 @@ function open(options) {
                 : onBoard.has(item.observation_id) ? 'Твоя находка. Эта улика уже на доске.' : 'Твоя находка';
             return evidenceCard(item, source, actions);
         });
-        const theories = arr(view.public.modules?.version_archive?.theories).map(item => panel(item.title, p(bodyText(item.body)), p(item.state === 'archived' ? 'Версия в архиве; её источники сохранены.' : 'Активная версия'),
+        const theories = arr(view.public.modules?.version_archive?.theories).map(item => card('story', item.title, item.state === 'archived' ? 'в архиве' : 'активная', p(bodyText(item.body)), item.state === 'archived' ? p('Версия в архиве; её источники сохранены.') : null,
             kit.row(...choiceList().filter(row => row.quote.kind === 'version_mark' && row.quote.params.version_id === item.id).map(row => actionButton(row, item.state === 'archived' ? `Вернуть версию: ${item.title}` : `В архив: ${item.title}`)))));
         const claimForm = formList().find(row => row.command_kind === 'claim');
         const draft = field('Твоя версия для доски', '', true);
-        return [...hearings(), panel('Доска дела', p('Текст игрока и показания остаются утверждениями. Для обвинения нужны опубликованные доказательства.')),
-            ...publicItems, ...(claimForm ? [panel('Добавить версию', draft.node, kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value}))))] : []),
-            ...testimony(), ...signsSeen(),
-            panel('Твои находки', p('Они не становятся известны другим до публикации.')), ...personal, ...theories];
+        return [...hearings(),
+            card('lens', 'Доска дела', publicItems.length ? plural(publicItems.length, 'запись', 'записи', 'записей') : '',
+                el('p', 'nc-muted', 'Для обвинения нужны опубликованные доказательства. Слова игроков, версии и показания остаются утверждениями.'),
+                ...(publicItems.length ? publicItems : [p('Доска пока пуста. Опубликованная находка появится здесь для всех за столом.')])),
+            card('papers', 'Твои находки', 'видишь только ты',
+                ...(personal.length ? personal : [p('Пока нет. Находки появляются после осмотров и разговоров; до публикации их не видит никто.')])),
+            ...(claimForm ? [card('story', 'Добавить версию', '', draft.node, kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value}))))] : []),
+            ...testimony(), ...signsSeen(), ...theories];
     }
     // Questions to removed players: public, answered «да» or «нет»; the answer is a claim, never evidence.
     function testimony() {

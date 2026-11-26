@@ -48,7 +48,9 @@ function controller(view, requestHook, options = {}) {
     const wrap = (cls, children) => { const node = make('section', cls); node.append(...children.flat(Infinity)); return node; };
     const kit = {
         button(label, click, opts) { const node = make('button', 'qw-btn ' + opts.kind, label); node.addEventListener('click', click); return node; },
-        panel(opts, ...children) { return wrap('nc-card', [make('h2', '', opts.title), ...children]); },
+        panel(opts, ...children) { return wrap('nc-card', [make('h2', '', opts.title), ...children]); },
+        evidence(opts) { return wrap(`nc-evidence ${opts.kind}`, [make('span', 'nc-evidence-kind', opts.kind === 'claim' ? 'Утверждение' : 'Доказательство'), make('strong', '', opts.title),
+            opts.image ? Object.assign(make('img', 'pic'), {src: opts.image}) : null, make('span', 'meta', opts.meta), make('p', '', opts.text), ...(opts.children || [])].filter(Boolean)); },
         row(...items) { return wrap('qw-btn-row', items); }, stack(...items) { return wrap('qw-btn-stack', items); },
         scene(opts) { return wrap('nc-hero', [make('h2', '', opts.title), make('p', '', opts.text || ''), ...(opts.body || [])]); },
         alert(opts) { return make('p', '', opts.title); }, netBanner(opts) { return make('p', '', opts.text); },

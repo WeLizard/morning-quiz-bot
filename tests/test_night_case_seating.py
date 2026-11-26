@@ -128,7 +128,11 @@ class FreeSeatingLobbyTests(unittest.IsolatedAsyncioTestCase):
         game = view["game_id"]
         self.assertEqual(view["seating"], "open")
         self.assertEqual(view["allowed_counts"], list(range(3, 13)))
+        self.assertEqual(view["windows"], {"slots": ["09:00", "19:00"], "count": 14})
         self.assertEqual(len(view["heroes"]), 12)
+        # Heroes the game always plays: title and public portrait only, never a seat.
+        self.assertTrue(all(set(row) == {"id", "title", "art"} for row in view["npc_heroes"]))
+        self.assertFalse({row["id"] for row in view["npc_heroes"]} & {row["id"] for row in view["heroes"]})
         for account in self.accounts[1:3]:
             view = await self.call("join_lobby", account, game, view)
         view = await self.call("take_seat", self.owner, game, view, {"character_id": "person_00", "look_id": None})
@@ -146,6 +150,8 @@ class FreeSeatingLobbyTests(unittest.IsolatedAsyncioTestCase):
         async with self.db.transaction() as session:
             owner_view = await self.service(session).get_view(account_id=self.owner, game_id=game)
         self.assertTrue(owner_view["lobby"]["can_start"])
+        # The lobby is dressed like the case: world, style pack and the (possibly absent) art binding, nothing else.
+        self.assertEqual(set(owner_view["public"]), {"world", "style_pack", "art"})
         started = await self.call("start_game", self.owner, game, owner_view["lobby"])
         self.assertEqual(started["status"], "running")
         async with self.db.transaction() as session:

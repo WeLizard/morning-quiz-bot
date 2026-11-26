@@ -234,7 +234,7 @@ function open(options) {
         ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; askGhost = null; whisperTo.clear(); hearingPick.clear(); accuseOpen = false;
         ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null; worldPack = null; kit.useWorld?.(null);
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.menu.register([], 'Ночной город');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); Q.menu.register([], 'Ночной город');
         const header = kit.header(); header.node.classList.add('ncase-bar');
         header.set({eyebrow: 'Ночной город', title: 'Доступ к делу изменился'});
         host.replaceChildren(header.node, put(el('main', 'nc-main ncase-main'), panel('Открой дело заново',
@@ -247,7 +247,8 @@ function open(options) {
         if (!view && !room) frame([panel('Связь с делом', p(notice), kit.row(button('Повторить', () => game ? refresh() : initialize())))]);
         else render();
     }
-    function frame(children, title = 'Усадьба', eyebrow = 'Ночной город') {
+    // dock: the bottom action panel (mockups); main then keeps room for it under the last card.
+    function frame(children, title = 'Усадьба', eyebrow = 'Ночной город', dock = null) {
         if (!live()) return;
         timer?.stop(); timer = null;
         const header = kit.header(), clock = view?.public?.clock;
@@ -263,7 +264,8 @@ function open(options) {
         if (notice && !unconfirmed) main.prepend(kit.alert({title: notice}));
         if (outbox.busy && !proposal?.sending) main.prepend(status(`${sending ? sending + ': ' : ''}отправляем…`));
         if (unconfirmed) main.prepend(kit.netBanner({text: 'Запрос ещё не подтверждён сервером', onRetry: () => retry().catch(fail)}));
-        host.replaceChildren(header.node, main); host.dataset.page = 'night';
+        if (dock) main.classList.add('has-dock');
+        host.replaceChildren(...[header.node, main, dock].filter(Boolean)); host.dataset.page = 'night';
     }
     function sceneTime() {
         if (!view?.server_now) return 'day';
@@ -568,7 +570,7 @@ function open(options) {
     async function entry() {
         epoch++; game = null; room = null; view = null; proposal = null; tab = 'place';
         selectedOriginal = ''; clearHistory();
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); lookPick = null;
         const result = await request('/api/guest/rooms');
         if (!live()) return;
         const rooms = panel('Твои компании', ...arr(result.items).map(item =>
@@ -609,8 +611,12 @@ function open(options) {
             : root.QW?.prefs?.resolvedTimezone?.() || deviceZone;
         const zone = root.QW?.prefs?.timezonePicker?.({zones, selected: preferredZone, label: 'Часовой пояс окон', searchLabel: 'Найти часовой пояс окон', fieldClass: 'ncase-field'});
         if (!zone) throw new Error('timezone_picker_unavailable');
+        // Mockup 4: the zone comes from the device (or the account); the picker opens only on «Изменить пояс».
+        const zoneLine = p(`Окна дела откроются по поясу ${zone.input.value || preferredZone}: он взят с твоего ${Object.hasOwn(boot || {}, 'account_timezone') && boot.account_timezone ? 'аккаунта' : 'устройства'}.`);
+        zone.node.hidden = true;
+        const change = kit.button('Изменить пояс', () => { zone.node.hidden = false; zoneLine.hidden = true; change.hidden = true; zone.search?.focus?.(); }, {kind: 'text', compact: true});
         frame([kit.scene({shell: 'rooms', title: room.title || 'Компания', text: 'Выбери дело. Каждый в компании отдельно присоединяется к сбору.'}),
-            panel('Начать сбор игроков', choice.node, zone.node, kit.stack(button('Создать стол', async () => {
+            panel('Начать сбор игроков', choice.node, zoneLine, put(el('div', 'qw-btn-row ncase-left'), change), zone.node, kit.stack(button('Создать стол', async () => {
                 selectedCase = choice.input.value;
                 const selected = cases.find(item => `${item.id}:${item.version}` === selectedCase);
                 const result = await mutate(`/api/rooms/${encodeURIComponent(room.id)}/night-case/lobby`, {command_id: id(), expected_lobby_revision: 0,
@@ -623,43 +629,129 @@ function open(options) {
         if (path === 'leave') return entry();
         if (result) await refresh();
     }
-    /* Free seating (lobby v2): every playable hero is a seat; the player is a quiet plate next to the hero. */
+    /* Free seating (lobby v2), mockup screens 4–5: every playable hero is a seat drawn as its portrait, the player is a plate on it;
+       a hero with several characters opens its own pick screen. The owner's word on screen is «персонаж», not «облик». */
     const heroLook = (hero, lookId) => arr(hero?.looks).find(look => look.id === lookId) || arr(hero?.looks)[0] || {};
-    const heroLine = look => [look.name ? look.title : '', Number.isInteger(look.age) ? `${look.age} лет` : ''].filter(Boolean).join(' · ');
-    const takeSeat = (heroId, lookId = null) => { lookPick = null; return lobbyCommand('seat', {character_id: heroId, look_id: lookId}); };
-    function heroSeats(data) {
-        const seats = arr(data.seats);
-        return kit.seats(arr(data.heroes).map(hero => {
-            const sitter = seats.find(row => row.character_id === hero.id), mine = sitter && sitter.seat === data.self_seat;
-            const look = heroLook(hero, sitter?.look_id), end = [];
-            if (sitter) end.push(kit.tag(mine ? 'ты' : seatName(sitter), {tone: mine ? 'amber' : ''}));
-            else if (data.self_seat) end.push(kit.button('Сесть', () => Promise.resolve(hero.multiple ? (lookPick = hero.id, render()) : takeSeat(hero.id)).catch(fail), {compact: true, disabled: outbox.busy}));
-            const sub = [sitter && !sitter.look_id && hero.multiple ? hero.title : heroLine(look), sitter ? (sitter.ready ? 'готов' : 'ещё не готов') : 'свободно'].filter(Boolean).join(' · ');
-            return {name: sitter?.look_id || !hero.multiple ? look.name || hero.title : hero.title, sub, me: mine, end};
+    const years = age => Number.isInteger(age) ? plural(age, 'год', 'года', 'лет') : '';
+    const ownSeat = data => arr(data?.seats).find(row => row.seat === data.self_seat);
+    const takeSeat = (heroId, lookId = null) => { lookPick = null; pickedLook = null; Q.nav.pop?.('night-case-pick'); return lobbyCommand('seat', {character_id: heroId, look_id: lookId}); };
+    const openPick = hero => { lookPick = hero.id; pickedLook = null; Q.nav.push?.({id: 'night-case-pick', onBack: () => { lookPick = null; render(); return true; }}); render(); };
+    const COLLECTIVE = {2: 'двоих', 3: 'троих', 4: 'четверых', 5: 'пятерых', 6: 'шестерых', 7: 'семерых', 8: 'восьмерых', 9: 'девятерых', 10: 'десятерых'};
+    const FROM = {3: 'трёх', 4: 'четырёх', 5: 'пяти', 6: 'шести', 7: 'семи', 8: 'восьми', 9: 'девяти', 10: 'десяти', 11: 'одиннадцати', 12: 'двенадцати'};
+    const lower = value => text(value).charAt(0).toLocaleLowerCase('ru') + text(value).slice(1);
+    // The portrait of a look from the case pack; a neutral mark when the pack has none.
+    function lookPortrait(look) {
+        const art = assets.get(look?.art?.asset_id);
+        if (!art) return put(el('span', 'blank'), icon('people'));
+        const image = el('img'); image.src = art.url; image.alt = text(look.art?.alt).slice(0, 300) || art.alt || ''; image.loading = 'lazy';
+        return image;
+    }
+    function heroCard(hero, data) {
+        const sitter = arr(data.seats).find(row => row.character_id === hero.id), mine = Boolean(sitter) && sitter.seat === data.self_seat;
+        const looks = arr(hero.looks), chosen = sitter && (sitter.look_id || !hero.multiple), look = chosen ? heroLook(hero, sitter.look_id) : looks[0] || {};
+        const ages = [...new Set(looks.map(row => row.age).filter(Number.isInteger))];
+        const sub = chosen ? [look.name, years(look.age)].filter(Boolean).join(', ')
+            : [ages.length > 1 ? `${ages.slice(0, -1).join(', ')} или ${years(ages.at(-1))}` : years(ages[0]), looks.length > 1 ? plural(looks.length, 'персонаж', 'персонажа', 'персонажей') : ''].filter(Boolean).join(' · ');
+        const pic = put(el('span', 'pic'), lookPortrait(look));
+        if (sitter) {
+            const plate = el('span', 'ncase-plate', mine ? 'ты' : seatName(sitter));
+            if (sitter.ready) plate.prepend(icon('check'));
+            pic.append(plate);
+        }
+        if (mine) pic.append(tick());
+        const card = put(el('button', `ncase-hero${mine ? ' mine' : sitter ? ' taken' : ''}`), pic, put(el('span', 'cap'), el('span', 'nm', hero.title), sub ? el('span', 'sub', sub) : null));
+        card.type = 'button';
+        card.setAttribute('aria-label', [hero.title, sub, sitter ? `${mine ? 'твоё место' : 'занято: ' + seatName(sitter)}${sitter.ready ? ', готовность подтверждена' : ''}` : 'свободно'].filter(Boolean).join(' · '));
+        if (mine) card.setAttribute('aria-pressed', 'true');
+        // A free hero seats a joined player who is not yet ready; a taken one is closed; the own seat reopens the pick when the hero has several characters.
+        const open = Boolean(data.self_seat) && !ownSeat(data)?.ready;
+        const go = !open ? null : !sitter ? () => hero.multiple ? openPick(hero) : takeSeat(hero.id) : mine && hero.multiple ? () => openPick(hero) : null;
+        card.disabled = !go && !mine || outbox.busy;
+        if (go) card.addEventListener('click', () => Promise.resolve(go()).catch(fail));
+        return card;
+    }
+    function anySeat(data) {
+        const here = arr(data.seats).filter(row => !row.character_id), mine = here.some(row => row.seat === data.self_seat);
+        const back = kit.art?.('card_back_role'), image = back ? el('img') : put(el('span', 'blank'), icon('people'));
+        if (back) { image.src = back; image.alt = ''; }
+        const who = here.length ? `Здесь: ${here.map(row => row.seat === data.self_seat ? 'ты' : seatName(row)).join(', ')}.` : '';
+        const end = mine ? kit.tag('ты здесь', {tone: 'amber'}) : data.self_seat && !ownSeat(data)?.ready ? kit.button('Сесть', () => takeSeat(null).catch(fail), {compact: true, disabled: outbox.busy}) : null;
+        return put(el('div', 'ncase-anyseat'), image, put(el('div'), el('strong', null, 'Любое свободное место'), el('span', 'nc-muted', ['Персонажа выберет игра при старте.', who].filter(Boolean).join(' '))), end);
+    }
+    function npcRow(data) {
+        const npcs = arr(data.npc_heroes);
+        if (!npcs.length) return null;
+        const faces = put(el('span', 'faces'), ...npcs.map(row => {
+            const art = assets.get(row.art?.asset_id);
+            if (!art) return put(el('span', 'ncase-face xs blank'), icon('people'));
+            const image = el('img', 'ncase-face xs'); image.src = art.url; image.alt = ''; image.loading = 'lazy'; return image;
         }));
+        const names = npcs.map(row => lower(row.title)), shown = names.length > 5 ? [...names.slice(0, 4), 'другие'] : names;
+        const list = shown.length > 1 ? `${shown.slice(0, -1).join(', ')} и ${shown.at(-1)}` : shown[0];
+        return put(el('div', 'ncase-never'), faces, el('span', 'nc-muted', `${npcs.length === 1 ? 'Этого персонажа' : `Этих ${COLLECTIVE[npcs.length] || npcs.length}`} всегда ведёт игра: ${list}.`));
+    }
+    // «GMT+3» of a zone, or nothing when the runtime cannot name it.
+    function zoneOffset(zone) {
+        try { return new Intl.DateTimeFormat('en', {timeZone: zone, timeZoneName: 'shortOffset'}).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value || ''; }
+        catch { return ''; }
+    }
+    function windowsCard(data) {
+        const slots = arr(data.windows?.slots), count = Number(data.windows?.count) || 14, zone = text(data.timezone) || 'UTC', offset = zoneOffset(zone);
+        const when = slots.length === 2 ? `Утро в ${slots[0]}, вечер в ${slots[1]}` : slots.length ? `Окна открываются в ${slots.join(', ')}` : 'Окна открываются утром и вечером';
+        return kit.panel({icon: 'calendar', title: 'Окна дела'}, el('p', 'nc-lead', `${when} по поясу ${zone}${offset && offset !== 'GMT' ? ` (${offset})` : ''}.`),
+            p(`Пояс задал хозяин стола, когда собирал его. Неделя — ${plural(count, 'окно', 'окна', 'окон')}.`));
     }
     function openLobby() {
-        const data = view.lobby, seats = arr(data.seats), own = seats.find(row => row.seat === data.self_seat);
-        const counts = arr(data.allowed_counts), lo = counts[0] || 3, hi = counts.at(-1) || 12;
-        const anyone = seats.filter(row => !row.character_id);
-        const name = field('Имя в этой партии', own?.name || '');
+        const data = view.lobby, seats = arr(data.seats), mine = ownSeat(data), owner = room?.role === 'owner';
+        const counts = arr(data.allowed_counts), lo = counts[0] || 3;
+        const ready = seats.filter(row => row.ready).length, free = arr(data.heroes).filter(hero => !seats.some(row => row.character_id === hero.id)).length;
+        const name = field('Имя в этой партии', mine?.name || '');
         const address = choose('Как обращаться в этой партии', [{id: 'n', label: 'Без рода'}, {id: 'm', label: 'Он'}, {id: 'f', label: 'Она'}], data.self?.address_form || 'n');
-        const picking = arr(data.heroes).find(hero => hero.id === lookPick);
-        const ownHero = arr(data.heroes).find(hero => hero.id === own?.character_id);
-        const ownLine = !own ? '' : ownHero ? `Ты играешь: ${heroLook(ownHero, own.look_id).name || ownHero.title}${own.look_id || !ownHero.multiple ? '' : ' (облик выберет игра)'}.`
-            : 'Ты на любом свободном месте — героя выберет игра при старте.';
-        const buttons = own ? [button(own.ready ? 'Изменить имя и готовность' : 'Я готов', () => lobbyCommand('ready', {name: name.input.value, address_form: address.input.value, ready: !own.ready})),
-            ...(own.character_id ? [button('Встать — любое свободное место', () => takeSeat(null))] : []),
-            ...(data.can_start ? [button('Начать дело', () => startGame(), 'primary')] : [])] : [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')];
-        return [kit.scene({slot: 'lobby', title: data.case?.title || 'Собираем стол',
-                text: `За столом ${seats.length}. Играть можно от ${lo} до ${hi}: невзятых героев ведёт игра. Выбери героя или садись на любое свободное место; кто злодей, решит только правда дела.`}),
-            ...(picking ? [panel(`Облик: ${picking.title}`, p('Выбери, каким будет этот герой.'), kit.stack(...arr(picking.looks).map(look => button(heroLine({...look, title: look.name || look.title}) || look.id, () => takeSeat(picking.id, look.id))),
-                button('Любой облик', () => takeSeat(picking.id)), button('Отмена', () => { lookPick = null; render(); }, 'text')))] : []),
-            panel('Места за столом', heroSeats(data), anyone.length ? p(`На любом свободном месте: ${anyone.map(row => row.seat === data.self_seat ? 'ты' : seatName(row)).join(', ')}.`) : null),
-            narratorLobby(),
-            panel('Твоё место', ...(own ? [p(ownLine), name.node, address.node] : []), kit.stack(...buttons)),
-            ...(room?.role === 'owner' ? [invitePanel()] : []),
-            ...(own ? [panel('Выход', kit.stack(button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')))] : [])];
+        if (mine?.ready) { name.input.disabled = true; address.input.disabled = true; }
+        lobbyFields = {name: name.input, address: address.input};
+        const scene = kit.scene({slot: 'lobby', size: 'short', eyebrow: `Сбор открыт · за столом ${seats.length}`, title: `Готовы ${ready} из ${seats.length}`,
+            text: `Выбери персонажа или садись на любое свободное место. Начать можно с ${FROM[lo] || lo} игроков: невзятых персонажей поведёт игра.`,
+            bar: kit.track({total: seats.length, taken: seats.length, ready, label: `Готовы ${ready} из ${seats.length}`})});
+        const table = kit.panel({icon: 'people', title: 'Места за столом', count: `свободно ${free}`, cls: 'nc-span'},
+            put(el('div', 'ncase-heroes'), ...arr(data.heroes).map(hero => heroCard(hero, data))), anySeat(data), npcRow(data));
+        const place = mine ? kit.panel({icon: 'seal', title: 'Как тебя звать'}, p(mine.ready ? 'Готовность подтверждена. Чтобы сменить имя или место, сними её.' : 'Имя и обращение видят все за столом. Потом подтверди готовность внизу.'), name.node, address.node) : null;
+        const leave = mine ? put(el('div', 'qw-danger-zone'), button('Покинуть сбор', () => { proposal = {leaveLobby: true, label: 'Покинуть сбор игроков?'}; render(); }, 'danger')) : null;
+        return [scene, table, put(el('div', 'nc-col'), place, narratorLobby()), put(el('div', 'nc-col'), owner ? invitePanel() : null, windowsCard(data), leave)];
+    }
+    // The ready toggle sits in the dock and reads the fields of «Как тебя звать» from main.
+    let lobbyFields = null;
+    function lobbyDock() {
+        const data = view.lobby, mine = ownSeat(data), owner = room?.role === 'owner';
+        if (!mine) return kit.dock({hint: 'Ты ещё не за столом', buttons: [button('Присоединиться к столу', () => lobbyCommand('join'), 'primary')]});
+        const hero = arr(data.heroes).find(row => row.id === mine.character_id), form = data.self?.address_form || 'n';
+        const look = hero && (mine.look_id || !hero.multiple) ? heroLook(hero, mine.look_id) : null;
+        const who = !hero ? 'Ты на любом свободном месте' : `Ты — ${hero.title}${look ? [look.name ? ', ' + look.name : '', Number.isInteger(look.age) ? ', ' + years(look.age) : ''].join('') : ' (персонажа выберет игра)'}`;
+        const state = mine.ready ? (form === 'f' ? 'готова' : form === 'm' ? 'готов' : 'готовность подтверждена') : form === 'f' ? 'ещё не готова' : form === 'm' ? 'ещё не готов' : 'готовность не подтверждена';
+        const readyLabel = mine.ready ? 'Снять готовность' : form === 'f' ? 'Я готова' : 'Я готов';
+        const buttons = [button(readyLabel, () => lobbyCommand('ready', {name: lobbyFields?.name.value ?? mine.name ?? '', address_form: lobbyFields?.address.value || form, ready: !mine.ready}), owner ? 'secondary' : 'primary')];
+        if (owner) { const start = button('Начать дело', () => startGame(), 'primary'); start.disabled = start.disabled || !data.can_start; buttons.push(start); }
+        return kit.dock({layout: 'row', hint: [who, state, owner ? 'ты хозяин стола' : ''].filter(Boolean).join(' · '), buttons});
+    }
+    let pickedLook = null;
+    function pickScreen(hero) {
+        const looks = arr(hero.looks), mine = ownSeat(view.lobby), current = mine?.character_id === hero.id ? mine.look_id : null;
+        if (!looks.some(look => look.id === pickedLook)) pickedLook = current || looks[0]?.id || null;
+        const cards = looks.map(look => {
+            const he = look.gender === 'f' ? 'она' : look.gender === 'm' ? 'он' : '';
+            const card = put(el('button', 'ncase-look'), put(el('span', 'pic'), lookPortrait(look), look.id === pickedLook ? tick() : null),
+                put(el('span', 'cap'), el('span', 'nm', [look.name || look.title, Number.isInteger(look.age) ? look.age : ''].filter(Boolean).join(', ')),
+                    el('span', 'sub', [he, lower(look.title || hero.title)].filter(Boolean).join(' · '))));
+            card.type = 'button'; card.setAttribute('aria-pressed', String(look.id === pickedLook));
+            card.addEventListener('click', () => { pickedLook = look.id; render(); });
+            return card;
+        });
+        const about = bodyText(heroLook(hero, pickedLook).public);
+        return [kit.panel({cls: 'nc-span'}, el('span', 'nc-eyebrow', `Место «${hero.title}» · ${plural(looks.length, 'персонаж', 'персонажа', 'персонажей')}`), el('h2', 'nc-h3', 'Кого ты играешь?'),
+            p(`Роль в деле одна, персонажи разные: своё имя, возраст, портрет и обращение.${about ? ' ' + about : ''}`), put(el('div', 'ncase-looks'), ...cards))];
+    }
+    function pickDock(hero) {
+        const look = heroLook(hero, pickedLook), any = arr(hero.looks).length === 2 ? 'Любой из двух' : 'Любой из них';
+        return kit.dock({layout: 'row', buttons: [button(any, () => takeSeat(hero.id)), button(`Сесть: ${look.name || look.title || hero.title}`, () => takeSeat(hero.id, look.id), 'primary')]});
     }
     function lobby() {
         if (view.lobby?.seating === 'open') return openLobby();
@@ -1208,6 +1300,11 @@ function open(options) {
         }
         if (view.lobby) {
             const extra = proposal?.leaveLobby ? panel(proposal.label, kit.row(button('Остаться', () => { proposal = null; render(); }), button('Покинуть', () => lobbyCommand('leave'), 'danger'))) : confirmation();
+            const open = view.lobby.seating === 'open', gathering = `Сбор · ${room?.title || 'компания'}`;
+            const picking = open && view.lobby.self_seat && !ownSeat(view.lobby)?.ready ? arr(view.lobby.heroes).find(hero => hero.id === lookPick && hero.multiple) : null;
+            if (!picking && lookPick) { lookPick = null; Q.nav.pop?.('night-case-pick'); }
+            if (picking) return frame([...pickScreen(picking), extra].filter(Boolean), `${picking.title}: кого играешь`, gathering, pickDock(picking));
+            if (open) return frame([...openLobby(), extra].filter(Boolean), view.lobby.case?.title || 'Сбор игроков', gathering, lobbyDock());
             frame([...lobby(), extra].filter(Boolean), view.lobby.case?.title || 'Сбор игроков'); return;
         }
         if (!view.self) return frame([panel('Дело недоступно', p('Твоё участие не найдено. Вернись к списку компаний.'))]);
@@ -1250,7 +1347,7 @@ function open(options) {
         view = proposal = room = game = boot = invitation = null; ownDraft = ''; recipients = [];
         outbox.clear(); cursors.clear(); for (const page of Object.values(pages)) page.items.length = 0;
         assets.clear(); assetWorld = null; worldPack = null;
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); kit.useWorld(null); document.documentElement.classList.remove('nc');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); kit.useWorld(null); document.documentElement.classList.remove('nc');
     }
     active = {close, refresh};
     document.documentElement.classList.add('nc');

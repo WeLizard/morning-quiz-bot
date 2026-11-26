@@ -530,6 +530,7 @@ class NightCaseApplicationService:
         view={'game_id':locked.game.id,'mode':'night_case',
             'case':{'id':locked.sealed.case_id,'version':locked.sealed.version,'title':lobby['title']},
             'timezone':locked.sealed.rules['timezone'],'status':locked.sealed.lifecycle,
+            'windows':{'slots':list(locked.sealed.rules.get('slots') or []),'count':locked.sealed.rules.get('window_count')},
             'lobby_revision':lobby['revision'],'seats':[{k:r[k] for k in seat_keys} for r in lobby['roster']],
             'self_seat':own['seat'] if own else None,
             'self':{k:own[k] for k in ('name','address_form','ready')} if own else None,
@@ -538,7 +539,11 @@ class NightCaseApplicationService:
             and len(lobby['roster']) in lobby['allowed_counts'] and all(r['ready'] for r in lobby['roster'])}
         if open_seating:
             view['seating']='open'
-            if case is not None: view['heroes']=_lobby_heroes(case.readonly())
+            if case is not None:
+                view['heroes']=_lobby_heroes(case.readonly())
+                # Heroes the game always plays (never a seat): only their title and public portrait.
+                view['npc_heroes']=[{'id':c['id'],'title':c['title'],'art':copy.deepcopy(looks_of(c)[0].get('art'))}
+                    for c in case.readonly()['characters'] if not c['can_be_player']]
         return view
 
     async def _create_prior(self,room_id,aliases,command_id,fingerprint):
@@ -988,8 +993,14 @@ class NightCaseApplicationService:
         if locked.sealed.lifecycle=='lobby':
             case,rules=await self._load_case(locked.sealed)
             self._checked_lobby(locked.sealed,case,rules)
+            # The lobby is dressed like the case: the world pack and the case's public pictures (portraits of
+            # the heroes and their looks). Nothing of the truth: the pack holds no finales (they are sealed).
+            meta=case.readonly()['meta']
+            try: art=await self._art(locked.sealed,case)
+            except NightCaseError: art=None   # no binding: the lobby is simply drawn without pictures
+            public={'world':copy.deepcopy(meta.get('world')),'style_pack':copy.deepcopy(meta.get('style_pack')),'art':art}
             return {'game_id':game_id,'mode':'night_case','lobby':self._lobby_view(locked,account.id,case),
-                'public':{},'self':None,'menu':[],'server_now':_stamp(now),'runtime_status':'ok'},locked
+                'public':public,'self':None,'menu':[],'server_now':_stamp(now),'runtime_status':'ok'},locked
         case,rules,state=await self._runtime(locked)
         original=selected if selected is not None else account.id if account.id in aliases else sorted(aliases,key=str)[0]
         player=next(p for p in state.players if p['account_id']==str(original))

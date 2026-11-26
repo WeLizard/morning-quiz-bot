@@ -765,3 +765,93 @@ test('the ⚙ menu has glyphs and switches music through the account preference,
     assert.equal(fixture.zoneApi.get().gamePreferences.music, false);
     fixture.handle.close();
 });
+
+/* Mockup screens 4–5: the free-seating lobby draws seats as hero portraits and a hero with several characters opens its own pick. */
+function openLobbyFixture() {
+    const crypto = require('node:crypto');
+    const sort = value => Array.isArray(value) ? value.map(sort) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sort(value[key])])) : value;
+    const ids = ['housekeeper', 'housekeeper__f62', 'investigator', 'host'];
+    const manifest = {schema: 'nc-assets/2', world: 'manor_lake', files: Object.fromEntries(ids.map((name, i) => [`assets/character_${name}.webp`, String(i + 1).repeat(64)])),
+        assets: Object.fromEntries(ids.map(name => [`manor_char_${name}`, {url: `assets/character_${name}.webp`, alt: name}]))};
+    const digest = crypto.createHash('sha256').update(JSON.stringify(sort(manifest))).digest('hex'), pointer = `/app/night/packs/${digest}/assets.json`;
+    const state = {game_id: 'game', mode: 'night_case', server_now: '2026-11-26T10:00:00Z', runtime_status: 'ok',
+        public: {world: 'manor_lake', style_pack: null, art: {manifest_sha256: digest, manifest_url: pointer}},
+        lobby: {lobby_revision: 7, seating: 'open', case: {title: 'Усадьба'}, timezone: 'Europe/Moscow', windows: {slots: ['09:00', '19:00'], count: 14},
+            allowed_counts: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12], can_start: false, self_seat: '1', self: {name: 'Вера', address_form: 'f', ready: false},
+            seats: [{seat: '1', name: 'Вера', ready: false, character_id: null, look_id: null}, {seat: '2', name: 'Нина', ready: true, character_id: 'investigator', look_id: null}],
+            heroes: [{id: 'housekeeper', title: 'Экономка', multiple: true, looks: [
+                {id: 'base', gender: 'f', age: 47, title: 'Экономка', name: 'Агата Карловна Линд', art: {asset_id: 'manor_char_housekeeper', alt: 'Портрет: Экономка'}, public: {text: 'Ключи от всего дома носит на поясе.'}},
+                {id: 'f62', gender: 'f', age: 62, title: 'Экономка', name: 'Марфа Савельевна Тюрина', art: {asset_id: 'manor_char_housekeeper__f62', alt: 'Портрет: Экономка'}}]},
+                {id: 'investigator', title: 'Следователь', multiple: false, looks: [{id: 'base', gender: 'm', age: 40, title: 'Следователь', name: 'Карл Ээрола', art: {asset_id: 'manor_char_investigator'}}]}],
+            npc_heroes: [{id: 'host', title: 'Хозяин усадьбы', art: {asset_id: 'manor_char_host'}}, {id: 'hunter', title: 'Охотник', art: null}]}};
+    return {state, manifest, pointer};
+}
+const nodesOf = (host, test) => { const out = []; const walk = node => { if (node instanceof Node) { if (test(node)) out.push(node); node.children.forEach(walk); } }; walk(host); return out; };
+const heroCards = host => nodesOf(host, node => /^ncase-hero\b/.test(node.className));
+
+test('the lobby seats are hero portraits with the player plate, the ready bar and who the game always plays (mockup 4)', async () => {
+    const {state, manifest, pointer} = openLobbyFixture();
+    const fixture = controller(state, url => url === pointer ? manifest : undefined); await settle();
+    const text = fixture.host.textContent;
+    assert.match(text, /Сбор открыт · за столом 2/);
+    assert.match(text, /Готовы 1 из 2/);
+    assert.equal(find(fixture.host, node => node.className === 'nc-track')?.dataset.ready, '1');
+    const [housekeeper, investigator] = heroCards(fixture.host);
+    assert.match(housekeeper.textContent, /Экономка/);
+    assert.match(housekeeper.textContent, /47 или 62 года · 2 персонажа/);
+    assert.match(find(housekeeper, node => node.tagName === 'img').src, /character_housekeeper\.webp$/);
+    assert.equal(housekeeper.disabled, false);
+    // A seat another player took carries their plate and is closed.
+    assert.equal(investigator.className, 'ncase-hero taken');
+    assert.equal(investigator.disabled, true);
+    assert.match(find(investigator, node => node.className === 'ncase-plate').textContent, /Нина/);
+    assert.match(investigator.textContent, /Карл Ээрола, 40 лет/);
+    assert.match(text, /Любое свободное место/);
+    assert.match(text, /Здесь: ты\./);
+    assert.match(text, /Этих двоих всегда ведёт игра: хозяин усадьбы и охотник\./);
+    assert.match(text, /Утро в 09:00, вечер в 19:00 по поясу Europe\/Moscow/);
+    assert.match(text, /Неделя — 14 окон/);
+    const dock = find(fixture.host, node => node.className === 'nc-dock');
+    assert.match(dock.textContent, /Ты на любом свободном месте · ещё не готова · ты хозяин стола/);
+    assert.ok(find(dock, node => node.tagName === 'button' && node.textContent === 'Начать дело'));
+    assert.doesNotMatch(text, /облик/i);
+    fixture.handle.close();
+});
+
+test('a hero with two characters opens the pick: two portraits, «Любой из двух» and «Сесть: имя» (mockup 5)', async () => {
+    const {state, manifest, pointer} = openLobbyFixture(), stack = [];
+    const nav = {push(entry) { stack.push(entry); }, pop(id) { const at = stack.findIndex(entry => entry.id === id); if (at >= 0) stack.splice(at, 1); }};
+    const fixture = controller(state, url => url === pointer ? manifest : url.endsWith('/seat') ? {receipt: {accepted: true}} : undefined, {nav}); await settle();
+    await heroCards(fixture.host)[0].click(); await settle();
+    const text = fixture.host.textContent;
+    assert.match(text, /Место «Экономка» · 2 персонажа/);
+    assert.match(text, /Кого ты играешь\?/);
+    assert.match(text, /Ключи от всего дома носит на поясе\./);
+    assert.ok(stack.some(entry => entry.id === 'night-case-pick'));
+    const looks = nodesOf(fixture.host, node => node.className === 'ncase-look');
+    assert.equal(looks.length, 2);
+    assert.match(looks[1].textContent, /Марфа Савельевна Тюрина, 62/);
+    assert.match(looks[1].textContent, /она · экономка/);
+    assert.equal(looks[0].attrs['aria-pressed'], 'true');
+    assert.ok(find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Любой из двух'));
+    await looks[1].click(); await settle();
+    const sit = find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Сесть: Марфа Савельевна Тюрина');
+    assert.ok(sit);
+    await sit.click(); await settle();
+    const seat = fixture.calls.find(call => call.url.endsWith('/seat'));
+    assert.deepEqual(JSON.parse(JSON.stringify(seat.body.params)), {character_id: 'housekeeper', look_id: 'f62'});
+    assert.equal(seat.body.expected_lobby_revision, 7);
+    assert.ok(!stack.some(entry => entry.id === 'night-case-pick'));
+    assert.doesNotMatch(text, /облик/i);
+    fixture.handle.close();
+});
+
+test('the ready toggle in the dock sends the name and address typed in the lobby', async () => {
+    const {state, manifest, pointer} = openLobbyFixture();
+    const fixture = controller(state, url => url === pointer ? manifest : url.endsWith('/ready') ? {receipt: {accepted: true}} : undefined); await settle();
+    find(fixture.host, node => node.attrs?.['aria-label'] === 'Имя в этой партии').value = 'Вера К.';
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Я готова').click(); await settle();
+    const ready = fixture.calls.find(call => call.url.endsWith('/ready'));
+    assert.deepEqual(JSON.parse(JSON.stringify(ready.body.params)), {name: 'Вера К.', address_form: 'f', ready: true});
+    fixture.handle.close();
+});

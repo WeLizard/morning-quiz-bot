@@ -91,6 +91,7 @@
     loadTelegramSdk();
     function platform() { return isTelegram() ? (tg().platform || 'unknown') : 'browser'; }
     function versionAtLeast(version) { return Boolean(call(() => tg()?.isVersionAtLeast?.(version))); }
+    function telegramFullscreenPhone() { return isTelegram() && MOBILE_PLATFORMS.has(tg().platform) && Boolean(tg().isFullscreen); }
     function isDesktop() { return root.classList.contains('qw-desktop') || matchMedia('(min-width: 1024px)').matches; }
     const readVar = name => getComputedStyle(root).getPropertyValue(name).trim();
 
@@ -293,6 +294,7 @@
     };
     function onViewportChange() {
         writeInsets();
+        syncBack();   // entering or leaving fullscreen shows or hides the on-screen ‹ (telegramFullscreenPhone)
         call(() => config.onResize?.());
         if (menu.isOpen()) renderMenu();
     }
@@ -309,8 +311,10 @@
         const depth = stack.length;
         const showTelegram = depth > 0 || Boolean(rootBack) || config.mode === 'game';
         if (isTelegram()) call(() => showTelegram ? tg().BackButton.show() : tg().BackButton.hide());
-        // The on-screen ‹ exists only outside Telegram and only on a nested screen.
-        for (const button of backButtons) button.hidden = isTelegram() || !(depth > 0 || (rootBack && rootOnScreen));
+        // The on-screen ‹ is for nested screens. Inside Telegram the BackButton in Telegram's header does that job, except in
+        // fullscreen on a phone: there Telegram shows only «Закрыть» and no «Назад» (Android, 2026-11-26), so ‹ is drawn too.
+        const ownBack = !isTelegram() || telegramFullscreenPhone();
+        for (const button of backButtons) button.hidden = !ownBack || !(depth > 0 || (rootBack && rootOnScreen));
     }
     function removeEntry(entry, fromPopstate) {
         const index = stack.indexOf(entry);
@@ -419,7 +423,7 @@
             gears.add(button);
             return button;
         },
-        /** Prepends ‹ (browser only, nested screens only). */
+        /** Prepends ‹ (nested screens only; inside Telegram only in fullscreen on a phone, see syncBack). */
         mountBack(container) {
             const button = iconButton('qw-back', 'back', 'Назад');
             button.addEventListener('click', () => nav.back());

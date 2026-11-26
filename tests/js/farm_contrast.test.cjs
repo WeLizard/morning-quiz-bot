@@ -67,7 +67,7 @@ test('authenticated farm delegates visual preferences to profile and responds to
  assert.doesNotMatch(app,/farm-contrast-mode|saveFarmContrast|farmContrastEpoch|farmContrastPending/);
  assert.match(settings,/if\(!globalThis\.QW\?\.prefs\?\.hasAccount\?\.\(\)\)\{/);
  assert.match(app,/addEventListener\?\.\('qw:game-preferences',syncFarmMotion\)/);
- const html=read('qw_farm/static/index.html');assert.match(html,/qw-shell\.js\?v=20261124-account-game-preferences/);assert.match(html,/qw-shell\.css\?v=20261124-account-game-preferences/);assert.match(html,/farm\/assets\/app\.js\?v=[\w-]+"/);
+ const html=read('qw_farm/static/index.html');const shellJs=h=>(h.match(/qw-shell\.js\?v=([\w-]+)/)||[])[1];assert.ok(shellJs(html),'the farm loads the shared shell with a version');assert.equal(shellJs(html),shellJs(read('web/mini_client/index.html')),'the farm and the hub load the same shell version');assert.match(html,/qw-shell\.css\?v=20261124-account-game-preferences/);assert.match(html,/farm\/assets\/app\.js\?v=[\w-]+"/);
 });
 test('refresh applies a new farm upkeep catalog revision and redraws the open view without changing selection',async()=>{
  const source=read('qw_farm/static/app.js'),own={id:'farm-a',server_time:100},oldCatalog={economy:{upkeep_revision:4,building_rate_pct:1}},nextCatalog={economy:{upkeep_revision:5,building_rate_pct:3}};

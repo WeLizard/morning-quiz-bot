@@ -1,5 +1,5 @@
 'use strict';
-// «Ночной город»: the music player of the client kit (off by default, track by phase, crossfades, pause in a hidden tab, silent on errors)
+// «Ночной город»: the music player of the client kit (on and quiet by default, track by phase, crossfades, pause in a hidden tab, silent on errors)
 // and the shipped music files. The player runs in a vm with fake <audio> elements and a manual clock; no browser.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -55,17 +55,25 @@ const pack = (id, slots, v = 'abc123') => ({id, v, music: Object.fromEntries(slo
 const PACKS = {manor_lake: pack('manor_lake', ['day', 'night', 'finale']), neon_city: pack('neon_city', ['day', 'finale'])};
 const url = (world, slot) => `/app/night/worlds/${world}/music_${slot}.m4a?v=abc123`;
 
-test('music is off by default: nothing is fetched or played until the player turns it on', () => {
+test('music is on by default and quiet (15 %), but waits for the first tap; a saved «off» stays off', () => {
     const p = player({packs: PACKS});
-    assert.equal(p.music.enabled, false);
-    p.music.follow({shell: true});
+    assert.equal(p.music.enabled, true);
+    assert.equal(p.music.volume, 0.15);
     p.music.follow({world: 'manor_lake', status: 'night'});
+    p.advance(1);
+    assert.equal(p.audios.length, 0, 'nothing plays before a user action');
     p.gesture();
     p.advance(3);
-    assert.equal(p.audios.length, 0, 'no <audio> element is even created');
-    assert.equal(p.store['nc-music'], undefined, 'nothing is written to storage by merely looking');
+    assert.equal(p.audios[0].src, url('manor_lake', 'night'));
+    assert.ok(Math.abs(p.audios.find(audio => !audio.paused).volume - 0.0225) < 0.001, 'level is 15 % squared');
+    assert.equal(p.store['nc-music'], undefined, 'nothing is written to storage by merely listening');
     const broken = player({saved: 'not json'});
-    assert.equal(broken.music.enabled, false);
+    assert.equal(broken.music.enabled, true);
+    const off = player({saved: {on: false, vol: 0.4}, packs: PACKS});
+    off.music.follow({world: 'manor_lake', status: 'night'});
+    off.gesture();
+    off.advance(3);
+    assert.equal(off.audios.length, 0, 'the player who turned it off hears nothing');
 });
 
 test('account preferences override the old local choice, wait for a gesture, and fade out', () => {
@@ -162,7 +170,7 @@ test('sound waits for a tap when it was on last time', () => {
 test('a change of track is a smooth 1.5 s crossfade, not a cut', () => {
     const p = player({packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'day'});
-    p.music.applyPreferences({music: true});
+    p.music.applyPreferences({music: true, music_volume: 70});
     p.gesture();
     p.advance(2);
     const day = p.audios[0];
@@ -181,7 +189,7 @@ test('a change of track is a smooth 1.5 s crossfade, not a cut', () => {
 test('a loop is crossfaded with itself 2.5 s before its end: no gap, no pile-up', () => {
     const p = player({packs: PACKS});
     p.music.follow({world: 'manor_lake', status: 'day'});
-    p.music.applyPreferences({music: true});
+    p.music.applyPreferences({music: true, music_volume: 70});
     p.gesture();
     p.advance(2);
     const first = p.audios[0];

@@ -617,8 +617,8 @@ kit.chat = ({title = 'Обсуждение', count = 'видят все за с�
 };
 
 /* --- music (docs/tasks/night_city/MUSIC_BRIEF.md §4) ---
-   Off by default; the ⚙ menu has «Музыка» (on / off) and «Громкость музыки»; both are kept in localStorage (try / catch: no storage → defaults).
-   Sound starts only after a user action: the menu tap itself, or, when it was on last time, the first tap anywhere.
+   On by default at 15 % (owner, MQB-012 B2); the ⚙ menu has «Музыка» (on / off) and «Громкость музыки»; both are kept in localStorage (try / catch: no storage → defaults).
+   Sound starts only after a user action: the menu tap itself, or, while it is on, the first tap anywhere.
    Track by place: the shell → one of the shell themes (random per session); a table → the world pack's `music`:
    lobby, day, voting → day; night → night (no night → day); the final → finale once, then silence (no finale → day).
    A loop is crossfaded with itself (two <audio> elements, 2.5 s, equal power) so there is no audible seam; a change of
@@ -639,7 +639,7 @@ kit.musicSlot = (music, status) => {
 
 /** The player; `env` carries the platform (tests give fakes). */
 function createMusic(env) {
-    const prefs = {on: false, vol: 0.7};
+    const prefs = {on: true, vol: 0.15};                      // owner's call (MQB-012 B2): on, quiet; a gesture still unlocks it
     try {
         const saved = JSON.parse(env.storage()?.getItem(MUSIC_KEY) || 'null');
         if (saved && typeof saved === 'object') {

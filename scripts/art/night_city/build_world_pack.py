@@ -36,12 +36,37 @@ CANON = ROOT / 'docs/tasks/night_city/worlds/canon'
 TIMES = ['morning', 'day', 'evening', 'night']
 PREVIEW_WORLDS = ['manor_lake', 'neon_city', 'circus']
 SCHEMA = 'nc-world-pack/1'
-MANOR_CASE_CANONICAL_SHA256 = 'b13ee4a05aef436603940643c20547f8d3db8dad4b7f53bc6d4b26b9d658766d'
+MANOR_CASE_CANONICAL_SHA256 = '4c8a5f882beafd02104d0a623aec3996cf9dec8b9677b42103fa383add717728'
 MANOR_LOOKS = 20                                  # extra appearance portraits from characters_variants/
 MANOR_SCENES = 6                                  # public event scenes from scenes_events/
-MANOR_SEALED = 3                                  # per-variant finales: withheld from the pack until the final
-MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS + MANOR_SCENES              # characters, locations, looks, scenes
-MANOR_WEBPS = 20 + 8 * 4 + 81 + MANOR_LOOKS + MANOR_SCENES        # portraits, place times, items, looks, scenes
+MANOR_SEALED = 5                                  # per-variant finales: withheld from the pack until the final
+MANOR_CASE_VERSION = 5
+# Case item -> source picture under the style pack (MANOR_V5_PLOT.md section 4). Every authored item has one.
+MANOR_ITEM_SOURCES = {
+    'service_key': 'items/i_S1_06_tagged_key.png', 'housekeeper_keys': 'items/i_S1_03_key_ring.png',
+    'will_draft': 'items/i_C1_01_rolled_will.png', 'official_folder': 'items_states/i_states_05_two_versions.png',
+    'will_register': 'items/i_S7_06_closed_book.png', 'burnt_corner': 'items/i_C1_02_singed_will_fragment.png',
+    'lawyer_seal': 'items/i_C1_03_lawyer_seal_and_wax.png', 'masonry_plan': 'items/i_C2_05_secret_compartment_book.png',
+    'key_ledger': 'items/i_S2_06_ledger_page.png', 'lawyer_receipt': 'items/i_S2_07_ticket.png',
+    'bolt_note': 'items/i_S2_02_folded_letter.png', 'hunting_horn': 'items/i_C1_06_hunting_horn.png',
+    'rope_scrap': 'items/i_S7_04_rope_coil.png', 'duty_roster': 'items_states/i_states_04_card_drawer.png',
+    'owner_letter': 'items/i_S2_01_paper_fragment.png', 'owner_calendar': 'items/i_C2_09_pocket_calendar.png',
+    'photo_plate': 'items/i_C1_07_old_camera.png', 'invitation': 'items/i_S2_03_sealed_envelope.png',
+    'invitation_order': 'items/i_S3_02_cracked_wax_seal.png', 'rights_appendix': 'items/i_S1_08_locked_box.png',
+    'hall_clock': 'items/i_S7_09_mantel_clock.png', 'regimen_papers': 'items/i_S3_08_ink_blot.png',
+    'extra_plate': 'items/i_S6_01_teacup_saucer.png', 'cash_box': 'items/i_S1_09_combination_safe.png',
+    'scarf': 'items/i_S7_03_scarf.png', 'held_letter': 'items/i_S3_01_intact_wax_seal.png',
+    'deck': 'items/i_C1_04_playing_cards.png', 'brooch': 'items/i_S4_05_brooch.png',
+    'diary': 'items/i_S7_07_locked_diary.png', 'owl_cane': 'items_props/i_prop_owl_cane.png',
+    'carbon_paper': 'items/i_C2_01_carbon_paper.png', 'yarn_ball': 'items_props/i_prop_yarn_ball.png',
+    'secateurs': 'items_props/i_prop_secateurs.png', 'boathouse_padlock': 'items/i_S1_04_padlock.png',
+    'heraldic_letter': 'items/i_C2_02_heraldic_envelope.png', 'butler_postbook': 'items/i_S5_05_notebook.png',
+    'letter_salver': 'items_states/i_states_06_letter_salver.png', 'closet_key': 'items/i_S4_01_round_glasses.png',
+    'unsigned_will': 'items_states/i_states_08_pen_notebook.png',
+}
+MANOR_ITEMS = len(MANOR_ITEM_SOURCES)
+MANOR_ART_REFS = 20 + 8 + MANOR_LOOKS + MANOR_SCENES + MANOR_ITEMS            # characters, locations, looks, scenes, items
+MANOR_WEBPS = 20 + 8 * 4 + MANOR_ITEMS + MANOR_LOOKS + MANOR_SCENES          # portraits, place times, items, looks, scenes
 SCENE_GROUPS = {'events': 'scene_'}               # public case group -> source file prefix
 SEALED_GROUPS = {'variants': 'scene_final_'}      # sealed case group -> source file prefix
 SEALED_DIR = ROOT / 'web/mini_client/night/sealed'  # served as /app/night/sealed/<sha256>.webp, listed nowhere
@@ -663,14 +688,22 @@ def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEA
     if len(sealed) != MANOR_SEALED:
         raise SystemExit(f'manor_lake case must have {MANOR_SEALED} sealed finale pictures, found {len(sealed)}')
 
-    item_paths = sorted((source.dir / 'items').glob('i_*.png'))
-    if len(item_paths) != 81:
-        raise SystemExit(f'expected 81 individual Manor item PNGs, found {len(item_paths)}')
+    case_items = case.get('items', [])
+    if {i.get('id') for i in case_items} != set(MANOR_ITEM_SOURCES) or len(case_items) != MANOR_ITEMS:
+        raise SystemExit('manor_lake case items do not match MANOR_ITEM_SOURCES')
     item_start = len(entries)
     item_quality = 80
-    for item_path in item_paths:
-        stem = item_path.stem
-        export_one(item_path, f'item_{stem}.webp', 400, item_quality)
+    for item in case_items:
+        art = item.get('art') or {}
+        asset_id, alt = art.get('asset_id'), art.get('alt')
+        if asset_id != f"manor_item_{item['id']}" or not isinstance(alt, str) or not alt:
+            raise SystemExit(f"item art must be manor_item_<id> with alt: {item['id']}")
+        path = source.find(MANOR_ITEM_SOURCES[item['id']])
+        if path is None:
+            raise SystemExit(f"missing item picture {MANOR_ITEM_SOURCES[item['id']]}")
+        if asset_id in assets:
+            raise SystemExit(f'duplicate case art asset_id: {asset_id}')
+        assets[asset_id] = {'url': export_one(path, f"item_{item['id']}.webp", 400, item_quality, asset_id), 'alt': alt}
     item_bytes = sum(rec['bytes'] for rec in entries[item_start:])
     while item_bytes > 10_000_000 and item_quality > 60:
         item_quality -= 4
@@ -686,12 +719,17 @@ def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEA
             })
         item_bytes = sum(rec['bytes'] for rec in entries[item_start:])
     if item_bytes > 10_000_000:
-        raise SystemExit(f'81 item WebPs exceed 10 MB at quality {item_quality}: {item_bytes} bytes')
+        raise SystemExit(f'{MANOR_ITEMS} item WebPs exceed 10 MB at quality {item_quality}: {item_bytes} bytes')
+    # Pictures an older build exported and this one did not (e.g. v4's unbound items) must not reach the pack.
+    exported = {rec['export'].removeprefix('assets/') for rec in entries if rec['export'].startswith('assets/')}
+    for old in assets_dir.glob('*.webp'):
+        if old.name not in exported:
+            old.unlink()
 
     manifest = {'schema': 'nc-assets/1', 'world': 'manor_lake', 'assets': assets}
     (out_dir / 'assets.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f"manor_lake assets: {len(case_chars)} characters, {look_count} looks, {len(case_places) * len(TIMES)} place variants, {scene_count} scenes, "
-          f"{len(item_paths)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
+          f"{len(case_items)} items, {item_bytes} item bytes, {sum(r['bytes'] for r in entries)} total image bytes")
     print(f"sealed finales: {json.dumps(sealed, sort_keys=True)}")
     if report_out:
         report = {
@@ -705,7 +743,7 @@ def build_manor_assets(world, defaults, out_dir, report_out=None, sealed_out=SEA
             'manifest_sha256': hashlib.sha256((out_dir / 'assets.json').read_bytes()).hexdigest(),
             'manifest_asset_ids': sorted(assets), 'manifest_count': len(assets),
             'character_count': len(case_chars), 'look_count': look_count, 'location_count': len(case_places),
-            'location_variant_count': len(case_places) * len(TIMES), 'scene_count': scene_count, 'item_count': len(item_paths),
+            'location_variant_count': len(case_places) * len(TIMES), 'scene_count': scene_count, 'item_count': len(case_items),
             'item_bytes': item_bytes, 'total_export_bytes': sum(r['bytes'] for r in entries),
             'assets': entries, 'sealed': sealed, 'sealed_assets': sealed_entries,
         }
@@ -741,15 +779,15 @@ def case_art_refs(case_path):
     raw = Path(case_path).read_bytes()
     case = json.loads(raw.decode('utf-8'))
     canonical_hash = hashlib.sha256(canonical_json_bytes(case)).hexdigest()
-    if case.get('meta', {}).get('version') != 4 or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
+    if case.get('meta', {}).get('version') != MANOR_CASE_VERSION or canonical_hash != MANOR_CASE_CANONICAL_SHA256:
         raise SystemExit('manor_lake case does not match the pinned art source')
     refs = {}
-    for group in ('characters', 'locations', *SCENE_GROUPS):
+    for group in ('characters', 'locations', *SCENE_GROUPS, 'items'):
         for entry in case.get(group, []):
             arts = [entry.get('art') or {}] + [look.get('art') or {} for look in (entry.get('looks') or [])[1:]]
             for art in arts:
                 asset_id, alt = art.get('asset_id'), art.get('alt')
-                if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc|scene)_[a-z0-9_]+', asset_id):
+                if not isinstance(asset_id, str) or not re.fullmatch(r'manor_(?:char|loc|scene|item)_[a-z0-9_]+', asset_id):
                     raise SystemExit(f'missing or invalid public art.asset_id in {group}')
                 if not isinstance(alt, str) or not alt:
                     raise SystemExit(f'missing public art.alt for {asset_id}')
@@ -844,8 +882,8 @@ def publish_immutable_manor_assets(assets_out, packs_root, report_out, compare_a
     if len(source_by_relative) != MANOR_WEBPS:
         raise SystemExit('source WebP names collide after canonical lowercase path mapping')
     files = {rel: hashlib.sha256(path.read_bytes()).hexdigest() for rel, path in source_by_relative.items()}
-    if sum(name.rsplit('/', 1)[1].startswith('item_') for name in files) != 81:
-        raise SystemExit('immutable source set must contain all 81 item WebPs')
+    if sum(name.rsplit('/', 1)[1].startswith('item_') for name in files) != MANOR_ITEMS:
+        raise SystemExit(f'immutable source set must contain all {MANOR_ITEMS} item WebPs')
 
     def relative_url(url):
         prefix = '/app/night/worlds/manor_lake/'

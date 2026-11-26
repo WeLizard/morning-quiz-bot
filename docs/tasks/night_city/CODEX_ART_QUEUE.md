@@ -520,3 +520,47 @@ neon c_06–c_10 и cosmic c_09 сгенерированы повторно; п�
 касается края кадра (baroque_mask — 3, polar_lithograph — 11 и 3, campus_ink — 2). Листы просмотрены выборочно
 (neon_noir, eldritch_etching, cosmic_engraving, velvet_flash): в стиле своих миров, годятся.
 Не сделано: облики не внесены в библии `<world>_visual.md` и в пакеты миров; это входит в этапы 5–7 MQB-012.
+
+## 8. «Усадьба» версия 5: три предмета и два финала (2026-11-26)
+
+Основание — сюжет версии 5, утверждённый владельцем 2026-11-26: [MANOR_V5_PLOT.md](MANOR_V5_PLOT.md).
+Пакет `noir_print_a`, папка `art_batch2/noir_print_a/`. Генератор — встроенный `image_gen`, платный API не
+использовать. Ничего не коммитить, ничего не удалять, процессы не убивать, временные файлы — в `F:\Temp`.
+Готовое не переделывать; проблемный файл — не больше двух переделок. Без текста, букв и цифр, без людей
+крупным планом, без крови и оружия.
+
+### 8.1 Предметы (`items_props/`, вырезки 1:1, 1024×1024 RGBA)
+
+Референс — `items/i_C1_07_old_camera.png` и эталон пакета `art_samples/a_3_evidence.png`. Промпт строить как
+у файлов в `items_props/manifest.json` («Same art style, linework, palette and framing as the reference item:
+vintage 1930s noir print, linocut feeling, deep ink black and midnight teal with ochre-gold accents, fine
+hatching, visible grain. A single isolated object, centered: <предмет>. Transparent background, crisp edges,
+no shadow, no glow, no text, letters or logos.»).
+
+| Файл | Предмет |
+| --- | --- |
+| `i_prop_owl_cane.png` | a gentleman's walking cane of dark polished wood with a carved owl head handle of tarnished silver, lying diagonally, a few crumbs of dark soil on the ferrule |
+| `i_prop_yarn_ball.png` | a ball of grey wool yarn with two steel knitting needles stuck through it and a short loose strand hanging down |
+| `i_prop_secateurs.png` | old pruning secateurs with worn wooden handles and a brass spring, the blade freshly oiled and clean |
+
+Каждый файл — запись в `items_props/manifest.json` (как у существующих, плюс `"generator": "codex image_gen"`),
+нормализация альфы, проверка Pillow (RGBA, прозрачные углы, предмет не касается края), `contact_props_v5.png`
+на пурпурном фоне.
+
+### 8.2 Финалы вариантов Г и Д (`scenes_events/`, 2:3, 1024×1536, непрозрачные)
+
+Как `scene_final_variant_a.png` … `c.png`: символ раскрытой правды, людей нет. Референсы — эталон пакета
+`art_samples/a_2_location.png` и место из таблицы. Промпт строить как у финалов в `scenes_events/manifest.json`
+(«Same engraved noir print style, palette, linework and lighting as the reference: dark navy and black masses,
+ochre-gold rim light, fine hatching, 1930s, December. Vertical scene illustration, no text, no letters. Scene:
+<сцена>. No people.»).
+
+| Файл | Место-референс | Сцена |
+| --- | --- | --- |
+| `scene_final_variant_d.png` | `locations/boathouse_night.png` | inside the wooden boathouse on stilts at night: a new brass padlock hangs open on a nail by the door, a plaid blanket and a ball of grey yarn with knitting needles on a bench, an empty tin mug, boot prints in the frost leading to the open door, pale moonlit ice visible through gaps between the logs |
+| `scene_final_variant_e.png` | `locations/servants_quarters_night.png` | a narrow storage closet at the end of the servants' corridor, its door ajar: old trunks stacked, a candle stub burning on a trunk lid beside a dip pen and a single blank sheet of paper, a pince-nez on a thin chain hanging from a nail, the dark corridor beyond |
+
+Записи в `scenes_events/manifest.json` (как у существующих, плюс `generator` и `source`), проверка Pillow
+(RGB без альфы), `contact_scenes_v5.png`.
+
+В конце — итог в `notes.txt` пакета: что сделано, отбраковка, модель и effort (или «не подтверждены»).

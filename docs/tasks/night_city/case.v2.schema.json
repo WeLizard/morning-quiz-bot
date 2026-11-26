@@ -1765,6 +1765,9 @@
                     "type": "null"
                   }
                 ]
+              },
+              "destroyed_flag": {
+                "$ref": "#/$defs/id"
               }
             }
           },

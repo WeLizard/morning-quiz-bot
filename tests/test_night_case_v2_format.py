@@ -339,6 +339,23 @@ class NightCasePersonalFormatTests(unittest.TestCase):
             doc["actions"][0]["outcomes"] = []
             compile_document(doc)
 
+    def test_destroyed_flag_names_a_false_flag_of_a_destroyable_original(self):
+        def with_flag(d, initial=False):
+            d["flags"].append({"id": "original_burned", "initial": initial})
+            return d
+        doc = with_flag(self.source())
+        doc["personal_tasks"]["originals"][0]["destroyed_flag"] = "original_burned"
+        self.assertEqual(compile_document(doc).document()["personal_tasks"]["originals"][0]["destroyed_flag"], "original_burned")
+        for mutate in (
+            lambda d: d["personal_tasks"]["originals"][0].update(destroyed_flag="missing"),
+            lambda d: with_flag(d, True)["personal_tasks"]["originals"][0].update(destroyed_flag="original_burned"),
+            lambda d: with_flag(d)["personal_tasks"]["originals"][1].update(destroyed_flag="original_burned"),
+        ):
+            doc = self.source()
+            mutate(doc)
+            with self.subTest(mutate=mutate), self.assertRaises(CaseV2Error):
+                compile_document(doc)
+
     def test_physical_operation_refs_locations_and_ownership(self):
         for mutate in (
             lambda d: d["personal_tasks"]["originals"][0].update(return_to="person_01"),

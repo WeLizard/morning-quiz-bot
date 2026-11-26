@@ -466,7 +466,10 @@ def _personal_act(doc, c, batch, player, action):
             success = own or status == "at_source" and player["location"] == original["source_location"]
             extra = [next(s["observation"] for s in original["sections"] if s["id"] == op["section"])] if success else []
         elif kind == "take_original": success = status == "at_source" and player["location"] == original["source_location"]
-        elif kind == "destroy_original": success = own and player["location"] in original["destroy_locations"]
+        elif kind == "destroy_original":
+            success = own and player["location"] in original["destroy_locations"]
+            if success and original.get("destroyed_flag"):   # public news of the loss (a scene may wait on it)
+                next(f for f in doc["public"]["flags"] if f["id"] == original["destroyed_flag"])["value"] = True
         else:
             recipient = next((p for p in doc["players"] if p["character_id"] == original["return_to"]), None)
             npc = next((n for n in doc["npcs"] if n["character_id"] == original["return_to"] and n["origin"] == "authored"), None)

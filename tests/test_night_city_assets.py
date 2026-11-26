@@ -17,10 +17,10 @@ SCHEMA = ROOT / 'scripts/art/night_city/assets_manifest.schema.json'
 IMMUTABLE_SCHEMA = ROOT / 'scripts/art/night_city/immutable_assets_manifest.schema.json'
 CASE = ROOT / 'content/night_city/manor_lake.case.json'
 ART = ROOT / 'docs/tasks/night_city/art_batch2/noir_print_a'
-PINNED_CASE_HASH = 'b13ee4a05aef436603940643c20547f8d3db8dad4b7f53bc6d4b26b9d658766d'
+PINNED_CASE_HASH = '4c8a5f882beafd02104d0a623aec3996cf9dec8b9677b42103fa383add717728'
 
 
-def case_art_refs(groups=('characters', 'locations', 'events')):
+def case_art_refs(groups=('characters', 'locations', 'events', 'items')):
     """Read only public art IDs and alt text; never include case prose in the manifest.
 
     Per-variant finales ('variants') are sealed: never in the public manifest or folder."""
@@ -88,7 +88,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(self.manifest['schema'], 'nc-assets/1')
         self.assertEqual(self.manifest['world'], 'manor_lake')
         self.assertEqual(set(self.manifest['assets']), set(refs))
-        self.assertEqual(len(refs), 54)
+        self.assertEqual(len(refs), 93)
         self.assertLessEqual(LOOK_ASSETS, set(refs))
         for asset_id, value in self.manifest['assets'].items():
             self.assertEqual(value['alt'], refs[asset_id]['alt'])
@@ -130,7 +130,7 @@ class ManorAssetExportTests(unittest.TestCase):
 
     def test_variant_finales_are_sealed_out_of_every_public_place(self):
         finales = case_art_refs(('variants',))
-        self.assertEqual(len(finales), 3)
+        self.assertEqual(len(finales), 5)
         sealed = self.report['sealed']
         self.assertEqual(set(sealed), set(finales))
         manifest_sha, case_hash = self.report['immutable_manifest_sha256'], self.report['case_canonical_sha256']
@@ -170,13 +170,13 @@ class ManorAssetExportTests(unittest.TestCase):
 
     def test_all_source_images_are_accounted_for_and_hashes_match(self):
         records = self.report['assets']
-        self.assertEqual(self.report['manifest_count'], 54)
+        self.assertEqual(self.report['manifest_count'], 93)
         self.assertEqual(self.report['character_count'], 20)
         self.assertEqual(self.report['look_count'], 20)
         self.assertEqual(self.report['location_variant_count'], 32)
         self.assertEqual(self.report['scene_count'], 6)
-        self.assertEqual(self.report['item_count'], 81)
-        self.assertEqual(len(records), 159)
+        self.assertEqual(self.report['item_count'], 39)
+        self.assertEqual(len(records), 117)
         self.assertLessEqual(self.report['item_bytes'], 10_000_000)
         self.assertEqual(
             hashlib.sha256((self.out / 'assets.json').read_bytes()).hexdigest(),
@@ -209,7 +209,7 @@ class ManorAssetExportTests(unittest.TestCase):
         self.assertEqual(set(self.immutable_manifest['files']), {
             f'assets/{path.name.lower()}' for path in (self.out / 'assets').glob('*.webp')
         })
-        self.assertEqual(len(self.immutable_manifest['files']), 159)
+        self.assertEqual(len(self.immutable_manifest['files']), 117)  # 20 portraits, 32 place times, 39 items, 26 looks and scenes
         self.assertEqual(set(self.immutable_manifest['assets']), set(case_art_refs()))
         self.assertNotIn(digest, json.dumps(self.immutable_manifest, ensure_ascii=False))
         for relative, expected_hash in self.immutable_manifest['files'].items():
@@ -273,7 +273,7 @@ class ManorAssetExportTests(unittest.TestCase):
     def test_pinned_case_version_and_hash(self):
         case = json.loads(CASE.read_text(encoding='utf-8'))
         canonical = json.dumps(case, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
-        self.assertEqual(case['meta']['version'], 4)
+        self.assertEqual(case['meta']['version'], 5)
         self.assertEqual(hashlib.sha256(canonical).hexdigest(), PINNED_CASE_HASH)
 
 

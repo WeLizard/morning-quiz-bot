@@ -427,6 +427,10 @@ def _compile_personal(d, maps):
         p = base + _ptr("originals", i)
         _ref(original["source_location"], loc, p + "/source_location")
         _refs(original["destroy_locations"], loc, p + "/destroy_locations")
+        if "destroyed_flag" in original:
+            _ref(original["destroyed_flag"], flags, p + "/destroyed_flag")
+            if not original["destroy_locations"] or flags[original["destroyed_flag"]]["initial"] is not False:
+                bad(p + "/destroyed_flag", "Флаг уничтожения требует места уничтожения и начального false")
         if original["initial_holder"] is not None:
             _ref(original["initial_holder"], chars, p + "/initial_holder")
         recipient = original["return_to"]

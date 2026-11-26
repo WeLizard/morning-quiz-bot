@@ -318,12 +318,30 @@ def _compact_public(public):
     return compact
 
 
+def _action_art(content,action_id):
+    """The picture of the item an action leads to: every outcome grants a record about that one item."""
+    action=next((a for a in content['actions'] if a['id']==action_id),None)
+    if action is None or not action.get('outcomes'):
+        return None
+    observations={o['id']:o for o in content['observations']}
+    subjects={(observations[e['observation']].get('subject') or {}).get('item')
+              for o in action['outcomes'] for e in o['effects'] if e['kind']=='grant_observation'}
+    if len(subjects)!=1 or None in subjects:
+        return None
+    item=next((i for i in content.get('items',[]) if i['id'] in subjects),None)
+    return copy.deepcopy(item['art']) if item and item.get('art') else None
+
+
 def _menu(entries,case=None):
     result=[]
     for entry in entries:
         row=asdict(entry)
         if 'quote' in row:
             row['quote']['params']=json.loads(row['quote']['params'])
+            if case is not None and row['quote']['kind']=='act':
+                art=_action_art(case.readonly(),row['quote']['params'].get('action_id'))
+                if art is not None:
+                    row['art']=art
             if case is not None and row['quote']['kind']=='talk':
                 content=case.readonly()
                 dialogue=next(d for d in content['dialogues'] if d['id']==row['quote']['params']['dialogue_id'])

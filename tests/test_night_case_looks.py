@@ -193,7 +193,9 @@ class DeterminismTests(unittest.TestCase):
                 sealed = dict(with_looks["sealed"]); sealed.pop("looks")
                 self.assertEqual(sealed, without["sealed"])
                 self.assertEqual(with_looks["players"], without["players"])
-                self.assertEqual(with_looks["npcs"], without["npcs"])
+                # A look gives the hero the game plays a different name; the roles and states stay the same.
+                strip = lambda npcs: [{k: v for k, v in n.items() if k != "name"} for n in npcs]
+                self.assertEqual(strip(with_looks["npcs"]), strip(without["npcs"]))
 
     def test_passability_does_not_depend_on_looks(self):
         results = []

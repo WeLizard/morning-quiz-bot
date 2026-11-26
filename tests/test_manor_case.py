@@ -131,6 +131,17 @@ class Play:
             self.act("investigator", "compare_" + key)
             self.cmd("investigator", "pin", {"observation_id": key})
 
+    def collect(self, keys):
+        """Inspect what each key needs (once per game), compare and pin the key on the board."""
+        for key, sources in keys:
+            for action in sources:
+                known = {k["observation_id"] for k in self.doc["knowledge"] if k["account_id"] == self.player("investigator")["account_id"]}
+                granted = next(e["observation"] for a in RAW["actions"] if a["id"] == action for o in a["outcomes"] for e in o["effects"])
+                if granted not in known:
+                    self.act("investigator", action)
+            self.act("investigator", "compare_" + key)
+            self.cmd("investigator", "pin", {"observation_id": key})
+
     def hearing(self, final=False):
         self.until(14 if final else max(3, self.doc["clock"]["window_idx"]))
         citations = [b["id"] for b in self.doc["public"]["board"] if b["observation_id"] in {"a1", "a2", "a3"}]
@@ -201,9 +212,9 @@ class ManorSemantics(unittest.TestCase):
         self.assertEqual(len(RAW["characters"]), 20)
         self.assertEqual(len(RAW["locations"]), 8)
         self.assertEqual([x["players"] for x in RAW["compositions"]], [4, 5, 8, 12])
-        self.assertEqual([(v["culprit"], v["accomplices"]) for v in RAW["variants"]], [("lawyer", ["housekeeper"]), ("hunter", ["watchman"]), ("owner", [])])
+        self.assertEqual([(v["culprit"], v["accomplices"]) for v in RAW["variants"]], [("lawyer", ["housekeeper"]), ("hunter", ["watchman"]), ("owner", []), ("companion", ["gardener"]), ("governess", ["butler"])])
         self.assertFalse(next(c for c in RAW["characters"] if c["id"] == "owner")["can_be_player"])
-        self.assertEqual(RAW["module_data"]["turning_point"]["concealed_npcs"][0]["placements"], [{"variants": ["variant_a", "variant_b"], "location": "cellar"}, {"variants": ["variant_c"], "location": "tower_room"}])
+        self.assertEqual(RAW["module_data"]["turning_point"]["concealed_npcs"][0]["placements"], [{"variants": ["variant_a", "variant_b"], "location": "cellar"}, {"variants": ["variant_c"], "location": "tower_room"}, {"variants": ["variant_d"], "location": "boathouse"}, {"variants": ["variant_e"], "location": "servants_quarters"}])
 
     def test_three_independent_keys_include_distinctive_third_without_npc(self):
         obs = {o["id"]: o for o in RAW["observations"]}
@@ -280,6 +291,55 @@ class ManorCommandAcceptance(unittest.TestCase):
                 self.assertEqual(p.doc["final"]["code"], "solved")
                 self.assertEqual(p.verified_witness().document()["final_code"], "solved")
 
+    def test_burning_is_news_and_the_ash_exposes_the_lawyer(self):
+        p = Play(4)
+        ash = lambda: "inspect_fireplace_ash" in {row.quote.target_id for row in available_actions(CASE, RULES, p.t.state, PlayerActor(p.player("daughter")["account_id"]), now_utc=p.now) if row.kind == "choice" and row.quote.kind == "act"}
+        p.go("daughter", "main_hall")
+        self.assertFalse(ash())
+        for action in ["lawyer_read_draft", "lawyer_take_draft", "burn_original"]:
+            p.act("lawyer", "act_" + action)
+        self.assertTrue(next(f["value"] for f in p.doc["public"]["flags"] if f["id"] == "will_burned"))
+        self.assertIn("ev_will_burned", self.scenes(p))
+        for action in ["inspect_fireplace_ash", "inspect_lawyer_seal", "compare_ash_seal"]:
+            p.act("daughter", action)
+        p.cmd("daughter", "pin", {"observation_id": "burner_seal"})
+        p.act("daughter", "act_expose_burner")
+        p.collect_a()
+        p.hearing()
+        self.assertEqual(p.doc["final"]["code"], "solved")
+        self.assertTrue(p.goal("daughter"))
+        self.assertFalse(p.goal("lawyer"))
+        self.assertEqual(self.scenes(p).count("ev_will_burned"), 1)
+        self.assertEqual(p.verified_witness().document()["schema"], "night-city-witness/2")
+
+    def test_a_record_about_an_item_shows_the_item_picture(self):
+        p = Play(4)
+        p.act("daughter", "inspect_lawyer_seal")
+        p.cmd("daughter", "pin", {"observation_id": "lawyer_seal_sample"})
+        view = project(CASE, RULES, p.t.state, PlayerActor(p.player("daughter")["account_id"]))
+        own = next(o for o in view["self"]["observations"] if o["observation_id"] == "lawyer_seal_sample")
+        pinned = next(b["observation"] for b in view["board"] if b["observation_id"] == "lawyer_seal_sample")
+        for record in (own, pinned):
+            self.assertEqual(record["art"]["asset_id"], "manor_item_lawyer_seal")
+            self.assertTrue(record["art"]["alt"])
+        about_place = next(o["id"] for o in RAW["observations"] if "location" in (o.get("subject") or {}))
+        p.read("investigator", about_place)
+        view = project(CASE, RULES, p.t.state, PlayerActor(p.player("investigator")["account_id"]))
+        self.assertNotIn("art", next(o for o in view["self"]["observations"] if o["observation_id"] == about_place))
+
+    def test_an_action_tile_shows_the_item_it_leads_to(self):
+        from application.night_case import _action_art, _menu
+        content = CASE.readonly()
+        self.assertEqual(_action_art(content, "inspect_lawyer_seal")["asset_id"], "manor_item_lawyer_seal")
+        self.assertEqual(_action_art(content, "compare_ash_seal")["asset_id"], "manor_item_burnt_corner")
+        self.assertIsNone(_action_art(content, "act_expose_burner"))  # a personal step: no record, no picture
+        p = Play(4)
+        rows = _menu(available_actions(CASE, RULES, p.t.state, PlayerActor(p.player("lawyer")["account_id"]), now_utc=p.now), CASE)
+        json.dumps(rows, ensure_ascii=False)
+        pictured = {row["quote"]["params"]["action_id"] for row in rows if row.get("art")}
+        self.assertTrue(pictured)
+        self.assertTrue(all(row["quote"]["kind"] == "act" for row in rows if row.get("art")))
+
     def test_daughter_original_is_personal_and_competes_with_burn(self):
         p = Play(4)
         p.find_rights()
@@ -303,6 +363,13 @@ class ManorCommandAcceptance(unittest.TestCase):
     def scenes(self, p):
         return [e["payload"]["content_event_id"] for e in p.doc["public"]["chronicle"] if e["kind"] == "scene"]
 
+    def test_every_scene_comes_once(self):
+        p = Play(4)
+        p.finish()
+        scenes = self.scenes(p)
+        self.assertEqual(scenes.count("ev_swapped_book"), 1)
+        self.assertEqual(len(scenes), len(set(scenes)), scenes)
+
     def test_found_owner_talks_and_silences_the_knock(self):
         quiet = Play(4)
         quiet.until(11)
@@ -325,9 +392,10 @@ class ManorCommandAcceptance(unittest.TestCase):
         talk = {"dialogue_id": "talk_maid", "node_id": "opening", "option_id": "ask_night"}
         actor = PlayerActor(p.player("investigator")["account_id"])
         offered = lambda: [row.label for row in available_actions(CASE, RULES, p.t.state, actor, now_utc=p.now) if row.kind == "choice" and row.quote.kind == "talk" and "горничн" in row.label]
-        self.assertEqual(offered(), ["Выслушать горничную"])
+        topics = ["Расспросить горничную про ночь", "Спросить горничную о домашних", "Спросить горничную про лодочный домик"]
+        self.assertEqual(offered(), topics)
         p.cmd("investigator", "talk", talk)
-        self.assertEqual(offered(), [])
+        self.assertEqual(offered(), topics[1:])
         with self.assertRaises(ValueError):
             quote_action(CASE, RULES, p.t.state, actor, CommandIntent("talk", talk), now_utc=p.now)
 
@@ -458,3 +526,37 @@ class ManorCommandAcceptance(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+D_KEYS = [("d1", ["inspect_knitting_carbon", "inspect_typewriter"]), ("d2", ["inspect_tub_soil"]), ("d3", ["inspect_yarn_ball"])]
+E_KEYS = [("e1", ["inspect_heraldic_envelope", "inspect_class_journal"]), ("e2", ["inspect_postbook", "inspect_letter_salver"]),
+          ("e3", ["inspect_governess_blotter", "inspect_class_journal"])]
+
+
+class ManorNewVariants(unittest.TestCase):
+    """Version 5 truths D (the boathouse) and E (the servants' closet) are solvable like A-C, and harmless elsewhere."""
+
+    def test_keys_and_shelter_solve_each_new_variant(self):
+        for variant, keys, shelter in [("variant_d", D_KEYS, "search_boathouse"), ("variant_e", E_KEYS, "search_servants_closet")]:
+            with self.subTest(variant=variant):
+                p = Play(4, variant)
+                p.collect(keys)
+                p.act("investigator", shelter)
+                self.assertEqual(p.doc["final"]["code"], "solved")
+                self.assertEqual(p.verified_witness().document()["final_code"], "solved")
+
+    def test_the_same_comparisons_find_harmless_things_in_other_variants(self):
+        p = Play(4, "variant_a")
+        for action in ["inspect_tub_soil", "compare_d2", "inspect_heraldic_envelope", "inspect_class_journal", "compare_e1"]:
+            p.act("investigator", action)
+        known = {k["observation_id"] for k in p.doc["knowledge"] if k["account_id"] == p.player("investigator")["account_id"]}
+        self.assertTrue({"silver_in_tub", "old_copybook"} <= known)
+        self.assertFalse({"d2", "e1"} & known)
+
+    def test_the_shadow_learns_what_it_did(self):
+        chars = {c["id"]: c for c in RAW["characters"]}
+        for variant in RAW["variants"]:
+            for cid in [variant["culprit"], *variant["accomplices"]]:
+                if chars[cid]["can_be_player"]:
+                    self.assertTrue(any(s["variants"] == [variant["id"]] for s in chars[cid]["secrets"]), (variant["id"], cid))
+

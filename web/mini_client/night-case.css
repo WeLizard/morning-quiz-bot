@@ -138,7 +138,7 @@
 .ncase-act img{width:48px;height:48px;border-radius:8px;background:var(--nc-tint);box-shadow:inset 0 0 0 1px var(--nc-edge-soft)}
 .ncase-act img.obj{object-fit:contain;padding:4px;box-sizing:border-box}
 .ncase-act img.face{object-fit:cover;object-position:50% 14%;border-radius:50%;box-shadow:0 0 0 1.5px var(--nc-indep)}
-.ncase-act .nm{display:block;font:650 var(--qw-fs-small)/1.25 var(--qw-font)}
+.ncase-act .nm{display:block;font:650 var(--qw-fs-small)/1.25 var(--qw-font);overflow-wrap:anywhere;hyphens:auto}
 .ncase-act .sub{display:block;font-size:var(--qw-fs-caption);line-height:1.25;color:var(--qw-game-muted)}
 :root.nc .ncase-act[aria-pressed="true"]{border-color:var(--nc-accent-text);box-shadow:inset 0 0 0 1px var(--nc-accent-text);background:var(--nc-tint)}
 .ncase-act .tick{position:absolute;left:38px;top:4px;width:22px;height:22px;box-sizing:border-box;padding:4px;border-radius:50%;background:var(--nc-accent);color:var(--nc-accent-ink);box-shadow:0 0 0 2px var(--nc-page)}

@@ -681,6 +681,14 @@ def _validate_modules(doc, case_doc, modules, streams, all_event_by_id):
                     for effect in outcome["effects"]:
                         if effect["kind"] == "set_flag":
                             values.setdefault(effect["flag"], set()).add(effect["value"])
+        tasks = case_doc.get("personal_tasks") or {}
+        for original in tasks.get("originals", []):
+            if not original.get("destroyed_flag"):
+                continue
+            burn_steps = {s["id"] for s in tasks["steps"] if s["operation"]["kind"] == "destroy_original" and s["operation"]["original"] == original["id"]}
+            if any(e["kind"] == "story_result" and e["window_idx"] == window and e["payload"]["step_id"] in burn_steps and e["payload"]["disposition"] == "completed"
+                   for stream in streams.values() for e in stream):
+                values.setdefault(original["destroyed_flag"], set()).add(True)
         return values
 
     private_flags_by_window = {}

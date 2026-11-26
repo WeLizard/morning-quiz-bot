@@ -423,10 +423,14 @@ def project(case, rules, state, viewer=None):
     doc, c = _validated(state, case, rules).document(), _case_doc(case)
     player = _player(doc, viewer) if isinstance(viewer, PlayerActor) else None
     content_observations = {o["id"]: o for o in c["observations"]}
+    item_art = {i["id"]: i["art"] for i in c.get("items", []) if i.get("art")}
     def materialized(oid, source):
         content = content_observations[oid]
         item = {"observation_id": oid, "kind": content["kind"], "title": content["title"], "body": copy.deepcopy(content["body"]), "source": copy.deepcopy(source)}
         if content["kind"] == "claim": item["speaker"] = content["speaker"]
+        # A record about an item shows the item's picture (the client draws it in the evidence frame).
+        subject_item = (content.get("subject") or {}).get("item")
+        if subject_item in item_art: item["art"] = copy.deepcopy(item_art[subject_item])
         return item
     public_final = None if doc["final"] is None else {"code": doc["final"]["code"], "at": doc["final"]["at"]}
     board = copy.deepcopy(doc["public"]["board"])

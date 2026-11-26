@@ -39,21 +39,19 @@ CASES_BEING_WRITTEN = {
     'eternal_hotel': '18+, only the premise (stage 8, B5)',
 }
 
-# Known gaps on 2026-11-26, matching MQB-012 §1.3. Each line goes when its gap is wired.
+# Known gaps on 2026-11-26 (after Manor v5), matching MQB-012 §1.3. Each line goes when its gap is wired.
 KNOWN_GAPS = {
     # §1.3 item 6: time-of-day place maps are not built for any world pack (build_world_pack.py --places).
     **{f'world:{w}:places_not_built': 'MQB-012 §1.3.6' for w in (
         'manor_lake', 'night_express', 'black_bay', 'newsprint_city', 'palace_masks', 'polar_star', 'circus',
         'campus', 'sand_city', 'neon_city', 'prohibition', 'deep_choir', 'dead_air', 'velvet_circle',
         'eternal_hotel')},
-    # §1.3 item 2: the 81 Manor item pictures sit in the pack folder but not in its manifest.
-    'pack:701d7ecb:unlisted:item': 'MQB-012 §1.3.2, stage 5',
     # §1.3 item 8: old case packs no current case binds to; deleting them is the owner's call (B3).
+    # 701d7ecb is the Manor v4 pack; the mockups in docs/design/mockups/night-case still draw from it.
+    'pack:701d7ecb:unbound': 'MQB-012 §1.3.8, question B3',
     'pack:0e56e5e8:unbound': 'MQB-012 §1.3.8, question B3',
     'pack:0e6305c9:unbound': 'MQB-012 §1.3.8, question B3',
     'pack:a640e3af:unbound': 'MQB-012 §1.3.8, question B3',
-    # П7: the Manor case v4 has no described items yet (stage 6, Manor v5).
-    'case:manor_lake_missing:no_items': 'MQB-012 stage 6',
     # The prototype (removed in stage 12) and the group Mafia game still say «мафия».
     'text:мафия:web/mini_client/night-city-ui.js': 'prototype v1, removed after its components move (stage 1, 12)',
     'text:мафия:handlers/mafia_handlers.py': 'owner decision: remove the word from the game (§1.4)',

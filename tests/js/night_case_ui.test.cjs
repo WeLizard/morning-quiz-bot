@@ -665,3 +665,34 @@ test('people nearby come by portrait with the player plate; a hero removed by th
     assert.equal(darkened?.children[0]?.src, `/app/night/packs/${digest}/assets/character_maid.webp`);
     live.handle.close();
 });
+
+/* MQB-012 screens 12–13: hearings by portrait; claims are shown but cannot be cited. */
+test('a hearing shows accuser and suspect by portrait; the final vote picks a hero tile and cites proofs only', async () => {
+    const state = view();
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active'}, {account_id: 'other', character_id: 'maid', name: 'Нина', status: 'active'}];
+    state.public.looks = {lawyer: {title: 'Адвокат'}, maid: {title: 'Горничная'}, butler: {title: 'Дворецкий'}};
+    state.public.board = [{id: 'b1', owner_account_id: 'other', kind: 'proof', observation_id: 'note', observation: {observation_id: 'note', kind: 'proof', title: 'Журнал ключей', body: {text: 'Выдачи ключей'}}},
+        {id: 'b2', owner_account_id: VIEWER, kind: 'claim', observation_id: null, text: 'Хозяин ушёл по льду'}];
+    state.public.hearing = {id: 'h1', accuser: 'other', suspect: 'butler', resolve_window: 4, initial_citations: ['b1']};
+    state.public.clock.phase = 'final_hearing';
+    state.menu = [{kind: 'form', entry_id: 'vote', label: 'vote', command_kind: 'vote', cost: 0, subject_ids: [], board_ids: ['b1', 'b2'], hearing_id: 'h1'},
+        {kind: 'form', entry_id: 'final_vote', label: 'final_vote', command_kind: 'final_vote', cost: 0, subject_ids: ['maid', 'butler'], board_ids: ['b1', 'b2'], hearing_id: null}];
+    const fixture = controller(state, url => url.endsWith('/quote') ? {} : url.endsWith('/commands') ? {receipt: {accepted: true}} : undefined);
+    await settle();
+    await button(fixture.host, 'Улики').click(); await settle();
+    const accuse = find(fixture.host, node => String(node.className).split(' ').includes('ncase-accuse'));
+    assert.ok(accuse, 'who accuses whom');
+    assert.match(accuse.textContent, /Горничная.*Нина.*обвиняет.*Дворецкий.*ведёт игра.*под подозрением/s);
+    const cites = (host) => { const rows = []; (function walk(node) { if (String(node.className).split(' ').includes('ncase-cite')) rows.push(node); node.children?.forEach?.(child => child.children && walk(child)); })(host); return rows; };
+    assert.equal(cites(fixture.host).filter(row => row.disabled).length, 2, 'the claim row is disabled in both forms');
+    const tile = find(fixture.host, node => node.attrs?.['aria-label'] === 'Выбрать: Дворецкий');
+    assert.ok(tile); tile.click();
+    assert.equal(tile.attrs['aria-pressed'], 'true');
+    const proofRows = cites(fixture.host).filter(row => !row.disabled);
+    proofRows[proofRows.length - 1].click();
+    await button(fixture.host, 'Отдать голос').click(); await settle();
+    const sent = fixture.calls.find(row => row.url.endsWith('/commands'));
+    assert.equal(sent.body.kind, 'final_vote');
+    assert.deepEqual({...sent.body.params, citations: [...sent.body.params.citations]}, {citations: ['b1'], suspect: 'butler'});
+    fixture.handle.close();
+});

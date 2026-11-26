@@ -313,6 +313,13 @@
 .ncase-accuse figcaption{display:flex;flex-direction:column;align-items:center;gap:2px}
 .ncase-accuse .ncase-who{justify-content:center}
 .ncase-accuse .ic.mid{--s:32px}
+/* live hearings: the tick only on the chosen tile; scales between the sides; a sign when the record has no picture */
+.ncase-suspect:not([aria-pressed="true"]) .tick{display:none}
+.ncase-suspect .pic .blank{display:grid;place-items:center;width:100%;height:100%;color:var(--nc-muted)}
+.ncase-scales{color:var(--nc-accent-text)}
+.ncase-scales .ic{--s:32px}
+.ncase-cite .sign{display:grid;place-items:center;width:44px;height:44px;border-radius:8px;background:var(--nc-tint);color:var(--nc-muted)}
+.ncase-cite:disabled{opacity:.7}
 .ncase-cast .ncase-who .nm{font-size:var(--qw-fs-body)}
 
 /* ---------- 15–23 states: new objects (transparent cutouts) over the case's own pictures ---------- */

@@ -148,7 +148,7 @@ function open(options) {
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
     let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
-    let askGhost = null, askText = ''; const whisperTo = new Map();
+    let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
     let viewer = boot?.viewer_account_id || null;
     const pages = {public: {items: [], next_cursor: null}, self: {items: [], next_cursor: null}, messages: {items: [], next_cursor: null}};
     const cursors = new Set(), controller = new AbortController();
@@ -231,7 +231,7 @@ function open(options) {
         if (locked || !alive) return;
         locked = true; epoch++; controller.abort(); clearInterval(poll); timer?.stop(); timer = null;
         view = proposal = room = game = boot = invitation = viewer = null;
-        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; askGhost = null; whisperTo.clear();
+        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; askGhost = null; whisperTo.clear(); hearingPick.clear(); accuseOpen = false;
         ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null; worldPack = null; kit.useWorld?.(null);
         Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.menu.register([], 'Ночной город');
@@ -940,6 +940,7 @@ function open(options) {
                 ...(publicItems.length ? publicItems : [p('Доска пока пуста. Опубликованная находка появится здесь для всех за столом.')])),
             card('papers', 'Твои находки', 'видишь только ты',
                 ...(personal.length ? personal : [p('Пока нет. Находки появляются после осмотров и разговоров; до публикации их не видит никто.')])),
+            ...hearings(['accuse']),
             ...(claimForm ? [card('story', 'Добавить версию', '', draft.node, kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value}))))] : []),
             ...testimony(), ...signsSeen(), ...theories];
     }
@@ -969,35 +970,85 @@ function open(options) {
         const signs = arr(view.public.modules?.ghost_visions?.signs);
         return signs.length ? [panel('Явления', ...signs.slice().reverse().map(sign => p(`Окно ${sign.window_idx} · ${placeName(sign.location)}: ${bodyText(sign.body)}`)))] : [];
     }
-    function hearings() {
-        return formList().filter(row => ['accuse', 'vote', 'final_vote'].includes(row.command_kind)).map(form => {
-            const subjects = choose('Кто вывел и скрывал хозяина? Если он всё сделал сам — выбери его.', [{id: '', label: 'Выбери участника'}, ...arr(form.subject_ids).map(char => ({id: char, label: nameOf(char)})),
-                ...(form.command_kind === 'final_vote' ? [{id: 'abstain', label: 'Воздержаться'}] : [])], form.command_kind === 'final_vote' && view.self.final_ballot ? (view.self.final_ballot.suspect || 'abstain') : '');
-            const citations = el('div', 'ncase-citations');
+    // Hearings (mockup screens 12–13): who accuses whom by portrait, the attached evidence in its frame,
+    // the suspect as a portrait tile, sources as rows to tick. Claims are shown but do not count, so they cannot be ticked.
+    const seatOf = char => arr(view.public.players).find(row => row.character_id === char);
+    const charOfAccount = account => arr(view.public.players).find(row => row.account_id === account)?.character_id || null;
+    function plateFor(char) {
+        const seat = seatOf(char);
+        if (!seat) return el('span', 'ncase-tag game', 'ведёт игра');
+        return char === view.self?.character_id ? el('span', 'ncase-tag me', 'ты') : el('span', 'ncase-tag', seatName(seat));
+    }
+    const heroWho = char => put(el('span', 'ncase-who'), el('span', 'nm', heroTitle(char)), plateFor(char));
+    const tick = () => put(el('span', 'tick'), icon('check'));
+    const boardObservation = entry => entry.observation || [...arr(view.public.observations), ...arr(view.self.observations)].find(item => item.observation_id === entry.observation_id);
+    const pressToggle = (node, on) => node.setAttribute('aria-pressed', on ? 'true' : 'false');
+    function accusedBlock(hearing) {
+        const side = (char, role) => put(el('figure'), portraitFrame(char, face(char, 'ncase-face lg')), put(el('figcaption'), heroWho(char), el('span', 'nc-muted', role)));
+        const accuser = charOfAccount(hearing.accuser);
+        const attached = arr(view.public.board).filter(entry => arr(hearing.initial_citations).includes(entry.id)).map(entry => {
+            const obs = boardObservation(entry);
+            return evidenceCard(obs ? {...obs, kind: entry.kind} : {kind: entry.kind, title: entry.kind === 'claim' ? 'Версия игрока' : 'Улика', text: entry.text},
+                entry.kind === 'claim' ? 'утверждение' : 'доказательство');
+        });
+        return [put(el('div', 'ncase-accuse'), accuser ? side(accuser, 'обвиняет') : null, put(el('span', 'ncase-scales'), icon('scales')), side(hearing.suspect, 'под подозрением')),
+            attached.length ? el('h3', 'nc-h3', `Приложенные улики · ${attached.length}`) : null, ...attached];
+    }
+    // A running hearing and the final vote go first; an accusation is one per case and opens from its own card.
+    function hearings(kinds = ['vote', 'final_vote']) {
+        return formList().filter(row => kinds.includes(row.command_kind)).map(form => {
+            const kind = form.command_kind, ballot = view.self.final_ballot, hearing = view.public.hearing;
+            if (!hearingPick.has(kind)) hearingPick.set(kind, kind === 'final_vote' && ballot ? (ballot.suspect || '') : '');
+            const tiles = [];
+            const suspects = kind === 'vote' ? null : put(el('div', 'ncase-suspects'), ...arr(form.subject_ids).map(char => {
+                const tile = put(el('button', 'ncase-suspect'), put(el('span', 'pic'), face(char, 'ncase-suspect-face'), tick()), el('span', 'nm', heroTitle(char)), plateFor(char));
+                tile.type = 'button'; tile.setAttribute('aria-label', `Выбрать: ${heroTitle(char)}`);
+                pressToggle(tile, hearingPick.get(kind) === char);
+                tile.addEventListener('click', () => { hearingPick.set(kind, char); for (const other of tiles) pressToggle(other.node, other.char === char); });
+                tiles.push({char, node: tile});
+                return tile;
+            }));
             const picked = new Set();
-            for (const entry of arr(view.public.board).filter(item => arr(form.board_ids).includes(item.id))) {
-                const input = el('input'); input.type = 'checkbox'; input.value = entry.id;
-                input.addEventListener('change', () => { if (input.checked && picked.size < 5) picked.add(entry.id); else { picked.delete(entry.id); input.checked = false; } });
-                const obs = entry.observation || [...arr(view.public.observations), ...arr(view.self.observations)].find(item => item.observation_id === entry.observation_id);
+            const rows = arr(view.public.board).filter(item => arr(form.board_ids).includes(item.id)).map(entry => {
+                const obs = boardObservation(entry), claim = entry.kind === 'claim', art = assets.get(obs?.art?.asset_id);
                 const owner = entry.owner_account_id === view.self.account_id ? 'ты' : arr(view.public.players).find(row => row.account_id === entry.owner_account_id)?.name;
-                citations.append(put(el('label', 'ncase-checkbox'), input, el('span', null, `${entry.kind === 'proof' ? 'Доказательство' : 'Утверждение'}: ${obs?.title || entry.text || 'Публичная улика'}${owner ? ` · ${owner}` : ''}`)));
-            }
+                const pic = art ? Object.assign(el('img'), {src: art.url, alt: ''}) : put(el('span', 'sign'), icon(claim ? 'story' : 'lens'));
+                const box = el('span', 'box');
+                const row = put(el('button', `ncase-cite${claim ? ' claim' : ''}`), pic,
+                    put(el('span'), el('span', 'nm', obs?.title || entry.text || 'Публичная улика'), el('span', 'sub', claim ? 'утверждение · не считается' : `доказательство${owner ? ` · ${owner}` : ''}`)), box);
+                row.type = 'button'; pressToggle(row, false);
+                if (claim) row.disabled = true;
+                else row.addEventListener('click', () => {
+                    if (picked.has(entry.id)) picked.delete(entry.id); else if (picked.size < 5) picked.add(entry.id); else return;
+                    pressToggle(row, picked.has(entry.id)); box.replaceChildren(...(picked.has(entry.id) ? [tick()] : []));
+                });
+                return row;
+            });
             const send = choice => {
-                const kind = form.command_kind, params = {citations: [...picked]};
+                const params = {citations: [...picked]};
                 if (kind === 'vote') Object.assign(params, {hearing_id: form.hearing_id, choice});
+                else if (choice === 'abstain') params.suspect = null;
                 else {
-                    if (!subjects.input.value) { notice = 'Выбери участника в списке.'; render(); return null; }
-                    params.suspect = subjects.input.value === 'abstain' ? null : subjects.input.value;
+                    if (!hearingPick.get(kind)) { notice = 'Выбери участника.'; render(); return null; }
+                    params.suspect = hearingPick.get(kind);
                 }
                 return command(kind, params);
             };
-            return panel(form.command_kind === 'vote' ? 'Идёт слушание' : form.command_kind === 'final_vote' ? 'Итоговое слушание' : 'Предъявить обвинение',
-                ...(form.command_kind === 'final_vote' ? [p('Назови, кто вывел и скрывал хозяина, и приложи улики с доски. Голос можно изменить, пока слушание не закрылось; итог объявят после закрытия.'),
-                    ...(view.self.final_ballot ? [kit.alert({tone: 'ok', icon: 'check', title: `Твой голос записан: ${view.self.final_ballot.suspect ? nameOf(view.self.final_ballot.suspect) : 'без обвинения'}`})] : [])] : []),
-                p('Выбери до пяти источников. Сервер проверит, хватает ли доказательств; утверждения ключами не считаются.'),
-                ...(form.command_kind === 'vote' ? [] : [subjects.node]), citations,
-                kit.row(...(form.command_kind === 'vote' ? [button('Возражаю', () => send('oppose')), button('Поддержать', () => send('support'))] : [button(form.command_kind === 'final_vote' ? (view.self.final_ballot ? 'Изменить голос' : 'Отдать голос') : 'Предъявить обвинение', () => send(), 'primary')])));
-        });
+            const sources = card('lens', 'Приложи улики', 'до пяти', el('p', 'nc-muted', 'Сервер проверит, хватает ли доказательств. Утверждения ключами не считаются.'),
+                rows.length ? put(el('div', 'ncase-cites'), ...rows) : p('На доске пока нет записей, которые можно приложить.'));
+            if (kind === 'vote') return [card('scales', 'Идёт слушание', hearing?.resolve_window ? `до окна ${hearing.resolve_window}` : '',
+                    el('p', 'nc-muted', 'Поддержи обвинение или возрази. Голос тайный; итог объявят, когда слушание закроется.'), ...(hearing ? accusedBlock(hearing) : [])),
+                sources, kit.row(button('Возражаю', () => send('oppose')), button('Поддержать', () => send('support'), 'primary'))];
+            if (kind === 'final_vote') return [card('scales', 'Итоговое слушание', '',
+                    el('p', 'nc-muted', 'Кто вывел и скрывал хозяина? Если он всё сделал сам, без помощников, назови его самого. Голос можно изменить, пока слушание не закрылось; итог объявят после закрытия.'),
+                    ballot ? kit.alert({tone: 'ok', icon: 'check', title: `Твой голос записан: ${ballot.suspect ? heroTitle(ballot.suspect) : 'без обвинения'}`}) : null),
+                card('people', 'Твой выбор', '', suspects), sources,
+                kit.row(button('Воздержаться', () => send('abstain')), button(ballot ? 'Изменить голос' : 'Отдать голос', () => send(), 'primary'))];
+            const lead = el('p', 'nc-muted', 'Хватает доказательств против кого-то? Предъяви обвинение: стол решит на слушании, поддержать его или нет. Если стол поддержит обвинение невиновного, тот выбывает из дела.');
+            if (!accuseOpen) return [card('scales', 'Обвинение', 'одно за дело', lead, kit.stack(button('Предъявить обвинение', () => { accuseOpen = true; render(); })))];
+            return [card('scales', 'Обвинение', 'одно за дело', lead), card('people', 'Кого обвинить', '', suspects), sources,
+                kit.row(button('Отмена', () => { accuseOpen = false; hearingPick.delete('accuse'); render(); }), button('Предъявить обвинение', () => send(), 'primary'))];
+        }).flat();
     }
     function chat() {
         const forms = formList().filter(row => row.command_kind === 'say');

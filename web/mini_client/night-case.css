@@ -20,8 +20,7 @@
 .ncase-citations,.ncase-recipients {display:flex;flex-direction:column;gap:var(--qw-s-2)}
 .ncase-claim {color:var(--qw-game-muted);font-size:var(--qw-fs-small)}
 .ncase-proof {color:var(--qw-game-accent);font-size:var(--qw-fs-small)}
-.ncase-message,.ncase-entry {display:flex;flex-direction:column;gap:var(--qw-s-2);border-bottom:var(--qw-outline-w) solid var(--qw-game-line);padding-bottom:var(--qw-s-3)}
-.ncase-message>strong {font-size:var(--qw-fs-body)}
+.ncase-entry {display:flex;flex-direction:column;gap:var(--qw-s-2);border-bottom:var(--qw-outline-w) solid var(--qw-game-line);padding-bottom:var(--qw-s-3)}
 .ncase-main .nc-hero {width:100%;box-sizing:border-box;min-height:200px}
 .ncase-main .nc-hero .copy {min-width:0}
 .ncase-role-portrait {width:min(100%,240px);max-height:320px;object-fit:contain;align-self:center}

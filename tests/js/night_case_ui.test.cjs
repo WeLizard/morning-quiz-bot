@@ -415,7 +415,10 @@ test('publish buttons name the evidence, a second publication is one card and ow
     assert.equal(fixture.host.textContent.split('Текст записки').length - 1, 2, 'one board card plus the own find');
     assert.match(fixture.host.textContent, /Оригинала больше нет/);
     await button(fixture.host, 'Беседа').click(); await settle();
-    assert.match(fixture.host.textContent, /Вера \(ты\)/);
+    const mine = find(fixture.host, node => String(node.className).split(' ').includes('mine'));
+    assert.ok(mine, 'own line is on the right');
+    assert.match(mine.textContent, /ты/);
+    assert.match(mine.textContent, /Привет/);
     fixture.handle.close();
 });
 

@@ -1011,21 +1011,32 @@ function open(options) {
             check.addEventListener('change', () => { recipients = recipients.filter(value => value !== target); if (check.checked && recipients.length < 2) recipients.push(target); else check.checked = false; });
             targetRows.append(put(el('label', 'ncase-checkbox'), check, el('span', null, nameOf(target))));
         }
-        const draft = field('Сообщение', ownDraft, true);
+        const draftLabel = channel === 'whisper' ? 'Реплика для приватной беседы' : 'Реплика за столом', draft = field(draftLabel, ownDraft, true);
+        draft.input.placeholder = draftLabel;
+        draft.input.rows = 2;
         draft.input.addEventListener('input', () => { ownDraft = draft.input.value; });
+        // A line of the table (mockup screen 9): the hero first, the player as a plate; own lines on the right.
         const messages = pages.messages.items.map(row => {
             const own = row.sender_account_id === view.self.account_id;
-            const sender = `${arr(view.public.players).find(p => p.account_id === row.sender_account_id)?.name || 'Участник'}${own ? ' (ты)' : ''}`;
-            return put(el('article', 'ncase-message'), el('strong', null, sender), el('span', 'nc-note', row.channel === 'whisper' ? 'Приватная беседа' : row.channel === 'ghost' ? removedWord() : 'Площадь'), p(row.text));
+            const seat = arr(view.public.players).find(item => item.account_id === row.sender_account_id);
+            const char = seat?.character_id || (own ? view.self.character_id : null);
+            const where = row.channel === 'whisper' ? 'приватно' : row.channel === 'ghost' ? removedWord().toLowerCase() : '';
+            const who = put(el('span', 'ncase-who'), el('span', 'nm', char ? heroTitle(char) : 'Участник'),
+                own ? el('span', 'ncase-tag me', 'ты') : seat ? el('span', 'ncase-tag', seatName(seat)) : null, where ? el('span', 'ncase-tag game', where) : null);
+            return put(el('div', `nc-msg${own ? ' mine' : ''}`), own ? null : portraitFrame(char, face(char, 'ncase-face xs')), put(el('div', 'bub'), who, p(row.text)));
         });
         const intro = view.self.status === 'ghost' ? ghostChatLine() : `Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. ${removedWord()} разговаривают отдельно.`;
-        return [panel('Переписка', p(intro), ...messages,
+        const left = view.self.communication?.remaining;
+        const send = button('Сказать', async () => {
+            const result = await command('say', {channel, recipients: channel === 'whisper' ? recipients : [], text: ownDraft});
+            if (result?.receipt?.accepted === true) { ownDraft = ''; render(); }
+        }, 'primary');
+        return [card('talk', 'Переписка', messages.length ? plural(messages.length, 'реплика', 'реплики', 'реплик') : '', el('p', 'nc-muted', intro),
+            messages.length ? put(el('div', 'nc-chat ncase-feed'), ...messages) : p('Пока тихо. Первая реплика может быть твоей.'),
             ...(pages.messages.next_cursor ? [kit.row(button('Ещё сообщения', async () => { await loadHistory('messages', true); render(); }))] : [])),
-            panel('Написать', ...(forms.length ? [channels.node, targetRows, draft.node, p(`Сообщений осталось в этом окне: ${view.self.communication?.remaining ?? '—'}`),
-                kit.row(button('Отправить', async () => {
-                    const result = await command('say', {channel, recipients: channel === 'whisper' ? recipients : [], text: ownDraft});
-                    if (result?.receipt?.accepted === true) { ownDraft = ''; render(); }
-                }))] : [p('Сейчас отправка недоступна. Ранее разрешённая переписка сохранена.')]))];
+            card('envelope', 'Написать', left == null ? '' : `осталось ${plural(Number(left), 'реплика', 'реплики', 'реплик')}`,
+                ...(forms.length ? [forms.length > 1 ? channels.node : null, targetRows.children.length ? targetRows : null, put(el('div', 'nc-compose'), draft.input, send)]
+                    : [p('Сейчас отправка недоступна. Ранее разрешённая переписка сохранена.')]))];
     }
     function eventText(item) {
         const payload = item.payload || {}, own = view.self;

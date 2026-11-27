@@ -1004,3 +1004,22 @@ test('«Новое дело» goes world → case card → company: the cast, th
     assert.ok(calls.some(call => call.url.startsWith('/api/night-case/games/game/view')), 'the lobby opens after the start');
     fixture.handle.close();
 });
+
+test('the case asks for the shell themes outside, the world day or night by the window time, the finale after the outcome (stage 4)', async () => {
+    const last = fixture => fixture.kit.music.places.filter(Boolean).at(-1);
+    let fixture = controller(null, url => url === '/api/guest/rooms' || url === '/api/guest/rooms/open' || url === '/api/night-case/mine' ? {items: []} : undefined, {target: null});
+    await settle();
+    assert.deepEqual(JSON.parse(JSON.stringify(last(fixture))), {shell: true}, 'the root plays the shell themes');
+    fixture.handle.close();
+    const running = (hour, extra = {}) => { const value = view(); value.server_now = `2026-11-27T${hour}:00:00Z`;
+        value.public = {...value.public, world: 'manor_lake', clock: {...value.public.clock, timezone: 'UTC'}, ...extra}; return value; };
+    for (const [hour, status] of [['09', 'day'], ['19', 'night'], ['23', 'night']]) {
+        fixture = controller(running(hour)); await settle();
+        assert.deepEqual(JSON.parse(JSON.stringify(last(fixture))), {world: 'manor_lake', status}, `${hour}:00`);
+        fixture.handle.close();
+        assert.equal(fixture.kit.music.places.at(-1), null, 'closing the case stops the music');
+    }
+    fixture = controller(running('19', {final: {variant_id: 'a'}})); await settle();
+    assert.deepEqual(JSON.parse(JSON.stringify(last(fixture))), {world: 'manor_lake', status: 'finished'});
+    fixture.handle.close();
+});

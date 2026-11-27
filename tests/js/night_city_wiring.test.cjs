@@ -14,7 +14,6 @@ const NOT_DRAWN_YET = {
     frame: 'hero, dossier and evidence frames of the world pack: stage 1 components',
     back: 'role card back and flip: stage 2, screen 6',
     emblem: 'side sign on the role card: stage 2, screen 6',
-    music: 'day, night and finale tracks: stage 4',
     state: 'case-state objects (pause, no connection, archive, letter): stage 2, screens 15-23',
 };
 
@@ -96,6 +95,9 @@ test('every pack group reaches a case screen, except the ones listed as not draw
         await tab.click(); await settle();
         for (const url of addresses(live.host)) seen.add(url);
     }
+    // Music is no picture: the player gets the world and the table state, the track is the world pack's music_<slot>.m4a.
+    const slot = {night: 'night', finished: 'finale'};
+    for (const place of live.kit.music.places) if (place?.world) seen.add(`/app/night/worlds/${place.world}/music_${slot[place.status] || 'day'}.m4a`);
     live.handle.close();
     for (const url of seen) assert.ok(url.startsWith(`/app/night/packs/${art.digest}/`) || url.startsWith('/app/night/'), `foreign address ${url}`);
     const drawn = new Set([...seen].map(group));

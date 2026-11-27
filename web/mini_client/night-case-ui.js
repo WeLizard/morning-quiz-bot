@@ -258,6 +258,7 @@ function open(options) {
         const header = kit.header(), clock = view?.public?.clock;
         header.node.classList.add('ncase-bar');
         kit.pageScene?.({slot: game ? 'day' : null, shell: game ? 'table' : 'entry', time: sceneTime()});
+        kit.music?.follow?.(musicPlace());
         if (clock?.closes_at && !view?.public?.final) timer = kit.timer({endsAt: Date.parse(clock.closes_at) / 1000,
             serverNow: Date.parse(view.server_now) / 1000, alive: live, onExpire: refresh});
         header.set({eyebrow, title, clock: timer?.clock});
@@ -271,6 +272,19 @@ function open(options) {
         if (dock) main.classList.add('has-dock');
         if (children.some(child => /\bnc-col\b/.test(child?.className || ''))) main.classList.add('ncase-cols');
         host.replaceChildren(...[header.node, main, dock].filter(Boolean)); host.dataset.page = 'night';
+    }
+    /* Music of the case (MQB-012 stage 4): the shell themes outside a case, the world's day track in the lobby and in a
+       morning window, its night track in an evening window, its finale once after the outcome. The player picks the file
+       from the loaded world pack; without a pack or a track it stays silent. */
+    function musicPlace() {
+        const world = view?.public?.world;
+        if (world) {
+            if (view.lobby) return {world, status: 'lobby'};
+            if (view.public.final || view.final_summary) return {world, status: 'finished'};
+            return {world, status: ['evening', 'night'].includes(sceneTime()) ? 'night' : 'day'};
+        }
+        if (fresh?.screen === 'case' && worldPack?.id) return {world: worldPack.id, status: 'lobby'};
+        return {shell: true};
     }
     function sceneTime() {
         if (!view?.server_now) return 'day';
@@ -1574,7 +1588,7 @@ function open(options) {
         view = proposal = room = game = boot = invitation = fresh = null; ownDraft = ''; recipients = [];
         outbox.clear(); cursors.clear(); for (const page of Object.values(pages)) page.items.length = 0;
         assets.clear(); assetWorld = null; worldPack = null;
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); popFlow(); kit.useWorld(null); document.documentElement.classList.remove('nc');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); popFlow(); kit.music?.stop?.(); kit.useWorld(null); document.documentElement.classList.remove('nc');
     }
     active = {close, refresh};
     document.documentElement.classList.add('nc');

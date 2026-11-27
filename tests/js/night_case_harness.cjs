@@ -60,6 +60,8 @@ function controller(view, requestHook, options = {}) {
         track(opts) { const node = make('div', 'nc-track'); node.setAttribute('aria-label', opts.label || ''); node.dataset.ready = String(opts.ready); node.dataset.total = String(opts.total); return node; },
         dock(opts) { return wrap('nc-dock', [opts.hint ? make('p', 'nc-dock-hint', opts.hint) : null, ...opts.buttons].filter(Boolean)); },
         tag(value) { return make('span', 'nc-tag', value); },
+        // The case tells the player where it is; the tests read the places it asked for.
+        music: {places: [], follow(place) { this.places.push(place); }, stop() { this.places.push(null); }},
         toggle(opts) { const node = make('button', 'nc-toggle', opts.title); node.dataset.on = String(opts.on); node.addEventListener('click', () => opts.onChange(!opts.on)); node.append(make('span', '', opts.text)); return node; },
     };
     const zoneApi = shellPrefs(options.Intl || Intl).prefs;

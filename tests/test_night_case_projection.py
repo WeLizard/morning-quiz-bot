@@ -188,6 +188,25 @@ class ModuleProjectionTests(unittest.TestCase):
         self.assertTrue(t.receipt["accepted"])
         self.assertEqual(next(x for x in project(case, rules, t.state)["modules"]["version_archive"]["theories"] if x["id"] == first)["state"], "active")
 
+    def test_nearby_lists_only_heroes_still_in_play(self):
+        """Finding 6: a removed (ghost) or departed hero is not «Кто рядом» for the living; the viewer still sees themself."""
+        case, rules, _, t = setup()
+        from domain.night_case_state import KernelState
+        doc = t.state.document()
+        for p in doc["players"]: p["location"] = doc["players"][0]["location"]
+        doc["players"][1].update(status="ghost", ap=0)
+        state = KernelState.from_document(doc, case, rules)
+        leaver = PlayerActor("account2")
+        state = step(case, rules, state, leaver, player_cmd(state, leaver.account_id, "forfeit", {}, "forfeit2"), now_utc=NOW).state
+        self.assertEqual(state.document()["players"][2]["status"], "departed")
+        names = lambda account: [x["character_id"] for x in project(case, rules, state, PlayerActor(account))["self"]["nearby"] if x["controller"] == "player"]
+        living, ghost = doc["players"][0], doc["players"][1]
+        self.assertIn(living["character_id"], names("account0"))
+        self.assertNotIn(ghost["character_id"], names("account0"))
+        self.assertNotIn(doc["players"][2]["character_id"], names("account0"))
+        self.assertIn(ghost["character_id"], names("account1"))
+        self.assertIn(living["character_id"], names("account1"))
+
     def test_hidden_npc_shared_gate_and_variant_independent_menu(self):
         from tests.test_night_case_engine import module_setup, module_play
         def dialogue(c): c["dialogues"][0]["character"] = "missing_keeper"

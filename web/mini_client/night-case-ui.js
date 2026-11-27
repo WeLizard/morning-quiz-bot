@@ -150,6 +150,8 @@ function open(options) {
     if (!kit || !Q) throw new Error('night_case_shell_required');
     let alive = true, locked = false, epoch = 0, poll = null, timer = null, reading = false, identityReading = false, commandBusy = false;
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
+    // The window (game:seq) in which a player who finished it chose to act again (finding 4); any other window keeps them closed.
+    let reopened = '';
     let boot = options.bootstrap, fresh = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
     let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
@@ -392,6 +394,22 @@ function open(options) {
                 if (proposal.forfeit) { proposal = null; await command('forfeit', {}); }
                 else await confirmProposal();
             }, proposal.forfeit ? 'danger' : 'primary')));
+    }
+    // In a case the choice is confirmed in the bottom dock (mockup 7): what and how much, «Отмена» and the verb.
+    const CONFIRM_VERB = {move: 'Перейти', talk: 'Поговорить', archive_request: 'Запросить', story_reply: 'Ответить'};
+    function confirmDock() {
+        if (!proposal) return null;
+        if (proposal.sending) return kit.dock({hint: `Отправляем… · ${proposal.label || 'Действие'}`, buttons: []});
+        const cancel = button('Отмена', () => { proposal = null; render(); });
+        if (proposal.forfeit) return kit.dock({layout: 'row', hint: 'Ты прекратишь участие. Вернуться в эту партию нельзя; твоя история до выхода сохранится.',
+            buttons: [cancel, button('Покинуть дело', async () => { proposal = null; await command('forfeit', {}); }, 'danger')]});
+        const cost = Number(proposal.cost) || 0, left = Number(view?.self?.ap) || 0;
+        const price = ghostKinds.has(proposal.kind) ? 'твоё единственное действие в этом окне'
+            : cost ? `${plural(cost, 'действие', 'действия', 'действий')} из ${left}` : 'без траты действий';
+        const split = /^([^:]{2,24}):\s/.exec(proposal.label || '');
+        const verb = CONFIRM_VERB[proposal.kind] || (split ? split[1] : 'Подтвердить');
+        return kit.dock({layout: 'row', hint: `${proposal.label || 'Действие'} · ${price}`,
+            buttons: [cancel, button(verb, () => confirmProposal().catch(fail), 'primary')]});
     }
     async function loadHistory(stream, more = false) {
         if (!game) return;
@@ -1166,6 +1184,16 @@ function open(options) {
         tile.addEventListener('click', () => Promise.resolve(selectAction(row, `Перейти: ${target?.name || row.label}`)).catch(fail));
         return tile;
     }
+    const windowKey = () => `${game}:${view?.public?.clock?.window_seq}`;
+    const actingAgain = () => reopened === windowKey();
+    // Finding 5: what this window's inspection here turned up stays on the place, in the evidence frame; all finds are in «Улики».
+    function foundHere(own, location) {
+        const idx = view.public.clock?.window_idx;
+        const items = arr(own.observations).filter(item => item.source?.kind === 'action' && item.source?.window_idx === idx && item.source?.location === location?.id);
+        if (!items.length) return null;
+        return card('lens', 'Найдено здесь', String(items.length), ...items.map(item => evidenceCard(item, 'Твоя находка · видишь только ты')),
+            kit.stack(button('Все находки — в «Уликах»', () => showTab('board'))));
+    }
     // Screen 7 «Место» (mockups, MQB-012 stage 2): the place by time of day with the action points, the window's event,
     // the people nearby by portrait, where to go as place tiles and what to do as action tiles.
     function place() {
@@ -1175,10 +1203,10 @@ function open(options) {
         const acts = choiceList().filter(row => ['act', 'archive_request', 'story_reply'].includes(row.quote.kind));
         const talks = choiceList().filter(row => row.quote.kind === 'talk');
         const nearby = arr(own.nearby).filter(row => row.character_id !== own.character_id);
-        const time = sceneTime(), ghost = own.status === 'ghost';
+        const time = sceneTime(), ghost = own.status === 'ghost', departed = own.status === 'departed';
         const scene = put(el('section', 'nc-hero ncase-place'), put(el('div', 'copy'),
-            el('span', 'nc-eyebrow', `${TIME_WORDS[time]} · ты здесь`), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)),
-            over || ghost ? null : put(el('div', 'ncase-hero-row'), apMeter(own.ap)), over ? null : narratorLine()));
+            el('span', 'nc-eyebrow', departed ? TIME_WORDS[time] : `${TIME_WORDS[time]} · ты здесь`), el('h2', null, location?.name || 'Усадьба'), p(bodyText(location?.body)),
+            over || ghost || departed ? null : put(el('div', 'ncase-hero-row'), apMeter(own.ap)), over || departed ? null : narratorLine()));
         const artwork = assets.get(location?.art?.asset_id);
         scene.style?.setProperty('--img', artwork ? `url(${artwork.variants?.[time] || artwork.url})` : 'none');
         if (over) return [scene];
@@ -1187,12 +1215,17 @@ function open(options) {
         const shared = current ? put(el('section', 'nc-card'), put(el('div', 'ncase-event'), sceneArt(current.art, 'Сцена окна'),
             put(el('div'), el('span', 'nc-eyebrow', 'Сейчас в усадьбе'), p(bodyText(current.body))))) : null;
         if (ghost) return [scene, shared, ...removedActions()];
-        const waiting = arr(own.modules?.archive_requests?.requests).filter(item => item.status === 'pending');
-        const free = boot?.capabilities?.free_intent === true ? field('Что ты хочешь сделать?', '', true) : null;
+        // Finding 7: a player who left the case reads the place and the window's event, nothing to do or go to.
+        if (departed) return [scene, shared];
+        const found = foundHere(own, location);
+        // Finding 4: a finished window closes the place; «Ещё действовать» in the window bar reopens it.
         const people = card('people', 'Кто рядом', nearby.length ? String(nearby.length) : '',
             nearby.length ? put(el('ul', 'ncase-people'), ...nearby.map(person)) : p(said('Сейчас ты здесь один.', 'Сейчас ты здесь одна.')));
+        if (own.finished_window && !actingAgain()) return [scene, shared, found, people];
+        const waiting = arr(own.modules?.archive_requests?.requests).filter(item => item.status === 'pending');
+        const free = boot?.capabilities?.free_intent === true ? field('Что ты хочешь сделать?', '', true) : null;
         const go = moves.length ? card('door', 'Куда пойти', costLine(moves), put(el('div', 'ncase-map'), ...moves.map(placeTile))) : null;
-        return [scene, shared, people,
+        return [scene, shared, found, people,
             ...actionGroups(acts),
             talks.length ? card('talk', 'Поговорить', costLine(talks), put(el('div', 'ncase-acts'), ...talks.map(talkTile))) : null,
             acts.length || talks.length ? null : card('lens', 'Действия', '', p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')),
@@ -1250,11 +1283,13 @@ function open(options) {
     // The confirmation still names the full action.
     const GROUP_SIGN = {archive_request: 'papers', story_reply: 'envelope', act: 'eye'};
     function actionGroups(rows) {
-        const groups = new Map();
+        const groups = new Map(), VERB = /^([^:]{2,40}):\s*(.+)$/;
+        // Labels without «Глагол: предмет» share one card; it is «Другие действия» only beside verb groups.
+        const rest = rows.some(row => row.quote.kind === 'act' && VERB.test(row.label)) ? 'Другие действия' : 'Что сделать здесь';
         for (const row of rows) {
-            const kind = row.quote.kind, split = /^([^:]{2,40}):\s*(.+)$/.exec(row.label);
+            const kind = row.quote.kind, split = VERB.exec(row.label);
             const [title, short] = kind === 'archive_request' ? ['Запросить в архиве', row.label] : kind === 'story_reply' ? ['Письмо', row.label]
-                : split ? [split[1], split[2]] : ['Другие действия', row.label];
+                : split ? [split[1], split[2]] : [rest, row.label];
             if (!groups.has(title)) groups.set(title, {kind, items: []});
             groups.get(title).items.push({row, full: row.label, short});
         }
@@ -1269,8 +1304,12 @@ function open(options) {
     function windowBar() {
         const own = view.self, pub = view.public, clock = pub.clock || {};
         if (pub.final || view.final_summary || own.status !== 'active' || !['investigation', 'final_hearing'].includes(clock.phase)) return null;
+        // The server lets a finished player act again (that action un-finishes the window), so the place says so plainly.
         if (own.finished_window) return panel(said('Ты завершил окно', 'Ты завершила окно'),
-            p('Ждём остальных. Новое окно откроется, когда все завершат своё или выйдет время.'));
+            p('Ждём остальных. Новое окно откроется, когда все завершат своё или выйдет время.'),
+            tab !== 'place' ? null : actingAgain() ? p('Действия снова открыты: первое же из них вернёт тебя в окно.')
+                : put(el('div'), p('Действия и переходы закрыты до следующего окна.'),
+                    kit.stack(button('Ещё действовать', () => { reopened = windowKey(); render(); }))));
         const finish = choiceList().find(row => row.quote.kind === 'finish_window');
         return finish ? card('hourglass', 'Окно', '', p(`${said('Сделал', 'Сделала')} всё, что ${said('хотел', 'хотела')}? Заверши окно: когда завершат все, следующее откроется раньше.`), kit.stack(actionButton(finish))) : null;
     }
@@ -1596,9 +1635,9 @@ function open(options) {
         }
         // A closed case is headed by its title (mockup 14), not by the last place.
         const caseTitle = arr(boot?.cases).find(item => item.id === pub.case_id)?.title;
-        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), confirmation(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean),
+        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean),
             over ? caseTitle || 'Дело закрыто' : arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
-            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`);
+            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`, confirmDock());
     }
     function close() {
         if (!alive) return;

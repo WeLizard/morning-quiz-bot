@@ -404,6 +404,48 @@ test('the confirm dialog leaves at once and shows sending while the server answe
     fixture.handle.close();
 });
 
+test('screen 7: a choice is confirmed in the bottom dock with its price and verb, and «Отмена» drops it', async () => {
+    const state = view();
+    state.menu = [choice('act', 'Осмотреть: Ключ сервисной панели', {action_id: 'key'}, 1)];
+    const fixture = controller(state);
+    await settle();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent.includes('Ключ сервисной панели')).click(); await settle();
+    const dock = find(fixture.host, node => node.className === 'nc-dock');
+    assert.ok(dock, 'the confirmation is the bottom dock, not a card in the page');
+    assert.match(dock.textContent, /Осмотреть: Ключ сервисной панели · 1 действие из 3/);
+    assert.ok(button(dock, 'Отмена')); assert.ok(button(dock, 'Осмотреть'));
+    await button(dock, 'Отмена').click(); await settle();
+    assert.equal(find(fixture.host, node => node.className === 'nc-dock'), undefined);
+    assert.equal(fixture.calls.filter(row => row.url.endsWith('/confirm')).length, 0);
+    fixture.handle.close();
+});
+
+test('screen 7, findings 4, 5 and 7: a finished window closes the place, the find stays on it, a departed player has no actions', async () => {
+    const state = view();
+    state.self.finished_window = true;
+    state.self.observations = [{observation_id: 'ash', kind: 'proof', title: 'Пепел в камине', body: {text: 'Обрывок письма'},
+        source: {kind: 'action', window_idx: 1, location: 'library'}},
+        {observation_id: 'old', kind: 'proof', title: 'Старая находка', body: {text: 'из первого окна'}, source: {kind: 'action', window_idx: 0, location: 'library'}}];
+    let fixture = controller(state);
+    await settle();
+    assert.match(fixture.host.textContent, /Найдено здесь.*Пепел в камине/);
+    assert.doesNotMatch(fixture.host.textContent, /Старая находка/, 'an earlier window\'s find is in «Улики», not on the place');
+    assert.equal(button(fixture.host, 'Осмотреть стол'), undefined, 'a finished window offers no action tiles');
+    assert.match(fixture.host.textContent, /Действия и переходы закрыты до следующего окна/);
+    await button(fixture.host, 'Ещё действовать').click(); await settle();
+    assert.ok(find(fixture.host, node => node.tagName === 'button' && node.textContent.includes('Осмотреть стол')), 'reopened on request');
+    fixture.handle.close();
+
+    const left = view();
+    left.self = {...left.self, status: 'departed', ap: 0};
+    left.menu = [];
+    fixture = controller(left);
+    await settle();
+    assert.match(fixture.host.textContent, /Участие завершено/);
+    assert.doesNotMatch(fixture.host.textContent, /Кто рядом|Здесь пока нет доступных действий|Можно перейти|из 3 действий/);
+    fixture.handle.close();
+});
+
 test('publish buttons name the evidence, a second publication is one card and own chat lines are marked', async () => {
     const state = view();
     state.self.account_id = VIEWER;

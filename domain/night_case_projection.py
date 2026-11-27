@@ -263,7 +263,9 @@ def _eligibility(case_doc, doc, actor, kind, params, now_utc):
         if ok and set(params["citations"]) <= {b["id"] for b in doc["public"]["board"]}: return "accepted", player, None
     elif kind == "vote":
         h = doc["hearing"]
-        if h and params["hearing_id"] == h["id"] and actor.account_id in h["eligible_accounts"] and set(params["citations"]) <= {b["id"] for b in doc["public"]["board"]}: return "accepted", player, None
+        # The accused may object but never support the accusation against their own hero (finding 3).
+        own_case = h is not None and player["character_id"] == h["suspect"] and params.get("choice") == "support"
+        if h and not own_case and params["hearing_id"] == h["id"] and actor.account_id in h["eligible_accounts"] and set(params["citations"]) <= {b["id"] for b in doc["public"]["board"]}: return "accepted", player, None
     elif kind == "final_vote":
         target = params["suspect"]
         alive = target is None or any(p["character_id"] == target and p["status"] in {"active", "fog"} for p in doc["players"]) or any(n["character_id"] == target and n["status"] == "active" for n in doc["npcs"])
@@ -403,7 +405,7 @@ def available_actions(case, rules, state, viewer, *, now_utc):
         entries.append(MenuChoice("choice", quote.selection_id, label, quote))
     board_ids = tuple(b["id"] for b in doc["public"]["board"])
     subjects = tuple(c["id"] for c in c["characters"] if any(p["character_id"] == c["id"] and p["status"] in {"active", "fog"} for p in doc["players"]) or any(n["character_id"] == c["id"] and n["status"] == "active" for n in doc["npcs"]))
-    for kind, params in (("claim", {"text": "x"}), ("accuse", {"suspect": subjects[0], "citations": []}) if subjects else ("accuse", {"suspect": "none", "citations": []}), ("vote", {"hearing_id": doc["hearing"]["id"], "choice": "support", "citations": []}) if doc["hearing"] else ("vote", {"hearing_id": "none", "choice": "support", "citations": []}), ("final_vote", {"suspect": None, "citations": []})):
+    for kind, params in (("claim", {"text": "x"}), ("accuse", {"suspect": subjects[0], "citations": []}) if subjects else ("accuse", {"suspect": "none", "citations": []}), ("vote", {"hearing_id": doc["hearing"]["id"], "choice": "oppose", "citations": []}) if doc["hearing"] else ("vote", {"hearing_id": "none", "choice": "oppose", "citations": []}), ("final_vote", {"suspect": None, "citations": []})):
         if _eligibility(c, doc, viewer, kind, params, now_utc)[0] == "accepted":
             entries.append(MenuForm("form", kind, kind, kind, 0, subjects if kind in {"accuse", "final_vote"} else (), board_ids if kind != "claim" else (), doc["hearing"]["id"] if kind == "vote" else None))
     if _enabled(c, "ghost_testimony"):

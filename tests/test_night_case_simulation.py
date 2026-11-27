@@ -22,11 +22,11 @@ CORE_TRACE_HASHES = (
     "7810f787aabe48873f757eb717fb23152cdfe9e9edf3c2b8da6c094cb48719da",
     "c46811f13d2a64754281dd9ac5a21287c3e8a2d6b1860bbc76c4280959f9bfff",
     "8153049297c7012ab6dce48833bd1e5f403d5be9860774a445639b66e7757da9",
-    "92f16e92cb02605b2dd8b9401601ff7c10d42a1f805fe34fbde97acafb858d1b",
+    "96459c6fc31930a731a1e362884c19144f2fb14c9735f690bde2d5bc2fb6b20a",  # the accused player opposes (finding 3)
     "c718a1a57d638da539f0e1187e13f01ea9bd6a34fbe64499f0fa01899bd46265",
-    None,  # Historical CLI output for this cell was truncated to 57 characters.
+    "56e6dda31bd0f91e91750c9acfa6f9d6650e9a4e7dc9fcf8c33ec8eb2fecb205",
     "29946ab48efd264f6e8ffe1b811a2ab9c3bf77f3a605613bfa33cadec10f144b",
-    "859a0ba07c9fcc243ab7ba915abd4142345b6231109947a82b565e76552fdc61",
+    "8411afd7ff6bd28b986d7c3349d21a27536a72378e0b30a28f34d8ec53fa8a64",  # the accused player opposes (finding 3)
 )
 
 

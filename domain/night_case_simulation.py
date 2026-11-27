@@ -518,10 +518,13 @@ def find_witness(case, rules, composition_id, variant_id, *, seed, budget=None, 
             if active:
                 reason = runner.form(active[0], "accuse", {"suspect": variant["culprit"], "citations": citations[:5]})
                 if reason is None:
+                    heroes = {p["account_id"]: p["character_id"] for p in doc["players"]}
                     for i, account in enumerate(active):
                         chunk = citations[5 + 5*i:10 + 5*i]
+                        # The accused cannot support the accusation against their own hero.
+                        choice = "oppose" if heroes.get(account) == variant["culprit"] else "support"
                         reason = runner.form(account, "vote", {"hearing_id": runner.transition.state.document()["hearing"]["id"],
-                                                             "choice": "support", "citations": chunk})
+                                                             "choice": choice, "citations": chunk})
                         if reason and reason != "unavailable": return _result(runner, "inconclusive", reason)
                 elif reason != "unavailable": return _result(runner, "inconclusive", reason)
         # Presence is a bounded once-per-window action; only needed to keep the table awake.

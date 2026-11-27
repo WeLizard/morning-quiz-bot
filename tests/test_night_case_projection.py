@@ -32,6 +32,25 @@ class ProjectionTests(unittest.TestCase):
         voted = quote_action(case, rules, t.state, voter, CommandIntent("vote", {"hearing_id": t.state.hearing["id"], "choice": "support", "citations": [board_id]}), now_utc=opened)
         self.assertEqual(voted.kind, "vote")
 
+    def test_the_accused_may_object_but_not_support_the_accusation_of_their_own_hero(self):
+        """Finding 3: the accused keeps the vote form, but only «Возражаю» is accepted from them."""
+        case, rules, _, t = setup()
+        actor, accused = PlayerActor("account0"), PlayerActor("account1")
+        for idx in range(2): t = tick(case, rules, t.state, command_id=f"advance{idx}")
+        opened = datetime.fromisoformat(t.state.clock["opened_at"].replace("Z", "+00:00"))
+        for account in ("account0", "account1"):
+            t = step(case, rules, t.state, PlayerActor(account), player_cmd(t.state, account, "seen", command_id=f"seen{account[-1]}000"), now_utc=opened)
+        hero = next(p["character_id"] for p in t.state.players if p["account_id"] == accused.account_id)
+        t = step(case, rules, t.state, actor, player_cmd(t.state, actor.account_id, "accuse", {"suspect": hero, "citations": []}, "accuse01"), now_utc=opened)
+        hearing = t.state.hearing["id"]
+        with self.assertRaises(ValueError):
+            quote_action(case, rules, t.state, accused, CommandIntent("vote", {"hearing_id": hearing, "choice": "support", "citations": []}), now_utc=opened)
+        self.assertEqual(quote_action(case, rules, t.state, accused, CommandIntent("vote", {"hearing_id": hearing, "choice": "oppose", "citations": []}), now_utc=opened).kind, "vote")
+        forms = [e for e in available_actions(case, rules, t.state, accused, now_utc=opened) if isinstance(e, MenuForm)]
+        self.assertIn("vote", [form.command_kind for form in forms])
+        # Others may still support it.
+        self.assertEqual(quote_action(case, rules, t.state, actor, CommandIntent("vote", {"hearing_id": hearing, "choice": "support", "citations": []}), now_utc=opened).kind, "vote")
+
     def test_quote_flag_predicate_uses_json_dependency(self):
         raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
         raw["flags"] = [{"id": "lamp_lit", "initial": True}]

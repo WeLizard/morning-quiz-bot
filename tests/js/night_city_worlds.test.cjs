@@ -11,6 +11,9 @@ const root = path.resolve(__dirname, '..', '..');
 const SOURCE = fs.readFileSync(path.join(root, 'web/mini_client/night-city-ui.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(root, 'web/mini_client/night-city.css'), 'utf8');
 const DIR = path.join(root, 'web/mini_client/night');
+// The built packs live outside git (MQB-012: web/mini_client/night/ is in .git/info/exclude),
+// so a clean checkout such as CI cannot check them. Tests that read them skip there, by name.
+const SHIPPED = fs.existsSync(path.join(DIR, 'worlds', 'index.json')) ? {} : {skip: 'web/mini_client/night/ is not built here (outside git)'};
 
 class Node {
     constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.dataset = {}; this.events = {}; this.style = {props: {}, setProperty(k, v) { this.props[k] = v; }, removeProperty(k) { delete this.props[k]; }};
@@ -45,7 +48,7 @@ const realFiles = () => {
     return files;
 };
 
-test('a world pack gives scenes by slot and time, portraits, emblems, frames and the palette; the shell has none of them', async () => {
+test('a world pack gives scenes by slot and time, portraits, emblems, frames and the palette; the shell has none of them', SHIPPED, async () => {
     const {kit, doc} = load({files: realFiles()});
     assert.equal(kit.world, null);
     assert.equal(kit.sceneUrl({slot: 'lobby', time: 'evening'}), '/app/night/shell/skyline.svg', 'no pack: the shell scene');
@@ -73,7 +76,7 @@ test('a world pack gives scenes by slot and time, portraits, emblems, frames and
     assert.ok(!('--nc-accent' in doc.documentElement.style.props) && !doc.documentElement.dataset.ncWorld);
 });
 
-test('missing slots borrow the neighbour (vote → day → lobby, out → night → lobby, finale → cover → title), then the shell scene', async () => {
+test('missing slots borrow the neighbour (vote → day → lobby, out → night → lobby, finale → cover → title), then the shell scene', SHIPPED, async () => {
     const pack = JSON.parse(JSON.stringify(readJson('worlds/manor_lake/pack.json')));
     const {kit} = load({files: {'/app/night/worlds/index.json': {worlds: []}, '/app/night/worlds/manor_lake/pack.json': pack}});
     const use = changes => { const copy = JSON.parse(JSON.stringify(pack)); for (const [slot, value] of Object.entries(changes)) { if (value === null) delete copy.scenes[slot]; else copy.scenes[slot] = value; } copy.v = ''; kit.useWorld(copy); };
@@ -99,7 +102,7 @@ test('missing slots borrow the neighbour (vote → day → lobby, out → night 
     assert.equal(name({slot: 'day', time: 'day'}), 'scene_day_day.webp', 'exact time wins');
 });
 
-test('a pack that fails to load leaves the shell: no exception, no palette, vector scene', async () => {
+test('a pack that fails to load leaves the shell: no exception, no palette, vector scene', SHIPPED, async () => {
     const {kit, doc} = load({files: realFiles(), fail: new Set(['/app/night/worlds/neon_city/pack.json'])});
     assert.equal(await kit.loadPack('neon_city'), null);
     kit.useWorld(null);
@@ -113,7 +116,7 @@ test('a pack that fails to load leaves the shell: no exception, no palette, vect
     assert.equal(await none.kit.worldIndex(), null, 'no index: null, not a throw');
 });
 
-test('shell backgrounds are swappable by slot (shell.json); a missing slot, file or json falls back to skyline.svg', async () => {
+test('shell backgrounds are swappable by slot (shell.json); a missing slot, file or json falls back to skyline.svg', SHIPPED, async () => {
     const {kit} = load({files: {'/app/night/shell/shell.json': {scenes: {entry: 'entry_night.webp', rooms: 'skyline.svg', invite: '../../etc/passwd', loading: 5}}}});
     assert.equal(kit.shellUrl('entry'), '/app/night/shell/skyline.svg', 'not loaded yet');
     await kit.loadShell();
@@ -161,7 +164,7 @@ test('a screen drawn before shell.json arrived gets its picture when it does', a
     assert.equal(strip.style.props['--img'], 'url(/app/night/shell/shell_invite_portrait.webp)');
 });
 
-test('every shipped pack is complete for the client: slots, 17 portraits, emblems, frames, palette, files on disk', () => {
+test('every shipped pack is complete for the client: slots, 17 portraits, emblems, frames, palette, files on disk', SHIPPED, () => {
     const index = readJson('worlds/index.json');
     assert.ok(index.worlds.length >= 11, 'the 11 built worlds and the ones added since');
     for (const entry of index.worlds) {

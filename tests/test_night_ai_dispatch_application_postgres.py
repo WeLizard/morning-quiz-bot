@@ -34,6 +34,11 @@ from tests import test_night_case_application as app_base
 from tests.test_night_ai_gateway_policy import FakeStream
 
 
+# These waits only catch a hang (a dispatcher that never reaches the network,
+# or a revoke that blocks on the in-flight call). They do not measure speed:
+# a cold CI runner or a debug event loop can take several seconds to get there.
+HANG_GUARD=30
+
 class ModelStream(FakeStream):
     def __init__(self,backend,peer):
         super().__init__(b'',peer);self.backend=backend;self.built=False
@@ -209,6 +214,17 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         async with self.db.transaction() as s:
             result=await self.service(s).execute(account_id=actor,game_id=game,command=command)
         self.assertTrue(result['receipt']['accepted'],result['receipt']);return result
+
+    async def forfeit_until_finished(self,game):
+        # The culprit is drawn at random at start. When the culprit is the last
+        # seat, the case ends with no investigators before that seat can leave,
+        # and a finished case accepts no forfeit. Leave until the case is over.
+        for actor in self.accounts[:4]:
+            async with self.db.transaction() as s:
+                if (await s.get(NightGameSealed,game)).lifecycle=='finished':return
+            await self.play(game,actor,'forfeit')
+        async with self.db.transaction() as s:
+            self.assertEqual((await s.get(NightGameSealed,game)).lifecycle,'finished')
 
     async def open_route(self,game):
         for actor,action,proof in ((self.owner,'inspect_key','proof_common'),(self.accounts[1],'inspect_mechanism','proof_mechanism')):
@@ -468,7 +484,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.backend.release=asyncio.Event()
         task=asyncio.create_task(self.dispatcher.dispatch(DispatchSource('intent',work.id),actor=AccountPrincipal(self.owner),worker_id='intent:test'))
         try:
-            await asyncio.wait_for(self.backend.entered.wait(),2)
+            await asyncio.wait_for(self.backend.entered.wait(),HANG_GUARD)
             await change(game,binding)
             async with self.db.transaction() as s:before=(await s.get(NightGameSealed,game)).kernel
         finally:self.backend.release.set()
@@ -497,7 +513,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_late_terminal_result_cannot_create_proposal(self):
         async def change(game,binding):
-            for actor in self.accounts[:4]:await self.play(game,actor,'forfeit')
+            await self.forfeit_until_finished(game)
         await self.late_result(change)
 
     async def test_late_source_expiry_cannot_create_proposal(self):
@@ -534,7 +550,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         from application.account_merge import AccountMergeService
         from storage.admin_actions import operation_fence
         async def change(game,binding):
-            for actor in self.accounts[:4]:await self.play(game,actor,'forfeit')
+            await self.forfeit_until_finished(game)
             async with self.db.transaction() as s:
                 await operation_fence(s,exclusive=True)
                 merge=AccountMergeService(clock=lambda:self.now.timestamp())
@@ -568,7 +584,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.backend.release=asyncio.Event()
         task=asyncio.create_task(self.dispatcher.dispatch(source,actor=worker,worker_id=worker.worker_id))
         try:
-            await asyncio.wait_for(self.backend.entered.wait(),2)
+            await asyncio.wait_for(self.backend.entered.wait(),HANG_GUARD)
             async with self.db.transaction() as s:
                 winner=await self.service(s).get_rendering(account_id=self.owner,game_id=game,job_id=source.id)
                 self.assertEqual(winner['source'],'authored')
@@ -712,7 +728,7 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         task=asyncio.create_task(facade.propose_intent(account_id=self.owner,game_id=game,request_id=uuid4().hex,
             text='Осмотреться',transaction_factory=authenticated_transaction))
         try:
-            await asyncio.wait_for(self.backend.entered.wait(),2)
+            await asyncio.wait_for(self.backend.entered.wait(),HANG_GUARD)
             self.assertEqual(self.backend.contexts,0)
             async with self.db.transaction() as s:(await s.get(GuestSession,GuestSession.key(token))).revoked=True
         finally:self.backend.release.set()
@@ -728,10 +744,10 @@ class DispatchApplicationPostgresTests(unittest.IsolatedAsyncioTestCase):
         self.backend.release=asyncio.Event()
         task=asyncio.create_task(self.dispatcher.dispatch(DispatchSource('intent',work.id),actor=AccountPrincipal(self.owner),worker_id='intent:test'))
         try:
-            await asyncio.wait_for(self.backend.entered.wait(),2)
+            await asyncio.wait_for(self.backend.entered.wait(),HANG_GUARD)
             async with self.db.transaction() as s:
                 before=(await s.get(NightGameSealed,game)).kernel
-                await asyncio.wait_for(self.ai(s).revoke_binding(operator=self.admin,binding_id=binding,client_request_id=uuid4().hex),2)
+                await asyncio.wait_for(self.ai(s).revoke_binding(operator=self.admin,binding_id=binding,client_request_id=uuid4().hex),HANG_GUARD)
         finally:self.backend.release.set()
         result=await task;self.assertEqual(result.result['kind'],'clarification')
         async with self.db.transaction() as s:

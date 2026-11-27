@@ -109,7 +109,8 @@ jobs:
 
       - name: Run JavaScript tests
         if: ${{ !cancelled() }}
-        run: node --test tests/js/mini_navigation.test.cjs tests/js/alchemy_sync.test.cjs tests/js/night_case_ui.test.cjs tests/js/night_city_wiring.test.cjs
+        # The whole suite: a hand-picked list let the farm tests drift unnoticed (2026-11-27).
+        run: node --test tests/js/*.test.cjs
 
       - name: Run repository checks
         if: ${{ !cancelled() }}

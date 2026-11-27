@@ -10,6 +10,9 @@ const {runInNewContext} = require('node:vm');
 const root = path.resolve(__dirname, '..', '..');
 const SOURCE = fs.readFileSync(path.join(root, 'web/mini_client/night-city-ui.js'), 'utf8');
 const DIR = path.join(root, 'web/mini_client/night');
+// The built packs live outside git (MQB-012: web/mini_client/night/ is in .git/info/exclude),
+// so a clean checkout such as CI cannot check them. Tests that read them skip there, by name.
+const SHIPPED = fs.existsSync(path.join(DIR, 'worlds', 'index.json')) ? {} : {skip: 'web/mini_client/night/ is not built here (outside git)'};
 const readJson = file => JSON.parse(fs.readFileSync(path.join(DIR, file), 'utf8'));
 
 const kit = (() => {
@@ -268,7 +271,7 @@ test('music and volume are profile settings independent of reduced motion', () =
     assert.doesNotMatch(SOURCE, /id: 'nc-music/);
 });
 
-test('shipped music: every world has day / night / finale files, AAC in m4a, durations match', () => {
+test('shipped music: every world has day / night / finale files, AAC in m4a, durations match', SHIPPED, () => {
     const index = readJson('worlds/index.json');
     assert.ok(index.worlds.length >= 15, index.worlds.length);
     for (const world of index.worlds) {

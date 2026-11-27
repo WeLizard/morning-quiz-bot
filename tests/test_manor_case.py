@@ -152,7 +152,8 @@ class Play:
         else:
             self.cmd("investigator", "accuse", {"suspect": "lawyer", "citations": citations})
             for char in active:
-                self.cmd(char, "vote", {"hearing_id": self.doc["hearing"]["id"], "choice": "support", "citations": []})
+                # The accused may only object to the accusation against their own hero (finding 3).
+                self.cmd(char, "vote", {"hearing_id": self.doc["hearing"]["id"], "choice": "oppose" if char == "lawyer" else "support", "citations": []})
         self.tick()
         if not final:
             while self.doc["hearing"] is not None and self.doc["final"] is None:

@@ -1,6 +1,8 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
 const code=fs.readFileSync(path.join(__dirname,'../../qw_farm/static/invite.js'),'utf8').replaceAll('export async function ','async function ').replaceAll('export function ','function ');
 const ID='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+// The real one-line date helper of the farm client, for slices that format dates.
+const displayDateOf=source=>{const at=source.indexOf('const displayDate=');return source.slice(at,source.indexOf('\n',at));};
 const SHARE_TOKEN='A'.repeat(43);
 function env(search='',tg=null,navigator=undefined){const memory=new Map(), opened=[];const context={URL,URLSearchParams,navigator,innerWidth:800,innerHeight:600,location:{search,hash:'',href:'https://qw.example/app/farm'+search},history:{replaceState(a,b,url){context.location.search=url.search;}},window:{Telegram:tg?{WebApp:tg}:undefined,open(...args){opened.push(args)}},sessionStorage:{setItem(k,v){memory.set(k,v)},getItem(k){return memory.get(k)||null},removeItem(k){memory.delete(k)}},document:{documentElement:{style:{setProperty(){},removeProperty(){}}}},setTimeout};vm.createContext(context);vm.runInContext(code+'\nObject.assign(globalThis,{parseInvite,parseInviteHint,incomingInvite,clearInvite,openTelegram,shareData,mailtoUrl,shareLink})',context);return {context,memory,opened};}
 test('UUID, web invitation and Main Mini App start payload parse to public id',()=>{const {context:c}=env();for(const value of [ID,ID.toUpperCase(),'farm_'+ID,'https://qw.example/app/farm?invite='+ID,'https://t.me/QuizzyBot?startapp=farm_'+ID])assert.equal(c.parseInvite(value),ID);});
@@ -98,11 +100,11 @@ test('Actual refresh discards late account and visit responses before changing t
  const poll=source.slice(source.indexOf('let polling=false;'),source.indexOf('let readyTimer=null'));
  const account=id=>({farm:{id,server_time:Date.now()/1000},speed:1});
  const S={me:account('a').farm,farm:account('a').farm,catalog:{},config:{demo:true},tab:'neighbors'};
- const calls=[],pending=[];
+ const calls=[],pending=[],problems=[];
  const scene={set:farm=>calls.push(['scene',farm.id]),fit:()=>{}};
  const document={hidden:false,activeElement:null,body:{classList:{remove(){}}}};
- const context={S,FRIEND_REQUESTS:{notify(){}},API:'/api/farm/v1',Date,scene,document,panelRenderSignature:'old',panelSnapshot:()=>'new',fertStock:()=>0,hasHeap:()=>false,dashaGame:{render(){}},dashaGameOpen:false,olegGame:null,olegGameOpen:false,closeOlegGame(){return true;},ballistaGame:null,ballistaGameOpen:false,closeBallistaGame(){return true;},pieGame:null,santaGame:null,santaGameOpen:false,pieGameOpen:false,closePieGame(){return true;},lastSessionRenewal:Date.now(),RENEW_AFTER:60000,now:()=>Date.now()/1000,
-  request:path=>new Promise(resolve=>pending.push({path,resolve})),updateHUD:()=>calls.push(['hud']),renderSeeds:()=>{},updateReady:()=>{},renderPanel:()=>calls.push(['panel']),renderRail:()=>{},showPanel:()=>{},queueNeighborGifts:()=>{},syncOrchardBadge:()=>{},syncMenuBadges:()=>{},orchardNotices:()=>{},connection:()=>{},toast:()=>{},showLogin:()=>{calls.push(['login']);S.me=S.farm=null;},
+ const context={S,FRIEND_REQUESTS:{notify(){}},API:'/api/farm/v1',Date,lastSessionRenewal:Date.now(),RENEW_AFTER:60000,syncFarmMotion:()=>{},scene,document,panelRenderSignature:'old',panelSnapshot:()=>'new',fertStock:()=>0,hasHeap:()=>false,dashaGame:{render(){}},dashaGameOpen:false,olegGame:null,olegGameOpen:false,closeOlegGame(){return true;},ballistaGame:null,ballistaGameOpen:false,closeBallistaGame(){return true;},pieGame:null,santaGame:null,santaGameOpen:false,pieGameOpen:false,closePieGame(){return true;},lastSessionRenewal:Date.now(),RENEW_AFTER:60000,now:()=>Date.now()/1000,
+  request:path=>new Promise(resolve=>pending.push({path,resolve})),updateHUD:()=>calls.push(['hud']),renderSeeds:()=>{},updateReady:()=>{},renderPanel:()=>calls.push(['panel']),renderRail:()=>{},showPanel:()=>{},queueNeighborGifts:()=>{},syncOrchardBadge:()=>{},syncMenuBadges:()=>{},orchardNotices:()=>{},connection:(message,failed)=>{if(failed)problems.push(message);},toast:()=>{},showLogin:()=>{calls.push(['login']);S.me=S.farm=null;},
   '$':()=>({open:false}),JSON};
  vm.createContext(context);vm.runInContext(refresh+'\n'+navigation+'\n'+selectTab+'\n'+poll+'\nObject.assign(globalThis,{refresh,visit,backHome,selectTab,poll})',context);
  const oldAccount=context.refresh({render:false});const first=pending.at(-1);assert.equal(first.path,'/api/farm/v1/me');
@@ -128,6 +130,7 @@ test('Actual refresh discards late account and visit responses before changing t
  assert.equal(panels,panelsBefore);
  document.activeElement=null;const nextPoll=context.poll();pending.at(-1).resolve(account('b'));await nextPoll;
  assert.equal(calls.filter(([kind])=>kind==='panel').length,panels+1);
+ assert.deepEqual(problems,[]);
 });
 
 const INFO={code:ID,web_url:'https://qw.example/app/farm?invite='+ID,mini_app_url:'https://t.me/QuizzyBot/play?startapp=farm_'+ID};
@@ -187,7 +190,7 @@ test('Viewing neighbors does not issue a token; cancelling the system share keep
   field:()=>[element(),element()],copyText:()=>()=>{},safe:fn=>fn,
   shareLink:async()=> 'cancelled',mailtoUrl:()=> 'mailto:?body=hello',openTelegram:()=>assert.fail('async popup'),toast:()=>{},modal:(title,content)=>modals.push([title,content]),
   request:async(url,options)=>{calls.push([url,options]);if(url.endsWith('/invite/share'))return {token,mini_app_url:'https://t.me/QuizzyBot/play?startapp=farm_'+token,share_url:'https://t.me/share/url?url=hello'};return info;}};
- vm.createContext(context);vm.runInContext(fn+'\nObject.assign(globalThis,{renderSharing})',context);
+ vm.createContext(context);vm.runInContext(displayDateOf(source)+'\n'+fn+'\nObject.assign(globalThis,{renderSharing})',context);
  context.renderSharing(element());await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(calls.map(([url])=>url),['/api/farm/v1/invite']);
  await buttons.find(b=>b.textContent==='Поделиться приглашением').action();
@@ -210,7 +213,7 @@ test('Telegram: the prepared message opens the native chat picker on every tap',
   field:()=>[element(),element()],copyText:()=>()=>{},safe:fn=>fn,
   shareLink:async()=> 'shared',mailtoUrl:()=> 'mailto:?body=hello',openTelegram:()=>assert.fail('fallback link'),toast:()=>{},modal:()=>assert.fail('fallback modal'),
   request:async(url,options)=>{calls.push([url,options]);if(url.endsWith('/invite/share'))return {token,mini_app_url:'https://t.me/QuizzyBot/play?startapp=farm_'+token,share_url:'https://t.me/share/url?url=hello',prepared_message_id:'prep-1'};return info;}};
- vm.createContext(context);vm.runInContext(fn+'\nObject.assign(globalThis,{renderSharing})',context);
+ vm.createContext(context);vm.runInContext(displayDateOf(source)+'\n'+fn+'\nObject.assign(globalThis,{renderSharing})',context);
  context.renderSharing(element());await new Promise(resolve=>setImmediate(resolve));
  const pick=buttons.find(b=>b.textContent==='Выбрать чат в Telegram');
  await pick.action();await pick.action();await pick.action();
@@ -227,7 +230,7 @@ test('Local-only invite shows the farm code without issuing a token',async()=>{
   el:(tag,text)=>element(text),card:(text)=>element(text),note:()=>{},renderInviteRewards:()=>{},
   button:(label)=>{buttons.push(label);return element(label);},copyText:()=>()=>{},
   request:async url=>{calls.push(url);return {code:ID,farm_name:'Ферма',rewards:null,local_only:true};}};
- vm.createContext(context);vm.runInContext(fn+'\nObject.assign(globalThis,{renderSharing})',context);
+ vm.createContext(context);vm.runInContext(displayDateOf(source)+'\n'+fn+'\nObject.assign(globalThis,{renderSharing})',context);
  context.renderSharing(element());await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(calls,['/api/farm/v1/invite']);
  assert.deepEqual(buttons,['Скопировать код фермы']);

@@ -1292,3 +1292,33 @@ test('screen 10: the board on the left signed «герой · игрок · ок
     assert.match(dock.textContent, /Опубликовать: Ключ сервисной панели · 1 действие из 3/);
     fixture.handle.close();
 });
+
+test('screen 11: «Досье» — who you are, the goal and the secret on the left; notes to you and your events, newest first, on the right', async () => {
+    const state = feedState();
+    state.self.faction = 'investigation';
+    state.self.role = {title: 'Садовник', age: 35, bio: {text: 'Пахнет землёй даже в декабре.'}};
+    state.self.goal = {body: {text: 'Дождаться конца метели и выкопать.'}, criteria: {text: 'Предмет у тебя к финалу.'}};
+    state.self.secrets = [{text: 'В кадке зимнего сада ты закопал чужой предмет.'}];
+    state.public.looks.housekeeper.title_forms.gen = 'Экономки';
+    const lines = [...feedLines,
+        {id: 'w1', sender_account_id: 'a3', channel: 'whisper', window_idx: 5, at: '2026-11-16T09:10:00Z', text: 'Ключ с биркой я видела у адвоката.'},
+        {id: 'w2', sender_account_id: VIEWER, channel: 'whisper', window_idx: 5, at: '2026-11-16T09:20:00Z', text: 'Моя записка, её здесь нет.'}];
+    const own = [{event_id: 'p1', kind: 'observation_granted', window_idx: 3, payload: {observation_id: 'scarf'}},
+        {event_id: 'p2', kind: 'observation_granted', window_idx: 5, payload: {observation_id: 'scarf'}}];
+    const fixture = controller(state, url => url.includes('stream=self') ? {items: own, next_cursor: null}
+        : url.includes('stream=messages') ? {items: lines, next_cursor: null} : undefined, {worldArt: true});
+    await settle();
+    await button(fixture.host, 'Досье').click(); await settle();
+    assert.ok(fixture.calls.some(call => call.url.includes('stream=messages')), 'the notes come with the dossier');
+    const walk = node => [node, ...(node.children || []).filter(child => child && child.children).flatMap(walk)];
+    const columns = walk(fixture.host).filter(node => node.className === 'nc-col');
+    assert.equal(columns.length, 2, 'two columns as on the mockup');
+    assert.match(columns[0].textContent, /Видишь только ты.*Садовник.*35 лет.*Знак Следствия.*Пахнет землёй/);
+    assert.match(columns[0].textContent, /Цель.*Дождаться конца метели.*Как засчитывается: Предмет у тебя к финалу/);
+    assert.match(columns[0].textContent, /Тайна.*В кадке зимнего сада/);
+    assert.ok(walk(columns[0]).some(node => node.tagName === 'img' && /emblem_investigation/.test(node.src)), 'the side sign');
+    assert.match(columns[1].textContent, /Записки.*от Экономки.*Вера.*окно 5.*Ключ с биркой.*Записку видишь только ты/);
+    assert.doesNotMatch(columns[1].textContent, /Моя записка|Ключ оставался изнутри/, 'only private lines from others');
+    assert.match(columns[1].textContent, /Твои события.*Окно 5.*Окно 3/, 'newest first');
+    fixture.handle.close();
+});

@@ -451,7 +451,7 @@ function open(options) {
     }
     const loadTab = async key => {
         if (key === 'feed') { await loadHistory('public'); await loadHistory('messages'); }
-        if (key === 'self') await loadHistory('self');
+        if (key === 'self') { await loadHistory('self'); await loadHistory('messages'); }
     };
     async function refresh({preserveUI = false} = {}) {
         if (!live() || reading) return;
@@ -1121,6 +1121,7 @@ function open(options) {
         return figure;
     }
     function role(turning = false) {
+        if (!turning) return dossier();
         const own = view.self, data = own.role || {}, faction = SIDES[own.faction] ? own.faction : 'investigation';
         const look = [data.name, data.age ? plural(Number(data.age), 'год', 'года', 'лет') : ''].filter(Boolean).join(', ');
         return [put(el('section', 'ncase-reveal'), put(el('div', 'ncase-rolewrap'), roleCard(data, faction, turning), put(el('div', 'ncase-role-copy'),
@@ -1128,9 +1129,39 @@ function open(options) {
             arr(own.secrets).length ? card('seal', 'Твоя тайна', '', ...arr(own.secrets).map(item => kit.secret(bodyText(item)))) : null,
             card('laurel', 'Твоя цель', '', p(bodyText(own.goal?.body)), el('h3', 'nc-h3', 'Как засчитывается цель'), p(bodyText(own.goal?.criteria)),
                 ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`))),
-            own.truth ? card('eye', 'Что ты знаешь о случившемся', '', kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method))) : null,
-            arr(own.modules?.archive_requests?.requests).length ? card('papers', 'Запросы в архив', '', ...arr(own.modules.archive_requests.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоих событиях.'))) : null))),
-            turning ? null : ownEvents()];
+            own.truth ? card('eye', 'Что ты знаешь о случившемся', '', kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method))) : null)))];
+    }
+    // Screen 11 «Досье» (mockup 11): who you are, the goal and the secret on the left; notes for you and your events on the right.
+    function dossier() {
+        const own = view.self, data = own.role || {}, faction = SIDES[own.faction] ? own.faction : 'investigation', char = own.character_id;
+        const side = el('span', 'ncase-side', SIDES[faction][1]), emblem = kit.art?.(`emblem_${faction}`);
+        if (emblem) { const image = el('img'); image.src = emblem; image.alt = ''; side.prepend(image); }
+        const person = [data.name, data.age ? plural(Number(data.age), 'год', 'года', 'лет') : ''].filter(Boolean).join(', ');
+        const me = card(null, '', '', put(el('div', 'ncase-me'), portraitFrame(char, face(char, 'ncase-face lg')),
+            put(el('div'), el('span', 'nc-eyebrow', 'Видишь только ты'), el('strong', null, data.title || heroTitle(char) || 'Твоя роль'),
+                person ? el('span', 'nc-muted', person) : null, side)),
+            bodyText(data.bio) ? el('p', 'nc-muted', bodyText(data.bio)) : null);
+        const goal = card('laurel', 'Цель', '', el('p', 'nc-lead', bodyText(own.goal?.body)),
+            bodyText(own.goal?.criteria) ? el('p', 'nc-muted', `Как засчитывается: ${bodyText(own.goal.criteria)}`) : null,
+            ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`)));
+        const secrets = arr(own.secrets).length ? card('seal', 'Тайна', '', put(el('div', 'ncase-secrets'), ...arr(own.secrets).map(item => kit.secret(bodyText(item))))) : null;
+        const truth = own.truth ? card('eye', 'Что ты знаешь о случившемся', '', put(el('div', 'ncase-secrets'), kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method)))) : null;
+        const archive = arr(own.modules?.archive_requests?.requests).length ? card('papers', 'Запросы в архив', '', ...arr(own.modules.archive_requests.requests)
+            .map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ — в твоих событиях.'))) : null;
+        const column = (...children) => put(el('div', 'nc-col'), ...children.filter(Boolean));
+        return [column(me, goal, secrets, truth), column(notes(), ownEvents(), archive)];
+    }
+    // «Записки»: private lines other players sent you (a private talk at one place); you answer them in «Гостиная» — «Приватно».
+    function notes() {
+        const own = view.self.account_id;
+        const rows = pages.messages.items.filter(row => row.channel === 'whisper' && row.sender_account_id !== own).slice().reverse();
+        if (!rows.length) return null;
+        return card('envelope', 'Записки', plural(rows.length, 'записка', 'записки', 'записок'), ...rows.map(row => {
+            const char = charOfAccount(row.sender_account_id), seat = arr(view.public.players).find(item => item.account_id === row.sender_account_id);
+            return put(el('article', 'ncase-note'), put(el('div', 'from'), char ? portraitFrame(char, face(char, 'ncase-face xs')) : null,
+                put(el('span', 'ncase-who'), el('span', 'nm', char ? `от ${heroAs(char, 'gen')}` : 'от участника'), seat ? el('span', 'ncase-tag', seatName(seat)) : null),
+                row.window_idx ? el('span', 'nc-muted', `окно ${row.window_idx}`) : null), p(row.text));
+        }), el('p', 'nc-muted', 'Записку видишь только ты. Ответить можно в «Гостиной» — «Приватно», если вы в одном месте.'));
     }
     /* Screen 6: in the first window the role comes as a card back; a tap turns it over, «Понятно, в усадьбу» goes to the
        place. Remembered for this session only: the client keeps nothing of the case on the device. */
@@ -1730,19 +1761,21 @@ function open(options) {
     }
     const EVENT_SIGN = {window: 'moon', board: 'papers', observation_granted: 'lens', archive_requested: 'papers', hearing: 'scales', status: 'people',
         npc_revealed: 'eye', world_changed: 'house', version_marked: 'story', ghost_whispered: 'envelope', ghost_whisper_received: 'envelope',
-        testimony_asked: 'talk', testimony_answered: 'talk', final: 'laurel', afk_notice: 'hourglass', window_digest: 'calendar', story_return_closed: 'envelope', scene: 'eye'};
+        testimony_asked: 'talk', testimony_answered: 'talk', action_result: 'lens', final: 'laurel', afk_notice: 'hourglass', window_digest: 'calendar', story_return_closed: 'envelope', scene: 'eye'};
     // «Досье» keeps the personal part of the old chronicle: own finds, moves and notes by window.
     function ownEvents() {
+        const found = new Map([...arr(view.public.observations), ...arr(view.self.observations)].map(item => [item.observation_id, item]));
         const entry = item => {
             const payload = item.payload || {};
-            const pic = put(el('span', 'sign'), icon(EVENT_SIGN[item.kind] || 'calendar'));
+            const art = assets.get(found.get(payload.observation_id || arr(payload.observation_ids)[0])?.art?.asset_id);
+            const pic = art ? Object.assign(el('img', 'obj'), {src: art.url, alt: '', loading: 'lazy'}) : put(el('span', 'sign'), icon(EVENT_SIGN[item.kind] || 'calendar'));
             return put(el('li'), pic, put(el('div'), el('span', 'when', `Окно ${item.window_idx}`), p(eventText(item)),
                 ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : [])));
         };
-        const items = pages.self.items;
-        return card('seal', 'Твои события', items.length ? plural(items.length, 'запись', 'записи', 'записей') : '',
-            pages.self.next_cursor ? kit.row(button('Раньше', async () => { await loadHistory('self', true); render(); })) : null,
-            items.length ? put(el('ul', 'ncase-chron'), ...items.map(entry)) : p('Пока ничего: твои находки, переходы и записки появятся здесь.'));
+        const items = pages.self.items.slice().reverse();
+        return card('calendar', 'Твои события', items.length ? plural(items.length, 'запись', 'записи', 'записей') : '',
+            items.length ? put(el('ul', 'ncase-chron'), ...items.map(entry)) : p('Пока ничего: твои находки, переходы и записки появятся здесь.'),
+            pages.self.next_cursor ? kit.row(button('Раньше', async () => { await loadHistory('self', true); render(); })) : null);
     }
     // 14 «Дело закрыто»: the played variant's picture and text, the own result, and who was who (hero first, player as a plate).
     const PARTS = {culprit: 'виновный', accomplice: 'сообщник Тени'};

@@ -501,7 +501,7 @@ async def exercise(port, output, *, with_farm=False, identity_only=False, identi
                 await page.wait_for_function('(window) => document.querySelector(".nc-title h1")?.textContent.startsWith("Окно " + window + " ·")', arg=refreshed['public']['clock']['window_idx'])
                 return refreshed
             await page.get_by_role('button', name='Досье', exact=True).click()
-            await page.get_by_role('heading', name='Как засчитывается цель', exact=True).wait_for()
+            await page.get_by_role('heading', name='Цель', exact=True).wait_for()
             if identity_only:
                 report['scope'] = 'night_case_identity_focused_fence' if identity_focused else 'night_case_identity_fence'
                 target = next(i for i in range(4) if i != actor)
@@ -556,7 +556,7 @@ async def exercise(port, output, *, with_farm=False, identity_only=False, identi
                     await reopen(page)
                 assert (await (await restored.value).json())['viewer_account_id'] == viewer_pins[actor]
                 await page.get_by_role('button', name='Досье', exact=True).click()
-                await page.get_by_role('heading', name='Как засчитывается цель', exact=True).wait_for()
+                await page.get_by_role('heading', name='Цель', exact=True).wait_for()
                 assert a_role in await page.locator('body').inner_text()
                 assert b_role not in await page.locator('body').inner_text()
                 report['steps'].extend(['cookie_A_to_B_focused_unsent_draft_background_probe_and_same_sequence_seen_no_B_effect' if identity_focused else 'cookie_A_to_B_old_forfeit_and_same_sequence_seen_profile_changed_no_B_effect',

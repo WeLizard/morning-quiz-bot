@@ -93,7 +93,7 @@ test('every pack group reaches a case screen, except the ones listed as not draw
     const live = controller(fullView(art), url => url === art.pointer ? art.manifest : undefined, {worldArt: true});
     await settle();
     for (const url of addresses(live.host)) seen.add(url);
-    for (const label of ['Место', 'Досье', 'Улики', 'Беседа', 'Хроника']) {
+    for (const label of ['Место', 'Гостиная', 'Улики', 'Досье']) {
         const tab = find(live.host, node => node.tagName === 'button' && node.textContent.trim() === label);
         assert.ok(tab, `tab ${label}`);
         await tab.click(); await settle();

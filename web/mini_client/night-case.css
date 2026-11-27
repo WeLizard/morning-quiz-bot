@@ -320,6 +320,11 @@
 .ncase-hearing-note strong{display:block;font:700 var(--qw-fs-small)/1.3 var(--qw-font)}
 .ncase-hearing-note .nc-muted{display:block}
 .ncase-hearing-note .qw-btn{grid-column:1/-1;justify-self:start}
+/* Screen 9: a publication without a picture keeps the slot with its sign; a feed line with «Прочитать описание» */
+.ncase-pub-sign{display:grid;place-items:center;width:52px;height:52px;border-radius:8px;background:var(--nc-surface-2)}
+.ncase-feed-note{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ncase-compose .ncase-channels,.ncase-compose .ncase-recipients{margin-bottom:var(--qw-s-2)}
+.ncase-compose .ncase-recipients{display:flex;flex-wrap:wrap;gap:4px 12px}
 
 /* ---------- 11 dossier: a note (whisper) ---------- */
 .ncase-note{padding:12px 14px;border-radius:4px 14px 14px 14px;background:linear-gradient(180deg,rgb(42 36 24),rgb(31 26 18));border:1px solid var(--nc-edge-soft);box-shadow:0 6px 14px rgb(0 0 0/.35)}

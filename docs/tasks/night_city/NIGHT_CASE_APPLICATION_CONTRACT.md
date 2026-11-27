@@ -445,7 +445,7 @@ Principal = verified Account UUID от существующего room_principal
 | get_view | game_id, principal; `{game_id,mode,public,self,menu,server_now,runtime_status}`. Self только свой, никаких raw snapshot/seed/общих counters. |
 | quote | game_id, CommandIntent; конкретный LegalAction/cost/own revision. Не расходует AP/квоту. |
 | execute | game_id, строгий Command; `{receipt,caused_event_ids,caused_message_ids}` по own/public scope. Повтор не приклеивает свежий чужой view к старой receipt. |
-| history | game_id, stream=`public|self|messages`, cursor, limit1..50; разрешённые страницы, отдельные cursors. Никакого общего total count. |
+| history | game_id, stream=`public|self|messages`, cursor, limit1..50, latest=false; разрешённые страницы, отдельные cursors. Никакого общего total count. Каждая запись несёт `at` (время записи, UTC). `latest=true` (2026-11-27, лента «Гостиная у камина»): первая страница — самые новые записи, внутри страницы от старых к новым; cursor ведёт к более старым; cursor одного порядка не принимается в другом. |
 | propose_intent / confirm_intent | Собственный request_id/text → Task2 ActionProposal/уточнение; confirmation только proposal_id, не новые params/cost. |
 | get_rendering | game_id,job_id; проверенный ACL → first-write-wins RenderingDTO. |
 | advance_due / resume_outage | Только SystemActor из worker, не HTTP player route. |

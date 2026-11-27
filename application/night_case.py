@@ -1182,7 +1182,7 @@ class NightCaseApplicationService:
     @staticmethod
     def _message_dto(row):
         return {key:copy.deepcopy(getattr(row,key)) for key in ('id','thread_key','channel','window_idx','text','text_hash')} | {
-            'sender_account_id':str(row.sender_account_id),'recipient_account_ids':copy.deepcopy(row.recipients)}
+            'sender_account_id':str(row.sender_account_id),'recipient_account_ids':copy.deepcopy(row.recipients),'at':_stamp(row.created_at)}
 
     async def get_message(self,*,account_id,game_id,message_id):
         _,locked,aliases=await self._access(account_id,game_id,history=True,shared=True)
@@ -1191,13 +1191,16 @@ class NightCaseApplicationService:
         if row is None or not await self._message_allowed(locked,state,row,aliases): raise NightCaseError('unavailable',404)
         return self._message_dto(row)
 
-    async def history(self,*,account_id,game_id,stream,cursor=None,limit=50,original_account_id=None):
+    async def history(self,*,account_id,game_id,stream,cursor=None,limit=50,original_account_id=None,latest=False):
+        """A page of one stream, oldest first. ``latest`` starts from the newest items and its cursor walks to older ones
+        (the feed «Гостиная у камина» shows the end of the table and loads the past on request)."""
         account,locked,aliases=await self._access(account_id,game_id,history=True,shared=True)
         selected=self._history_selection(locked,aliases,original_account_id)
         if selected is not None: aliases=frozenset({selected})
         if stream not in {'public','self','messages'} or type(limit) is not int or not 1<=limit<=50:
             raise NightCaseError('invalid_command',422)
-        cursor_scope=stream if selected is None else stream+':original:'+str(selected)
+        if type(latest) is not bool: raise NightCaseError('invalid_command',422)
+        cursor_scope=(stream+(':latest' if latest else ''))+('' if selected is None else ':original:'+str(selected))
         key=self._uncursor(cursor,account.id,game_id,cursor_scope)
         case,rules,state=await self._runtime(locked)
         doc=state.document(); cutoffs={}
@@ -1210,14 +1213,20 @@ class NightCaseApplicationService:
             query=select(NightMessage).where(NightMessage.game_id==game_id,or_(*clauses))
             if key is not None:
                 if type(key) is not list or len(key)!=2: raise NightCaseError('unavailable',404)
-                query=query.where(or_(NightMessage.created_at>_parse(key[0]),and_(NightMessage.created_at==_parse(key[0]),NightMessage.id>key[1])))
-            rows=list((await self.session.scalars(query.order_by(NightMessage.created_at,NightMessage.id))).all())
+                at=_parse(key[0])
+                query=query.where(or_(NightMessage.created_at<at,and_(NightMessage.created_at==at,NightMessage.id<key[1]))) if latest else \
+                    query.where(or_(NightMessage.created_at>at,and_(NightMessage.created_at==at,NightMessage.id>key[1])))
+            order=(NightMessage.created_at.desc(),NightMessage.id.desc()) if latest else (NightMessage.created_at,NightMessage.id)
+            rows=list((await self.session.scalars(query.order_by(*order))).all())
             allowed=[]
             for row in rows:
                 if await self._message_allowed(locked,state,row,aliases): allowed.append(row)
                 if len(allowed)>limit: break
-            page=allowed[:limit]; items=[self._message_dto(r) for r in page]
-            next_key=[_stamp(page[-1].created_at),page[-1].id] if len(allowed)>limit and page else None
+            page=allowed[:limit]
+            if latest: page.reverse()
+            items=[self._message_dto(r) for r in page]
+            edge=(page[0] if latest else page[-1]) if page else None
+            next_key=[_stamp(edge.created_at),edge.id] if len(allowed)>limit and edge is not None else None
         else:
             scopes=['public'] if stream=='public' else ['account:'+str(a) for a in aliases]
             clauses=[]
@@ -1229,12 +1238,25 @@ class NightCaseApplicationService:
                 if cutoff is not None: clause=and_(clause,NightEvent.audience_seq<=cutoff)
                 clauses.append(clause)
             query=select(NightEvent).where(NightEvent.game_id==game_id,or_(*clauses))
-            if key is not None:
-                if type(key) is not list or len(key)!=2 or type(key[1]) is not int: raise NightCaseError('unavailable',404)
-                query=query.where(or_(NightEvent.scope>key[0],and_(NightEvent.scope==key[0],NightEvent.audience_seq>key[1])))
-            rows=list((await self.session.scalars(query.order_by(NightEvent.scope,NightEvent.audience_seq).limit(limit+1))).all())
-            page=rows[:limit]; items=[{k:copy.deepcopy(getattr(r,k)) for k in ('event_id','audience_seq','window_idx','kind','payload')} for r in page]
-            next_key=[page[-1].scope,page[-1].audience_seq] if len(rows)>limit and page else None
+            if latest:
+                # Newest first by time; one transition writes its events at one instant, so scope and seq break the tie.
+                if key is not None:
+                    if type(key) is not list or len(key)!=3 or type(key[1]) is not str or type(key[2]) is not int: raise NightCaseError('unavailable',404)
+                    at=_parse(key[0])
+                    query=query.where(or_(NightEvent.created_at<at,and_(NightEvent.created_at==at,or_(NightEvent.scope<key[1],
+                        and_(NightEvent.scope==key[1],NightEvent.audience_seq<key[2])))))
+                rows=list((await self.session.scalars(query.order_by(NightEvent.created_at.desc(),NightEvent.scope.desc(),
+                    NightEvent.audience_seq.desc()).limit(limit+1))).all())
+                page=rows[:limit][::-1]
+                next_key=[_stamp(page[0].created_at),page[0].scope,page[0].audience_seq] if len(rows)>limit and page else None
+            else:
+                if key is not None:
+                    if type(key) is not list or len(key)!=2 or type(key[1]) is not int: raise NightCaseError('unavailable',404)
+                    query=query.where(or_(NightEvent.scope>key[0],and_(NightEvent.scope==key[0],NightEvent.audience_seq>key[1])))
+                rows=list((await self.session.scalars(query.order_by(NightEvent.scope,NightEvent.audience_seq).limit(limit+1))).all())
+                page=rows[:limit]
+                next_key=[page[-1].scope,page[-1].audience_seq] if len(rows)>limit and page else None
+            items=[{k:copy.deepcopy(getattr(r,k)) for k in ('event_id','audience_seq','window_idx','kind','payload')}|{'at':_stamp(r.created_at)} for r in page]
         return {'items':items,'next_cursor':self._cursor(account.id,game_id,cursor_scope,next_key) if next_key is not None else None}
 
     @_atomic

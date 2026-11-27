@@ -179,6 +179,10 @@
 /* ---------- buttons in the style: gold leaf on ink; sizes, gaps and classes stay the shell's ---------- */
 :root.nc .qw-btn{border-color:var(--nc-gold);background:#15140f;color:#f6e7c8;box-shadow:inset 0 0 0 2px #15140f,inset 0 0 0 3px rgb(214 165 82/.22);border-radius:var(--qw-r-control)}
 :root.nc .qw-btn .ic{--s:24px;margin-left:-4px}
+/* A segmented choice stays one control (UI_RULES §9): the gold-leaf button above must not round or frame its segments */
+:root.nc .qw-btn-group>.qw-btn{border:0;border-radius:0;box-shadow:none;background:transparent;color:var(--qw-game-muted)}
+:root.nc .qw-btn-group>.qw-btn+*{border-left:var(--qw-outline-w) solid var(--qw-game-line)}
+:root.nc .qw-btn-group>.qw-btn:is([aria-pressed="true"],[aria-checked="true"]):where(:not(:disabled,[aria-disabled="true"])){background:var(--qw-game-accent-fill);color:var(--qw-game-accent-ink)}
 :root.nc .qw-btn.primary:where(:not(:disabled,[aria-disabled="true"])){border-color:#5a3c10;color:var(--qw-game-accent-ink);text-shadow:0 1px 0 rgb(255 236 190/.45);
   background:linear-gradient(180deg,#f3c873 0%,#e2a443 48%,#c98a2c 100%);box-shadow:inset 0 0 0 2px rgb(255 228 160/.35),0 2px 0 #3b2708}
 :root.nc .qw-btn.text{border-color:transparent;background:transparent;box-shadow:none;color:var(--nc-gold-text)}

@@ -193,7 +193,7 @@ test('only terminal own-seat DTO enables selection and scopes subsequent view an
     fixture.handle.close();
     data.runtime_status = 'finished'; data.menu = [];
     fixture = controller(data); await settle();
-    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Хроника').click(); await settle();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Гостиная').click(); await settle();
     const selection = find(fixture.host, node => node.attrs?.['aria-label'] === 'Твои завершённые роли');
     assert.ok(selection); selection.value = original;
     await selection.events.change(); await settle();
@@ -253,7 +253,7 @@ test('a late own-history response cannot restore private DOM after the profile f
         if (armed && url.includes('/view')) { const error = new Error(); error.status = 409; error.code = 'profile_changed'; throw error; }
     });
     await settle();
-    const pending = find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Хроника').click(); await settle();
+    const pending = find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Досье').click(); await settle();
     armed = true; await fixture.handle.refresh();
     release({items: [{event_id: 'old-private', text: 'LATE_PRIVATE_CANARY'}], next_cursor: 'old-cursor'});
     await pending; await settle();
@@ -470,7 +470,7 @@ test('presence: opening the case reports it once per window, the place has no «
     assert.equal(button(fixture.host, 'Я здесь'), undefined, 'opening the case is «Я здесь»');
     assert.match(fixture.host.textContent, /Горничная.*в сети/);
     assert.match(fixture.host.textContent, /Повар.*был 40 мин назад/);
-    await button(fixture.host, 'Беседа').click(); await settle();
+    await button(fixture.host, 'Гостиная').click(); await settle();
     assert.match(fixture.host.textContent, /За столом.*Дворецкий.*был 3 дня назад/);
     assert.doesNotMatch(fixture.host.textContent, /Вера[^·]*в сети/, 'no line about oneself');
     fixture.handle.close();
@@ -519,7 +519,7 @@ test('publish buttons name the evidence, a second publication is one card and ow
     assert.equal(button(fixture.host, 'Опубликовать улику'), undefined);
     assert.equal(fixture.host.textContent.split('Текст записки').length - 1, 2, 'one board card plus the own find');
     assert.match(fixture.host.textContent, /Оригинала больше нет/);
-    await button(fixture.host, 'Беседа').click(); await settle();
+    await button(fixture.host, 'Гостиная').click(); await settle();
     const mine = find(fixture.host, node => String(node.className).split(' ').includes('mine'));
     assert.ok(mine, 'own line is on the right');
     assert.match(mine.textContent, /ты/);
@@ -737,7 +737,7 @@ test('a living player asks a removed one from the board for 1 action; a case wit
     const sent = fixture.calls.find(row => row.url.endsWith('/commands'));
     assert.equal(sent.body.kind, 'testimony_ask');
     assert.deepEqual({...sent.body.params}, {ghost: 'lawyer', text: 'Вы видели свет в окне?'});
-    await button(fixture.host, 'Беседа').click(); await settle();
+    await button(fixture.host, 'Гостиная').click(); await settle();
     assert.match(fixture.host.textContent, /Призраки разговаривают отдельно/);
     fixture.handle.close();
 });
@@ -845,7 +845,7 @@ test('the chronicle declines by the character (owner B1): the hero in the case f
     const items = [{event_id: 'e1', kind: 'hearing', window_idx: 3, payload: {stage: 'opened', suspect: 'housekeeper'}},
         {event_id: 'e2', kind: 'ghost_whispered', window_idx: 4, payload: {recipient_character: 'butler', observation_id: 'x'}}];
     const fixture = controller(state, url => url.includes('/history?') ? {items, next_cursor: null} : undefined); await settle();
-    await button(fixture.host, 'Хроника').click(); await settle();
+    await button(fixture.host, 'Досье').click(); await settle();
     const all = fixture.host.textContent;
     assert.match(all, /Открыто слушание: обвиняют Экономку\./);
     assert.match(all, /Ты передала Дворецкому лично/);
@@ -1137,5 +1137,129 @@ test('in the first window the role comes as a card back, turns over and leads to
     assert.ok(!button('Понятно, в усадьбу') && !button('Перевернуть карту'));
     await fixture.handle.refresh(); await settle();
     assert.ok(!button('Перевернуть карту'), 'shown once in the session');
+    fixture.handle.close();
+});
+
+/* Screen 9 «Гостиная у камина» (MQB-012): one feed of the table, the week, the reply box in the dock. */
+function feedState() {
+    const state = view();
+    state.self.account_id = VIEWER;
+    state.self.character_id = 'gardener';
+    state.self.communication = {remaining: 4};
+    state.public.clock = {window_idx: 5, window_seq: 5, phase: 'investigation', timezone: 'UTC'};
+    state.public.players = [{account_id: VIEWER, character_id: 'gardener', name: 'Гость', status: 'active'},
+        {account_id: 'a1', character_id: 'maid', name: 'Кира', status: 'active'},
+        {account_id: 'a2', character_id: 'lawyer', name: 'Олег', status: 'active'},
+        {account_id: 'a3', character_id: 'housekeeper', name: 'Вера', status: 'active'}];
+    state.public.looks = {gardener: {title: 'Садовник'}, maid: {title: 'Горничная', gender: 'f'}, lawyer: {title: 'Адвокат'},
+        housekeeper: {title: 'Экономка', gender: 'f', title_forms: {acc: 'Экономку'}}};
+    state.public.observations = [{observation_id: 'scarf', kind: 'proof', title: 'Шарф врача', body: {text: 'Забыт в зимнем саду'}}];
+    state.public.board = [{id: 'b1', owner_account_id: 'a1', kind: 'proof', observation_id: 'scarf'}];
+    state.public.hearing = {id: 'h1', accuser: 'a2', suspect: 'housekeeper', resolve_window: 6, initial_citations: []};
+    state.public.chronicle = [{event_id: 'sc4', kind: 'scene', window_idx: 4, payload: {body: {text: 'В зимнем саду найден шарф.'}}}];
+    state.menu.push({kind: 'form', command_kind: 'say', channel: 'square', label: 'Всем'});
+    return state;
+}
+const feedEvents = [
+    {event_id: 'sc4', kind: 'scene', window_idx: 4, at: '2026-11-16T07:00:00Z', payload: {body: {text: 'В зимнем саду найден шарф.'}}},
+    {event_id: 'pub', kind: 'board', window_idx: 4, at: '2026-11-16T07:30:00Z', payload: {board_id: 'b1'}},
+    {event_id: 'w5', kind: 'window', window_idx: 5, at: '2026-11-16T08:00:00Z', payload: {window_idx: 5, phase: 'investigation', opened_at: '2026-11-16T18:00:00Z'}},
+    {event_id: 'hr', kind: 'hearing', window_idx: 5, at: '2026-11-16T09:30:00Z', payload: {hearing_id: 'h1', suspect: 'housekeeper', stage: 'opened', resolve_window: 6}}];
+const feedLines = [
+    {id: 'm1', sender_account_id: 'a3', channel: 'square', window_idx: 5, at: '2026-11-16T08:10:00Z', text: 'Ключ оставался изнутри.'},
+    {id: 'm2', sender_account_id: VIEWER, channel: 'square', window_idx: 5, at: '2026-11-16T09:00:00Z', text: 'Кто положил ключ на конторку?'}];
+
+test('screen 9: four tabs, the week, one feed of events and lines in time order, the reply box in the dock', async () => {
+    const fixture = controller(feedState(), url => url.includes('stream=public') ? {items: feedEvents, next_cursor: null}
+        : url.includes('stream=messages') ? {items: feedLines, next_cursor: null} : undefined);
+    await settle();
+    const tabs = find(fixture.host, node => node.attrs?.['aria-label'] === 'Разделы дела');
+    assert.deepEqual(tabs.children.map(node => node.textContent.replace(/\d+$/, '')), ['Место', 'Гостиная', 'Улики', 'Досье']);
+    await button(fixture.host, 'Гостиная').click(); await settle();
+    const reads = fixture.calls.filter(call => call.url.includes('/history?'));
+    assert.ok(reads.some(call => call.url.includes('stream=public')) && reads.some(call => call.url.includes('stream=messages')));
+    assert.ok(reads.every(call => call.url.includes('latest=true')), 'the feed is read from its end');
+    const all = fixture.host.textContent;
+    assert.match(all, /Неделя дела/);
+    assert.equal(find(fixture.host, node => node.className === 'day now').textContent.trim(), '3', 'window 5 is on day 3');
+    const track = find(fixture.host, node => String(node.className).includes('ncase-track'));
+    assert.equal(track.attrs['aria-label'], 'Окно 5 из 14');
+    const order = ['В зимнем саду найден шарф', 'публикует улику', 'Открылось окно 5 · вечер', 'Ключ оставался изнутри', 'Кто положил ключ', 'Адвокат обвиняет Экономку'];
+    const at = order.map(part => all.indexOf(part));
+    assert.ok(at.every(value => value >= 0), JSON.stringify(at));
+    assert.deepEqual([...at].sort((a, b) => a - b), at, 'by time, events and lines together');
+    assert.match(all, /Горничная.*Кира.*публикует улику.*Шарф врача/);
+    const mine = find(fixture.host, node => String(node.className).split(' ').includes('mine'));
+    assert.match(mine.textContent, /Садовник.*ты.*Кто положил ключ/);
+    assert.match(all, /Гостиную видят все за столом · осталось 4 реплики в этом окне/);
+    assert.ok(find(fixture.host, node => node.tagName === 'textarea' && node.attrs['aria-label'] === 'Реплика за столом'));
+    assert.ok(button(fixture.host, 'Сказать'));
+    assert.doesNotMatch(all, /Хроника|Беседа/);
+    await button(fixture.host, 'К слушанию').click(); await settle();
+    assert.equal(find(fixture.host, node => node.attrs?.['aria-current'] === 'page').textContent.replace(/\d+$/, ''), 'Улики');
+    fixture.handle.close();
+});
+
+test('screen 9: a long table reads its end first, «Раньше» adds older lines above, a refresh keeps them', async () => {
+    const line = (id, text, window, minute) => ({id, sender_account_id: 'a1', channel: 'square', window_idx: window, at: `2026-11-16T09:${minute}:00Z`, text});
+    const newest = [line('n0', 'новая 0', 5, '00'), line('n1', 'новая 1', 5, '01'), line('n2', 'новая 2', 5, '02')];
+    const oldest = [{...line('o0', 'старая реплика', 2, '00'), at: '2026-11-15T09:00:00Z'}];
+    let latest = newest;
+    const fixture = controller(feedState(), url => {
+        if (!url.includes('stream=messages')) return undefined;
+        return url.includes('cursor=older') ? {items: oldest, next_cursor: null} : {items: latest, next_cursor: 'older'};
+    });
+    await settle();
+    await button(fixture.host, 'Гостиная').click(); await settle();
+    assert.match(fixture.host.textContent, /новая 2/);
+    assert.doesNotMatch(fixture.host.textContent, /старая реплика/);
+    await button(fixture.host, 'Раньше').click(); await settle();
+    const all = fixture.host.textContent;
+    assert.ok(all.indexOf('старая реплика') >= 0 && all.indexOf('старая реплика') < all.indexOf('новая 0'), 'older lines go above');
+    assert.equal(button(fixture.host, 'Раньше'), undefined, 'nothing older is left');
+    latest = [...newest.slice(1), line('n3', 'новая 3', 5, '09')];
+    await fixture.handle.refresh(); await settle();
+    const after = fixture.host.textContent;
+    assert.match(after, /старая реплика/, 'the past already read stays');
+    assert.match(after, /новая 0.*новая 1.*новая 2.*новая 3/);
+    fixture.handle.close();
+});
+
+test('screen 9: a line sent from the dock reaches the feed; new evidence shows a badge on «Улики»', async () => {
+    const state = feedState();
+    const lines = [];
+    const fixture = controller(state, url => {
+        if (url.endsWith('/quote')) return {};
+        if (url.endsWith('/commands')) {
+            lines.push({id: 'm9', sender_account_id: VIEWER, channel: 'square', window_idx: 5, at: '2026-11-16T09:59:00Z', text: 'Проверим следы'});
+            return {receipt: {accepted: true}, caused_message_ids: ['m9']};
+        }
+        if (url.includes('stream=messages')) return {items: lines, next_cursor: null};
+        return undefined;
+    });
+    await settle();
+    await button(fixture.host, 'Гостиная').click(); await settle();
+    const box = find(fixture.host, node => node.tagName === 'textarea' && node.attrs['aria-label'] === 'Реплика за столом');
+    box.value = 'Проверим следы'; await box.events.input?.();
+    await button(fixture.host, 'Сказать').click(); await settle();
+    const sent = fixture.calls.find(call => call.url.endsWith('/commands'));
+    assert.equal(sent.body.kind, 'say');
+    assert.deepEqual({...sent.body.params, recipients: [...sent.body.params.recipients]}, {channel: 'square', recipients: [], text: 'Проверим следы'});
+    assert.match(fixture.host.textContent, /Садовник.*ты.*Проверим следы/);
+    state.public.board.push({id: 'b2', owner_account_id: 'a2', kind: 'claim', observation_id: null, text: 'Ушёл по льду'});
+    await fixture.handle.refresh(); await settle();
+    const tab = find(fixture.host, node => node.tagName === 'button' && node.textContent.startsWith('Улики'));
+    assert.match(tab.textContent, /^Улики *1$/, 'one new record on the board');
+    fixture.handle.close();
+});
+
+test('«Досье» keeps the personal events by window; the feed does not show them', async () => {
+    const fixture = controller(feedState(), url => url.includes('stream=self') ? {items: [{event_id: 'p1', kind: 'observation_granted', window_idx: 3, payload: {observation_id: 'scarf'}}], next_cursor: null}
+        : url.includes('stream=public') ? {items: feedEvents, next_cursor: null} : undefined);
+    await settle();
+    await button(fixture.host, 'Досье').click(); await settle();
+    assert.match(fixture.host.textContent, /Твои события.*Окно 3.*Находка: «Шарф врача»/);
+    await button(fixture.host, 'Гостиная').click(); await settle();
+    assert.doesNotMatch(fixture.host.textContent, /Находка: «Шарф врача»/);
     fixture.handle.close();
 });

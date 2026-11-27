@@ -187,9 +187,9 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
         return await invoke(request, identity, 'execute', write=True, game_id=game_id, command=await body(request))
 
     @app.get('/api/night-case/games/{game_id}/history')
-    async def history(request: Request, game_id: str, stream: str, cursor: str | None = None, limit: int = Query(50, ge=1, le=50), identity: str | None = Query(None), original_account_id: str | None = None):
+    async def history(request: Request, game_id: str, stream: str, cursor: str | None = None, limit: int = Query(50, ge=1, le=50), identity: str | None = Query(None), original_account_id: str | None = None, latest: bool = False):
         selection = {} if original_account_id is None else {'original_account_id': original_account_id}
-        return await invoke(request, identity, 'history', game_id=game_id, stream=stream, cursor=cursor, limit=limit, **selection)
+        return await invoke(request, identity, 'history', game_id=game_id, stream=stream, cursor=cursor, limit=limit, latest=latest, **selection)
 
     @app.get('/api/night-case/games/{game_id}/messages/{message_id}')
     async def message(request: Request, game_id: str, message_id: str, identity: str | None = Query(None)):

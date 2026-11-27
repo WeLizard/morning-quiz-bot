@@ -19,6 +19,7 @@ function playerView(value) {
     // A wrong verdict is the only way out of play to a removed seat: the removed screen names that hearing.
     safe.public.removals = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'hearing' && entry.payload?.stage === 'closed' && entry.payload?.resolution === 'wrong')
         .map(entry => ({window_idx: entry.window_idx, suspect: entry.payload.suspect}));
+    safe.public.chronicle_count = arr(value?.public?.chronicle).length;
     safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem', 'finished_window', 'final_ballot']) : null;
     // Screen 8 shows the answer of a talk: only the results of the viewer's own actions leave the private events.
     if (safe.self) safe.self.results = arr(value.self.private_events).filter(event => event?.kind === 'action_result')
@@ -161,6 +162,8 @@ function open(options) {
     // every few minutes while the case is on screen; the server marks the seat once per window and keeps the time.
     const PRESENCE_EVERY = 3 * 60 * 1000;
     let pinged = {key: '', at: 0};
+    // Tab badges count what appeared since the player last looked (in memory: the client keeps nothing on the device).
+    const looked = {feed: null, board: null};
     let boot = options.bootstrap, fresh = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
     let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
@@ -230,7 +233,7 @@ function open(options) {
         const closed = arr(view?.public?.removals).filter(row => row.suspect === own).at(-1);
         return closed ? `Слушание в окне ${closed.window_idx}: стол поддержал обвинение, но ${said('ты не виновен', 'ты не виновна')}.` : '';
     };
-    const ghostChatLine = () => `Площадь ты по-прежнему читаешь, но писать туда не можешь. Писать можно только ${mystic() ? 'другим призракам' : 'другим отстранённым'} — во вкладке «Беседа».`;
+    const ghostChatLine = () => `Площадь ты по-прежнему читаешь, но писать туда не можешь. Писать можно только ${mystic() ? 'другим призракам' : 'другим отстранённым'}.`;
     const ghostKinds = new Set(['ghost_share', 'ghost_whisper', 'testimony_answer', 'ghost_sign']);
     const questions = () => arr(view?.public?.modules?.ghost_testimony?.questions);
     const placeName = location => arr(view?.public?.locations).find(item => item.id === location)?.name || 'Усадьба';
@@ -238,7 +241,7 @@ function open(options) {
     const instant = new Set(['seen', 'finish_window']);
     let info = '';
     const receipts = {claim: 'Версия опубликована на доске.', accuse: 'Обвинение предъявлено: открыто слушание.', vote: 'Твой голос на слушании записан.', final_vote: 'Твой голос записан. Его можно изменить, пока слушание не закрылось.',
-        pin: 'Улика опубликована на доске.', finish_window: 'Окно завершено.', archive_request: 'Запрос отправлен. Ответ придёт в следующем окне — его покажут в хронике и досье.', seen: 'Отмечено: ты за столом.',
+        pin: 'Улика опубликована на доске.', finish_window: 'Окно завершено.', archive_request: 'Запрос отправлен. Ответ придёт в следующем окне — его покажут в «Досье».', seen: 'Отмечено: ты за столом.',
         ghost_share: 'Воспоминание опубликовано на доске.', ghost_whisper: 'Воспоминание передано лично.', testimony_answer: 'Ответ записан на доске.', ghost_sign: 'Знак явлен всем за столом.',
         testimony_ask: 'Вопрос задан. Ответ «да» или «нет» появится на доске.'};
 
@@ -263,7 +266,7 @@ function open(options) {
         else render();
     }
     // dock: the bottom action panel (mockups); main then keeps room for it under the last card.
-    function frame(children, title = 'Усадьба', eyebrow = 'Ночной город', dock = null) {
+    function frame(children, title = 'Усадьба', eyebrow = 'Ночной город', dock = null, mainClass = '') {
         if (!live()) return;
         timer?.stop(); timer = null;
         const header = kit.header(), clock = view?.public?.clock;
@@ -281,6 +284,7 @@ function open(options) {
         if (outbox.busy && !proposal?.sending) main.prepend(status(`${sending ? sending + ': ' : ''}отправляем…`));
         if (unconfirmed) main.prepend(kit.netBanner({text: 'Запрос ещё не подтверждён сервером', onRetry: () => retry().catch(fail)}));
         if (dock) main.classList.add('has-dock');
+        if (mainClass) main.classList.add(mainClass);
         if (children.some(child => /\bnc-col\b/.test(child?.className || ''))) main.classList.add('ncase-cols');
         host.replaceChildren(...[header.node, main, dock].filter(Boolean)); host.dataset.page = 'night';
     }
@@ -297,13 +301,14 @@ function open(options) {
         if (fresh?.screen === 'case' && worldPack?.id) return {world: worldPack.id, status: 'lobby'};
         return {shell: true};
     }
-    function sceneTime() {
-        if (!view?.server_now) return 'day';
+    function timeOf(stamp) {
+        if (!stamp) return 'day';
         try {
-            const hour = Number(new Intl.DateTimeFormat('en', {timeZone: view.public?.clock?.timezone || 'UTC', hourCycle: 'h23', hour: '2-digit'}).format(new Date(view.server_now)));
+            const hour = Number(new Intl.DateTimeFormat('en', {timeZone: view?.public?.clock?.timezone || 'UTC', hourCycle: 'h23', hour: '2-digit'}).format(new Date(stamp)));
             return hour < 6 || hour >= 21 ? 'night' : hour < 11 ? 'morning' : hour < 17 ? 'day' : 'evening';
         } catch { return 'day'; }
     }
+    const sceneTime = () => timeOf(view?.server_now);
     // Sound and contrast are account settings (the hub profile has the same switches): applied at once on this
     // device, saved to the account, rolled back if the server refuses.
     async function saveMusic(on) {
@@ -425,18 +430,26 @@ function open(options) {
         return kit.dock({layout: 'row', hint: `${proposal.label || 'Действие'} · ${price}`,
             buttons: [cancel, button(verb, () => confirmProposal().catch(fail), 'primary')]});
     }
+    // A stream is read from its end (newest 50); «Раньше» walks to older pages. A refresh reads the end again and keeps the
+    // older pages already read when the new end overlaps them; after a gap it starts over from the end.
     async function loadHistory(stream, more = false) {
         if (!game) return;
         const generation = epoch;
         const state = pages[stream], cursor = more ? state.next_cursor : null;
         if (more && !cursor || cursor && cursors.has(stream + cursor)) return;
-        const value = await request(api(`history?stream=${stream}&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}${historySelection()}`));
+        const value = await request(api(`history?stream=${stream}&limit=50&latest=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}${historySelection()}`));
         if (!live() || generation !== epoch) return;
-        const merged = more ? [...state.items, ...arr(value.items)] : arr(value.items);
-        const seen = new Set(); state.items = merged.filter(row => { const key = row.event_id || row.id; if (!key || seen.has(key)) return false; seen.add(key); return true; });
-        state.next_cursor = value.next_cursor || null;
+        const key = row => row.event_id || row.id, page = arr(value.items).filter(key), ids = new Set(page.map(key));
+        const unique = rows => { const seen = new Set(); return rows.filter(row => !seen.has(key(row)) && seen.add(key(row))); };
+        if (more) { state.items = unique([...page, ...state.items]); state.next_cursor = value.next_cursor || null; }
+        else if (value.next_cursor && state.items.some(row => ids.has(key(row)))) state.items = unique([...state.items.filter(row => !ids.has(key(row))), ...page]);
+        else { state.items = unique(page); state.next_cursor = value.next_cursor || null; if (!more) for (const old of [...cursors]) if (old.startsWith(stream)) cursors.delete(old); }
         if (cursor) cursors.add(stream + cursor);
     }
+    const loadTab = async key => {
+        if (key === 'feed') { await loadHistory('public'); await loadHistory('messages'); }
+        if (key === 'self') await loadHistory('self');
+    };
     async function refresh({preserveUI = false} = {}) {
         if (!live() || reading) return;
         const generation = epoch;
@@ -465,7 +478,8 @@ function open(options) {
                     if (!live() || generation !== epoch) return;
                     if (pack) { worldPack = pack; kit.useWorld(pack); }
                 }
-                if (tab === 'chat') await loadHistory('messages');
+                await loadTab(tab);
+                if (!live() || generation !== epoch) return;
                 if (aiOn()) {
                     await loadAI();
                     if (!live() || generation !== epoch) return;
@@ -1064,14 +1078,24 @@ function open(options) {
             link.node, kit.row(button('Скопировать ссылку', async () => { await navigator.clipboard.writeText(link.input.value); notice = 'Ссылка скопирована.'; render(); })),
             p('Отправь код или ссылку друзьям. Присоединение к партии остаётся отдельным действием.'), openToggle());
     }
-    // Section tabs: a sign over the label (mockups, game mode). «Беседа» and «Хроника» become one feed in stage 9.
-    const TABS = [['place', 'house', 'Место'], ['chat', 'talk', 'Беседа'], ['board', 'lens', 'Улики'], ['self', 'seal', 'Досье'], ['history', 'calendar', 'Хроника']];
+    // Section tabs as on the mockups: a sign over the label, a badge with what is new since the player last looked.
+    // «Гостиная у камина» is the shared feed (talk and the case's shared events); the personal events are in «Досье».
+    const TABS = [['place', 'house', 'Место'], ['feed', 'talk', 'Гостиная'], ['board', 'lens', 'Улики'], ['self', 'seal', 'Досье']];
+    const tabCount = key => key === 'feed' ? Number(view?.public?.chronicle_count) || 0 : key === 'board' ? arr(view?.public?.board).length : 0;
+    function badge(key) {
+        if (!(key in looked)) return 0;
+        const now = tabCount(key);
+        if (looked[key] == null || tab === key || looked[key] > now) looked[key] = now;
+        return now - looked[key];
+    }
     function navigation() {
         const nav = el('nav', 'ncase-nav ncase-tabs'); nav.setAttribute('aria-label', 'Разделы дела');
         return put(nav, ...TABS.map(([key, sign, label]) => {
             const control = el('button', null, label); control.type = 'button';
             control.prepend(icon(sign));
-            control.addEventListener('click', () => Promise.resolve((async () => { showTab(key); if (key === 'chat') { await loadHistory('messages'); render(); } if (key === 'history') { await loadHistory('public'); await loadHistory('self'); render(); } })()).catch(fail));
+            const fresh = badge(key);
+            if (fresh > 0) { const mark = el('b', 'ncase-badge', fresh > 99 ? '99+' : fresh); mark.setAttribute('aria-label', `новых: ${fresh}`); control.append(mark); }
+            control.addEventListener('click', () => Promise.resolve((async () => { showTab(key); await loadTab(key); render(); })()).catch(fail));
             control.setAttribute('aria-current', tab === key ? 'page' : 'false'); return control;
         }));
     }
@@ -1102,7 +1126,8 @@ function open(options) {
             card('laurel', 'Твоя цель', '', p(bodyText(own.goal?.body)), el('h3', 'nc-h3', 'Как засчитывается цель'), p(bodyText(own.goal?.criteria)),
                 ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`))),
             own.truth ? card('eye', 'Что ты знаешь о случившемся', '', kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method))) : null,
-            arr(own.modules?.archive_requests?.requests).length ? card('papers', 'Запросы в архив', '', ...arr(own.modules.archive_requests.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоей хронике.'))) : null)))];
+            arr(own.modules?.archive_requests?.requests).length ? card('papers', 'Запросы в архив', '', ...arr(own.modules.archive_requests.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоих событиях.'))) : null))),
+            turning ? null : ownEvents()];
     }
     /* Screen 6: in the first window the role comes as a card back; a tap turns it over, «Понятно, в усадьбу» goes to the
        place. Remembered for this session only: the client keeps nothing of the case on the device. */
@@ -1252,7 +1277,7 @@ function open(options) {
         const chat = card('talk', 'Разговор', '', put(el('div', 'nc-chat'),
             put(el('div', 'nc-msg mine'), put(el('div', 'bub'), p(conversation.question))),
             put(el('div', 'nc-msg'), face(npc, 'ncase-face xs'), put(el('div', 'bub ncase-npc-say'), el('span', 'who', heroTitle(npc)),
-                p(said_ || 'Ответ ещё в пути: он появится здесь и в «Хронике».'))),
+                p(said_ || 'Ответ ещё в пути: он появится здесь и в «Досье».'))),
             ...found.map(item => put(el('span', 'nc-sys'), icon(item.kind === 'claim' ? 'story' : 'lens'),
                 `В твои находки: «${item.title}» — ${item.kind === 'claim' ? 'утверждение' : 'доказательство'}`))));
         const more = choiceList().filter(row => row.quote.kind === 'talk' && row.npc_character_id === npc);
@@ -1301,7 +1326,7 @@ function open(options) {
             ...actionGroups(acts),
             talks.length ? card('talk', 'Поговорить', costLine(talks), put(el('div', 'ncase-acts'), ...talks.map(talkTile))) : null,
             acts.length || talks.length ? null : card('lens', 'Действия', '', p('Здесь пока нет доступных действий. Можно перейти в другое место или дождаться следующего окна.')),
-            waiting.length ? card('papers', 'Архив', '', p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в хронику и досье.`)) : null,
+            waiting.length ? card('papers', 'Архив', '', p(`Архивных запросов в пути: ${waiting.length}. Ответ придёт в следующем окне — в «Досье».`)) : null,
             go,
             ...(free ? [card('story', 'Своими словами', '', free.node, kit.stack(button('Предложить действие', async () => {
                     const result = await mutate(api('intent'), {request_id: id(), text: free.input.value, selection_id: null});
@@ -1544,47 +1569,110 @@ function open(options) {
                 kit.row(button('Отмена', () => { accuseOpen = false; hearingPick.delete('accuse'); render(); }), button('Предъявить обвинение', () => send(), 'primary'))];
         }).flat();
     }
-    function chat() {
+    // Screen 9 «Гостиная у камина»: the week, then one feed of the table — what the case showed everyone (a new window,
+    // a scene, a publication, a hearing) and what the players said, in time order; the reply box is the dock.
+    function track() {
+        const now = Number(view.public.clock?.window_idx) || 1, node = el('div', 'ncase-track');
+        node.setAttribute('aria-label', `Окно ${now} из 14`);
+        for (let day = 1; day <= 7; day++) {
+            const cell = el('span', `day${Math.ceil(now / 2) === day ? ' now' : ''}`);
+            for (const idx of [day * 2 - 1, day * 2]) cell.append(el('i', idx < now ? 'done' : idx === now ? 'cur' : ''));
+            node.append(put(cell, el('b', null, day)));
+        }
+        return node;
+    }
+    function sayLine(row) {
+        const own = row.sender_account_id === view.self.account_id;
+        const seat = arr(view.public.players).find(item => item.account_id === row.sender_account_id);
+        const char = seat?.character_id || (own ? view.self.character_id : null);
+        const where = row.channel === 'whisper' ? 'приватно' : row.channel === 'ghost' ? removedWord().toLowerCase() : '';
+        const who = put(el('span', 'ncase-who'), el('span', 'nm', char ? heroTitle(char) : 'Участник'),
+            own ? el('span', 'ncase-tag me', 'ты') : seat ? el('span', 'ncase-tag', seatName(seat)) : null, where ? el('span', 'ncase-tag game', where) : null);
+        return put(el('div', `nc-msg${own ? ' mine' : ''}`), own ? null : portraitFrame(char, face(char, 'ncase-face xs')), put(el('div', 'bub'), who, p(row.text)));
+    }
+    const sysLine = (sign, value) => put(el('span', 'nc-sys'), icon(sign), value);
+    function feedEvent(item) {
+        const payload = item.payload || {}, pub = view.public;
+        const describe = payload.job_id ? kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); })) : null;
+        if (item.kind === 'window') {
+            const words = payload.phase === 'final_hearing' ? 'Началось итоговое слушание' : payload.phase === 'frozen' ? 'Стол остановился: все пропустили окна'
+                : `Открылось окно ${payload.window_idx || item.window_idx} · ${TIME_WORDS[timeOf(payload.opened_at)].toLowerCase()}`;
+            return sysLine(timeOf(payload.opened_at) === 'night' || timeOf(payload.opened_at) === 'evening' ? 'moon' : 'sun', words);
+        }
+        if (item.kind === 'scene') {
+            const art = sceneArt(sceneOf(item.event_id)?.art, 'Событие окна');
+            return put(el('article', 'ncase-report'), art, put(el('div'), el('span', 'nc-eyebrow', `Событие · окно ${item.window_idx}`), p(eventText(item)), describe));
+        }
+        if (item.kind === 'board') {
+            const entry = arr(pub.board).find(row => row.id === payload.board_id);
+            if (entry) {
+                const claim = entry.kind === 'claim', obs = claim ? null : boardObservation(entry), art = assets.get(obs?.art?.asset_id);
+                const pic = art ? Object.assign(el('img'), {src: art.url, alt: '', loading: 'lazy'}) : put(el('span', 'ncase-pub-sign'), icon(claim ? 'story' : 'lens'));
+                const char = charOfAccount(entry.owner_account_id);
+                return put(el('article', 'ncase-pub'), pic, put(el('div'), char ? heroWho(char) : el('span', 'ncase-who', 'Участник'),
+                    el('span', 'nc-muted', claim ? 'выкладывает версию' : entry.kind === 'proof' ? 'публикует улику' : 'выкладывает показание'),
+                    el('strong', null, claim ? text(entry.text) : obs?.title || 'Улика')));
+            }
+        }
+        if (item.kind === 'hearing' && payload.stage === 'opened' && pub.hearing?.id === payload.hearing_id) {
+            const accuser = charOfAccount(pub.hearing.accuser), suspect = payload.suspect;
+            return put(el('article', 'ncase-hearing-note'), put(el('span', 'faces'), accuser ? portraitFrame(accuser, face(accuser, 'ncase-face sm')) : null, icon('scales'), portraitFrame(suspect, face(suspect, 'ncase-face sm'))),
+                put(el('div'), el('strong', null, accuser ? `${heroTitle(accuser)} обвиняет ${heroAs(suspect, 'acc')}` : `Обвиняют ${heroAs(suspect, 'acc')}`),
+                    el('span', 'nc-muted', `Идёт слушание · решение в окне ${payload.resolve_window || item.window_idx + 1}`)),
+                button('К слушанию', () => showTab('board')));
+        }
+        const line = sysLine(EVENT_SIGN[item.kind] || 'calendar', eventText(item));
+        return describe ? put(el('div', 'ncase-feed-note'), line, describe) : line;
+    }
+    function feed() {
+        const clock = view.public.clock || {}, now = Number(clock.window_idx) || 1;
+        const week = card('calendar', 'Неделя дела', `день ${Math.ceil(now / 2)} из 7`, track());
+        week.classList.add('ncase-week');
+        // The shared events and the lines in one order: by time, then the window for an older server without times.
+        const rows = [...pages.public.items.map((item, i) => ({item, i, at: item.at, window: item.window_idx, node: feedEvent})),
+            ...pages.messages.items.map((item, i) => ({item, i: 1e6 + i, at: item.at, window: item.window_idx, node: sayLine}))];
+        rows.sort((a, b) => (a.at && b.at ? a.at.localeCompare(b.at) : (a.window || 0) - (b.window || 0)) || a.i - b.i);
+        const older = pages.public.next_cursor || pages.messages.next_cursor;
+        const whisper = formList().some(row => row.command_kind === 'say' && row.channel === 'whisper');
+        const intro = view.self.status === 'ghost' ? ghostChatLine()
+            : `${whisper ? 'Приватная беседа — только 2–3 игрокам рядом, за 1 действие. ' : ''}${removedWord()} разговаривают отдельно.`;
+        const list = put(el('div', 'nc-chat ncase-feed'), older ? kit.row(button('Раньше', async () => { await loadHistory('public', true); await loadHistory('messages', true); render(); })) : null,
+            rows.length ? rows.map(row => row.node(row.item)) : p('Пока тихо. Первая реплика может быть твоей.'));
+        // Who else is at the table and when they last had the case open (owner decision 2026-11-27).
+        const seated = arr(view.public.players).filter(row => row.status !== 'departed' && row.account_id !== view.self.account_id)
+            .map(row => ({character_id: row.character_id, name: row.name, controller: 'player'}));
+        return [week, seated.length ? card('people', 'За столом', String(seated.length), put(el('ul', 'ncase-people'), ...seated.map(person))) : null,
+            kit.panel({cls: 'nc-span'}, intro ? el('p', 'nc-muted', intro) : null, list)];
+    }
+    // The reply box of «Гостиная» (mockup 9): the hint says who reads it and how many lines are left; a private talk names
+    // its 2–3 listeners right above the box.
+    function composeDock() {
         const forms = formList().filter(row => row.command_kind === 'say');
-        if (!forms.some(row => row.channel === channel)) channel = forms[0]?.channel || '';
-        const form = forms.find(row => row.channel === channel);
-        const channels = choose('Беседа', forms.map(row => ({id: row.channel, label: row.label})), channel);
-        channels.input.addEventListener('change', () => { channel = channels.input.value; recipients = []; render(); });
+        if (!forms.length) return null;
+        if (!forms.some(row => row.channel === channel)) channel = forms[0].channel;
+        const form = forms.find(row => row.channel === channel), left = view.self.communication?.remaining;
+        const reads = channel === 'whisper' ? 'Приватно — только тем, кого ты выбрал' : channel === 'ghost' ? `Видят только ${removedWord().toLowerCase()}` : 'Гостиную видят все за столом';
+        const hint = el('p', 'nc-dock-hint', `${reads}${left == null ? '' : ` · осталось ${plural(Number(left), 'реплика', 'реплики', 'реплик')} в этом окне`}`);
+        const channels = forms.length > 1 ? put(el('div', 'qw-btn-group ncase-channels'), ...forms.map(row => {
+            const chip = el('button', 'qw-btn', {square: 'Всем', whisper: 'Приватно', ghost: removedWord()}[row.channel] || row.label); chip.type = 'button';
+            chip.setAttribute('aria-pressed', row.channel === channel ? 'true' : 'false');
+            chip.addEventListener('click', () => { channel = row.channel; recipients = []; render(); });
+            return chip;
+        })) : null;
         const targetRows = el('div', 'ncase-recipients');
-        for (const target of arr(form?.recipient_ids || form?.subject_ids)) {
+        if (channel === 'whisper') for (const target of arr(form?.recipient_ids || form?.subject_ids)) {
             const check = el('input'); check.type = 'checkbox'; check.checked = recipients.includes(target);
             check.addEventListener('change', () => { recipients = recipients.filter(value => value !== target); if (check.checked && recipients.length < 2) recipients.push(target); else check.checked = false; });
             targetRows.append(put(el('label', 'ncase-checkbox'), check, el('span', null, heroLabel(target))));
         }
         const draftLabel = channel === 'whisper' ? 'Реплика для приватной беседы' : 'Реплика за столом', draft = field(draftLabel, ownDraft, true);
-        draft.input.placeholder = draftLabel;
-        draft.input.rows = 2;
+        draft.input.placeholder = draftLabel; draft.input.rows = 1;
         draft.input.addEventListener('input', () => { ownDraft = draft.input.value; });
-        // A line of the table (mockup screen 9): the hero first, the player as a plate; own lines on the right.
-        const messages = pages.messages.items.map(row => {
-            const own = row.sender_account_id === view.self.account_id;
-            const seat = arr(view.public.players).find(item => item.account_id === row.sender_account_id);
-            const char = seat?.character_id || (own ? view.self.character_id : null);
-            const where = row.channel === 'whisper' ? 'приватно' : row.channel === 'ghost' ? removedWord().toLowerCase() : '';
-            const who = put(el('span', 'ncase-who'), el('span', 'nm', char ? heroTitle(char) : 'Участник'),
-                own ? el('span', 'ncase-tag me', 'ты') : seat ? el('span', 'ncase-tag', seatName(seat)) : null, where ? el('span', 'ncase-tag game', where) : null);
-            return put(el('div', `nc-msg${own ? ' mine' : ''}`), own ? null : portraitFrame(char, face(char, 'ncase-face xs')), put(el('div', 'bub'), who, p(row.text)));
-        });
-        const intro = view.self.status === 'ghost' ? ghostChatLine() : `Площадь — всем за столом. Приватная беседа — только 2–3 игрокам рядом, за 1 ОД. ${removedWord()} разговаривают отдельно.`;
-        const left = view.self.communication?.remaining;
         const send = button('Сказать', async () => {
             const result = await command('say', {channel, recipients: channel === 'whisper' ? recipients : [], text: ownDraft});
-            if (result?.receipt?.accepted === true) { ownDraft = ''; render(); }
+            if (result?.receipt?.accepted === true) { ownDraft = ''; await loadHistory('messages'); render(); }
         }, 'primary');
-        const seated = arr(view.public.players).filter(row => row.status !== 'departed' && row.account_id !== view.self.account_id)
-            .map(row => ({character_id: row.character_id, name: row.name, controller: 'player'}));
-        return [seated.length ? card('people', 'За столом', String(seated.length), put(el('ul', 'ncase-people'), ...seated.map(person))) : null,
-            card('talk', 'Переписка', messages.length ? plural(messages.length, 'реплика', 'реплики', 'реплик') : '', el('p', 'nc-muted', intro),
-            messages.length ? put(el('div', 'nc-chat ncase-feed'), ...messages) : p('Пока тихо. Первая реплика может быть твоей.'),
-            ...(pages.messages.next_cursor ? [kit.row(button('Ещё сообщения', async () => { await loadHistory('messages', true); render(); }))] : [])),
-            card('envelope', 'Написать', left == null ? '' : `осталось ${plural(Number(left), 'реплика', 'реплики', 'реплик')}`,
-                ...(forms.length ? [forms.length > 1 ? channels.node : null, targetRows.children.length ? targetRows : null, put(el('div', 'nc-compose'), draft.input, send)]
-                    : [p('Сейчас отправка недоступна. Ранее разрешённая переписка сохранена.')]))];
+        return put(el('div', 'nc-dock ncase-compose'), put(el('div'), hint, channels, targetRows.children.length ? targetRows : null, put(el('div', 'nc-compose'), draft.input, send)));
     }
     function eventText(item) {
         const payload = item.payload || {}, own = view.self;
@@ -1608,7 +1696,7 @@ function open(options) {
         case 'testimony_answered': { const q = questions().find(row => row.question_event_id === payload.question_event_id); return `${q ? player(q.ghost_character) : 'Выбывший'} отвечает: ${payload.answer === 'yes' ? 'да' : 'нет'}.`; }
         case 'final': return 'Дело закрыто.';
         case 'afk_notice': return `Ты ${said('пропустил', 'пропустила')} окон подряд: ${payload.missed_windows}.`;
-        case 'window_digest': return 'Итог окна записан в хронику.';
+        case 'window_digest': return 'Итог окна готов.';
         case 'story_return_closed': return payload.decision === 'accepted' ? 'Письмо передано.' : 'Письмо не передано.';
         default: return 'Событие дела.';
         }
@@ -1616,17 +1704,18 @@ function open(options) {
     const EVENT_SIGN = {window: 'moon', board: 'papers', observation_granted: 'lens', archive_requested: 'papers', hearing: 'scales', status: 'people',
         npc_revealed: 'eye', world_changed: 'house', version_marked: 'story', ghost_whispered: 'envelope', ghost_whisper_received: 'envelope',
         testimony_asked: 'talk', testimony_answered: 'talk', final: 'laurel', afk_notice: 'hourglass', window_digest: 'calendar', story_return_closed: 'envelope', scene: 'eye'};
-    function history() {
+    // «Досье» keeps the personal part of the old chronicle: own finds, moves and notes by window.
+    function ownEvents() {
         const entry = item => {
             const payload = item.payload || {};
-            const pic = (item.kind === 'scene' && sceneArt(sceneOf(item.event_id)?.art, 'Сцена окна')) || put(el('span', 'sign'), icon(EVENT_SIGN[item.kind] || 'calendar'));
+            const pic = put(el('span', 'sign'), icon(EVENT_SIGN[item.kind] || 'calendar'));
             return put(el('li'), pic, put(el('div'), el('span', 'when', `Окно ${item.window_idx}`), p(eventText(item)),
                 ...(payload.job_id ? [kit.row(button('Прочитать описание', async () => { const value = await mutate(api(`renderings/${encodeURIComponent(payload.job_id)}`), {}); notice = text(value?.text); render(); }))] : [])));
         };
-        const eventCards = (stream, sign, title, empty) => card(sign, title, pages[stream].items.length ? plural(pages[stream].items.length, 'запись', 'записи', 'записей') : '',
-            pages[stream].items.length ? put(el('ul', 'ncase-chron'), ...pages[stream].items.map(entry)) : p(empty),
-            ...(pages[stream].next_cursor ? [kit.row(button('Ещё записи', async () => { await loadHistory(stream, true); render(); }))] : []));
-        return [eventCards('public', 'calendar', 'Общий ход дела', 'Записей пока нет.'), eventCards('self', 'seal', 'Твои события', 'Пока ничего: твои находки, переходы и записки появятся здесь.')];
+        const items = pages.self.items;
+        return card('seal', 'Твои события', items.length ? plural(items.length, 'запись', 'записи', 'записей') : '',
+            pages.self.next_cursor ? kit.row(button('Раньше', async () => { await loadHistory('self', true); render(); })) : null,
+            items.length ? put(el('ul', 'ncase-chron'), ...items.map(entry)) : p('Пока ничего: твои находки, переходы и записки появятся здесь.'));
     }
     // 14 «Дело закрыто»: the played variant's picture and text, the own result, and who was who (hero first, player as a plate).
     const PARTS = {culprit: 'виновный', accomplice: 'сообщник Тени'};
@@ -1691,27 +1780,29 @@ function open(options) {
                     : card('people', 'Что дальше', '', p('Новое дело начнёт хозяин компании: сбор появится здесь же.'), kit.row(button('К компаниям', () => entry())))]
             : card('laurel', 'Дело закрыто', '', p('Развязка, твой итог и «кто был кем» — на вкладке «Место».'), kit.row(button('К итогу', () => showTab('place'), 'primary')));
         const finalHearing = clock.phase === 'final_hearing' && !pub.final;
-        const hearingNotice = (pub.hearing || finalHearing) && tab !== 'board' ? card('scales', finalHearing ? 'Итоговое слушание' : 'Идёт слушание', '',
+        // «Гостиная» shows an ordinary hearing in its own feed note (mockup 9); the final hearing keeps the card everywhere.
+        const hearingNotice = (pub.hearing && !(tab === 'feed' && arr(pages.public.items).some(item => item.payload?.hearing_id === pub.hearing.id)) || finalHearing) && tab !== 'board' ? card('scales', finalHearing ? 'Итоговое слушание' : 'Идёт слушание', '',
             p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
             kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
         // Once the case is closed the place tab is the finale (mockup 14): no place picture or actions under it.
         if (conversation && !talking()) conversation = null;
-        const current = over && tab === 'place' ? [] : tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : talking() ? talkScreen() : place();
+        const current = over && tab === 'place' ? [] : tab === 'self' ? role() : tab === 'board' ? board() : tab === 'feed' ? feed() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : talking() ? talkScreen() : place();
         let selector = null;
         if (['finished', 'stopped'].includes(view.runtime_status) && arr(view.history_seats).length > 1) {
             const choice = choose('Твои завершённые роли', [{id: '', label: 'Все твои роли'}, ...view.history_seats.map(seat => ({id: seat.original_account_id, label: `${seat.display_name} · ${seat.role_title}`}))], selectedOriginal);
             choice.input.addEventListener('change', async () => {
                 selectedOriginal = choice.input.value; epoch++; clearHistory(); view = null; render();
                 await refresh();
-                if (tab === 'history') { await loadHistory('public'); await loadHistory('self'); render(); }
+                await loadTab(tab); render();
             });
             selector = panel('Твоя история', choice.node);
         }
         // A closed case is headed by its title (mockup 14), not by the last place.
         const caseTitle = arr(boot?.cases).find(item => item.id === pub.case_id)?.title;
-        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), ...current, tab === 'rules' || talking() ? null : windowBar()].filter(Boolean),
+        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), ...current, tab === 'rules' || tab === 'feed' || talking() ? null : windowBar()].filter(Boolean),
             over ? caseTitle || 'Дело закрыто' : arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
-            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`, confirmDock() || (talking() ? talkDock() : null));
+            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`,
+            confirmDock() || (talking() ? talkDock() : tab === 'feed' && !over ? composeDock() : null), tab === 'feed' ? 'ncase-chatmain' : '');
     }
     function close() {
         if (!alive) return;

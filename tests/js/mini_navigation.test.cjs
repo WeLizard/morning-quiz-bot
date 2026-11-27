@@ -1108,6 +1108,28 @@ test('guest room owner creates and revokes invite codes; guest can join by paste
     assert.deepEqual(JSON.parse(join.options.body), {invite_code: inviteCode});
 });
 
+test('«Ночной город» reminders are one switch in Profile settings, saved as an account preference', async () => {
+    const saved = [];
+    const app = await application(true, '', {overrides: {'/api/account/game-preferences?identity=telegram:POST': options => {
+        saved.push(JSON.parse(options.body));
+        return {status: 200, body: {account_id: JSON.parse(options.body).account_id, game_preferences: {night_case_notifications: false}}};
+    }}});
+    app.tab('profile').click(); await flush();
+    findButton(app.content, 'Настройки').click(); await flush();
+    const card = app.content.querySelector('.night-case-notifications');
+    assert.ok(card, 'the card is in Profile → Settings');
+    assert.match(card.textContent, /Напоминания о деле в Telegram/);
+    assert.match(card.textContent, /Тайн в сообщениях нет/);
+    const input = card.querySelectorAll('input')[0];
+    assert.equal(input.type, 'checkbox');
+    assert.equal(input.checked, true, 'on until switched off');
+    input.checked = false; await input.events.change(); await flush();
+    assert.deepEqual(saved.map(body => body.game_preferences), [{night_case_notifications: false}]);
+    assert.match(card.textContent, /Настройка сохранена/);
+    input.checked = true; await input.events.change(); await flush();
+    assert.deepEqual(saved.at(-1).game_preferences, {night_case_notifications: null}, 'on again removes the override');
+});
+
 test('home restores the heading and keeps global settings inside profile', async () => {
     const app = await application();
     assert.equal(app.content.querySelector('h1').textContent, 'Ну что, сыграем?');

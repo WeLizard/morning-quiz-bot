@@ -406,6 +406,10 @@
 .ncase-act .obj.sign .ic{--s:26px}
 .ncase-nav button .ic{pointer-events:none}
 .ncase-reveal .ncase-rolecard{align-self:center}
+/* Screen 6: the back is centred; the face turns in from the side the card was flipped to (nc-turn of night-city.css). */
+.ncase-turn{display:flex;flex-direction:column;align-items:center;gap:var(--qw-s-4);text-align:center}
+.ncase-rolecard.turned{animation:nc-turn .45s ease-out}
+@media(prefers-reduced-motion:reduce){.ncase-rolecard.turned{animation:none}}
 
 /* ===== out of play (owner decision: removed — darkened; killed — «Пепел», the owner's pick on B7, 2026-11-26) =====
    On a wrapper of the portrait (.pic of a hero card, .ncase-faceframe around a face): an <img> has no pseudo-elements. */

@@ -1023,3 +1023,21 @@ test('the case asks for the shell themes outside, the world day or night by the 
     assert.deepEqual(JSON.parse(JSON.stringify(last(fixture))), {world: 'manor_lake', status: 'finished'});
     fixture.handle.close();
 });
+
+test('in the first window the role comes as a card back, turns over and leads to the place once (mockup 6)', async () => {
+    const value = view();
+    value.self = {...value.self, status: 'active', faction: 'investigation', role: {title: 'Садовник'}, goal: {body: {text: 'Выкопать'}, criteria: {text: 'Раньше других'}}};
+    const fixture = controller(value, undefined, {revealRole: true});
+    await settle();
+    const button = label => find(fixture.host, node => node.tagName === 'button' && node.textContent === label);
+    assert.ok(button('Перевернуть карту'), 'the back comes first');
+    assert.doesNotMatch(fixture.host.textContent, /Садовник/, 'the role is hidden until the card turns');
+    await button('Перевернуть карту').click(); await settle();
+    assert.match(fixture.host.textContent, /Садовник/);
+    assert.match(fixture.host.textContent, /Досье всегда открыто во вкладке «Досье»/);
+    await button('Понятно, в усадьбу').click(); await settle();
+    assert.ok(!button('Понятно, в усадьбу') && !button('Перевернуть карту'));
+    await fixture.handle.refresh(); await settle();
+    assert.ok(!button('Перевернуть карту'), 'shown once in the session');
+    fixture.handle.close();
+});

@@ -60,6 +60,12 @@ function controller(view, requestHook, options = {}) {
         track(opts) { const node = make('div', 'nc-track'); node.setAttribute('aria-label', opts.label || ''); node.dataset.ready = String(opts.ready); node.dataset.total = String(opts.total); return node; },
         dock(opts) { return wrap('nc-dock', [opts.hint ? make('p', 'nc-dock-hint', opts.hint) : null, ...opts.buttons].filter(Boolean)); },
         tag(value) { return make('span', 'nc-tag', value); },
+        // World pack art as the kit gives it (frames, emblems, the card back) when a world is in use.
+        art(name) { const file = {frame_hero: 'frame_hero', frame_evidence: 'frame_evidence', frame_dossier: 'frame_dossier', card_back_role: 'back_role',
+            emblem_investigation: 'emblem_investigation', emblem_shadow: 'emblem_shadow', emblem_independent: 'emblem_independent'}[name];
+            return options.worldArt && file ? `/app/night/worlds/manor_lake/${file}.webp` : ''; },
+        roleCard(opts) { const node = make('div', 'nc-rolecard back'); const url = this.art('card_back_role');
+            if (url) node.append(Object.assign(make('img'), {src: url})); node.addEventListener('click', () => opts.onOpen?.()); return node; },
         // The case tells the player where it is; the tests read the places it asked for.
         music: {places: [], follow(place) { this.places.push(place); }, stop() { this.places.push(null); }},
         toggle(opts) { const node = make('button', 'nc-toggle', opts.title); node.dataset.on = String(opts.on); node.addEventListener('click', () => opts.onChange(!opts.on)); node.append(make('span', '', opts.text)); return node; },
@@ -84,7 +90,7 @@ function controller(view, requestHook, options = {}) {
         if (url.endsWith('/confirm')) return {receipt: {accepted: true}};
         throw new Error('Unexpected request: ' + url);
     };
-    const handle = win.NightCase.open({host, target: {roomId: 'room'}, bootstrap: {enabled: true, cases: [], viewer_account_id: VIEWER}, identity: 'guest', request, isCurrent: () => true, ...options});
+    const handle = win.NightCase.open({host, target: {roomId: 'room'}, bootstrap: {enabled: true, cases: [], viewer_account_id: VIEWER}, identity: 'guest', request, isCurrent: () => true, revealRole: false, ...options});
     return {host, handle, calls, nodes, intervals, doc, listeners, zoneApi, menu, kit};
 }
 

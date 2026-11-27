@@ -10,10 +10,6 @@ const crypto = require('node:crypto');
 const {controller, find, settle} = require('./night_case_harness.cjs');
 
 const NOT_DRAWN_YET = {
-    item: 'evidence cards are text; items get pictures in stage 2 (screen 10) and the pack lists them in stage 5',
-    frame: 'hero, dossier and evidence frames of the world pack: stage 1 components',
-    back: 'role card back and flip: stage 2, screen 6',
-    emblem: 'side sign on the role card: stage 2, screen 6',
     state: 'case-state objects (pause, no connection, archive, letter): stage 2, screens 15-23',
 };
 
@@ -50,7 +46,7 @@ function fullView({digest, pointer}) {
             locations: [{id: 'library', name: 'Библиотека', body: {text: 'Пахнет старой бумагой.'}, art: art('manor_loc_library')}],
             players: [{seat: 1, character_id: 'lawyer', title: 'Адвокат', art: art('manor_char_lawyer__f40')}],
             npcs: [{character_id: 'cook', title: 'Повар', art: art('manor_char_cook')}],
-            board: [{id: 'card', kind: 'evidence', title: 'Ключ', body: {text: 'Ключ от сарая.'}, item: {id: 'key', art: art('manor_item_key')}}],
+            board: [{id: 'card', kind: 'evidence', observation_id: 'obs_key', observation: {observation_id: 'obs_key', kind: 'evidence', title: 'Ключ', body: {text: 'Ключ от сарая.'}, art: art('manor_item_key')}}],
             chronicle: [{event_id: 'evt_window', kind: 'window', window_idx: 2, payload: {window_idx: 2}},
                 {event_id: 'evt_scene', kind: 'scene', window_idx: 2, payload: {content_event_id: 'ev_blizzard', body: {text: 'Метель.'}}, art: art('manor_scene_ev_blizzard')}]},
         self: {actor_seq: 0, status: 'active', location: 'library', character_id: 'lawyer', ap: 3, faction: 'investigation',
@@ -86,9 +82,17 @@ function addresses(host) {
 
 test('every pack group reaches a case screen, except the ones listed as not drawn yet', async () => {
     const art = pack();
-    const live = controller(fullView(art), url => url === art.pointer ? art.manifest : undefined);
+    // In the first window the role comes as a card back that turns over (screen 6).
+    const first = fullView(art); first.public.clock = {...first.public.clock, window_idx: 1};
+    const reveal = controller(first, url => url === art.pointer ? art.manifest : undefined, {worldArt: true, revealRole: true});
     await settle();
-    const seen = new Set(addresses(live.host));
+    const seen = new Set(addresses(reveal.host));
+    await find(reveal.host, node => node.tagName === 'button' && node.textContent === 'Перевернуть карту').click(); await settle();
+    for (const url of addresses(reveal.host)) seen.add(url);
+    reveal.handle.close();
+    const live = controller(fullView(art), url => url === art.pointer ? art.manifest : undefined, {worldArt: true});
+    await settle();
+    for (const url of addresses(live.host)) seen.add(url);
     for (const label of ['Место', 'Досье', 'Улики', 'Беседа', 'Хроника']) {
         const tab = find(live.host, node => node.tagName === 'button' && node.textContent.trim() === label);
         assert.ok(tab, `tab ${label}`);

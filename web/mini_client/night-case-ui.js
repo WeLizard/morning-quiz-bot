@@ -1033,9 +1033,9 @@ function open(options) {
     }
     // Screen 6/11: the role card in the world's hero frame (portrait of this party's look, side sign), then side, secret and goal.
     const SIDES = {investigation: ['Твоя сторона — следствие', 'Знак Следствия'], shadow: ['Твоя сторона — Тень', 'Знак Тени'], independent: ['Ты сам по себе', 'Независимые']};
-    function roleCard(data, faction) {
+    function roleCard(data, faction, turning = false) {
         const artwork = assets.get(data.art?.asset_id);
-        const figure = el('figure', 'ncase-rolecard'), frame = el('span', `face${view.self?.status === 'ghost' ? ' ncase-out' : ''}`);
+        const figure = el('figure', `ncase-rolecard${turning ? ' turned' : ''}`), frame = el('span', `face${view.self?.status === 'ghost' ? ' ncase-out' : ''}`);
         if (artwork) {
             const portrait = el('img', 'ncase-role-portrait'); portrait.src = artwork.url;
             portrait.alt = text(data.art?.alt).slice(0, 300) || artwork.alt || data.title || 'Портрет роли'; frame.append(portrait);
@@ -1046,18 +1046,35 @@ function open(options) {
         const emblemUrl = kit.art?.(`emblem_${faction}`), side = el('span', 'side', (SIDES[faction] || SIDES.investigation)[1]);
         if (emblemUrl) { const emblem = el('img'); emblem.src = emblemUrl; emblem.alt = ''; side.prepend(emblem); }
         figure.append(put(el('figcaption'), el('span', 'eyebrow', 'Видишь только ты'), el('strong', null, data.title || 'Твоя роль'), side));
+        if (turning) { figure.style?.setProperty?.('--dir', String(kit.flip?.dir || 1)); if (kit.flip) kit.flip.dir = 1; }
         return figure;
     }
-    function role() {
+    function role(turning = false) {
         const own = view.self, data = own.role || {}, faction = SIDES[own.faction] ? own.faction : 'investigation';
         const look = [data.name, data.age ? plural(Number(data.age), 'год', 'года', 'лет') : ''].filter(Boolean).join(', ');
-        return [put(el('section', 'ncase-reveal'), put(el('div', 'ncase-rolewrap'), roleCard(data, faction), put(el('div', 'ncase-role-copy'),
+        return [put(el('section', 'ncase-reveal'), put(el('div', 'ncase-rolewrap'), roleCard(data, faction, turning), put(el('div', 'ncase-role-copy'),
             card('scales', faction === 'independent' ? said('Ты сам по себе', 'Ты сама по себе') : SIDES[faction][0], '', look ? p(look) : null, p(bodyText(data.bio))),
             arr(own.secrets).length ? card('seal', 'Твоя тайна', '', ...arr(own.secrets).map(item => kit.secret(bodyText(item)))) : null,
             card('laurel', 'Твоя цель', '', p(bodyText(own.goal?.body)), el('h3', 'nc-h3', 'Как засчитывается цель'), p(bodyText(own.goal?.criteria)),
                 ...arr(own.personal?.work_progress).map(item => p(`Этапов работы завершено: ${item.completed_stages.length}`))),
             own.truth ? card('eye', 'Что ты знаешь о случившемся', '', kit.secret(bodyText(own.truth.motive)), kit.secret(bodyText(own.truth.method))) : null,
             arr(own.modules?.archive_requests?.requests).length ? card('papers', 'Запросы в архив', '', ...arr(own.modules.archive_requests.requests).map(item => p(item.status === 'pending' ? 'Запрос отправлен. Ответ придёт в следующем игровом окне.' : 'Архивный ответ сохранён в твоей хронике.'))) : null)))];
+    }
+    /* Screen 6: in the first window the role comes as a card back; a tap turns it over, «Понятно, в усадьбу» goes to the
+       place. Remembered for this session only: the client keeps nothing of the case on the device. */
+    const seenRoles = new Set();
+    let turned = false;
+    const roleSeen = () => options.revealRole === false || seenRoles.has(game);
+    function revealRole(clock) {
+        const eyebrow = `Дело началось · окно ${clock.window_idx || 1}`;
+        if (!turned) {
+            const open = () => { turned = true; render(); };
+            return frame([put(el('section', 'ncase-reveal ncase-turn'), kit.roleCard?.({face: false, onOpen: open}),
+                p('Твоя роль — тайна дела. Переверни карту, когда никто не смотрит в твой экран.'))],
+            'Твоя роль', eyebrow, kit.dock({hint: 'Нажми на карту или на кнопку', buttons: [button('Перевернуть карту', open, 'primary')]}));
+        }
+        const done = () => { seenRoles.add(game); turned = false; showTab('place'); render(); };
+        return frame(role(true), 'Твоя роль', eyebrow, kit.dock({hint: 'Досье всегда открыто во вкладке «Досье»', buttons: [button('Понятно, в усадьбу', done, 'primary')]}));
     }
     // Event and finale pictures: only assets of the verified pack, alt from the case.
     function sceneArt(art, fallback) {
@@ -1550,6 +1567,7 @@ function open(options) {
         }
         if (!view.self) return frame([panel('Дело недоступно', p('Твоё участие не найдено. Вернись к списку компаний.'))]);
         const own = view.self, pub = view.public, clock = pub.clock || {};
+        if (own.status === 'active' && (clock.window_idx || 1) <= 1 && !pub.final && !view.final_summary && !selectedOriginal && !roleSeen()) return revealRole(clock);
         const stateNotice = clock.phase === 'frozen' ? panel('Стол ждёт возвращения', p('Общий простой остановил окна. Отметь возвращение, чтобы продолжить.'),
             kit.row(...choiceList().filter(row => row.quote.kind === 'seen').map(row => actionButton(row)))) : own.status === 'departed' ? panel('Участие завершено', p('Тебе доступна собственная разрешённая история до выхода и итог дела.')) : own.status === 'ghost' && tab !== 'place' ? panel(removedTitle(), p('Твоё действие окна — во вкладке «Место».')) : null;
         const final = own.postmortem;

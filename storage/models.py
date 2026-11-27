@@ -1086,6 +1086,14 @@ class NightLobbyMessage(Base):
     )
 
 
+class NightPresence(Base):
+    """When a player last had the case open: «в сети», «был недавно» beside the hero. Not part of the case state."""
+    __tablename__ = 'night_presence'
+    game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='CASCADE'), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey('accounts.id', ondelete='RESTRICT'), primary_key=True)
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class NightEvent(Base):
     __tablename__ = 'night_events'
     game_id: Mapped[str] = mapped_column(String(64), ForeignKey('games.id', ondelete='RESTRICT'), primary_key=True)

@@ -141,6 +141,9 @@
 .ncase-person.npc .ncase-face{box-shadow:0 0 0 1.5px var(--nc-indep),0 0 0 3.5px rgb(var(--nc-page-rgb)/.9)}
 .ncase-person .nm{max-width:100%;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere;font:700 var(--qw-fs-small)/1.25 var(--qw-font)}
 .ncase-person .sub{font-size:var(--qw-fs-caption);color:var(--qw-game-muted)}
+.ncase-seen{margin-top:2px;font-size:var(--qw-fs-caption);line-height:1.25;color:var(--qw-game-muted)}
+.ncase-seen.on{color:var(--nc-ok)}
+.ncase-seen.on::before{content:'';display:inline-block;width:7px;height:7px;margin-right:5px;border-radius:50%;background:currentColor;vertical-align:1px}
 .ncase-acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--qw-btn-gap)}
 :root.nc .ncase-act{position:relative;display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:10px;min-height:64px;margin:0;padding:7px 10px 7px 7px;
   text-align:left;cursor:pointer;font:inherit;color:var(--qw-game-text);border-radius:12px;border:1px solid var(--qw-game-line);background:var(--nc-surface)}

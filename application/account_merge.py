@@ -79,6 +79,7 @@ MERGE_POLICY = {
     ('night_lobby_commands', 'original_actor_account_id'): 'history',
     ('night_messages', 'sender_account_id'): 'history',
     ('night_lobby_messages', 'sender_account_id'): 'history',
+    ('night_presence', 'account_id'): 'history',
     ('night_intent_proposals', 'original_actor_account_id'): 'history',
     ('night_episode_drafts', 'reviewed_by'): 'history',
     ('night_reward_claims', 'original_account_id'): 'history',

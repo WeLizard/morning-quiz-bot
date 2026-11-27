@@ -157,6 +157,10 @@ function open(options) {
     let reopened = '';
     // Screen 8 «Разговор»: the talk the player just had ({npc, question, events, cost, key}); the place shows it until «К месту».
     let conversation = null;
+    // Having the case open is «Я здесь» (owner decision 2026-11-27): the client says so on opening, in a new window and
+    // every few minutes while the case is on screen; the server marks the seat once per window and keeps the time.
+    const PRESENCE_EVERY = 3 * 60 * 1000;
+    let pinged = {key: '', at: 0};
     let boot = options.bootstrap, fresh = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
     let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
@@ -441,6 +445,7 @@ function open(options) {
             if (game) {
                 const value = await request(api(`view${selectedOriginal ? '?original_account_id=' + encodeURIComponent(selectedOriginal) : ''}`));
                 if (!live() || generation !== epoch) return;
+                present(value);
                 // Focused drafts and pending confirmations retain their exact nodes.
                 // This read still checks both the viewer fence and current game ACL.
                 if (preserveUI) return;
@@ -592,6 +597,17 @@ function open(options) {
         }
         catch { /* The request fence already purges lost identity; transient failure keeps drafts. */ }
         finally { identityReading = false; }
+    }
+    function present(value) {
+        if (selectedOriginal || document.hidden || value?.runtime_status !== 'running' || !['active', 'fog', 'ghost'].includes(value?.self?.status)) return;
+        const key = `${game}:${value.public?.clock?.window_seq}`, now = Date.now();
+        if (pinged.key === key && now - pinged.at < PRESENCE_EVERY) return;
+        pinged = {key, at: now};
+        const generation = epoch;
+        // Best effort: a lost ping is repeated by the next poll; a mark that changed the case brings a fresh view.
+        request(api('presence'), {method: 'POST', body: {}}).then(result => {
+            if (result?.marked === true && live() && generation === epoch) refresh({preserveUI: Boolean(proposal || outbox.busy || outbox.pending)});
+        }).catch(() => { if (generation === epoch) pinged = {key: '', at: 0}; });
     }
     function backgroundPoll() {
         if (!live()) { close(); return; }
@@ -1161,7 +1177,23 @@ function open(options) {
     // Out of play: a removed hero is darkened (owner decision); «killed» waits for a case with deaths and the owner's pick (B7).
     const removed = char => arr(view?.public?.players).some(item => item.character_id === char && item.status === 'ghost');
     const portraitFrame = (char, node) => removed(char) ? put(el('span', 'ncase-faceframe ncase-out'), node) : node;
-    const person = row => put(el('li', `ncase-person${row.controller === 'npc' ? ' npc' : ''}`), portraitFrame(row.character_id, face(row.character_id)), el('span', 'nm', heroTitle(row.character_id)), plate(row));
+    // Like a messenger: «в сети» while the case is open (the client reports every 3 minutes), then how long ago, by the hero's gender.
+    function seenText(char) {
+        const seat = arr(view?.public?.players).find(item => item.character_id === char);
+        if (!seat?.seen_at || seat.account_id === view.self?.account_id || seat.status === 'departed') return '';
+        const at = new Date(seat.seen_at), now = Date.parse(view.server_now) || Date.now(), minutes = Math.floor((now - at.getTime()) / 60000);
+        if (!Number.isFinite(minutes)) return '';
+        const was = lookOf(char)?.gender === 'f' ? 'была' : 'был', hhmm = `${at.getHours()}:${String(at.getMinutes()).padStart(2, '0')}`;
+        const day = date => new Date(date).setHours(0, 0, 0, 0), days = Math.round((day(now) - day(at)) / 86400000);
+        if (minutes < 5) return 'в сети';
+        if (minutes < 60) return `${was} ${minutes} мин назад`;
+        if (days === 0) return `${was} сегодня в ${hhmm}`;
+        if (days === 1) return `${was} вчера в ${hhmm}`;
+        return days < 7 ? `${was} ${plural(days, 'день', 'дня', 'дней')} назад` : `${was} давно`;
+    }
+    const seenLine = char => { const value = seenText(char); return value ? el('span', `ncase-seen${value === 'в сети' ? ' on' : ''}`, value) : null; };
+    const person = row => put(el('li', `ncase-person${row.controller === 'npc' ? ' npc' : ''}`), portraitFrame(row.character_id, face(row.character_id)), el('span', 'nm', heroTitle(row.character_id)), plate(row),
+        row.controller === 'npc' ? null : seenLine(row.character_id));
     const pressed = row => proposal?.selection_id && proposal.selection_id === row.quote.selection_id;
     // An action as a tile: the item or the speaker's portrait, else the verb's sign; the confirmation names the full action.
     function actTile(row, label, {face: speaker = null, sub = '', sign = 'eye', full = label} = {}) {
@@ -1276,9 +1308,7 @@ function open(options) {
                     notice = result?.kind === 'clarification' ? 'Уточни действие: выбери одну из доступных кнопок. Пока ничего не потрачено.' : '';
                     if (result?.kind === 'proposal') proposal = {...result.proposal, label: 'Предложенное действие'};
                     render();
-                })))] : []),
-            // A frozen table offers «Я здесь» in its own notice above; the place does not repeat it.
-            ...(view.public.clock?.phase === 'frozen' ? [] : choiceList().filter(row => row.quote.kind === 'seen').map(row => panel(row.label, kit.stack(actionButton(row)))))];
+                })))] : [])];
     }
     // A removed player: one free action per window (MANOR_MODULES_V2 §9). Everything offered comes from the menu.
     function removedActions() {
@@ -1546,7 +1576,10 @@ function open(options) {
             const result = await command('say', {channel, recipients: channel === 'whisper' ? recipients : [], text: ownDraft});
             if (result?.receipt?.accepted === true) { ownDraft = ''; render(); }
         }, 'primary');
-        return [card('talk', 'Переписка', messages.length ? plural(messages.length, 'реплика', 'реплики', 'реплик') : '', el('p', 'nc-muted', intro),
+        const seated = arr(view.public.players).filter(row => row.status !== 'departed' && row.account_id !== view.self.account_id)
+            .map(row => ({character_id: row.character_id, name: row.name, controller: 'player'}));
+        return [seated.length ? card('people', 'За столом', String(seated.length), put(el('ul', 'ncase-people'), ...seated.map(person))) : null,
+            card('talk', 'Переписка', messages.length ? plural(messages.length, 'реплика', 'реплики', 'реплик') : '', el('p', 'nc-muted', intro),
             messages.length ? put(el('div', 'nc-chat ncase-feed'), ...messages) : p('Пока тихо. Первая реплика может быть твоей.'),
             ...(pages.messages.next_cursor ? [kit.row(button('Ещё сообщения', async () => { await loadHistory('messages', true); render(); }))] : [])),
             card('envelope', 'Написать', left == null ? '' : `осталось ${plural(Number(left), 'реплика', 'реплики', 'реплик')}`,

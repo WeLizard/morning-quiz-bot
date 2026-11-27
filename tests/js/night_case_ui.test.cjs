@@ -452,6 +452,30 @@ test('screen 8: a confirmed talk opens the conversation with the answer and the 
     fixture.handle.close();
 });
 
+test('presence: opening the case reports it once per window, the place has no «Я здесь», the table shows who was when', async () => {
+    const state = view();
+    state.self.account_id = VIEWER;
+    state.menu.push(choice('seen', 'Я здесь'));
+    state.public.looks = {maid: {title: 'Горничная', gender: 'f'}, cook: {title: 'Повар', gender: 'm'}, butler: {title: 'Дворецкий', gender: 'm'}};
+    state.public.players = [{account_id: VIEWER, character_id: 'lawyer', name: 'Вера', status: 'active', seen_at: '2026-11-16T09:59:00Z'},
+        {account_id: 'a1', character_id: 'maid', name: 'Нина', status: 'active', seen_at: '2026-11-16T09:57:00Z'},
+        {account_id: 'a2', character_id: 'cook', name: 'Олег', status: 'active', seen_at: '2026-11-16T09:20:00Z'},
+        {account_id: 'a3', character_id: 'butler', name: 'Пётр', status: 'active', seen_at: '2026-11-13T09:20:00Z'}];
+    state.self.nearby = [{character_id: 'maid', name: 'Нина', controller: 'player'}, {character_id: 'cook', name: 'Олег', controller: 'player'}];
+    const fixture = controller(state, url => url.endsWith('/presence') ? {marked: false} : undefined);
+    await settle();
+    assert.equal(fixture.calls.filter(row => row.url.endsWith('/presence') && row.method === 'POST').length, 1);
+    for (const poll of [...fixture.intervals]) poll(); await settle();
+    assert.equal(fixture.calls.filter(row => row.url.endsWith('/presence')).length, 1, 'not again in the same window within minutes');
+    assert.equal(button(fixture.host, 'Я здесь'), undefined, 'opening the case is «Я здесь»');
+    assert.match(fixture.host.textContent, /Горничная.*в сети/);
+    assert.match(fixture.host.textContent, /Повар.*был 40 мин назад/);
+    await button(fixture.host, 'Беседа').click(); await settle();
+    assert.match(fixture.host.textContent, /За столом.*Дворецкий.*был 3 дня назад/);
+    assert.doesNotMatch(fixture.host.textContent, /Вера[^·]*в сети/, 'no line about oneself');
+    fixture.handle.close();
+});
+
 test('screen 7, findings 4, 5 and 7: a finished window closes the place, the find stays on it, a departed player has no actions', async () => {
     const state = view();
     state.self.finished_window = true;

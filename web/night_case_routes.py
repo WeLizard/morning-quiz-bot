@@ -174,6 +174,10 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
         selection = {} if original_account_id is None else {'original_account_id': original_account_id}
         return await invoke(request, identity, 'get_view', game_id=game_id, **selection)
 
+    @app.post('/api/night-case/games/{game_id}/presence')
+    async def presence(request: Request, game_id: str, identity: str | None = Query(None)):
+        return await invoke(request, identity, 'mark_present', write=True, game_id=game_id)
+
     @app.post('/api/night-case/games/{game_id}/quote')
     async def quote(request: Request, game_id: str, identity: str | None = Query(None)):
         return await invoke(request, identity, 'quote', write=True, game_id=game_id, intent=await body(request, ['kind', 'params']))

@@ -21,6 +21,7 @@ from typing import Awaitable, Callable
 from uuid import UUID, uuid4
 
 from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from domain.address import effective_address_form, parse_address_form
 from domain.night_case_engine import Transition, open_counts, start, start_open, step
@@ -38,7 +39,7 @@ from storage.guest_accounts import normalize_display_name
 from domain.night_case_delivery_state import normalize_say_text
 from storage.models import (Account, AccountMerge, Game, GamePlayer, GameCommand,
     NightCase, NightGameSealed, NightLobbyCommand, NightLobbyMessage, NightEvent, NightMessage,
-    NightIntentProposal, NightRenderJob, NightRendering, NightRewardClaim,
+    NightIntentProposal, NightPresence, NightRenderJob, NightRendering, NightRewardClaim,
     Room, RoomMembership)
 from storage.night_cases import (NightCaseRepository, NightStorageConflict, SealedGame, canonical_json, json_hash, command_key, public_envelope, MAX_KERNEL_BYTES)
 
@@ -1053,6 +1054,35 @@ class NightCaseApplicationService:
         result,_=await self._view(account_id,game_id,original_account_id,snapshot=False)
         return result
 
+    # Presence (owner decision 2026-11-27): having the case open is «Я здесь». The client reports that the case is open;
+    # the server keeps the time for «в сети / был недавно» and, once per window, marks the seat present in the case with
+    # the same free «seen» move the button made, so a player who only reads is not taken for gone (fog, idle table).
+    # A paused table is not woken by this: there «Я здесь» stays a deliberate press.
+    PRESENCE_STEP=timedelta(minutes=1)
+
+    async def mark_present(self,*,account_id,game_id):
+        account,locked,_=await self._access(account_id,game_id,snapshot=True)
+        now=self.clock(); _stamp(now)
+        if locked.sealed.lifecycle!='running': return {'marked':False}
+        await self.session.execute(pg_insert(NightPresence).values(game_id=game_id,account_id=account.id,seen_at=now)
+            .on_conflict_do_update(index_elements=[NightPresence.game_id,NightPresence.account_id],set_={'seen_at':now},
+                where=NightPresence.seen_at<=now-self.PRESENCE_STEP))
+        case,rules,state=await self._runtime(locked)
+        player=next((p for p in state.players if p['account_id']==str(account.id)),None)
+        clock=state.clock
+        if (player is None or player['status'] not in {'active','fog','ghost'} or clock['phase'] not in {'investigation','final_hearing'}
+                or player['last_seen_window']==clock['window_idx'] or now>=_parse(clock['closes_at'])):
+            return {'marked':False}
+        # One id per seat, window and own move count: a replay is the same command, a later move makes a new one.
+        command_id=hashlib.sha256(f"presence:{game_id}:{account.id}:{clock['window_seq']}:{player['actor_seq']}".encode()).hexdigest()
+        result=await self.execute(account_id=account.id,game_id=game_id,command={'command_id':command_id,'kind':'seen','params':{},
+            'window_idx':clock['window_idx'],'window_seq':clock['window_seq'],'actor_seq':player['actor_seq']})
+        return {'marked':result['receipt']['accepted'] is True}
+
+    async def _presence_of(self,game_id):
+        rows=(await self.session.execute(select(NightPresence.account_id,NightPresence.seen_at).where(NightPresence.game_id==game_id))).all()
+        return {str(account):_stamp(seen.replace(second=0,microsecond=0)) for account,seen in rows}
+
     async def _view(self,account_id,game_id,original_account_id,*,snapshot):
         account,locked,aliases=await self._access(account_id,game_id,history=True,snapshot=snapshot,shared=not snapshot)
         selected=self._history_selection(locked,aliases,original_account_id)
@@ -1085,6 +1115,10 @@ class NightCaseApplicationService:
             art,sealed=await self._art(locked.sealed,case,with_sealed=True)
             view={'public':_public(case,rules,state,art),'self':raw['self']}
             view['self'].pop('receipts',None)
+            # «в сети / был недавно» beside each hero: when the player last had the case open, to the minute.
+            seen=await self._presence_of(game_id)
+            for row in view['public'].get('players',[]):
+                if row['account_id'] in seen: row['seen_at']=seen[row['account_id']]
             _reveal_finale(view['self'],sealed)
             titles={cid:look['title'] for cid,look in raw['looks'].items()}
             for nearby in view['self'].get('nearby',[]):

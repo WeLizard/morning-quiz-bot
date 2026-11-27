@@ -20,6 +20,9 @@ function playerView(value) {
     safe.public.removals = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'hearing' && entry.payload?.stage === 'closed' && entry.payload?.resolution === 'wrong')
         .map(entry => ({window_idx: entry.window_idx, suspect: entry.payload.suspect}));
     safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem', 'finished_window', 'final_ballot']) : null;
+    // Screen 8 shows the answer of a talk: only the results of the viewer's own actions leave the private events.
+    if (safe.self) safe.self.results = arr(value.self.private_events).filter(event => event?.kind === 'action_result')
+        .slice(-20).map(event => ({event_id: event.event_id, body: event.payload?.body, observation_ids: arr(event.payload?.observation_ids)}));
     return safe;
 }
 function artPointer(binding) {
@@ -152,6 +155,8 @@ function open(options) {
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
     // The window (game:seq) in which a player who finished it chose to act again (finding 4); any other window keeps them closed.
     let reopened = '';
+    // Screen 8 «Разговор»: the talk the player just had ({npc, question, events, cost, key}); the place shows it until «К месту».
+    let conversation = null;
     let boot = options.bootstrap, fresh = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
     let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
@@ -322,6 +327,7 @@ function open(options) {
         ], 'Ночной город');
     }
     function showTab(next) {
+        conversation = null;
         if (next !== 'place' && tab === 'place') Q.nav.push?.({id: 'night-case-section', title: next, onBack: () => { tab = 'place'; render(); return true; }});
         else if (next === 'place' && tab !== 'place') Q.nav.pop?.('night-case-section');
         tab = next; render();
@@ -362,7 +368,8 @@ function open(options) {
         try {
             const value = await mutate(api('intent'), {request_id: id(), selection_id: row.quote.selection_id, text: null});
             if (value?.kind !== 'proposal') return;
-            proposal = {...value.proposal, label, kind: row.quote.kind};
+            proposal = {...value.proposal, label, kind: row.quote.kind,
+                talk: row.quote.kind === 'talk' ? {npc: row.npc_character_id, question: row.label} : null};
             if (instant.has(row.quote.kind)) return await confirmProposal();
         } finally { if (!proposal?.sending) sending = ''; }
         render();
@@ -374,6 +381,9 @@ function open(options) {
         try {
             const result = await mutate(api('confirm'), {proposal_id: sent.proposal_id});
             if (result?.receipt?.accepted !== false && receipts[sent.kind]) info = receipts[sent.kind];
+            // The answer is the talk's own action_result among the events this command caused.
+            if (sent.talk && result?.receipt?.accepted === true)
+                conversation = {...sent.talk, events: arr(result.caused_event_ids), cost: Number(sent.cost) || 0, key: windowKey()};
         } finally {
             // The dialog leaves at once; the fresh view arrives after.
             proposal = null; sending = ''; render();
@@ -1194,6 +1204,36 @@ function open(options) {
         return card('lens', 'Найдено здесь', String(items.length), ...items.map(item => evidenceCard(item, 'Твоя находка · видишь только ты')),
             kit.stack(button('Все находки — в «Уликах»', () => showTab('board'))));
     }
+    // Screen 8 «Разговор» (mockup 8): the speaker, the question and the answer, what went to the finds, the next questions.
+    const talking = () => Boolean(conversation && conversation.key === windowKey() && tab === 'place' && view?.self?.status === 'active');
+    function talkScreen() {
+        const own = view.self, npc = conversation.npc, location = arr(view.public.locations).find(item => item.id === own.location);
+        const answer = arr(own.results).find(item => conversation.events.includes(item.event_id));
+        const known = new Map(arr(own.observations).map(item => [item.observation_id, item]));
+        const look = lookOf(npc), line = bodyText(look?.public) || text(look?.public);
+        const speaker = put(el('section', 'nc-card nc-span'), put(el('div', 'ncase-npc'), face(npc, 'portrait'),
+            put(el('div'), el('span', 'nc-eyebrow', `${location?.name || 'Усадьба'} · ${TIME_WORDS[sceneTime()].toLowerCase()}`),
+                put(el('span', 'ncase-who'), el('span', 'nm', heroTitle(npc)), el('span', 'ncase-tag game', 'ведёт игра')),
+                line ? el('p', 'nc-muted', line) : null)));
+        const said_ = answer ? bodyText(answer.body) || text(answer.body) : '';
+        const found = arr(answer?.observation_ids).map(id => known.get(id)).filter(Boolean);
+        const chat = card('talk', 'Разговор', '', put(el('div', 'nc-chat'),
+            put(el('div', 'nc-msg mine'), put(el('div', 'bub'), p(conversation.question))),
+            put(el('div', 'nc-msg'), face(npc, 'ncase-face xs'), put(el('div', 'bub ncase-npc-say'), el('span', 'who', heroTitle(npc)),
+                p(said_ || 'Ответ ещё в пути: он появится здесь и в «Хронике».'))),
+            ...found.map(item => put(el('span', 'nc-sys'), icon(item.kind === 'claim' ? 'story' : 'lens'),
+                `В твои находки: «${item.title}» — ${item.kind === 'claim' ? 'утверждение' : 'доказательство'}`))));
+        const more = choiceList().filter(row => row.quote.kind === 'talk' && row.npc_character_id === npc);
+        const ask = card('talk', 'Расспросить', costLine(more), more.length
+            ? put(el('div', `ncase-acts${more.length === 1 ? ' one' : ''}`), ...more.map(row => actTile(row, row.label, {face: npc, full: `${row.label} · ${heroTitle(npc)}`})))
+            : p(`${heroTitle(npc)} сейчас больше ничего не добавит.`));
+        return [speaker, put(el('div', 'nc-col'), chat), put(el('div', 'nc-col'), ask)];
+    }
+    function talkDock() {
+        const left = Number(view.self.ap) || 0, cost = conversation.cost;
+        return kit.dock({hint: `${cost ? `Разговор стоил ${plural(cost, 'действие', 'действия', 'действий')} · ` : ''}осталось ${plural(left, 'действие', 'действия', 'действий')}`,
+            buttons: [button('К месту', () => { conversation = null; render(); }, 'primary')]});
+    }
     // Screen 7 «Место» (mockups, MQB-012 stage 2): the place by time of day with the action points, the window's event,
     // the people nearby by portrait, where to go as place tiles and what to do as action tiles.
     function place() {
@@ -1622,7 +1662,8 @@ function open(options) {
             p(finalHearing ? `Неделя подошла к концу. Назови, кто вывел и скрывал хозяина, и приложи улики с доски.${own.final_ballot ? ' Твой голос уже записан — его можно изменить.' : ''}` : 'Посмотри обвинение и опубликованные источники, затем сделай свой выбор.'),
             kit.row(button(finalHearing ? (own.final_ballot ? 'Изменить голос' : 'Перейти к голосованию') : 'Открыть слушание', () => showTab('board'), 'primary'))) : null;
         // Once the case is closed the place tab is the finale (mockup 14): no place picture or actions under it.
-        const current = over && tab === 'place' ? [] : tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : place();
+        if (conversation && !talking()) conversation = null;
+        const current = over && tab === 'place' ? [] : tab === 'self' ? role() : tab === 'board' ? board() : tab === 'chat' ? chat() : tab === 'history' ? history() : tab === 'rules' ? rules() : tab === 'narrator' ? narratorTab() : talking() ? talkScreen() : place();
         let selector = null;
         if (['finished', 'stopped'].includes(view.runtime_status) && arr(view.history_seats).length > 1) {
             const choice = choose('Твои завершённые роли', [{id: '', label: 'Все твои роли'}, ...view.history_seats.map(seat => ({id: seat.original_account_id, label: `${seat.display_name} · ${seat.role_title}`}))], selectedOriginal);
@@ -1635,9 +1676,9 @@ function open(options) {
         }
         // A closed case is headed by its title (mockup 14), not by the last place.
         const caseTitle = arr(boot?.cases).find(item => item.id === pub.case_id)?.title;
-        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), ...current, tab === 'rules' ? null : windowBar()].filter(Boolean),
+        frame([navigation(), selector, stateNotice, hearingNotice, ...[finale].flat(), ...current, tab === 'rules' || talking() ? null : windowBar()].filter(Boolean),
             over ? caseTitle || 'Дело закрыто' : arr(pub.locations).find(item => item.id === own.location)?.name || 'Усадьба',
-            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`, confirmDock());
+            over ? `Дело закрыто · окно ${clock.window_idx || '—'} из 14` : `Окно ${clock.window_idx || '—'} из 14 · ${TIME_WORDS[sceneTime()].toLowerCase()}`, confirmDock() || (talking() ? talkDock() : null));
     }
     function close() {
         if (!alive) return;

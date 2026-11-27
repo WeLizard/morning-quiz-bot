@@ -420,6 +420,38 @@ test('screen 7: a choice is confirmed in the bottom dock with its price and verb
     fixture.handle.close();
 });
 
+test('screen 8: a confirmed talk opens the conversation with the answer and the finds; «К месту» goes back', async () => {
+    const ask = (label, id) => ({...choice('talk', label, {dialogue_id: 'd', option_id: id}, 1), npc_character_id: 'butler', npc_title: 'Дворецкий'});
+    const state = view();
+    state.public.looks = {butler: {title: 'Дворецкий', public: 'Появляется бесшумно.'}};
+    state.menu = [ask('Расспросить про ночь', 'night')];
+    let talked = false;
+    const after = () => ({...state, self: {...state.self, ap: 2,
+        observations: [{observation_id: 'w', kind: 'claim', title: 'Слова дворецкого', body: {text: 'Письмо было не мне'}}],
+        private_events: [{event_id: 'e1', kind: 'action_result', payload: {body: {text: 'Письмо было не мне. Я положил его обратно.'}, observation_ids: ['w']}},
+            {event_id: 'e2', kind: 'story_offer', payload: {body: {text: 'SECRET_LETTER'}}}]},
+        menu: [ask('Спросить о письме', 'letter')]});
+    const fixture = controller(state, url => {
+        if (url.endsWith('/confirm')) { talked = true; return {receipt: {accepted: true}, caused_event_ids: ['e1'], caused_message_ids: []}; }
+        if (url.includes('/view') && talked) return after();
+    });
+    await settle();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent.includes('Расспросить про ночь')).click(); await settle();
+    await button(find(fixture.host, node => node.className === 'nc-dock'), 'Поговорить').click(); await settle();
+    const page = fixture.host.textContent;
+    assert.match(page, /Появляется бесшумно/);
+    assert.match(page, /Расспросить про ночь.*Письмо было не мне\. Я положил его обратно\./);
+    assert.match(page, /В твои находки: «Слова дворецкого» — утверждение/);
+    assert.match(page, /Расспросить.*Спросить о письме/);
+    assert.doesNotMatch(page, /SECRET_LETTER|Кто рядом|Завершить окно/);
+    const dock = find(fixture.host, node => node.className === 'nc-dock');
+    assert.match(dock.textContent, /Разговор стоил 1 действие · осталось 2 действия/);
+    await button(dock, 'К месту').click(); await settle();
+    assert.match(fixture.host.textContent, /Кто рядом/);
+    assert.doesNotMatch(fixture.host.textContent, /Письмо было не мне\. Я положил/);
+    fixture.handle.close();
+});
+
 test('screen 7, findings 4, 5 and 7: a finished window closes the place, the find stays on it, a departed player has no actions', async () => {
     const state = view();
     state.self.finished_window = true;

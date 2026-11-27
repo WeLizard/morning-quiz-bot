@@ -16,11 +16,11 @@ import secrets
 import re
 from functools import lru_cache
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Awaitable, Callable
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, exists, func, or_, select, text, update
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from domain.address import effective_address_form, parse_address_form
 from domain.night_case_engine import Transition, open_counts, start, start_open, step
@@ -30,6 +30,7 @@ from domain.night_case_state import (KernelState, PlayerActor, SystemActor, Rule
     decode_state, encode_state, engine_build_for, event_scope, parse_command, rules_snapshot)
 from domain.frozen_json import freeze, thaw
 from application import night_art
+from application.night_case_nudges import enqueue_case_nudges
 from domain.night_case_v2_format import CompiledCase, compile_v2, load_v2
 from domain.night_case_narrative import (ActionContext, ActionProposal, confirm_action, propose_action)
 from storage.admin_actions import operation_fence
@@ -39,8 +40,7 @@ from storage.models import (Account, AccountMerge, Game, GamePlayer, GameCommand
     NightCase, NightGameSealed, NightLobbyCommand, NightLobbyMessage, NightEvent, NightMessage,
     NightIntentProposal, NightRenderJob, NightRendering, NightRewardClaim,
     Room, RoomMembership)
-from storage.night_cases import (NightCaseRepository, NightStorageConflict, NightStorageCorruption,
-    SealedGame, canonical_json, json_hash, command_key, public_envelope, MAX_KERNEL_BYTES)
+from storage.night_cases import (NightCaseRepository, NightStorageConflict, SealedGame, canonical_json, json_hash, command_key, public_envelope, MAX_KERNEL_BYTES)
 
 
 class NightCaseError(ValueError):
@@ -909,6 +909,7 @@ class NightCaseApplicationService:
             old.status=player['status']
             old.public_state={'name':player['name'],'seat':old.seat,'status':player['status']}
         lifecycle='finished' if doc['clock']['phase']=='finished' else 'running'
+        before=copy.deepcopy(locked.sealed.kernel) if locked.sealed.kernel else None
         await self.repo.write_snapshot(locked,expected_storage_revision=locked.sealed.storage_revision,kernel=doc,lobby=None,
             snapshot_hash=hashlib.sha256(encoded).hexdigest(),lifecycle=lifecycle)
         await self.repo.append_events([NightEvent(game_id=locked.game.id,event_id=e['event_id'],scope=event_scope(e['audience']),
@@ -934,6 +935,9 @@ class NightCaseApplicationService:
                         kind='case_result',reward_facts=fact,seen_observation_ids=ids,formula_version=1,created_at=now))
         if self.transition_hook:
             await self.transition_hook(TransitionContext(locked,case,rules,now,actor_key,command_summary),transition)
+        # Private Telegram nudges: public facts only, deduped, delivered by the bot (MQB-012 stage 11).
+        await enqueue_case_nudges(self.session,game=locked.game,case_doc=case.readonly(),rules_doc=rules.document(),
+            before=before,after=doc,messages=transition.messages,events=transition.events,actor_key=actor_key,now=now)
         await self.session.flush()
         return state
 

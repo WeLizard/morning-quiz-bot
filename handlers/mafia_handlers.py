@@ -31,6 +31,32 @@ ROOM_PHASE_LINES = {
 }
 
 
+# «Ночной город» case nudges (application/night_case_nudges.py): public facts only.
+NIGHT_NUDGE_LINES = {
+    'start': 'дело началось. Переверни карту — узнай свою роль.',
+    'window': 'открылось окно {window_idx} из {window_count} — ходы снова есть.',
+    'final_hearing': 'итоговое слушание, окно {window_idx} из {window_count}: назови виновного.',
+    'hearing': 'у камина слушание, обвиняют: {suspect}. Голосовать можно до конца следующего окна.',
+    'whisper': 'тебе шепнули. Прочитать можно в деле.',
+    'letter': 'тебе пришло письмо.',
+    'final': 'дело закрыто. Итог и «кто был кем» — в деле.',
+}
+
+
+def render_night_nudge(payload: dict, *, url: str | None = None):
+    """Private nudge about a «Ночной город» case. Never a role, a secret, a clue or the text of a message."""
+    event = payload.get('event')
+    line = NIGHT_NUDGE_LINES.get('final_hearing' if event == 'window' and payload.get('final_hearing') else event)
+    if line is None:
+        return None
+    values = {key: escape(str(payload.get(key, ''))) for key in ('window_idx', 'window_count', 'suspect')}
+    title = f'🌒 <b>{escape(str(payload.get("case_title") or "Ночной город"))}</b>'
+    if payload.get('room_title'):
+        title += ' · ' + escape(str(payload['room_title']))
+    rows = [[Button('Открыть дело', url=url)]] if url else []
+    return f'{title}\n{line.format(**values)}', rows
+
+
 def room_phase_url(bot_username, room_id):
     """Mini App link that opens one room (``startapp=roomid_<room id>``), or None."""
     try:
@@ -411,13 +437,17 @@ class MafiaHandlers:
         kinds = {'mafia.phase', 'classic.question', 'classic.finished',
                  'photo.question', 'photo.hint', 'photo.feedback',
                  'photo.result', 'photo.finished', 'farm.request',
-                 'problem_report.text', 'problem_report.images', 'mafia.room_phase'}
+                 'problem_report.text', 'problem_report.images', 'mafia.room_phase',
+                 'night_case.nudge'}
         # Pause this delivery kind before claiming: pending rows and their deadlines stay intact.
         if os.getenv('MQB_FARM_REQUEST_DELIVERY_ENABLED', '1') == '0':
             kinds.discard('farm.request')
         # Private room-phase nudges can be paused independently; pending rows are kept.
         if os.getenv('MQB_ROOM_MAFIA_DELIVERY_ENABLED', '1') == '0':
             kinds.discard('mafia.room_phase')
+        # «Ночной город» case nudges, the same way.
+        if os.getenv('MQB_NIGHT_CASE_DELIVERY_ENABLED', '1') == '0':
+            kinds.discard('night_case.nudge')
         for _ in range(20):
             item = await queue.claim(worker_id, kinds=kinds)
             if item is None:
@@ -433,6 +463,9 @@ class MafiaHandlers:
                     continue
                 if item['kind'] == 'mafia.room_phase':
                     await self._deliver_room_phase(context, queue, worker_id, item)
+                    continue
+                if item['kind'] == 'night_case.nudge':
+                    await self._deliver_night_nudge(context, queue, worker_id, item)
                     continue
                 if item['kind'] == 'farm.request':
                     payload = item['payload']
@@ -510,15 +543,31 @@ class MafiaHandlers:
                 await queue.delivered(item['id'], worker_id, claim_version=item['claim_version'])
 
     async def _deliver_room_phase(self, context, queue, worker_id, item):
-        """Send one private room-phase nudge; a closed private chat is a quiet skip."""
+        """One private room-phase nudge of a room mafia game."""
         payload = item['payload']
         rendered = render_room_phase(
             payload, url=room_phase_url(getattr(context.bot, 'username', None), payload.get('room_id', '')))
+
+        async def current(session):
+            return await MafiaApplicationService(session).room_phase_is_current(
+                game_id=item['game_id'], phase_revision=payload.get('phase_revision'))
+        await self._send_private_nudge(context, queue, worker_id, item, rendered, current)
+
+    async def _deliver_night_nudge(self, context, queue, worker_id, item):
+        """One private nudge about a «Ночной город» case; the button opens its company."""
+        from application.night_case_nudges import nudge_is_current
+        payload = item['payload']
+        rendered = render_night_nudge(
+            payload, url=room_phase_url(getattr(context.bot, 'username', None), payload.get('room_id', '')))
+        await self._send_private_nudge(context, queue, worker_id, item, rendered,
+                                       lambda session: nudge_is_current(session, payload))
+
+    async def _send_private_nudge(self, context, queue, worker_id, item, rendered, is_current):
+        """Send one private nudge; a stale one or a closed private chat is a quiet skip."""
         stale = rendered is None
         if not stale:
             async with self.database.transaction() as session:
-                stale = not await MafiaApplicationService(session).room_phase_is_current(
-                    game_id=item['game_id'], phase_revision=payload.get('phase_revision'))
+                stale = not await is_current(session)
         if stale:
             await queue.skipped(item['id'], worker_id, claim_version=item['claim_version'])
             return

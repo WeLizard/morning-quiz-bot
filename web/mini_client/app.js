@@ -1058,7 +1058,7 @@
             } catch (error) { feedback.textContent = error.message; event.currentTarget.disabled = false; }
         }, 'danger'));
         box.append(guestExit);
-        guestMain.append(box, timezoneSetting('guest'), appearanceCard('guest'), gamePreferencesCard('guest'), farmRequestNotificationsCard('guest'));
+        guestMain.append(box, timezoneSetting('guest'), appearanceCard('guest'), gamePreferencesCard('guest'), nightCaseNotificationsCard('guest'), farmRequestNotificationsCard('guest'));
         if (focusLink) { linkAnchor.scrollIntoView?.({block: 'center'}); linkAnchor.nextElementSibling?.focus?.(); }
     }
     // Guest «Чаты» / «Рейтинг»: both depend on Telegram chats, so a guest sees one clear step instead of an empty list.
@@ -2179,6 +2179,34 @@
         });
         return card;
     }
+    // «Ночной город» reminders in Telegram: one account-wide switch (game_preferences.night_case_notifications; absent = on).
+    function nightCaseNotificationsCard(identity) {
+        const profile = () => identity === 'guest' ? state.guest : state.me;
+        const account = profile()?.account_id;
+        const box = el('section', undefined, 'card night-case-notifications');
+        box.append(el('h2', 'Уведомления «Ночного города»'));
+        const label = el('label', undefined, 'setting-row'), input = el('input');
+        input.type = 'checkbox';
+        input.checked = profile()?.game_preferences?.night_case_notifications !== false;
+        label.append(el('span', 'Напоминания о деле в Telegram'), input);
+        const message = el('p', 'Новое окно, слушание у камина, шёпот, письмо и конец дела. Тайн в сообщениях нет; ночью бот молчит.', 'muted');
+        box.append(label, message);
+        input.addEventListener('change', async () => {
+            if (!account || profile()?.account_id !== account) return;
+            const checked = input.checked; input.disabled = true;
+            const path = `/api/account/game-preferences?identity=${identity}`;
+            const options = {headers: {'Content-Type': 'application/json', 'X-Guest-CSRF': '1'},
+                body: JSON.stringify({account_id: account, game_preferences: {night_case_notifications: checked ? null : false}})};
+            try {
+                const result = identity === 'guest' ? await guestRequest(path, 'POST', options) : await request(path, {...options, method: 'POST'});
+                if (profile()?.account_id !== account) return;
+                profile().game_preferences = result.game_preferences;
+                message.textContent = 'Настройка сохранена.';
+            } catch (error) { input.checked = !checked; message.textContent = error.message; }
+            finally { input.disabled = false; }
+        });
+        return box;
+    }
     // Notification preferences have one entry point: Profile → Settings, for both sign-in methods.
     function farmRequestNotificationsCard(identity) {
         const version = generation, account = (identity === 'guest' ? state.guest : state.me)?.account_id;
@@ -2221,7 +2249,7 @@
         const row = el('div', undefined, 'setting-row'), copy = el('div'); copy.append(el('strong', 'Telegram'), el('small', `${state.me.display_name} · привязан`));
         row.append(copy, el('span', '✓', 'badge')); via.append(row);
         content.append(via, devicesSection('telegram'));
-        content.append(timezoneSetting('telegram'), appearanceCard('telegram'), gamePreferencesCard('telegram'), farmRequestNotificationsCard('telegram'));
+        content.append(timezoneSetting('telegram'), appearanceCard('telegram'), gamePreferencesCard('telegram'), nightCaseNotificationsCard('telegram'), farmRequestNotificationsCard('telegram'));
         const actions = el('div', undefined, 'qw-danger-zone'); actions.append(button('Выйти', async () => {
             try { await request('/api/mini/session', {method: 'DELETE'}); clearTimeout(renewTimer); state.authenticated = false; state.me = null; state.page = 'home';
                 try { localStorage.setItem('mqb-telegram-logged-out', '1'); } catch {}

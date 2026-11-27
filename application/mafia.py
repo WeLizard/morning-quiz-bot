@@ -9,7 +9,7 @@ from functools import wraps
 from uuid import UUID
 
 from storage.admin_actions import operation_fence, require_access
-from sqlalchemy import String, cast, select
+from sqlalchemy import select
 from domain.mafia import (
     LOBBY_IDLE_SECONDS,
     cast_vote,
@@ -39,8 +39,9 @@ from storage.games import GameRepository
 from sqlalchemy import func, text, update
 from application import room_limits
 from application.rooms import RoomApplicationService
-from storage.models import (Account, AccountIdentity, ChatMember, Game, GameEvent, Room,
-                            RoomInvite, RoomMembership, User)
+from application.room_telegram import telegram_members
+from storage.models import (ChatMember, Game, GameEvent, Room,
+                            RoomInvite, RoomMembership)
 from storage.notifications import NotificationQueue
 
 
@@ -477,24 +478,8 @@ class MafiaApplicationService:
             value = player.get('account_id') if isinstance(player, dict) else None
             if value is not None and str(value) != str(skip_account_id):
                 accounts.add(UUID(str(value)))
-        if accounts:
-            # Whoever left or was removed from the room is not nudged about its table.
-            accounts = set((await self.session.scalars(select(RoomMembership.account_id).where(
-                RoomMembership.room_id == row.room_id, RoomMembership.status == 'active',
-                RoomMembership.account_id.in_(accounts)))).all())
-        if not accounts:
-            return 0
-        user_ids = (await self.session.scalars(
-            select(User.id).join(Account, Account.id == User.account_id)
-            .join(AccountIdentity, AccountIdentity.account_id == User.account_id)
-            .where(
-                User.account_id.in_(accounts), User.archived.is_(False), User.bot_blocked.is_(False),
-                Account.archived.is_(False), Account.bot_blocked.is_(False),
-                AccountIdentity.provider == 'telegram',
-                AccountIdentity.provider_subject == cast(User.id, String),
-                AccountIdentity.revoked_at.is_(None), AccountIdentity.verified_at.is_not(None),
-            ).order_by(User.id)
-        )).all()
+        # Whoever left or was removed from the room is not nudged about its table.
+        user_ids = [user_id for _, user_id in await telegram_members(self.session, row.room_id, accounts)]
         if not user_ids:
             return 0
         room = await self.session.get(Room, row.room_id)

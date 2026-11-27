@@ -1,6 +1,7 @@
-"""Shared optional sound and motion preferences for account-owned game settings."""
+"""Shared optional sound, motion and reminder preferences for account-owned game settings."""
 
-GAME_PREFERENCE_KEYS = frozenset({'sound_effects', 'music', 'music_volume', 'animations'})
+# night_case_notifications: «Ночной город» reminders in Telegram (application/night_case_nudges.py); absent = on.
+GAME_PREFERENCE_KEYS = frozenset({'sound_effects', 'music', 'music_volume', 'animations', 'night_case_notifications'})
 
 
 def parse_game_preferences_patch(value):
@@ -11,7 +12,7 @@ def parse_game_preferences_patch(value):
     for key, item in value.items():
         if item is None:
             result[key] = None
-        elif key in {'sound_effects', 'music', 'animations'}:
+        elif key in {'sound_effects', 'music', 'animations', 'night_case_notifications'}:
             if not isinstance(item, bool):
                 raise ValueError('game_preferences')
             result[key] = item

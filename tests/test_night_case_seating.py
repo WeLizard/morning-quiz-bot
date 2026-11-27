@@ -160,6 +160,45 @@ class FreeSeatingLobbyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(running["self"]["character_id"], "person_00")
         self.assertEqual(second["self"]["character_id"], "person_01")
 
+    async def test_my_cases_list_companies_with_the_case_and_my_hero(self):
+        """Mockup 1 «Твои дела»: each company of mine with its current case, the window and the hero I took; nothing secret."""
+        from storage.models import Room, RoomMembership
+        idle = uuid4().hex
+        async with self.db.transaction() as session:
+            session.add(Room(id=idle, kind="standalone", title="Без дела", owner_account_id=self.owner)); await session.flush()
+            session.add(RoomMembership(room_id=idle, account_id=self.owner, role="owner"))
+        async def mine(account):
+            async with self.db.transaction() as session:
+                rows = (await self.service(session).my_cases(account_id=account))["items"]
+            return {row["room_id"]: row for row in rows}
+        self.assertEqual((await mine(self.owner))[idle], {"room_id": idle, "title": "Без дела", "members": 1, "game_id": None, "status": "none"})
+        async with self.db.transaction() as session:
+            view = (await self.service(session).create_lobby(account_id=self.owner, room_id=self.room, command=self.cmd(
+                0, {"case_id": self.ref.case_id, "case_version": self.ref.case_version, "timezone": "Europe/Berlin"})))["view"]
+        game = view["game_id"]
+        for account in self.accounts[1:3]:
+            view = await self.call("join_lobby", account, game, view)
+        view = await self.call("take_seat", self.owner, game, view, {"character_id": "person_00", "look_id": None})
+        row = (await mine(self.owner))[self.room]
+        self.assertEqual({k: row[k] for k in ("game_id", "status", "members", "seated", "players", "window")},
+                         {"game_id": game, "status": "lobby", "members": 4, "seated": True, "players": 3, "window": {"idx": 0, "count": 14}})
+        self.assertEqual(row["hero"]["character_id"], "person_00")
+        self.assertEqual(row["case_title"], view["case"]["title"])
+        outsider = (await mine(self.accounts[3]))[self.room]
+        self.assertEqual((outsider["seated"], outsider["hero"]), (False, None), "a member not at the table has no hero")
+        view = await self.call("take_seat", self.accounts[1], game, view, {"character_id": "person_01", "look_id": None})
+        for i, account in enumerate(self.accounts[:3]):
+            view = await self.call("set_ready", account, game, view, {"name": f"Player {i}", "address_form": "n", "ready": True})
+        async with self.db.transaction() as session:
+            owner_view = await self.service(session).get_view(account_id=self.owner, game_id=game)
+        await self.call("start_game", self.owner, game, owner_view["lobby"])
+        row = (await mine(self.accounts[1]))[self.room]
+        self.assertEqual((row["status"], row["hero"]["character_id"], row["self_status"], row["window"]["count"]), ("running", "person_01", "active", 14))
+        self.assertGreaterEqual(row["window"]["idx"], 0)
+        self.assertEqual(set(row), {"room_id", "title", "members", "game_id", "status", "window", "hero", "case_title", "world", "art",
+                                    "phase", "seated", "players", "self_status"}, "no side, truth or other accounts")
+        self.assertEqual(set(row["hero"]["look"]) - {"name", "public"}, {"id", "gender", "age", "title", "title_forms", "art"})
+
     async def say(self, account, game, text, command_id=None):
         async with self.db.transaction() as session:
             return await self.service(session).post_lobby_message(account_id=account, game_id=game,

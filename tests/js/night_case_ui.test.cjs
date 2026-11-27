@@ -80,7 +80,7 @@ test('Case entry is the game root: no Mafia, no single-case hero, companies and 
     const all = textOf(fixture.host);
     assert.ok(!find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Классическая Мафия'));
     assert.doesNotMatch(all, /Хозяин исчез|Твои комнаты/);
-    for (const label of ['Твои компании', 'Новая компания', 'Войти по приглашению']) assert.match(all, new RegExp(label));
+    for (const label of ['Твои компании', 'Новое дело', 'Войти по приглашению']) assert.match(all, new RegExp(label));
     assert.equal(opened, 0);
     fixture.handle.close();
     assert.equal(fixture.intervals.size, 0);
@@ -96,9 +96,17 @@ test('a company is one step below the root: Back returns to the company list', a
     await settle();
     assert.deepEqual(stack.map(item => item.id), []);
     assert.ok(fixture.calls.some(call => call.url === '/api/guest/rooms'));
-    assert.ok(find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Пятничная компания'));
+    const row = find(fixture.host, node => node.tagName === 'li' && node.textContent.includes('Пятничная компания'));
+    assert.ok(row && find(row, node => node.tagName === 'button' && node.textContent === 'Открыть'));
     fixture.handle.close();
 });
+
+// The owner's company without a case: «Новое дело» → the world → the case card with the zone (mockups 2–3).
+async function openCaseCard(fixture) {
+    await settle();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Новое дело').click(); await settle();
+    await find(fixture.host, node => node.tagName === 'button' && /^Дальше: /.test(node.textContent)).click(); await settle();
+}
 
 test('new case defaults to the device IANA zone, filters all supplied zones and falls back to UTC', async () => {
     const zones = ['UTC', 'Europe/Berlin', 'Asia/Tokyo', 'America/New_York'];
@@ -106,16 +114,15 @@ test('new case defaults to the device IANA zone, filters all supplied zones and 
     const deviceIntl = {DateTimeFormat: function (_locale, options = {}) { if (options.timeZone === 'Pacific/Unknown') throw new RangeError('bad IANA zone'); return {resolvedOptions: () => ({timeZone: 'Asia/Tokyo'})}; }};
     let fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
         {target: {roomId: 'room'}, bootstrap, Intl: deviceIntl});
-    await settle();
+    await openCaseCard(fixture);
     let zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
     let search = find(fixture.host, node => node.attrs?.['aria-label'] === 'Найти часовой пояс окон');
     assert.ok(zone); assert.ok(search); assert.equal(zone.value, 'Asia/Tokyo', JSON.stringify({device: fixture.zoneApi.deviceTimezone(), resolved: fixture.zoneApi.resolvedTimezone(), values: zone.children.map(option => option.value)}));
     assert.deepEqual(zone.children.map(option => option.value), ['America/New_York', 'Asia/Tokyo', 'Europe/Berlin', 'UTC']);
-    find(fixture.host, node => node.attrs?.['aria-label'] === 'Дело').value = 'manor_lake_missing:1';
     search.value = 'America/New_York'; await search.events.input();
     assert.deepEqual(zone.children.map(option => option.value), ['Asia/Tokyo', 'America/New_York']);
     zone.value = 'America/New_York'; await zone.events.change();
-    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Создать стол').click(); await settle();
+    await find(fixture.host, node => node.tagName === 'button' && node.textContent === 'Начать сбор').click(); await settle();
     const create = fixture.calls.find(call => call.url.endsWith('/lobby'));
     assert.ok(create, JSON.stringify(fixture.calls.map(call => call.url)));
     assert.equal(create.body.params.timezone, 'America/New_York');
@@ -123,7 +130,7 @@ test('new case defaults to the device IANA zone, filters all supplied zones and 
 
     fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined, {target: {roomId: 'room'}, bootstrap,
         Intl: {DateTimeFormat: function (_locale, options = {}) { if (options.timeZone === 'Pacific/Unknown') throw new RangeError('bad IANA zone'); return {resolvedOptions: () => ({timeZone: 'Pacific/Unknown'})}; }}});
-    await settle();
+    await openCaseCard(fixture);
     zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
     assert.equal(zone.value, 'UTC');
     fixture.handle.close();
@@ -131,7 +138,7 @@ test('new case defaults to the device IANA zone, filters all supplied zones and 
     const savedBootstrap = {...bootstrap, account_timezone: 'America/New_York'};
     fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
         {target: {roomId: 'room'}, bootstrap: savedBootstrap, Intl: deviceIntl});
-    await settle();
+    await openCaseCard(fixture);
     zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
     assert.equal(zone.value, 'America/New_York', 'the stored account zone beats the device zone');
     fixture.handle.close();
@@ -139,7 +146,7 @@ test('new case defaults to the device IANA zone, filters all supplied zones and 
     fixture = controller(view(), url => url.endsWith('/night-case/current') ? {game_id: null} : undefined,
         {target: {roomId: 'room'}, bootstrap: {...bootstrap, account_timezone: null}, Intl: deviceIntl});
     fixture.zoneApi.setTimezone('America/New_York');
-    await settle();
+    await openCaseCard(fixture);
     zone = find(fixture.host, node => node.attrs?.['aria-label'] === 'Часовой пояс окон');
     assert.equal(zone.value, 'Asia/Tokyo', 'explicit automatic mode uses this device, not a stale shell account zone');
     fixture.handle.close();
@@ -931,5 +938,69 @@ test('the owner opens the lobby to strangers in «Пригласить» (mockup
     assert.equal(JSON.stringify(fixture.calls.find(call => call.url === '/api/guest/rooms/room/open').body), '{"open":true}');
     assert.equal(toggle().dataset.on, 'true');
     assert.match(toggle().textContent, /Стол виден в «Открытых сборах»; без движения за столом уйдёт из списка в \d\d:\d\d\./);
+    fixture.handle.close();
+});
+
+test('the root lists my cases with my hero and every company with its state; «Новое дело» is the dock (mockup 1)', async () => {
+    const mine = {items: [
+        {room_id: 'r1', title: 'Пятничный стол', members: 6, game_id: 'g1', status: 'running', window: {idx: 5, count: 14}, phase: 'investigation', seated: true, players: 6,
+            hero: {character_id: 'gardener', look: {id: 'base', title: 'Садовник', art: {asset_id: 'manor_char_gardener'}}}, case_title: 'Хозяин исчез', world: 'manor_lake', art: null, self_status: 'active'},
+        {room_id: 'r2', title: 'Дачники', members: 4, game_id: null, status: 'none'},
+        {room_id: 'r3', title: 'Соседи', members: 3, game_id: 'g3', status: 'lobby', window: {idx: 0, count: 14}, seated: false, players: 2, hero: null, case_title: 'Хозяин исчез', world: 'manor_lake', art: null}]};
+    const rooms = {items: [{id: 'r1', title: 'Пятничный стол', role: 'member'}, {id: 'r2', title: 'Дачники', role: 'owner'}, {id: 'r3', title: 'Соседи', role: 'member'}]};
+    const fixture = controller(null, url => url === '/api/guest/rooms' ? rooms : url === '/api/night-case/mine' ? mine : url === '/api/guest/rooms/open' ? {items: []} : undefined, {target: null});
+    await settle();
+    const card = find(fixture.host, node => node.tagName === 'section' && node.children[0]?.textContent === 'Твои дела');
+    assert.ok(card, 'a case I sit in is on the root');
+    assert.match(card.textContent, /Хозяин исчез/);
+    assert.match(card.textContent, /Садовник · Пятничный стол/);
+    assert.match(card.textContent, /Окно 5 из 14/);
+    assert.doesNotMatch(card.textContent, /Соседи/, 'a lobby I do not sit at is not my case');
+    assert.ok(find(card, node => node.tagName === 'button' && node.textContent === 'Вернуться в дело'));
+    const line = title => find(fixture.host, node => node.tagName === 'li' && node.textContent.includes(title))?.textContent || '';
+    assert.match(line('Дачники'), /4 человека · свободна/);
+    assert.match(line('Соседи'), /3 человека · сбор на дело, за столом 2/);
+    assert.match(line('Пятничный стол'), /6 человек · идёт дело, окно 5/);
+    const dock = find(fixture.host, node => node.className === 'nc-dock');
+    assert.ok(dock && find(dock, node => node.tagName === 'button' && node.textContent === 'Новое дело'));
+    fixture.handle.close();
+});
+
+test('«Новое дело» goes world → case card → company: the cast, the name check and one company on a retry (mockups 2–3)', async () => {
+    const bootstrap = {enabled: true, viewer_account_id: VIEWER, cases: [{id: 'manor', version: 5, title: 'Хозяин исчез', world: 'manor_lake', timezones: ['UTC', 'Europe/Berlin'],
+        summary: 'Зима, усадьба отрезана метелью.', players: {min: 3, max: 12}, art: null,
+        heroes: [{id: 'gardener', title: 'Садовник', looks: [{id: 'base', art: null}], multiple: false}, {id: 'maid', title: 'Горничная', looks: [{id: 'base', art: null}], multiple: false}],
+        npc_heroes: [{id: 'owner', title: 'Владелец усадьбы', art: null}]}]};
+    let lobbyCalls = 0;
+    const fixture = controller(null, (url, init) => {
+        if (url === '/api/guest/rooms' && init.method === 'POST') return {id: 'new-room', title: init.body.title, role: 'owner'};
+        if (url === '/api/guest/rooms' || url === '/api/guest/rooms/open' || url === '/api/night-case/mine') return {items: []};
+        if (url === '/api/rooms/new-room/night-case/lobby' && ++lobbyCalls === 1) { const error = new Error('busy'); error.status = 409; error.code = 'rate_limited'; throw error; }
+        if (url === '/api/rooms/new-room/night-case/lobby') return {view: {game_id: 'game'}};
+        return undefined;
+    }, {target: null, bootstrap});
+    const calls = fixture.calls, posts = () => calls.filter(call => call.url === '/api/guest/rooms' && call.method === 'POST').length;
+    await settle();
+    const click = async label => { const node = find(fixture.host, row => row.tagName === 'button' && row.textContent === label); assert.ok(node, label); await node.click(); await settle(); };
+    await click('Новое дело');
+    const tile = find(fixture.host, node => node.tagName === 'button' && /nc-world/.test(node.className));
+    assert.equal(tile.attrs['aria-pressed'], 'true', 'the only world with a case is picked');
+    assert.match(tile.textContent, /1 дело/);
+    await click('Дальше: Хозяин исчез');
+    const all = fixture.host.textContent;
+    for (const value of ['Действующие лица', 'Садовник', 'Горничная', '3–12 игроков', 'Зима, усадьба отрезана метелью.', 'Как идёт дело', 'Название компании']) assert.match(all, new RegExp(value));
+    assert.match(all, /всегда ведёт игра: владелец усадьбы/);
+    await click('Собрать компанию');
+    assert.match(fixture.host.textContent, /Дай компании название/);
+    assert.equal(posts(), 0, 'no company without a name');
+    find(fixture.host, node => node.attrs?.['aria-label'] === 'Название компании').value = 'Пятничный стол';
+    await click('Собрать компанию');
+    assert.equal(posts(), 1);
+    assert.match(fixture.host.textContent, /Слишком много запросов/, 'a failed lobby stays on the case card');
+    await click('Начать сбор');
+    assert.equal(posts(), 1, 'the retry reuses the created company');
+    const create = calls.filter(call => call.url === '/api/rooms/new-room/night-case/lobby').at(-1);
+    assert.equal(JSON.stringify([create.body.params.case_id, create.body.params.case_version]), '["manor",5]');
+    assert.ok(calls.some(call => call.url.startsWith('/api/night-case/games/game/view')), 'the lobby opens after the start');
     fixture.handle.close();
 });

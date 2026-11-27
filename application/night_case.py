@@ -24,7 +24,7 @@ from sqlalchemy import and_, exists, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from domain.address import effective_address_form, parse_address_form
 from domain.night_case_engine import Transition, open_counts, start, start_open, step
-from domain.night_case_text import looks_of, public_look
+from domain.night_case_text import chosen_looks, looks_of, public_look
 from domain.night_case_projection import CommandIntent, available_actions, project, quote_action
 from domain.night_case_state import (KernelState, PlayerActor, SystemActor, RulesSnapshot,
     decode_state, encode_state, engine_build_for, event_scope, parse_command, rules_snapshot)
@@ -185,6 +185,18 @@ AvailabilityHook = Callable[[TransitionContext], Awaitable[AvailabilityDecision]
 @lru_cache(maxsize=32)
 def _compile(content_bytes: bytes) -> CompiledCase:
     return compile_v2(load_v2(content_bytes))
+
+
+def _registered_case(row) -> CompiledCase:
+    """The compiled case of a registered row, verified against its content hash; cached like a game's case."""
+    key=(row.case_id,row.version,row.content_hash)
+    case=_VERIFIED_CASES.get(key)
+    if case is None:
+        case=_compile(canonical_json(row.content))
+        if (case.case_id,case.case_version,case.content_hash)!=key: raise ValueError('night_content_hash')
+        if len(_VERIFIED_CASES)>=_VERIFIED_CASES_MAX: _VERIFIED_CASES.pop(next(iter(_VERIFIED_CASES)))
+        _VERIFIED_CASES[key]=case
+    return case
 
 
 def _lobby_counts(case_doc, version):
@@ -1259,8 +1271,18 @@ class NightCaseApplicationService:
             row=await self.repo.get_case(ref.case_id,ref.case_version)
             if row is None or row.admission!='rehearsal' or row.content_hash!=ref.content_hash or row.engine_build not in self.registry.allowed_builds:
                 continue
-            cases.append({'id':row.case_id,'version':row.version,'title':row.content['meta']['title'],
-                'timezones':sorted(self.registry.allowed_timezones)})
+            item={'id':row.case_id,'version':row.version,'title':row.content['meta']['title'],
+                'timezones':sorted(self.registry.allowed_timezones)}
+            cases.append(item)
+            # The case card (mockup 3): its world, premise, table size and cast — what the lobby shows anyone in the company.
+            try:
+                case=_registered_case(row); doc=case.readonly(); meta=doc['meta']; counts=_lobby_counts(doc,2)
+                art=_art_binding(row.validation_report,meta)
+            except (NightCaseError,ValueError,KeyError):
+                continue
+            item.update(world=meta.get('world'),summary=meta.get('summary') or '',players={'min':min(counts),'max':max(counts)},art=art,
+                heroes=_lobby_heroes(doc),
+                npc_heroes=[{'id':c['id'],'title':c['title'],'art':copy.deepcopy(looks_of(c)[0].get('art'))} for c in doc['characters'] if not c['can_be_player']])
         return {'enabled':True,'cases':cases}
 
     async def room_game(self,*,account_id,room_id):
@@ -1268,6 +1290,55 @@ class NightCaseApplicationService:
         await self._member(room_id,account.id)
         row=await self.session.scalar(select(Game).where(Game.room_id==room_id,Game.mode=='night_case',Game.is_current.is_(True)))
         return {'game_id':row.id if row else None}
+
+    async def my_cases(self,*,account_id):
+        """Root of the case screen (mockup 1): every company of mine with its current case and my hero in it.
+
+        Read from the sealed rows without locks or a decoded kernel. Nothing secret leaves it: only the case,
+        the window, the hero I took and my own status; the side, the truth and other players stay in the view."""
+        account=await self._principal(account_id)
+        aliases={str(a) for a in await historical_aliases(self.session,account.id)}
+        members=select(RoomMembership.room_id,func.count().label('n')).where(RoomMembership.status=='active').group_by(RoomMembership.room_id).subquery()
+        rows=(await self.session.execute(select(Room,members.c.n,Game,NightGameSealed)
+            .join(RoomMembership,and_(RoomMembership.room_id==Room.id,RoomMembership.account_id==account.id,RoomMembership.status=='active'))
+            .join(members,members.c.room_id==Room.id)
+            .outerjoin(Game,and_(Game.room_id==Room.id,Game.mode=='night_case',Game.is_current.is_(True)))
+            .outerjoin(NightGameSealed,NightGameSealed.game_id==Game.id)
+            .where(Room.kind=='standalone').order_by(Room.created_at.desc(),Room.id))).all()
+        items=[]
+        for room,count,game,sealed in rows:
+            item={'room_id':room.id,'title':room.title,'members':int(count),'game_id':None,'status':'none'}
+            items.append(item)
+            if game is None or sealed is None: continue
+            item.update(game_id=game.id,status=sealed.lifecycle,window={'idx':0,'count':sealed.rules.get('window_count')},hero=None)
+            try:
+                case,_rules=await self._load_case(sealed)
+                art=await self._art(sealed,case)
+            except NightCaseError:
+                item['status']='unavailable'; continue
+            content=case.readonly()
+            item.update(case_title=(sealed.lobby or {}).get('title') or content['meta']['title'],world=content['meta'].get('world'),art=art)
+            heroes={c['id']:c for c in content['characters']}
+            if sealed.lifecycle=='lobby':
+                roster=sealed.lobby['roster']
+                own=next((r for r in roster if r['account_id'] in aliases),None)
+                item.update(seated=own is not None,players=len(roster))
+                if own and own.get('character_id') in heroes:
+                    looks=looks_of(heroes[own['character_id']])
+                    look=next((x for x in looks if x['id']==own.get('look_id')),looks[0])
+                    item['hero']={'character_id':own['character_id'],'look':public_look(look)}
+                continue
+            kernel=sealed.kernel or {}
+            clock=kernel.get('clock') or {}
+            item['window']['idx']=clock.get('window_idx',0)
+            item['phase']=clock.get('phase')
+            players=list(kernel.get('players') or ())
+            own=next((p for p in players if p.get('account_id') in aliases),None)
+            item.update(seated=own is not None,players=len(players))
+            if own and own.get('character_id') in heroes:
+                item['hero']={'character_id':own['character_id'],'look':public_look(chosen_looks(content,kernel)[own['character_id']])}
+                item['self_status']=own.get('status')
+        return {'items':items}
 
     @_atomic
     async def get_rendering(self,*,account_id,game_id,job_id):

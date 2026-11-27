@@ -150,7 +150,7 @@ function open(options) {
     if (!kit || !Q) throw new Error('night_case_shell_required');
     let alive = true, locked = false, epoch = 0, poll = null, timer = null, reading = false, identityReading = false, commandBusy = false;
     let view = null, room = null, game = null, tab = 'place', notice = '', proposal = null, sending = '';
-    let boot = options.bootstrap, selectedCase = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
+    let boot = options.bootstrap, fresh = null, ownDraft = '', channel = 'square', recipients = [], invitation = null, lookPick = null, lobbyDraft = '', chatFocus = false;
     // Choices of the removed-player forms outlive the poll re-render, like the chat draft.
     let askGhost = null, askText = ''; const whisperTo = new Map(), hearingPick = new Map(); let accuseOpen = false;
     let viewer = boot?.viewer_account_id || null;
@@ -235,10 +235,10 @@ function open(options) {
         if (locked || !alive) return;
         locked = true; epoch++; controller.abort(); clearInterval(poll); timer?.stop(); timer = null;
         view = proposal = room = game = boot = invitation = viewer = null;
-        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; selectedCase = null; lookPick = null; lobbyDraft = ''; askGhost = null; whisperTo.clear(); hearingPick.clear(); accuseOpen = false;
+        ownDraft = selectedOriginal = notice = askText = ''; recipients = []; channel = 'square'; fresh = null; lookPick = null; lobbyDraft = ''; askGhost = null; whisperTo.clear(); hearingPick.clear(); accuseOpen = false;
         ai = aiPresets = aiMode = null; aiAt = 0; aiKeyForm = false;
         outbox.clear(); clearHistory(); assets.clear(); assetWorld = null; worldPack = null; kit.useWorld?.(null);
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); Q.menu.register([], 'Ночной город');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); popFlow(); Q.menu.register([], 'Ночной город');
         const header = kit.header(); header.node.classList.add('ncase-bar');
         header.set({eyebrow: 'Ночной город', title: 'Доступ к делу изменился'});
         host.replaceChildren(header.node, put(el('main', 'nc-main ncase-main'), panel('Открой дело заново',
@@ -248,7 +248,7 @@ function open(options) {
     function fail(error) {
         if (!live()) return;
         notice = errorText(error);
-        if (!view && !room) frame([panel('Связь с делом', p(notice), kit.row(button('Повторить', () => game ? refresh() : initialize())))]);
+        if (!view && !room && !fresh) frame([panel('Связь с делом', p(notice), kit.row(button('Повторить', () => game ? refresh() : initialize())))]);
         else render();
     }
     // dock: the bottom action panel (mockups); main then keeps room for it under the last card.
@@ -269,6 +269,7 @@ function open(options) {
         if (outbox.busy && !proposal?.sending) main.prepend(status(`${sending ? sending + ': ' : ''}отправляем…`));
         if (unconfirmed) main.prepend(kit.netBanner({text: 'Запрос ещё не подтверждён сервером', onRetry: () => retry().catch(fail)}));
         if (dock) main.classList.add('has-dock');
+        if (children.some(child => /\bnc-col\b/.test(child?.className || ''))) main.classList.add('ncase-cols');
         host.replaceChildren(...[header.node, main, dock].filter(Boolean)); host.dataset.page = 'night';
     }
     function sceneTime() {
@@ -561,7 +562,7 @@ function open(options) {
     }
     // A company and its case are one step below the root: BackButton / ‹ returns to the list.
     async function enterRoom(next) {
-        epoch++; room = next; view = null; proposal = null; tab = 'place';
+        epoch++; room = next; view = null; proposal = null; tab = 'place'; fresh = null; popFlow();
         selectedOriginal = ''; clearHistory();
         Q.nav.pop?.('night-case-section');
         Q.nav.push?.({id: 'night-case-room', onBack: () => { entry().catch(fail); return true; }});
@@ -571,32 +572,190 @@ function open(options) {
         game = current.game_id || null;
         if (game) await refresh(); else renderRoom();
     }
+    // Pictures of a case pack outside a game (portraits on the root and the case card): verified once per pack, like the game's.
+    const artCache = new Map();
+    function packArt(binding, world) {
+        const pointer = artPointer(binding);
+        if (!pointer || !/^[a-z][a-z0-9_]{1,31}$/.test(text(world))) return Promise.resolve(new Map());
+        if (!artCache.has(pointer)) artCache.set(pointer, request(pointer).then(value => verifiedManifest(value, world, binding))
+            .catch(() => { artCache.delete(pointer); return new Map(); }));
+        return artCache.get(pointer);
+    }
+    function artImage(map, art, cls = 'ncase-face') {
+        const hit = map?.get(art?.asset_id);
+        if (!hit) return put(el('span', `${cls} blank`), icon('people'));
+        return Object.assign(el('img', cls), {src: hit.url, alt: '', loading: 'lazy'});
+    }
+    const thumbImg = (world, cls = 'thumb') => {
+        const entry = kit.worldEntry?.(world), url = entry ? kit.thumbUrl?.(entry) : '';
+        return url ? Object.assign(el('img', cls), {src: url, alt: ''}) : el('span', `${cls} blank`);
+    };
+    const popFlow = () => { Q.nav.pop?.('night-case-case'); Q.nav.pop?.('night-case-new'); };
+    // «6 человек · идёт дело, окно 5» (mockup 1, «Твои компании»).
+    function companyLine(row) {
+        const people = plural(Number(row?.members) || 1, 'человек', 'человека', 'человек');
+        const state = !row || ['none', 'stopped'].includes(row.status) ? 'свободна'
+            : row.status === 'lobby' ? `сбор на дело, за столом ${row.players || 1}`
+            : row.status === 'running' ? `идёт дело, окно ${row.window?.idx || 1}`
+            : row.status === 'finished' ? 'дело закрыто' : row.status === 'interrupted' ? 'дело на паузе' : 'дело недоступно';
+        return `${people} · ${state}`;
+    }
+    // A case I sit in (mockup 1, «Твои дела»): the world cover with my hero's portrait, where it stands, «Вернуться».
+    function myCase(item, row, art) {
+        const look = row.hero?.look, count = Number(row.window?.count) || 14, idx = Number(row.window?.idx) || 1;
+        const where = row.status === 'lobby' ? `Сбор · за столом ${row.players || 1}`
+            : row.phase === 'frozen' ? `Окно ${idx} из ${count} · стол ждёт возвращения`
+            : row.phase === 'final_hearing' ? `Окно ${idx} из ${count} · итоговое слушание` : `Окно ${idx} из ${count}`;
+        const who = [look ? text(look.title) : row.status === 'lobby' ? 'персонаж не выбран' : null, item.title].filter(Boolean).join(' · ');
+        return [put(el('div', 'ncase-mycase'), put(el('span', 'art'), thumbImg(row.world, 'cover'), look ? artImage(art, look.art, 'ncase-face sm') : null),
+                put(el('div'), el('strong', null, row.case_title || 'Дело'), el('span', 'nc-muted', who),
+                    put(el('span', 'ncase-news'), icon(row.status === 'lobby' ? 'people' : 'moon'), where))),
+            kit.stack(button(row.status === 'lobby' ? 'Вернуться к сбору' : 'Вернуться в дело', () => enterRoom(item)))];
+    }
     async function entry() {
-        epoch++; game = null; room = null; view = null; proposal = null; tab = 'place';
+        epoch++; game = null; room = null; view = null; proposal = null; tab = 'place'; fresh = null;
         selectedOriginal = ''; clearHistory();
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); lookPick = null;
-        const [result, open] = await Promise.all([request('/api/guest/rooms'),
-            request('/api/guest/rooms/open').catch(() => null), kit.worldIndex?.()]);
-        if (!live()) return;
-        const rooms = panel('Твои компании', ...arr(result.items).map(item =>
-            button(item.title || 'Компания', () => enterRoom(item))));
-        if (!arr(result.items).length) rooms.append(p('Собери компанию и пригласи друзей. Играть можно от 3 до 12: сколько пришло, столько и играет, невзятых героев ведёт игра.'));
-        const title = field('Название компании');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); popFlow(); lookPick = null;
+        worldPack = null; kit.useWorld?.(null);
+        const generation = epoch;
+        const [result, open, mine] = await Promise.all([request('/api/guest/rooms'),
+            request('/api/guest/rooms/open').catch(() => null), request('/api/night-case/mine').catch(() => null), kit.worldIndex?.()]);
+        if (!live() || generation !== epoch) return;
+        const rooms = arr(result.items), cases = new Map(arr(mine?.items).map(row => [row.room_id, row]));
+        const playing = rooms.map(item => ({item, row: cases.get(item.id)})).filter(({row}) => row?.seated && ['lobby', 'running'].includes(row.status));
+        const arts = new Map(await Promise.all(playing.filter(({row}) => row.hero).map(async ({row}) => [row.room_id, await packArt(row.art, row.world)])));
+        if (!live() || generation !== epoch) return;
+        const mineCard = playing.length ? kit.panel({icon: 'story', title: 'Твои дела', count: String(playing.length)},
+            ...playing.flatMap(({item, row}) => myCase(item, row, arts.get(row.room_id)))) : null;
+        const list = el('ul', 'nc-list ncase-rows');
+        for (const item of rooms) {
+            const row = cases.get(item.id), action = button('Открыть', () => enterRoom(item));
+            action.classList.add('compact');
+            list.append(put(el('li'), thumbImg(row?.world || item.world), put(el('div'), el('span', 'ttl', item.title || 'Компания'),
+                el('span', 'meta', mine ? companyLine(row) : item.role === 'owner' ? 'ты хозяин' : 'ты участник')), action));
+        }
+        if (!rooms.length) list.append(put(el('li', 'nc-empty'), el('span', 'nc-muted', 'Собери компанию и пригласи друзей: «Новое дело» внизу. Играть можно от 3 до 12 — сколько пришло, столько и играет, невзятых героев ведёт игра.')));
         const code = field('Код или ссылка приглашения');
-        frame([kit.scene({shell: 'entry', size: 'tall', title: 'Ночной город', text: 'Детективные истории в разных мирах. Компания берёт дело и неделю живёт в нём: заходи, когда удобно, игра сама напишет, что случилось.'}), rooms,
-            open ? openTables(arr(open.items).filter(item => item.game === 'night_case')) : null,
-            panel('Новая компания', title.node, kit.stack(button('Создать', async () => {
-                const value = await mutate('/api/guest/rooms', {request_id: id(), title: title.input.value});
-                if (value) await enterRoom(value);
-            }))),
-            panel('Войти по приглашению', code.node, kit.stack(button('Войти', async () => {
-                const parsed = root.NightCity.parseInvite(code.input.value);
-                if (parsed?.roomId) return enterRoom({id: parsed.roomId, title: 'Компания'});
-                const token = parsed?.code || code.input.value.trim();
-                const params = /^[A-Za-z0-9_-]{43}$/.test(token) ? {invite_code: token} : {short_code: token};
-                const value = await mutate('/api/guest/rooms/join', params);
-                if (value) await enterRoom(value);
-            })))], 'Ночной город');
+        const join = kit.panel({icon: 'key', title: 'Войти по приглашению'}, code.node, kit.stack(button('Войти', async () => {
+            const parsed = root.NightCity.parseInvite(code.input.value);
+            if (parsed?.roomId) return enterRoom({id: parsed.roomId, title: 'Компания'});
+            const token = parsed?.code || code.input.value.trim();
+            const params = /^[A-Za-z0-9_-]{43}$/.test(token) ? {invite_code: token} : {short_code: token};
+            const value = await mutate('/api/guest/rooms/join', params);
+            if (value) await enterRoom(value);
+        })));
+        frame([kit.scene({shell: 'entry', size: 'tall', eyebrow: 'Детективы на неделю', title: 'Ночной город', text: 'Детективные истории в разных мирах. Компания берёт дело и неделю живёт в нём: заходи, когда удобно, игра сама напишет, что случилось.'}),
+            put(el('div', 'nc-col'), mineCard, join),
+            put(el('div', 'nc-col'), open ? openTables(arr(open.items).filter(item => item.game === 'night_case')) : null,
+                kit.panel({icon: 'table', title: 'Твои компании', count: rooms.length ? String(rooms.length) : ''}, list))],
+        'Ночной город', 'QuizzyWizzy', kit.dock({buttons: [button('Новое дело', () => showWorlds(null), 'primary')]}));
+    }
+    /* «Новое дело» (mockups 2–3): a world, then its case, then the company. `fresh.room` is set when an owner
+       picks a case for a company that already exists; otherwise the company is created with the lobby. */
+    const caseWorld = item => item.world || `case_${item.id}`;
+    const casesOf = world => arr(boot?.cases).filter(item => caseWorld(item) === world);
+    function showWorlds(target) {
+        fresh = {room: target, world: fresh?.world || null, name: fresh?.name || '', zone: fresh?.zone || null, adult: false, screen: 'worlds'};
+        popFlow();
+        Q.nav.push?.({id: 'night-case-new', onBack: () => { const back = fresh?.room; fresh = null; popFlow(); (back ? enterRoom(back) : entry()).catch(fail); return true; }});
+        return renderWorlds();
+    }
+    async function renderWorlds() {
+        const generation = epoch, index = await kit.worldIndex?.();
+        if (!live() || generation !== epoch || !fresh) return;
+        fresh.screen = 'worlds'; worldPack = null; kit.useWorld?.(null);
+        // Worlds of the index; a case whose world the index does not know still gets its own tile.
+        const worlds = arr(index?.worlds).map(row => ({...row}));
+        for (const item of arr(boot?.cases)) if (!worlds.some(row => row.id === caseWorld(item))) worlds.push({id: caseWorld(item), title: item.title, era: ''});
+        if (!casesOf(fresh.world).length) fresh.world = worlds.find(row => casesOf(row.id).length)?.id || null;
+        const grid = el('div', 'nc-worlds ncase-worlds');
+        for (const world of worlds) {
+            const count = casesOf(world.id).length, age = kit.worldAge?.(world.id, world.age) || 12, picked = world.id === fresh.world;
+            const url = kit.thumbUrl?.(world) || '';
+            const tile = put(el('button', `nc-world${count ? '' : ' soon'}`), url ? Object.assign(el('img'), {src: url, alt: ''}) : null,
+                age >= 16 ? el('span', 'w-tag', `${age}+`) : null, picked ? tick() : null,
+                put(el('span', 'w-copy'), el('span', 'w-name', world.title), world.era ? el('span', 'w-era', world.era) : null,
+                    el('span', 'w-cases', count ? plural(count, 'дело', 'дела', 'дел') : 'дела пишутся')));
+            tile.type = 'button';
+            if (picked) tile.setAttribute('aria-pressed', 'true');
+            if (count) tile.addEventListener('click', () => { if (fresh) { fresh.world = world.id; fresh.adult = false; renderWorlds(); } });
+            else { tile.setAttribute('aria-disabled', 'true'); tile.setAttribute('aria-label', `${world.title}: дела пишутся`); }
+            grid.append(tile);
+        }
+        const chosen = worlds.find(row => row.id === fresh.world), adultOnly = chosen && (kit.worldAge?.(chosen.id, chosen.age) || 12) >= 18;
+        const next = !chosen ? null : adultOnly && !fresh.adult
+            ? button('Мне есть 18', () => { fresh.adult = true; return showCase(); }, 'primary')
+            : button(`Дальше: ${chosen.title}`, () => showCase(), 'primary');
+        frame([kit.panel({cls: 'nc-span'}, el('p', 'nc-lead', 'Миры между собой не связаны: своё место, эпоха и правила о мистике. В каждом — свои дела на неделю.'), grid)],
+            'Выбери мир', 'Ночной город · новое дело',
+            kit.dock({hint: !chosen ? 'Дела пока недоступны' : adultOnly && !fresh.adult ? 'В этом мире есть сцены для взрослых' : '', buttons: next ? [next] : []}));
+    }
+    function showCase() {
+        Q.nav.pop?.('night-case-case');
+        Q.nav.push?.({id: 'night-case-case', onBack: () => { Q.nav.pop?.('night-case-case'); renderWorlds().catch(fail); return true; }});
+        return renderCase();
+    }
+    // The device (or account) zone; the picker opens only on «Изменить пояс» (mockup 4).
+    function zoneControl(zones) {
+        let deviceZone = root.QW?.prefs?.deviceTimezone?.() || 'UTC';
+        try { deviceZone = Intl.DateTimeFormat('en', {timeZone: deviceZone}).resolvedOptions().timeZone || deviceZone; } catch { deviceZone = 'UTC'; }
+        const stored = Object.hasOwn(boot || {}, 'account_timezone');
+        const preferredZone = stored ? (boot.account_timezone || deviceZone) : root.QW?.prefs?.resolvedTimezone?.() || deviceZone;
+        const zone = root.QW?.prefs?.timezonePicker?.({zones, selected: fresh?.zone || preferredZone, label: 'Часовой пояс окон', searchLabel: 'Найти часовой пояс окон', fieldClass: 'ncase-field'});
+        if (!zone) throw new Error('timezone_picker_unavailable');
+        const line = p(`Окна дела откроются по поясу ${zone.input.value || preferredZone}: он взят с твоего ${stored && boot.account_timezone ? 'аккаунта' : 'устройства'}.`);
+        zone.node.hidden = !fresh?.zone;
+        line.hidden = Boolean(fresh?.zone);
+        zone.input.addEventListener?.('change', () => { if (fresh) fresh.zone = zone.input.value; });
+        const change = kit.button('Изменить пояс', () => { zone.node.hidden = false; line.hidden = true; change.hidden = true; zone.search?.focus?.(); }, {kind: 'text', compact: true});
+        change.hidden = Boolean(fresh?.zone);
+        return {nodes: [line, put(el('div', 'qw-btn-row ncase-left'), change), zone.node], value: () => zone.input.value};
+    }
+    async function renderCase() {
+        if (!fresh) return;
+        const cases = casesOf(fresh.world), item = cases.find(row => `${row.id}:${row.version}` === fresh.key) || cases[0];
+        if (!item) return renderWorlds();
+        fresh.key = `${item.id}:${item.version}`; fresh.screen = 'case';
+        const generation = epoch;
+        const [pack, art] = await Promise.all([item.world && kit.loadPack ? kit.loadPack(item.world) : null, packArt(item.art, item.world)]);
+        if (!live() || generation !== epoch || !fresh) return;
+        if (pack) { worldPack = pack; kit.useWorld(pack); }
+        const entry = kit.worldEntry?.(item.world);
+        const facts = put(el('div', 'ncase-facts'), item.players ? kit.tag(`${item.players.min}–${item.players.max} игроков`, {icon: 'people'}) : null,
+            kit.tag('неделя: утро и вечер', {icon: 'calendar'}));
+        const heroes = arr(item.heroes), npcs = arr(item.npc_heroes);
+        const cast = heroes.length ? kit.panel({icon: 'people', title: 'Действующие лица', count: String(heroes.length)},
+            p('Каждый выбирает себе персонажа. Кого не взяли, ведёт игра. Кто на чьей стороне, решит правда дела при старте.'),
+            put(el('ul', 'ncase-castgrid'), ...heroes.map(hero => put(el('li'), artImage(art, arr(hero.looks)[0]?.art), el('span', 'nm', hero.title)))),
+            npcRow({npc_heroes: npcs}, art)) : null;
+        const step = (slot, title, body) => put(el('li'), Object.assign(el('img'), {src: kit.sceneUrl?.({slot, time: slot === 'night' ? 'night' : 'day', shell: 'table'}) || '', alt: ''}),
+            put(el('div'), el('strong', null, title), el('span', null, body)));
+        const how = kit.panel({icon: 'story', title: 'Как идёт дело'}, put(el('ol', 'ncase-how'),
+            step('day', 'Ходи по местам дела', 'Утром и вечером открывается окно. Переход и осмотр тратят его действия.'),
+            step('night', 'Находи улики', 'Находки видишь только ты, пока не выложишь их на доску дела.'),
+            step('vote', 'Докажи на слушании', 'В конце недели каждый называет виновного и прикладывает улики.')));
+        const zone = zoneControl(arr(item.timezones));
+        const name = fresh.room ? null : field('Название компании', fresh.name);
+        name?.input.addEventListener('input', () => { if (fresh) fresh.name = name.input.value; });
+        const company = kit.panel({icon: 'table', title: fresh.room ? `Компания «${fresh.room.title || 'Компания'}»` : 'Твоя компания'},
+            name ? name.node : null, name ? p('Компания — твои друзья по делу. Пригласишь их ссылкой из сбора.') : null, ...zone.nodes);
+        const start = async () => {
+            if (!fresh) return;
+            if (!fresh.room && !name.input.value.trim()) { notice = 'Дай компании название.'; return renderCase(); }
+            // A created company stays the target: a retry after a failed lobby does not create a second one.
+            if (!fresh.room) fresh.room = await mutate('/api/guest/rooms', {request_id: id(), title: name.input.value}) || null;
+            const target = fresh?.room;
+            if (!target || !live()) return;
+            const result = await mutate(`/api/rooms/${encodeURIComponent(target.id)}/night-case/lobby`, {command_id: id(), expected_lobby_revision: 0,
+                params: {case_id: item.id, case_version: item.version, timezone: zone.value()}});
+            if (!result?.view || !live()) return;
+            fresh = null; popFlow(); room = target; game = result.view.game_id;
+            Q.nav.push?.({id: 'night-case-room', onBack: () => { entry().catch(fail); return true; }});
+            await refresh();
+        };
+        frame([kit.scene({slot: 'cover', size: 'tall', eyebrow: [entry?.title, entry?.era].filter(Boolean).join(' · ') || 'Дело недели', title: item.title, text: item.summary || '', body: [facts]}),
+            put(el('div', 'nc-col'), cast), put(el('div', 'nc-col'), how, company)],
+        item.title, `${entry?.title || 'Ночной город'} · дело`, kit.dock({buttons: [button(fresh.room ? 'Начать сбор' : 'Собрать компанию', start, 'primary')]}));
     }
     // Open lobbies of other companies: look at the table without a code; the hero is chosen in the lobby.
     function openTables(items) {
@@ -613,8 +772,8 @@ function open(options) {
             list.append(put(el('li'), thumb ? Object.assign(el('img', 'thumb'), {src: thumb, alt: ''}) : el('span'),
                 put(el('div'), el('span', 'ttl', table.title || 'Компания'), el('span', 'meta', meta)), action));
         }
-        if (!items.length) list.append(put(el('li', 'nc-empty'), el('span'), el('span', 'nc-muted', 'Открытых сборов сейчас нет. Хозяин стола открывает сбор в карточке «Пригласить».')));
-        return panel('Открытые сборы', list);
+        if (!items.length) list.append(put(el('li', 'nc-empty'), el('span', 'nc-muted', 'Открытых сборов сейчас нет. Хозяин стола открывает сбор в карточке «Пригласить».')));
+        return kit.panel({icon: 'people', title: 'Открытые сборы', count: items.length ? String(items.length) : ''}, list);
     }
     async function joinOpen(table, control, adult = false) {
         if (!adult && (Number(table.world_age) || 0) >= 18) {
@@ -647,29 +806,9 @@ function open(options) {
     }
     function renderRoom() {
         if (room?.role !== 'owner') return frame([panel(room?.title || 'Компания', p('Хозяин компании ещё не начал сбор на дело. Когда начнёт, здесь можно будет присоединиться.'), kit.row(button('Проверить', () => enterRoom(room))))], room?.title || 'Компания');
-        const cases = arr(boot?.cases);
-        if (!cases.length) return frame([panel('Дело пока недоступно', p('Проверенные дела ещё не открыты для этой компании.'))], room?.title || 'Компания');
-        const choice = choose('Дело', cases.map(item => ({id: `${item.id}:${item.version}`, label: item.title})), selectedCase);
-        const zones = [...new Set(cases.flatMap(item => arr(item.timezones)))].sort();
-        let deviceZone = root.QW?.prefs?.deviceTimezone?.() || 'UTC';
-        try { deviceZone = Intl.DateTimeFormat('en', {timeZone: deviceZone}).resolvedOptions().timeZone || deviceZone; } catch { deviceZone = 'UTC'; }
-        const preferredZone = Object.hasOwn(boot || {}, 'account_timezone')
-            ? (boot.account_timezone || deviceZone)
-            : root.QW?.prefs?.resolvedTimezone?.() || deviceZone;
-        const zone = root.QW?.prefs?.timezonePicker?.({zones, selected: preferredZone, label: 'Часовой пояс окон', searchLabel: 'Найти часовой пояс окон', fieldClass: 'ncase-field'});
-        if (!zone) throw new Error('timezone_picker_unavailable');
-        // Mockup 4: the zone comes from the device (or the account); the picker opens only on «Изменить пояс».
-        const zoneLine = p(`Окна дела откроются по поясу ${zone.input.value || preferredZone}: он взят с твоего ${Object.hasOwn(boot || {}, 'account_timezone') && boot.account_timezone ? 'аккаунта' : 'устройства'}.`);
-        zone.node.hidden = true;
-        const change = kit.button('Изменить пояс', () => { zone.node.hidden = false; zoneLine.hidden = true; change.hidden = true; zone.search?.focus?.(); }, {kind: 'text', compact: true});
-        frame([kit.scene({shell: 'rooms', title: room.title || 'Компания', text: 'Выбери дело. Каждый в компании отдельно присоединяется к сбору.'}),
-            panel('Начать сбор игроков', choice.node, zoneLine, put(el('div', 'qw-btn-row ncase-left'), change), zone.node, kit.stack(button('Создать стол', async () => {
-                selectedCase = choice.input.value;
-                const selected = cases.find(item => `${item.id}:${item.version}` === selectedCase);
-                const result = await mutate(`/api/rooms/${encodeURIComponent(room.id)}/night-case/lobby`, {command_id: id(), expected_lobby_revision: 0,
-                    params: {case_id: selected.id, case_version: selected.version, timezone: zone.input.value}});
-                if (result?.view) { game = result.view.game_id; await refresh(); }
-            }, 'primary')))], room.title || 'Компания');
+        if (!arr(boot?.cases).length) return frame([panel('Дело пока недоступно', p('Проверенные дела ещё не открыты для этой компании.'))], room?.title || 'Компания');
+        frame([kit.scene({shell: 'rooms', title: room.title || 'Компания', text: 'У компании сейчас нет дела. Выбери мир и дело — каждый в компании потом сам присоединяется к сбору.'})],
+            room.title || 'Компания', 'Ночной город', kit.dock({buttons: [button('Новое дело', () => showWorlds(room), 'primary')]}));
     }
     async function lobbyCommand(path, params = {}) {
         const result = await mutate(api(path), {command_id: id(), expected_lobby_revision: view.lobby.lobby_revision, params});
@@ -725,11 +864,11 @@ function open(options) {
         const end = mine ? kit.tag('ты здесь', {tone: 'amber'}) : data.self_seat && !ownSeat(data)?.ready ? kit.button('Сесть', () => takeSeat(null).catch(fail), {compact: true, disabled: outbox.busy}) : null;
         return put(el('div', 'ncase-anyseat'), image, put(el('div'), el('strong', null, 'Любое свободное место'), el('span', 'nc-muted', ['Персонажа выберет игра при старте.', who].filter(Boolean).join(' '))), end);
     }
-    function npcRow(data) {
+    function npcRow(data, map = assets) {
         const npcs = arr(data.npc_heroes);
         if (!npcs.length) return null;
         const faces = put(el('span', 'faces'), ...npcs.map(row => {
-            const art = assets.get(row.art?.asset_id);
+            const art = map.get(row.art?.asset_id);
             if (!art) return put(el('span', 'ncase-face xs blank'), icon('people'));
             const image = el('img', 'ncase-face xs'); image.src = art.url; image.alt = ''; image.loading = 'lazy'; return image;
         }));
@@ -1380,6 +1519,8 @@ function open(options) {
         if (!live()) return;
         menu();
         if (!view) {
+            // «Новое дело» redraws its own step (a notice, «отправляем…»); a failing step leaves the flow.
+            if (fresh && !game) { (fresh.screen === 'case' ? renderCase() : renderWorlds()).catch(error => { fresh = null; fail(error); }); return; }
             if (game) frame([panel('Связь с твоим делом', p('Чтение партии пока недоступно. Её состояние хранится на сервере.'), kit.row(button('Обновить', refresh)))]);
             else if (room) renderRoom();
             return;
@@ -1430,10 +1571,10 @@ function open(options) {
     function close() {
         if (!alive) return;
         alive = false; epoch++; controller.abort(); clearInterval(poll); timer?.stop();
-        view = proposal = room = game = boot = invitation = null; ownDraft = ''; recipients = [];
+        view = proposal = room = game = boot = invitation = fresh = null; ownDraft = ''; recipients = [];
         outbox.clear(); cursors.clear(); for (const page of Object.values(pages)) page.items.length = 0;
         assets.clear(); assetWorld = null; worldPack = null;
-        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); kit.useWorld(null); document.documentElement.classList.remove('nc');
+        Q.nav.pop?.('night-case-room'); Q.nav.pop?.('night-case-section'); Q.nav.pop?.('night-case-pick'); popFlow(); kit.useWorld(null); document.documentElement.classList.remove('nc');
     }
     active = {close, refresh};
     document.documentElement.classList.add('nc');

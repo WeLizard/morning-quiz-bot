@@ -148,6 +148,10 @@ def register_night_case_routes(app, *, principal, identity_for, read_body,
             return JSONResponse({'enabled': False, 'cases': []}, headers={'Cache-Control': 'no-store'})
         return await invoke(request, identity, 'list_cases')
 
+    @app.get('/api/night-case/mine')
+    async def mine(request: Request, identity: str | None = Query(None)):
+        return await invoke(request, identity, 'my_cases')
+
     @app.get('/api/rooms/{room_id}/night-case/current')
     async def current(request: Request, room_id: str, identity: str | None = Query(None)):
         return await invoke(request, identity, 'room_game', room_id=room_id)

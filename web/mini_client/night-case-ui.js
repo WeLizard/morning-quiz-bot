@@ -20,6 +20,9 @@ function playerView(value) {
     safe.public.removals = arr(value?.public?.chronicle).filter(entry => entry?.kind === 'hearing' && entry.payload?.stage === 'closed' && entry.payload?.resolution === 'wrong')
         .map(entry => ({window_idx: entry.window_idx, suspect: entry.payload.suspect}));
     safe.public.chronicle_count = arr(value?.public?.chronicle).length;
+    // The window in which each board record was published (screen 10 signs it «герой · игрок · окно N»).
+    safe.public.board_windows = Object.fromEntries(arr(value?.public?.chronicle).filter(entry => entry?.kind === 'board' && entry.payload?.board_id)
+        .map(entry => [entry.payload.board_id, entry.window_idx]));
     safe.self = value?.self ? pick(value.self, ['account_id', 'character_id', 'role', 'status', 'location', 'ap', 'actor_seq', 'faction', 'goal', 'secrets', 'truth', 'observations', 'nearby', 'personal', 'communication', 'modules', 'postmortem', 'finished_window', 'final_ballot']) : null;
     // Screen 8 shows the answer of a talk: only the results of the viewer's own actions leave the private events.
     if (safe.self) safe.self.results = arr(value.self.private_events).filter(event => event?.kind === 'action_result')
@@ -1418,46 +1421,70 @@ function open(options) {
         record.className += ` ncase-evi${claim ? ' claim-card' : ''}`;
         return record;
     }
+    // Screen 10 «Улики»: the board of the case on the left (what the table has published, signed «герой · игрок · окно»),
+    // on the right the own finds with «Опубликовать», the accusation and a new version.
     function board() {
         const all = [...arr(view.public.observations), ...arr(view.self.observations)], observations = new Map(all.map(item => [item.observation_id, item]));
-        const playerName = account => arr(view.public.players).find(row => row.account_id === account)?.name;
+        const signed = account => {
+            const char = charOfAccount(account), seat = arr(view.public.players).find(row => row.account_id === account);
+            return [char ? heroTitle(char) : null, account === view.self.account_id ? 'ты' : seat ? seatName(seat) : null].filter(Boolean).join(' · ');
+        };
+        const windowOf = row => view.public.board_windows?.[row.id];
         // One card per published observation: a second publisher is a name on it, not a second copy.
         const groups = new Map();
         for (const row of arr(view.public.board)) {
             const key = row.observation_id ? `obs:${row.observation_id}` : `row:${row.id}`;
             if (!groups.has(key)) groups.set(key, {row, owners: []});
-            const owner = row.owner_account_id === view.self.account_id ? 'ты' : playerName(row.owner_account_id);
+            const owner = signed(row.owner_account_id);
             if (owner && !groups.get(key).owners.includes(owner)) groups.get(key).owners.push(owner);
         }
         const publicItems = [...groups.values()].map(({row, owners}) => {
+            const when = windowOf(row) ? `окно ${windowOf(row)}` : '';
+            if (row.kind === 'claim') return evidenceCard({kind: 'claim', title: text(row.text) || 'Версия игрока'}, ['Версия: ' + (owners.join(', ') || 'игрок'), when].filter(Boolean).join(' · '));
             const observation = row.observation || observations.get(row.observation_id);
-            const by = owners.length ? `Опубликовал${owners.length > 1 ? 'и' : ''}: ${owners.join(', ')}` : 'Опубликовано на доске';
-            return observation ? evidenceCard(observation, by) : evidenceCard({kind: row.kind, title: row.kind === 'claim' ? 'Версия игрока' : 'Улика', text: row.text}, by);
+            const by = [owners.join(', ') || 'Опубликовано на доске', when].filter(Boolean).join(' · ');
+            return observation ? evidenceCard(observation, by) : evidenceCard({kind: row.kind, title: 'Улика', text: row.text}, by);
         });
         const onBoard = new Set(arr(view.public.board).map(row => row.observation_id).filter(Boolean));
         const lost = new Set(arr(view.self.personal?.lost_observations));
+        // A short button in the card names the find for screen readers and in the confirmation.
+        const publish = (row, short, full) => {
+            const node = kit.button(`${short}${row.quote.cost ? ` · ${row.quote.cost} ОД` : ''}`, () => Promise.resolve(selectAction(row, full)).catch(fail),
+                {kind: 'secondary', compact: true, disabled: outbox.busy});
+            node.setAttribute('aria-label', full);
+            return node;
+        };
         const personal = arr(view.self.observations).map(item => {
+            const title = item.title || 'улика';
             const actions = choiceList().filter(row => ['pin', 'ghost_share'].includes(row.quote.kind) && row.quote.params.observation_id === item.observation_id)
-                .map(row => actionButton(row, row.quote.kind === 'pin' ? `${onBoard.has(item.observation_id) ? 'Подтвердить от себя' : 'Опубликовать'}: ${item.title || 'улика'}` : `${row.label}: ${item.title || 'воспоминание'}`));
-            const passed = item.source?.kind === 'ghost' ? `Передано лично от ${heroAs(item.source.actor_character, 'gen')} — ${mystic() ? 'призрака дела' : 'выбывшего из дела'}.` : '';
-            const source = lost.has(item.observation_id) ? 'Твоя находка. Оригинала больше нет: от него остался пепел. Записанное тобой — всё, что от него осталось.'
-                : passed ? `${passed}${onBoard.has(item.observation_id) ? ' Эта улика уже на доске.' : ''}`
-                : onBoard.has(item.observation_id) ? 'Твоя находка. Эта улика уже на доске.' : 'Твоя находка';
-            return evidenceCard(item, source, actions);
+                .map(row => row.quote.kind === 'pin'
+                    ? publish(row, onBoard.has(item.observation_id) ? 'Подтвердить от себя' : 'Опубликовать', `${onBoard.has(item.observation_id) ? 'Подтвердить от себя' : 'Опубликовать'}: ${title}`)
+                    : publish(row, row.label, `${row.label}: ${item.title || 'воспоминание'}`));
+            const source = item.source || {};
+            const where = source.kind === 'ghost' ? `Передано лично от ${heroAs(source.actor_character, 'gen')} — ${mystic() ? 'призрака дела' : 'выбывшего из дела'}`
+                : [source.location ? placeName(source.location) : null, source.window_idx ? `окно ${source.window_idx}` : null].filter(Boolean).join(' · ') || 'Твоя находка';
+            const state = lost.has(item.observation_id) ? 'Оригинала больше нет: от него остался пепел. Записанное тобой — всё, что от него осталось.'
+                : onBoard.has(item.observation_id) ? 'Уже на доске.' : '';
+            return evidenceCard(item, [where, state].filter(Boolean).join(' · '), actions);
         });
         const theories = arr(view.public.modules?.version_archive?.theories).map(item => card('story', item.title, item.state === 'archived' ? 'в архиве' : 'активная', p(bodyText(item.body)), item.state === 'archived' ? p('Версия в архиве; её источники сохранены.') : null,
             kit.row(...choiceList().filter(row => row.quote.kind === 'version_mark' && row.quote.params.version_id === item.id).map(row => actionButton(row, item.state === 'archived' ? `Вернуть версию: ${item.title}` : `В архив: ${item.title}`)))));
         const claimForm = formList().find(row => row.command_kind === 'claim');
         const draft = field('Твоя версия для доски', '', true);
+        draft.input.className = 'nc-field ncase-draft'; draft.input.rows = 3;
+        draft.input.placeholder = 'Например: ключ панели выдавали по журналу — сверить с распиской';
+        const left = kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value})));
+        left.classList?.add('ncase-left');
+        const column = (...children) => put(el('div', 'nc-col'), ...children.flat().filter(Boolean));
         return [...hearings(),
-            card('lens', 'Доска дела', publicItems.length ? plural(publicItems.length, 'запись', 'записи', 'записей') : '',
+            column(card('lens', 'Доска дела', publicItems.length ? plural(publicItems.length, 'запись', 'записи', 'записей') : '',
                 el('p', 'nc-muted', 'Для обвинения нужны опубликованные доказательства. Слова игроков, версии и показания остаются утверждениями.'),
-                ...(publicItems.length ? publicItems : [p('Доска пока пуста. Опубликованная находка появится здесь для всех за столом.')])),
-            card('papers', 'Твои находки', 'видишь только ты',
+                ...(publicItems.length ? publicItems : [p('Доска пока пуста. Опубликованная находка появится здесь для всех за столом.')]))),
+            column(card('papers', 'Твои находки', 'видишь только ты',
                 ...(personal.length ? personal : [p('Пока нет. Находки появляются после осмотров и разговоров; до публикации их не видит никто.')])),
-            ...hearings(['accuse']),
-            ...(claimForm ? [card('story', 'Добавить версию', '', draft.node, kit.row(button('Опубликовать версию', () => command('claim', {text: draft.input.value}))))] : []),
-            ...testimony(), ...signsSeen(), ...theories];
+                ...hearings(['accuse']),
+                claimForm ? card('story', 'Добавить версию', '', draft.input, left) : null,
+                ...testimony(), ...signsSeen(), ...theories)];
     }
     // Questions to removed players: public, answered «да» or «нет»; the answer is a claim, never evidence.
     function testimony() {

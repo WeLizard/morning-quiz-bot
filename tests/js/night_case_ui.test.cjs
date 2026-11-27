@@ -514,8 +514,10 @@ test('publish buttons name the evidence, a second publication is one card and ow
     const fixture = controller(state, url => url.includes('/history?stream=messages') ? {items: [{id: 'm1', sender_account_id: VIEWER, channel: 'square', text: 'Привет'}], next_cursor: null} : undefined);
     await settle();
     await button(fixture.host, 'Улики').click(); await settle();
-    assert.ok(button(fixture.host, 'Подтвердить от себя: Записка у камина'));
-    assert.ok(button(fixture.host, 'Опубликовать: Черновик'));
+    const named = label => find(fixture.host, node => node.tagName === 'button' && node.attrs?.['aria-label'] === label);
+    assert.ok(named('Подтвердить от себя: Записка у камина'));
+    assert.ok(named('Опубликовать: Черновик'));
+    assert.ok(button(fixture.host, 'Опубликовать') && button(fixture.host, 'Подтвердить от себя'), 'the card button is short');
     assert.equal(button(fixture.host, 'Опубликовать улику'), undefined);
     assert.equal(fixture.host.textContent.split('Текст записки').length - 1, 2, 'one board card plus the own find');
     assert.match(fixture.host.textContent, /Оригинала больше нет/);
@@ -1261,5 +1263,32 @@ test('«Досье» keeps the personal events by window; the feed does not show
     assert.match(fixture.host.textContent, /Твои события.*Окно 3.*Находка: «Шарф врача»/);
     await button(fixture.host, 'Гостиная').click(); await settle();
     assert.doesNotMatch(fixture.host.textContent, /Находка: «Шарф врача»/);
+    fixture.handle.close();
+});
+
+test('screen 10: the board on the left signed «герой · игрок · окно», own finds with a short «Опубликовать» on the right', async () => {
+    const state = feedState();
+    state.public.board.push({id: 'b2', owner_account_id: 'a2', kind: 'claim', observation_id: null, text: 'Хозяин ушёл по льду'});
+    state.public.chronicle.push({event_id: 'e-b1', kind: 'board', window_idx: 4, payload: {board_id: 'b1'}}, {event_id: 'e-b2', kind: 'board', window_idx: 5, payload: {board_id: 'b2'}});
+    state.self.observations = [{observation_id: 'key', kind: 'proof', title: 'Ключ сервисной панели', body: {text: 'Бирка старой мастерской'},
+        source: {kind: 'action', location: 'library', window_idx: 3}}, {...state.public.observations[0], source: {kind: 'action', location: 'library', window_idx: 2}}];
+    state.menu.push(choice('pin', 'Опубликовать улику', {observation_id: 'key'}, 1));
+    state.menu.push({kind: 'form', command_kind: 'claim', label: 'Версия'});
+    const fixture = controller(state);
+    await settle();
+    await button(fixture.host, 'Улики').click(); await settle();
+    const walk = node => [node, ...(node.children || []).filter(child => child && child.children).flatMap(walk)];
+    const columns = walk(fixture.host).filter(node => node.className === 'nc-col');
+    assert.equal(columns.length, 2, 'two columns as on the mockup');
+    assert.match(columns[0].textContent, /Доска дела.*Шарф врача.*Горничная · Кира · окно 4/);
+    assert.match(columns[0].textContent, /Утверждение.*Хозяин ушёл по льду.*Версия: Адвокат · Олег · окно 5/);
+    assert.match(columns[1].textContent, /Твои находки.*Ключ сервисной панели.*Библиотека · окно 3/);
+    assert.match(columns[1].textContent, /Шарф врача.*Библиотека · окно 2 · Уже на доске\./);
+    assert.match(columns[1].textContent, /Добавить версию.*Опубликовать версию/);
+    const publish = find(fixture.host, node => node.tagName === 'button' && node.attrs?.['aria-label'] === 'Опубликовать: Ключ сервисной панели');
+    assert.match(publish.textContent, /^Опубликовать · 1 ОД$/);
+    await publish.click(); await settle();
+    const dock = find(fixture.host, node => node.className === 'nc-dock');
+    assert.match(dock.textContent, /Опубликовать: Ключ сервисной панели · 1 действие из 3/);
     fixture.handle.close();
 });
